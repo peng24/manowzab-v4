@@ -132,13 +132,13 @@ function updateAwayTimer() {
 onMounted(() => {
   console.log("🚀 App mounted");
 
-  // Initialize Nickname Listener
+  // ✅ Initialize Nickname Listener ทันที
   nicknameStore.initNicknameListener();
 
-  // Initialize connections
+  // ✅ Initialize Firebase connections ทันที
   stockStore.connectToStock("demo");
 
-  // Listen to Firebase connection status
+  // ✅ Listen to Firebase connection status ทันที
   const connectedRef = dbRef(db, ".info/connected");
   onValue(connectedRef, (snap) => {
     if (snap.val() === true) {

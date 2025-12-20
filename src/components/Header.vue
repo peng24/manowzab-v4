@@ -5,23 +5,26 @@
       <div class="status-cluster">
         <span
           :class="['status-item', systemStore.statusDb]"
-          title="สถานะฐานข้อมูล"
+          :title="getStatusTitle('db')"
         >
           <i class="fa-solid fa-database"></i>
         </span>
         <span
           :class="['status-item', systemStore.statusApi]"
-          title="สถานะ YouTube API"
+          :title="getStatusTitle('api')"
         >
           <i class="fa-brands fa-youtube"></i>
         </span>
         <span
           :class="['status-item', systemStore.statusChat]"
-          title="สถานะการดึงแชท"
+          :title="getStatusTitle('chat')"
         >
           <i class="fa-solid fa-comments"></i>
         </span>
-        <span class="key-indicator" title="API Key">
+        <span
+          class="key-indicator"
+          :title="`กำลังใช้ API Key #${systemStore.currentKeyIndex + 1}`"
+        >
           <i class="fa-solid fa-key"></i> {{ systemStore.currentKeyIndex + 1 }}
         </span>
       </div>
@@ -75,44 +78,37 @@
 
       <!-- Tools Dropdown -->
       <div class="dropdown" ref="dropdownRef">
-        <button class="btn btn-sim" @click="toggleDropdown">
+        <button class="btn btn-sim" @click.stop="toggleDropdown">
           ⚡ Tools <i class="fa-solid fa-caret-down"></i>
         </button>
 
-        <!-- ✅ Portal to body for proper z-index -->
-        <Teleport to="body">
-          <div
-            v-if="showDropdown"
-            class="dropdown-content"
-            :style="dropdownStyle"
-            @click.stop
-          >
-            <a @click="downloadCSV">
-              <i class="fa-solid fa-file-csv"></i> บันทึกแชท (CSV)
-            </a>
-            <a @click="testVoice">
-              <i class="fa-solid fa-volume-high"></i> ทดสอบเสียง
-            </a>
-            <a @click="toggleFullScreen">
-              <i class="fa-solid fa-expand"></i> เต็มจอ (iPad)
-            </a>
-            <a @click="toggleAwayMode">
-              <i class="fa-solid fa-moon"></i> โหมดพาลูกนอน
-            </a>
-            <a @click="toggleSimulation">
-              <i
-                :class="isSimulating ? 'fa-solid fa-stop' : 'fa-solid fa-bolt'"
-              ></i>
-              {{ isSimulating ? "หยุดจำลอง" : "เริ่มจำลองแชท" }}
-            </a>
-            <a @click="askAiKey">
-              <i class="fa-solid fa-key"></i> ตั้งค่า API Key
-            </a>
-            <a @click="forceUpdate" style="color: #00e676">
-              <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
-            </a>
-          </div>
-        </Teleport>
+        <!-- ✅ ใช้ v-show แทน Teleport -->
+        <div v-show="showDropdown" class="dropdown-content" @click.stop>
+          <a @click="downloadCSV">
+            <i class="fa-solid fa-file-csv"></i> บันทึกแชท (CSV)
+          </a>
+          <a @click="testVoice">
+            <i class="fa-solid fa-volume-high"></i> ทดสอบเสียง
+          </a>
+          <a @click="toggleFullScreen">
+            <i class="fa-solid fa-expand"></i> เต็มจอ (iPad)
+          </a>
+          <a @click="toggleAwayMode">
+            <i class="fa-solid fa-moon"></i> โหมดพาลูกนอน
+          </a>
+          <a @click="toggleSimulation">
+            <i
+              :class="isSimulating ? 'fa-solid fa-stop' : 'fa-solid fa-bolt'"
+            ></i>
+            {{ isSimulating ? "หยุดจำลอง" : "เริ่มจำลองแชท" }}
+          </a>
+          <a @click="askAiKey">
+            <i class="fa-solid fa-key"></i> ตั้งค่า API Key
+          </a>
+          <a @click="forceUpdate" style="color: #00e676">
+            <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
+          </a>
+        </div>
       </div>
     </div>
 
@@ -160,7 +156,6 @@ const isSimulating = ref(false);
 const isConnecting = ref(false);
 const shippingData = ref({});
 const dropdownRef = ref(null);
-const dropdownStyle = ref({});
 let simIntervalId = null;
 
 // ✅ คำนวณจำนวนลูกค้าที่พร้อมส่ง
@@ -179,43 +174,48 @@ const shippingCount = computed(() => {
   ).length;
 });
 
-// ✅ Toggle Dropdown with positioning
+// ✅ ฟังก์ชันแสดง Title ของ Status
+function getStatusTitle(type) {
+  const titles = {
+    db: {
+      ok: "✅ เชื่อมต่อ Firebase สำเร็จ",
+      warn: "⚠️ Firebase มีปัญหา",
+      err: "❌ ไม่สามารถเชื่อมต่อ Firebase",
+    },
+    api: {
+      ok: "✅ YouTube API พร้อมใช้งาน",
+      warn: "⚠️ API Key ใกล้หมด Quota",
+      err: "❌ YouTube API ไม่สามารถใช้งาน",
+    },
+    chat: {
+      ok: "✅ กำลังดึงแชทสด",
+      warn: "⚠️ แชทมีปัญหา",
+      err: "❌ ไม่สามารถดึงแชท",
+    },
+  };
+
+  const status =
+    type === "db"
+      ? systemStore.statusDb
+      : type === "api"
+      ? systemStore.statusApi
+      : systemStore.statusChat;
+
+  return titles[type][status] || "ไม่ทราบสถานะ";
+}
+
+// ✅ Toggle Dropdown
 function toggleDropdown(event) {
   event.preventDefault();
   event.stopPropagation();
-
   showDropdown.value = !showDropdown.value;
-
-  if (showDropdown.value && dropdownRef.value) {
-    // Calculate position
-    setTimeout(() => {
-      const button = dropdownRef.value.querySelector(".btn-sim");
-      if (button) {
-        const rect = button.getBoundingClientRect();
-        dropdownStyle.value = {
-          position: "fixed",
-          top: `${rect.bottom + 8}px`,
-          right: `${window.innerWidth - rect.right}px`,
-          zIndex: 9999,
-        };
-      }
-    }, 10);
-  }
-
   console.log("🔽 Dropdown:", showDropdown.value);
 }
 
 // ✅ Close dropdown when clicking outside
 function handleClickOutside(event) {
-  if (!showDropdown.value) return;
-
-  const dropdown = document.querySelector(".dropdown-content");
-  if (
-    dropdown &&
-    !dropdown.contains(event.target) &&
-    dropdownRef.value &&
-    !dropdownRef.value.contains(event.target)
-  ) {
+  if (!dropdownRef.value) return;
+  if (!dropdownRef.value.contains(event.target)) {
     showDropdown.value = false;
   }
 }
@@ -224,10 +224,9 @@ function handleClickOutside(event) {
 function toggleAI() {
   const newState = !systemStore.isAiCommander;
 
-  update(
-    dbRef(db, "system/aiCommander"),
-    newState ? systemStore.myDeviceId : null
-  )
+  update(dbRef(db, "system/aiCommander"), {
+    enabled: newState ? systemStore.myDeviceId : null,
+  })
     .then(() => {
       systemStore.isAiCommander = newState;
       queueSpeech(newState ? "เปิด AI Commander" : "ปิด AI Commander");
@@ -242,6 +241,7 @@ async function toggleConnection() {
   if (systemStore.isConnected) {
     disconnect();
     systemStore.isConnected = false;
+    systemStore.statusChat = "err";
     queueSpeech("หยุดการเชื่อมต่อ");
     return;
   }
@@ -265,6 +265,7 @@ async function toggleConnection() {
     const success = await connectVideo(videoId.value);
 
     if (success) {
+      systemStore.statusChat = "ok";
       queueSpeech("เชื่อมต่อสำเร็จ กำลังอ่านคอมเมนต์");
       Swal.fire({
         icon: "success",
@@ -274,6 +275,7 @@ async function toggleConnection() {
         showConfirmButton: false,
       });
     } else {
+      systemStore.statusChat = "warn";
       Swal.fire({
         icon: "info",
         title: "เชื่อมต่อวิดีโอแล้ว",
@@ -284,6 +286,8 @@ async function toggleConnection() {
   } catch (error) {
     console.error("Connection error:", error);
     systemStore.isConnected = false;
+    systemStore.statusApi = "err";
+    systemStore.statusChat = "err";
     Swal.fire({
       icon: "error",
       title: "เชื่อมต่อไม่สำเร็จ",
@@ -348,7 +352,6 @@ function toggleAwayMode() {
   const awayRef = dbRef(db, "system/awayMode");
 
   if (!currentState) {
-    // เปิดโหมดพาลูกนอน
     set(awayRef, {
       isAway: true,
       startTime: Date.now(),
@@ -356,35 +359,18 @@ function toggleAwayMode() {
     })
       .then(() => {
         console.log("✅ Away mode enabled");
-
-        // ไม่ต้องพูดที่นี่ เพราะจะพูดใน App.vue listener
-
         Swal.fire({
           icon: "info",
           title: "โหมดพาลูกนอน",
-          html: `
-            <p style="margin: 10px 0;">ระบบจะประกาศข้อความอัตโนมัติ:</p>
-            <ul style="text-align: left; padding-left: 20px;">
-              <li>แจ้งเปิดโหมดทันที</li>
-              <li>แจ้งเตือนทุก 2 นาที</li>
-              <li>ซิงค์ไปทุกเครื่อง</li>
-            </ul>
-          `,
-          timer: 3000,
+          text: "ระบบจะซิงค์ไปทุกเครื่อง",
+          timer: 2000,
           showConfirmButton: false,
         });
       })
       .catch((err) => {
         console.error("Away mode error:", err);
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: "ไม่สามารถเปิดโหมดได้",
-          timer: 2000,
-        });
       });
   } else {
-    // ปิดโหมดพาลูกนอน
     set(awayRef, {
       isAway: false,
       startTime: null,
@@ -392,16 +378,9 @@ function toggleAwayMode() {
     })
       .then(() => {
         console.log("✅ Away mode disabled");
-        // ไม่ต้องพูดที่นี่ เพราะจะพูดใน App.vue listener
       })
       .catch((err) => {
         console.error("Away mode error:", err);
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: "ไม่สามารถปิดโหมดได้",
-          timer: 2000,
-        });
       });
   }
 

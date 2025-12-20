@@ -10,6 +10,11 @@
 
       <button class="btn btn-dark" @click="resetVoice">🔇 Reset</button>
 
+      <!-- ✅ ปุ่มบันทึกแชท -->
+      <button class="btn btn-success" @click="downloadCSV">
+        <i class="fa-solid fa-file-csv"></i> CSV
+      </button>
+
       <div style="margin-left: auto; display: flex; gap: 2px">
         <button class="btn btn-dark" @click="adjustZoom(-2)">A-</button>
         <button class="btn btn-dark" @click="adjustZoom(2)">A+</button>
@@ -33,19 +38,26 @@
           <img :src="msg.avatar" class="avatar" />
           <div class="chat-content">
             <div class="chat-header">
-              <!-- ✅ เพิ่ม @click เพื่อตั้งชื่อเล่น -->
               <span
                 :class="['badge-nick', msg.isAdmin ? 'vip-admin' : '']"
                 :style="{ background: msg.color }"
-                @click="askNickname(msg.uid, msg.displayName)"
+                @click="
+                  askNickname(
+                    msg.uid,
+                    getCurrentNickname(msg.uid, msg.realName)
+                  )
+                "
                 style="cursor: pointer"
                 :title="'คลิกเพื่อตั้งชื่อเล่น'"
               >
-                {{ msg.displayName }}
+                {{ getCurrentNickname(msg.uid, msg.realName) }}
               </span>
 
               <span
-                v-if="msg.realName && msg.realName !== msg.displayName"
+                v-if="
+                  msg.realName &&
+                  getCurrentNickname(msg.uid, msg.realName) !== msg.realName
+                "
                 class="real-name-sub"
               >
                 ({{ msg.realName }})
@@ -85,6 +97,7 @@
 import { ref, watch } from "vue";
 import { useSystemStore } from "../stores/system";
 import { useChatStore } from "../stores/chat";
+import { useNicknameStore } from "../stores/nickname";
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
@@ -92,11 +105,17 @@ import Swal from "sweetalert2";
 
 const systemStore = useSystemStore();
 const chatStore = useChatStore();
+const nicknameStore = useNicknameStore();
 const { queueSpeech, resetVoice: resetAudio } = useAudio();
 
 const chatViewport = ref(null);
 const showScrollButton = ref(false);
 const fontSize = ref(16);
+
+// ✅ ฟังก์ชันดึง nickname แบบ Real-time
+function getCurrentNickname(uid, realName) {
+  return nicknameStore.getNickname(uid, realName);
+}
 
 function toggleSound() {
   systemStore.isSoundOn = !systemStore.isSoundOn;
@@ -112,6 +131,27 @@ function resetVoice() {
   }
 }
 
+// ✅ เพิ่มฟังก์ชันบันทึก CSV
+function downloadCSV() {
+  if (chatStore.fullChatLog.length === 0) {
+    Swal.fire({
+      icon: "warning",
+      title: "ไม่มีข้อมูล",
+      text: "ยังไม่มีข้อความแชทเข้ามา",
+      timer: 2000,
+    });
+    return;
+  }
+
+  chatStore.downloadChatCSV(systemStore.currentVideoId);
+  Swal.fire({
+    icon: "success",
+    title: "บันทึกแล้ว",
+    timer: 1500,
+    showConfirmButton: false,
+  });
+}
+
 function adjustZoom(delta) {
   fontSize.value += delta;
   document.documentElement.style.setProperty(
@@ -120,13 +160,14 @@ function adjustZoom(delta) {
   );
 }
 
+// ✅ แก้ไขฟังก์ชัน handleScroll (เอา 100 มารวมกับบรรทัดเดียวกัน)
 function handleScroll() {
   if (!chatViewport.value) return;
   const isAtBottom =
     chatViewport.value.scrollHeight -
-      chatViewport.value.scrollTop -
-      chatViewport.value.clientHeight <
-    100;
+    chatViewport.value.scrollTop -
+    chatViewport.value.clientHeight;
+  100;
   showScrollButton.value = !isAtBottom;
 }
 
@@ -136,7 +177,6 @@ function scrollToBottom() {
   }
 }
 
-// ✅ ฟังก์ชันตั้งชื่อเล่น
 function askNickname(uid, currentName) {
   if (!uid) return;
 
@@ -159,6 +199,7 @@ function askNickname(uid, currentName) {
               title: "บันทึกแล้ว",
               text: `เปลี่ยนชื่อเป็น "${nickname}"`,
               timer: 1500,
+              showConfirmButton: false,
             });
           })
           .catch((error) => {

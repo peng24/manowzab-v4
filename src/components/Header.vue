@@ -1,7 +1,6 @@
 <template>
   <div class="header">
     <div class="header-controls">
-      <!-- Status Cluster -->
       <div class="status-cluster">
         <span
           :class="['status-item', systemStore.statusDb]"
@@ -29,7 +28,6 @@
         </span>
       </div>
 
-      <!-- AI Commander -->
       <button
         :class="[
           'btn',
@@ -41,10 +39,8 @@
         🤖 AI: {{ systemStore.isAiCommander ? "เปิด" : "ปิด" }}
       </button>
 
-      <!-- History Button -->
       <button class="btn btn-dark" @click="openHistory">🕒</button>
 
-      <!-- Shipping Button -->
       <button
         :class="['btn', 'btn-shipping', shippingCount > 0 ? '' : 'empty']"
         @click="openDashboard"
@@ -52,7 +48,6 @@
         🚚 ({{ shippingCount }})
       </button>
 
-      <!-- Video ID Input -->
       <input
         type="text"
         v-model="videoId"
@@ -61,7 +56,6 @@
         @keyup.enter="toggleConnection"
       />
 
-      <!-- Connect Button -->
       <button
         :class="['btn', systemStore.isConnected ? 'btn-dark' : 'btn-primary']"
         @click="toggleConnection"
@@ -76,43 +70,47 @@
         }}
       </button>
 
-      <!-- Tools Dropdown -->
       <div class="dropdown" ref="dropdownRef">
         <button class="btn btn-sim" @click.stop="toggleDropdown">
           ⚡ Tools <i class="fa-solid fa-caret-down"></i>
         </button>
 
-        <!-- ✅ ใช้ v-show แทน Teleport -->
-        <div v-show="showDropdown" class="dropdown-content" @click.stop>
-          <a @click="downloadCSV">
-            <i class="fa-solid fa-file-csv"></i> บันทึกแชท (CSV)
-          </a>
-          <a @click="testVoice">
-            <i class="fa-solid fa-volume-high"></i> ทดสอบเสียง
-          </a>
-          <a @click="toggleFullScreen">
-            <i class="fa-solid fa-expand"></i> เต็มจอ (iPad)
-          </a>
-          <a @click="toggleAwayMode">
-            <i class="fa-solid fa-moon"></i> โหมดพาลูกนอน
-          </a>
-          <a @click="toggleSimulation">
-            <i
-              :class="isSimulating ? 'fa-solid fa-stop' : 'fa-solid fa-bolt'"
-            ></i>
-            {{ isSimulating ? "หยุดจำลอง" : "เริ่มจำลองแชท" }}
-          </a>
-          <a @click="askAiKey">
-            <i class="fa-solid fa-key"></i> ตั้งค่า API Key
-          </a>
-          <a @click="forceUpdate" style="color: #00e676">
-            <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
-          </a>
-        </div>
+        <Teleport to="body">
+          <div
+            v-if="showDropdown"
+            class="dropdown-content"
+            :style="dropdownStyle"
+            @click.stop
+          >
+            <a @click="downloadCSV">
+              <i class="fa-solid fa-file-csv"></i> บันทึกแชท (CSV)
+            </a>
+            <a @click="testVoice">
+              <i class="fa-solid fa-volume-high"></i> ทดสอบเสียง
+            </a>
+            <a @click="toggleFullScreen">
+              <i class="fa-solid fa-expand"></i> เต็มจอ (iPad)
+            </a>
+            <a @click="toggleAwayMode">
+              <i class="fa-solid fa-moon"></i> โหมดพาลูกนอน
+            </a>
+            <a @click="toggleSimulation">
+              <i
+                :class="isSimulating ? 'fa-solid fa-stop' : 'fa-solid fa-bolt'"
+              ></i>
+              {{ isSimulating ? "หยุดจำลอง" : "เริ่มจำลองแชท" }}
+            </a>
+            <a @click="askAiKey">
+              <i class="fa-solid fa-key"></i> ตั้งค่า API Key
+            </a>
+            <a @click="forceUpdate" style="color: #00e676">
+              <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
+            </a>
+          </div>
+        </Teleport>
       </div>
     </div>
 
-    <!-- Header Info -->
     <div class="header-info">
       <div
         :class="['status-dot', systemStore.isConnected ? 'online' : '']"
@@ -121,7 +119,13 @@
         👁️ {{ systemStore.viewerCount.toLocaleString() }}
       </div>
       <div class="live-title">{{ systemStore.liveTitle }}</div>
-      <div class="version-badge" :title="getVersionTooltip()">
+
+      <div
+        class="version-badge"
+        :title="getVersionTooltip()"
+        @click="showChangelog"
+        style="cursor: pointer"
+      >
         {{ systemStore.version }}
       </div>
     </div>
@@ -137,8 +141,25 @@ import { useYouTube } from "../composables/useYouTube";
 import { useGemini } from "../composables/useGemini";
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, update, set } from "firebase/database";
-import { db } from "../composables/useFirebase";
+import { db } from "../composables/useFirebase"; // หรือ "../firebase" ตามโครงสร้างไฟล์จริงของคุณ
 import Swal from "sweetalert2";
+
+// ==========================================
+// ✅ Logger Configuration
+// ==========================================
+const DEBUG_MODE = true;
+const logger = {
+  log: (...args) => {
+    if (DEBUG_MODE) console.log(...args);
+  },
+  warn: (...args) => {
+    if (DEBUG_MODE) console.warn(...args);
+  },
+  error: (...args) => {
+    console.error(...args);
+  },
+};
+// ==========================================
 
 const systemStore = useSystemStore();
 const chatStore = useChatStore();
@@ -156,6 +177,7 @@ const isSimulating = ref(false);
 const isConnecting = ref(false);
 const shippingData = ref({});
 const dropdownRef = ref(null);
+const dropdownStyle = ref({});
 let simIntervalId = null;
 
 // ✅ คำนวณจำนวนลูกค้าที่พร้อมส่ง
@@ -208,14 +230,26 @@ function getStatusTitle(type) {
 function toggleDropdown(event) {
   event.preventDefault();
   event.stopPropagation();
+
+  if (!showDropdown.value) {
+    const btn = event.currentTarget;
+    const rect = btn.getBoundingClientRect();
+
+    dropdownStyle.value = {
+      position: "fixed",
+      top: `${rect.bottom + 5}px`,
+      right: `${window.innerWidth - rect.right}px`,
+      zIndex: "9999",
+    };
+  }
+
   showDropdown.value = !showDropdown.value;
-  console.log("🔽 Dropdown:", showDropdown.value);
+  logger.log("🔽 Dropdown:", showDropdown.value);
 }
 
 // ✅ Close dropdown when clicking outside
 function handleClickOutside(event) {
-  if (!dropdownRef.value) return;
-  if (!dropdownRef.value.contains(event.target)) {
+  if (showDropdown.value) {
     showDropdown.value = false;
   }
 }
@@ -232,7 +266,7 @@ function toggleAI() {
       queueSpeech(newState ? "เปิด AI Commander" : "ปิด AI Commander");
     })
     .catch((error) => {
-      console.error("Error toggling AI:", error);
+      logger.error("Error toggling AI:", error);
     });
 }
 
@@ -284,7 +318,7 @@ async function toggleConnection() {
       });
     }
   } catch (error) {
-    console.error("Connection error:", error);
+    logger.error("Connection error:", error);
     systemStore.isConnected = false;
     systemStore.statusApi = "err";
     systemStore.statusChat = "err";
@@ -333,7 +367,7 @@ function testVoice() {
 function toggleFullScreen() {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch((err) => {
-      console.error("Fullscreen error:", err);
+      logger.error("Fullscreen error:", err);
       Swal.fire({
         icon: "error",
         title: "ไม่สามารถเข้าโหมดเต็มจอได้",
@@ -358,7 +392,7 @@ function toggleAwayMode() {
       deviceId: systemStore.myDeviceId,
     })
       .then(() => {
-        console.log("✅ Away mode enabled");
+        logger.log("✅ Away mode enabled");
         Swal.fire({
           icon: "info",
           title: "โหมดพาลูกนอน",
@@ -368,7 +402,7 @@ function toggleAwayMode() {
         });
       })
       .catch((err) => {
-        console.error("Away mode error:", err);
+        logger.error("Away mode error:", err);
       });
   } else {
     set(awayRef, {
@@ -377,10 +411,10 @@ function toggleAwayMode() {
       closedBy: systemStore.myDeviceId,
     })
       .then(() => {
-        console.log("✅ Away mode disabled");
+        logger.log("✅ Away mode disabled");
       })
       .catch((err) => {
-        console.error("Away mode error:", err);
+        logger.error("Away mode error:", err);
       });
   }
 
@@ -392,6 +426,7 @@ async function toggleSimulation() {
   isSimulating.value = !isSimulating.value;
 
   if (isSimulating.value) {
+    // Dynamic import to save load time
     const { useChatProcessor } = await import(
       "../composables/useChatProcessor"
     );
@@ -498,9 +533,42 @@ function getVersionTooltip() {
   return `Manowzab Command Center ${systemStore.version}`;
 }
 
+// ✅ Show Changelog (ย้ายออกมาไว้ตรงนี้แล้ว)
+function showChangelog() {
+  Swal.fire({
+    title: "🚀 v4.1.0 Patch Notes",
+    html: `
+      <div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ฟีเจอร์ใหม่ (New Features)</h4>
+        <ul style="margin-bottom: 10px;">
+          <li>📱 <strong>Mobile & iPad Ready:</strong> ปรับ UI ใหม่ แก้ปัญหาตารางซ้อนกัน ใช้งานบนจอสัมผัสได้ลื่นไหล</li>
+          <li>🔄 <strong>Multi-device Sync:</strong> ซิงค์ "จำนวนสต็อก" และ "โหมดพาลูกนอน" ข้ามเครื่องทันที</li>
+          <li>🧹 <strong>Console Cleaner:</strong> จัดการ Log ไม่ให้รกหน้าจอขณะใช้งานจริง</li>
+        </ul>
+
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🐛 การแก้ไขบั๊ก (Bug Fixes)</h4>
+        <ul>
+          <li>💬 แก้ปัญหาแชท "ทักทาย" หรือข้อความทั่วไปไม่ขึ้นในระบบ</li>
+          <li>🛡️ เพิ่มระบบป้องกัน AI Error ไม่ให้กระทบการทำงานหลัก</li>
+          <li>⚡ ปรับปรุงประสิทธิภาพการตัดสต็อกให้แม่นยำขึ้น</li>
+        </ul>
+        
+        <p style="margin-top: 15px; font-size: 0.8em; color: #888;">
+          Deploy Date: ${new Date().toLocaleDateString("th-TH")}
+        </p>
+      </div>
+    `,
+    background: "#1e1e1e",
+    color: "#fff",
+    confirmButtonText: "รับทราบ!",
+    confirmButtonColor: "#00e676",
+    width: 600,
+  });
+}
+
 // ✅ Mounted & Unmounted
 onMounted(() => {
-  console.log("🎯 Header mounted");
+  logger.log("🎯 Header mounted");
 
   // Listen to shipping data
   onValue(dbRef(db, "shipping"), (snapshot) => {
@@ -518,7 +586,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  console.log("👋 Header unmounting");
+  logger.log("👋 Header unmounting");
 
   // Remove listener
   document.removeEventListener("click", handleClickOutside);

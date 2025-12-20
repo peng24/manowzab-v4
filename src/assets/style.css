@@ -36,8 +36,6 @@ body {
   background: var(--bg-dark);
   color: var(--text-primary);
   line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
@@ -52,16 +50,13 @@ body {
   width: 10px;
   height: 10px;
 }
-
 ::-webkit-scrollbar-track {
   background: #1a1a1a;
 }
-
 ::-webkit-scrollbar-thumb {
   background: #444;
   border-radius: 5px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
@@ -69,7 +64,6 @@ body {
 /* ========================================
    HEADER SECTION
    ======================================== */
-
 .header {
   background: #252525;
   border-bottom: 1px solid var(--border-color);
@@ -93,7 +87,6 @@ body {
   position: relative;
   z-index: 101;
 }
-
 .header-controls::-webkit-scrollbar {
   height: 4px;
 }
@@ -107,32 +100,23 @@ body {
   border-radius: 6px;
   align-items: center;
 }
-
 .status-item {
   font-size: 1.1em;
   color: #555;
-  transition: all 0.3s ease;
   cursor: help;
   display: flex;
   align-items: center;
   gap: 4px;
 }
-
-.status-item i {
-  font-size: 1.2em;
-}
-
 .status-item.ok {
   color: var(--success);
   text-shadow: 0 0 5px rgba(0, 230, 118, 0.4);
   animation: statusPulse 2s infinite;
 }
-
 .status-item.warn {
   color: var(--warn);
   animation: statusBlink 1s infinite;
 }
-
 .status-item.err {
   color: var(--primary);
   animation: blinkRed 0.5s infinite alternate;
@@ -147,7 +131,6 @@ body {
     opacity: 0.6;
   }
 }
-
 @keyframes statusBlink {
   0%,
   50%,
@@ -159,7 +142,6 @@ body {
     opacity: 0.3;
   }
 }
-
 @keyframes blinkRed {
   from {
     opacity: 1;
@@ -191,7 +173,6 @@ body {
   font-size: 0.95em;
   color: var(--text-secondary);
 }
-
 .status-dot {
   width: 12px;
   height: 12px;
@@ -199,13 +180,11 @@ body {
   background: #555;
   transition: 0.3s;
 }
-
 .status-dot.online {
   background: var(--success);
   box-shadow: 0 0 8px var(--success);
   animation: pulse 2s infinite;
 }
-
 @keyframes pulse {
   0%,
   100% {
@@ -220,7 +199,6 @@ body {
   font-weight: 600;
   color: var(--success);
 }
-
 .live-title {
   flex: 1;
   white-space: nowrap;
@@ -229,7 +207,6 @@ body {
   color: var(--text-primary);
   font-weight: 500;
 }
-
 .version-badge {
   background: #333;
   padding: 4px 10px;
@@ -255,37 +232,29 @@ body {
   align-items: center;
   gap: 6px;
 }
-
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
 .btn-primary {
   background: var(--success);
   color: #000;
   font-weight: 600;
 }
-
 .btn-primary:hover:not(:disabled) {
   background: #00c864;
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 230, 118, 0.3);
 }
-
 .btn-dark {
   background: #333;
   color: #fff;
 }
-
 .btn-dark:hover:not(:disabled) {
   background: #444;
 }
-
 .btn-dark:active:not(:disabled) {
   background: #222;
 }
-
 .btn-ai {
   background: #6a1b9a;
   color: #fff;
@@ -293,18 +262,14 @@ body {
   position: relative;
   overflow: hidden;
 }
-
 .btn-ai.active {
   background: linear-gradient(45deg, #6a1b9a, #8e24aa);
   animation: pulseAi 2s infinite;
-  box-shadow: 0 0 15px rgba(156, 39, 176, 0.5);
 }
-
 .btn-ai.inactive {
   background: #444;
   color: #888;
 }
-
 @keyframes pulseAi {
   0%,
   100% {
@@ -314,52 +279,42 @@ body {
     box-shadow: 0 0 15px rgba(156, 39, 176, 0.8);
   }
 }
-
 .btn-shipping {
   background: #1976d2;
   color: #fff;
   font-weight: 600;
 }
-
 .btn-shipping:hover:not(:disabled) {
   background: #1565c0;
 }
-
 .btn-shipping.empty {
   background: #333;
   color: #888;
 }
-
 .btn-sim {
   background: #ff8f00;
   color: #fff;
   font-weight: 600;
 }
-
 .btn-sim:hover:not(:disabled) {
   background: #ff6f00;
 }
-
 .btn-sim:active:not(:disabled) {
   transform: scale(0.95);
   background: #cc7a00;
 }
-
 .btn-success {
   background: var(--success);
   color: #000;
   font-weight: 600;
 }
-
 .btn-success:hover:not(:disabled) {
   background: #00c864;
 }
-
 .btn-mute {
   background: #333;
   color: #fff;
 }
-
 .btn-mute.active {
   background: var(--success);
   color: #000;
@@ -377,7 +332,6 @@ body {
   width: 180px;
   transition: 0.2s;
 }
-
 .input-id:focus {
   outline: none;
   border-color: var(--success);
@@ -389,23 +343,21 @@ body {
   position: relative;
   display: inline-block;
 }
-
 .dropdown-content {
   position: absolute;
-  right: 0;
   top: 100%;
+  right: 0;
+  z-index: 1000;
   background-color: #333;
   min-width: 240px;
   max-height: 80vh;
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
-  z-index: 9999;
   border-radius: 8px;
   border: 2px solid #555;
   margin-top: 8px;
   animation: dropdownSlide 0.15s ease-out;
 }
-
 .dropdown-content a {
   color: #eee;
   padding: 14px 18px;
@@ -419,32 +371,26 @@ body {
   transition: all 0.2s;
   user-select: none;
 }
-
 .dropdown-content a:last-child {
   border-bottom: none;
   border-radius: 0 0 6px 6px;
 }
-
 .dropdown-content a:first-child {
   border-radius: 6px 6px 0 0;
 }
-
 .dropdown-content a:hover {
   background-color: #444;
   padding-left: 24px;
 }
-
 .dropdown-content a:active {
   background-color: #555;
   transform: scale(0.98);
 }
-
 .dropdown-content a i {
   width: 20px;
   text-align: center;
   font-size: 1.1em;
 }
-
 @keyframes dropdownSlide {
   from {
     opacity: 0;
@@ -459,7 +405,6 @@ body {
 /* ========================================
    MAIN CONTAINER
    ======================================== */
-
 .main-container {
   display: flex;
   flex: 1;
@@ -468,9 +413,8 @@ body {
 }
 
 /* ========================================
-   STOCK PANEL
+   STOCK PANEL & GRID (UPDATED)
    ======================================== */
-
 .stock-panel {
   flex: 1;
   display: flex;
@@ -490,69 +434,77 @@ body {
   gap: 10px;
   flex-wrap: wrap;
 }
-
 .stock-stats {
   font-size: 1.1em;
   font-weight: 600;
   color: var(--text-secondary);
 }
-
 .stat-sold {
   color: var(--primary);
   font-size: 1.3em;
   font-weight: bold;
 }
 
+/* ✅ ปรับ GRID ให้มีระยะห่างมากขึ้น */
 .stock-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 10px;
-  padding: 15px;
+  gap: 15px; /* ✅ เพิ่ม Gap ทั่วไป */
+  row-gap: 20px; /* ✅ เพิ่มระยะห่างแนวบน-ล่าง เป็นพิเศษ */
+  padding: 20px; /* เพิ่ม Padding รอบนอก */
   overflow-y: auto;
   flex: 1;
 }
 
 /* ========================================
-   STOCK PANEL - แก้การแสดงผล
+   STOCK ITEM STYLING
    ======================================== */
-
 .stock-item {
   aspect-ratio: 1;
   background: #2a2a2a;
   border: 2px solid #444;
-  border-radius: 8px;
+  border-radius: 12px; /* โค้งมนขึ้นอีกนิด */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
   position: relative;
-  padding: 6px; /* ✅ ลดจาก 8px */
+  padding: 4px;
   overflow: hidden;
+  min-height: 85px; /* ✅ เพิ่มความสูงขั้นต่ำ */
+  z-index: 0;
+  transition: transform 0.1s, border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* เงาเบาๆ ให้ดูมีระยะ */
 }
 
-.stock-item:hover {
-  border-color: #666;
+/* ✅ Hover เฉพาะ PC */
+@media (hover: hover) {
+  .stock-item:hover {
+    border-color: #777;
+    background: #333;
+    transform: translateY(-2px) scale(1.02); /* ลอยขึ้นนิดเดียวพอ */
+    z-index: 10;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.stock-item:active {
+  transform: scale(0.96);
   background: #333;
-  transform: scale(1.05);
-  z-index: 1;
 }
-
 .stock-item.sold {
   background: rgba(211, 47, 47, 0.15);
   border-color: var(--primary);
-  box-shadow: 0 0 10px rgba(211, 47, 47, 0.3);
 }
-
-.stock-item.sold:hover {
-  background: rgba(211, 47, 47, 0.25);
-}
-
-/* New Order Animation - 15 seconds only */
 .stock-item.sold.new-order {
   animation: newOrderBlink 1s infinite;
   z-index: 2;
+}
+.stock-item.highlight {
+  animation: highlightBox 1s ease-out;
+  z-index: 5;
+  border-color: #ffeb3b !important;
 }
 
 @keyframes newOrderBlink {
@@ -568,14 +520,6 @@ body {
     background-color: rgba(211, 47, 47, 0.15);
   }
 }
-
-/* Highlight effect for auto-scroll */
-.stock-item.highlight {
-  animation: highlightBox 1s ease-out;
-  z-index: 5;
-  border-color: #ffeb3b !important;
-}
-
 @keyframes highlightBox {
   0% {
     transform: scale(1.15);
@@ -587,18 +531,15 @@ body {
   }
 }
 
-/* ✅ หมายเลขสินค้า */
 .stock-num {
   font-size: 1.5em;
   font-weight: bold;
   color: var(--text-primary);
-  margin-bottom: 2px; /* ✅ ลดจาก 4px */
+  margin-bottom: 2px;
   line-height: 1;
 }
-
-/* ✅ ชื่อคนจอง - ปรับให้แสดงครบ */
 .stock-status {
-  font-size: 0.75em; /* ✅ ลดจาก 0.85em */
+  font-size: 0.75em;
   color: var(--text-secondary);
   text-align: center;
   max-width: 100%;
@@ -606,67 +547,57 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.2;
-  padding: 0 2px; /* ✅ เพิ่ม padding ข้าง */
+  padding: 0 2px;
 }
-
 .stock-item.sold .stock-status {
   color: #fff;
   font-weight: 600;
-  font-size: 0.8em; /* ✅ เพิ่มขนาดเมื่อจองแล้ว */
+  font-size: 0.8em;
 }
-
-/* ✅ ราคา */
 .stock-price {
-  font-size: 0.7em; /* ✅ ลดจาก 0.8em */
+  font-size: 0.7em;
   font-weight: 600;
   margin-top: 2px;
   color: #ffd700;
 }
 
-/* ✅ Queue Badge - ปรับตำแหน่งไม่ให้ทับชื่อ */
 .queue-badge {
   position: absolute;
-  top: 2px; /* ✅ ลดจาก 4px */
-  right: 2px; /* ✅ ลดจาก 4px */
+  top: 3px;
+  right: 3px;
   background: #ff9800;
   color: #000;
-  font-size: 0.65em; /* ✅ ลดจาก 0.7em */
+  font-size: 0.65em;
   font-weight: bold;
-  padding: 1px 4px; /* ✅ ลดจาก 2px 6px */
-  border-radius: 8px; /* ✅ ลดจาก 10px */
+  padding: 1px 4px;
+  border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   line-height: 1;
 }
-
-/* ✅ Source Icon - ปรับตำแหน่งไม่ให้ทับชื่อ */
 .source-icon {
   position: absolute;
-  top: 2px; /* ✅ ลดจาก 4px */
-  left: 2px; /* ✅ ลดจาก 4px */
-  font-size: 0.7em; /* ✅ ลดจาก 0.8em */
-  opacity: 0.7; /* ✅ เพิ่มจาก 0.6 */
-  background: rgba(0, 0, 0, 0.5); /* ✅ เพิ่มพื้นหลังให้เห็นชัดขึ้น */
+  top: 3px;
+  left: 3px;
+  font-size: 0.7em;
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.5);
   padding: 2px 4px;
   border-radius: 4px;
   line-height: 1;
 }
-
 .source-icon.ai {
-  color: #ce93d8; /* ✅ เปลี่ยนให้สว่างขึ้น */
+  color: #ce93d8;
 }
-
 .source-icon.regex {
-  color: #ffb74d; /* ✅ เปลี่ยนให้สว่างขึ้น */
+  color: #ffb74d;
 }
-
 .source-icon.manual {
-  color: #64b5f6; /* ✅ เปลี่ยนให้สว่างขึ้น */
+  color: #64b5f6;
 }
 
 /* ========================================
    CHAT PANEL
    ======================================== */
-
 .chat-panel {
   width: 400px;
   display: flex;
@@ -675,7 +606,6 @@ body {
   border-left: 1px solid var(--border-color);
   overflow: hidden;
 }
-
 .tools-bar {
   display: flex;
   gap: 8px;
@@ -685,27 +615,23 @@ body {
   flex-wrap: wrap;
   align-items: center;
 }
-
 #chat-viewport {
   flex: 1;
   overflow-y: auto;
   position: relative;
   scroll-behavior: smooth;
 }
-
 #chat-list {
   padding: 15px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .chat-row {
   display: flex;
   gap: 10px;
   animation: slideIn 0.3s ease-out;
 }
-
 @keyframes slideIn {
   from {
     opacity: 0;
@@ -716,14 +642,12 @@ body {
     transform: translateX(0);
   }
 }
-
 .chat-row.admin {
   background: rgba(255, 193, 7, 0.1);
   padding: 8px;
   border-radius: 8px;
   border-left: 3px solid #ffc107;
 }
-
 .avatar {
   width: 40px;
   height: 40px;
@@ -731,21 +655,18 @@ body {
   flex-shrink: 0;
   border: 2px solid #444;
 }
-
 .chat-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-
 .chat-header {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
-
 .badge-nick {
   padding: 3px 10px;
   border-radius: 12px;
@@ -758,12 +679,10 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .badge-nick:hover {
   transform: scale(1.05);
   filter: brightness(1.2);
 }
-
 .badge-nick.vip-admin {
   background: linear-gradient(45deg, #ffd700, #ffed4e) !important;
   color: #000 !important;
@@ -772,7 +691,6 @@ body {
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
   animation: adminGlow 2s infinite;
 }
-
 @keyframes adminGlow {
   0%,
   100% {
@@ -782,13 +700,11 @@ body {
     box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
   }
 }
-
 .real-name-sub {
   font-size: 0.85em;
   color: #888;
   font-style: italic;
 }
-
 .tag-source {
   padding: 2px 6px;
   border-radius: 4px;
@@ -798,24 +714,20 @@ body {
   align-items: center;
   gap: 4px;
 }
-
 .tag-source.ai {
   background: rgba(156, 39, 176, 0.3);
   color: #ce93d8;
 }
-
 .tag-source.regex {
   background: rgba(255, 152, 0, 0.3);
   color: #ffb74d;
 }
-
 .chat-msg {
   color: var(--text-primary);
   font-size: var(--chat-size);
   line-height: 1.5;
   word-wrap: break-word;
 }
-
 .scroll-bottom-btn {
   position: absolute;
   bottom: 20px;
@@ -832,7 +744,6 @@ body {
   animation: bounce 2s infinite;
   z-index: 10;
 }
-
 @keyframes bounce {
   0%,
   100% {
@@ -846,7 +757,6 @@ body {
 /* ========================================
    DASHBOARD & MODALS
    ======================================== */
-
 .dashboard-overlay {
   position: fixed;
   top: 0;
@@ -860,7 +770,6 @@ body {
   z-index: 9998;
   animation: fadeIn 0.2s;
 }
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -869,7 +778,6 @@ body {
     opacity: 1;
   }
 }
-
 .dashboard-content {
   background: #121212;
   border-radius: 8px;
@@ -882,7 +790,6 @@ body {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9);
   animation: slideUp 0.3s ease-out;
 }
-
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -893,7 +800,6 @@ body {
     transform: translateY(0) scale(1);
   }
 }
-
 .dashboard-header {
   display: flex;
   justify-content: space-between;
@@ -902,26 +808,22 @@ body {
   padding-bottom: 15px;
   border-bottom: 2px solid #333;
 }
-
 .dash-title {
   font-size: 1.5em;
   font-weight: bold;
   color: var(--success);
 }
-
 .shipping-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.95em;
 }
-
 .shipping-table thead {
   background: #252525;
   position: sticky;
   top: 0;
   z-index: 1;
 }
-
 .shipping-table th {
   padding: 12px;
   text-align: left;
@@ -929,16 +831,13 @@ body {
   color: var(--success);
   border-bottom: 2px solid #444;
 }
-
 .shipping-table td {
   padding: 12px;
   border-bottom: 1px solid #333;
 }
-
 .shipping-table tr:hover {
   background: #252525;
 }
-
 .edit-input {
   background: #333;
   border: 1px solid #555;
@@ -948,12 +847,10 @@ body {
   width: 100%;
   font-family: "Noto Sans Thai", sans-serif;
 }
-
 .edit-input:focus {
   outline: none;
   border-color: var(--success);
 }
-
 .history-search-box {
   width: 100%;
   padding: 10px 15px;
@@ -964,19 +861,16 @@ body {
   font-size: 1em;
   font-family: "Noto Sans Thai", sans-serif;
 }
-
 .history-search-box:focus {
   outline: none;
   border-color: var(--success);
   box-shadow: 0 0 8px rgba(0, 230, 118, 0.3);
 }
-
 .history-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
-
 .history-item {
   background: #1e1e1e;
   padding: 15px;
@@ -987,14 +881,12 @@ body {
   transition: 0.2s;
   position: relative;
 }
-
 .history-item:hover {
   background: #252525;
   border-color: #555;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
-
 .history-title {
   font-size: 1.1em;
   font-weight: bold;
@@ -1002,12 +894,10 @@ body {
   margin-bottom: 5px;
   padding-right: 40px;
 }
-
 .history-date {
   font-size: 0.9em;
   color: #888;
 }
-
 .btn-delete-history {
   position: absolute;
   top: 10px;
@@ -1021,7 +911,6 @@ body {
   font-size: 0.9em;
   transition: 0.2s;
 }
-
 .btn-delete-history:hover {
   background: #b71c1c;
   transform: scale(1.1);
@@ -1030,7 +919,6 @@ body {
 /* ========================================
    AWAY MODE BANNER
    ======================================== */
-
 .away-banner {
   position: fixed;
   top: 70px;
@@ -1045,18 +933,15 @@ body {
   animation: pulseAway 3s infinite;
   max-width: 90%;
 }
-
 .away-content {
   display: flex;
   align-items: center;
   gap: 15px;
 }
-
 .away-icon {
   font-size: 2em;
   animation: moonSway 4s ease-in-out infinite;
 }
-
 @keyframes moonSway {
   0%,
   100% {
@@ -1066,24 +951,20 @@ body {
     transform: rotate(10deg);
   }
 }
-
 .away-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-
 .away-title {
   font-size: 1.3em;
   font-weight: bold;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
-
 .away-subtitle {
   font-size: 0.85em;
   opacity: 0.9;
 }
-
 .away-timer {
   font-family: "Courier New", monospace;
   font-size: 1.4em;
@@ -1095,7 +976,6 @@ body {
   text-align: center;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
-
 .away-btn {
   background: white;
   color: #667eea;
@@ -1112,18 +992,15 @@ body {
   gap: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
-
 .away-btn:hover {
   background: #f0f0f0;
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
-
 .away-btn:active {
   transform: translateY(0);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
-
 @keyframes pulseAway {
   0%,
   100% {
@@ -1135,114 +1012,68 @@ body {
 }
 
 /* ========================================
-   RESPONSIVE DESIGN
-   ======================================== */
-
-/* ✅ Responsive - ปรับ Font ตามขนาดหน้าจอ */
-@media (max-width: 1200px) {
-  .stock-grid {
-    grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
-  }
-
-  .stock-num {
-    font-size: 1.3em;
-  }
-
-  .stock-status {
-    font-size: 0.7em;
-  }
-}
-
-@media (max-width: 768px) {
-  .stock-grid {
-    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-    gap: 8px;
-    padding: 10px;
-  }
-
-  .stock-num {
-    font-size: 1.2em;
-  }
-
-  .stock-status {
-    font-size: 0.65em;
-  }
-
-  .stock-price {
-    font-size: 0.6em;
-  }
-}
-
-/* ========================================
    UTILITY CLASSES
    ======================================== */
-
 .text-center {
   text-align: center;
 }
-
 .text-success {
   color: var(--success);
 }
-
 .text-error {
   color: var(--primary);
 }
-
 .text-warn {
   color: var(--warn);
 }
-
 .mb-10 {
   margin-bottom: 10px;
 }
-
 .mt-10 {
   margin-top: 10px;
 }
-
 .p-10 {
   padding: 10px;
 }
-
 .flex {
   display: flex;
 }
-
 .flex-center {
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .gap-10 {
   gap: 10px;
+}
+.no-select {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 /* ========================================
    SWAL2 CUSTOM STYLING
    ======================================== */
-
 .swal2-popup {
   background: #1e1e1e !important;
   color: #fff !important;
   border: 1px solid #444 !important;
 }
-
 .swal2-title {
   color: #fff !important;
 }
-
 .swal2-html-container {
   color: #ccc !important;
 }
-
 .swal2-input {
   background: #333 !important;
   color: #fff !important;
   border: 1px solid #555 !important;
 }
-
 .swal2-input:focus {
   border-color: var(--success) !important;
   box-shadow: 0 0 8px rgba(0, 230, 118, 0.3) !important;
@@ -1251,7 +1082,6 @@ body {
 /* ========================================
    PRINT STYLES
    ======================================== */
-
 @media print {
   .header,
   .tools-bar,
@@ -1259,12 +1089,110 @@ body {
   .dropdown {
     display: none !important;
   }
-
   .stock-grid {
     display: block;
   }
-
   .stock-item {
     break-inside: avoid;
+  }
+}
+
+/* ========================================
+   RESPONSIVE DESIGN (FIXED FOR IPAD & MOBILE)
+   ======================================== */
+
+/* ✅ Tablet & iPad (1024px ลงมา) */
+@media (max-width: 1024px) {
+  .main-container {
+    flex-direction: column;
+  }
+  .stock-panel {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .chat-panel {
+    width: 100%;
+    height: 40vh;
+    min-height: 300px;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    flex: none;
+  }
+
+  /* ✅ GRID สำหรับ Tablet เพิ่มระยะห่างแถว (row-gap) */
+  .stock-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 12px; /* ช่องไฟแนวนอน */
+    row-gap: 20px; /* ✅ ช่องไฟแนวตั้ง (แก้ซ้อนกัน) */
+    padding: 20px 15px 50px 15px; /* เพิ่ม Padding ล่างเผื่อไว้ */
+  }
+
+  .header-controls {
+    overflow-x: auto;
+  }
+  .dashboard-content {
+    max-width: 95%;
+    max-height: 90vh;
+    padding: 15px;
+  }
+
+  /* Font Adjustments */
+  .stock-num {
+    font-size: 1.4em;
+    margin-bottom: 0;
+  }
+  .stock-status {
+    font-size: 0.7em;
+    margin-top: 2px;
+  }
+  .stock-price {
+    font-size: 0.7em;
+  }
+  .queue-badge {
+    font-size: 0.6em;
+    padding: 1px 3px;
+    top: 2px;
+    right: 2px;
+  }
+  .source-icon {
+    font-size: 0.6em;
+    padding: 1px 3px;
+    top: 2px;
+    left: 2px;
+  }
+}
+
+/* ✅ Mobile (768px ลงมา) */
+@media (max-width: 768px) {
+  .stock-grid {
+    grid-template-columns: repeat(3, 1fr) !important; /* บังคับ 3 คอลัมน์ */
+    gap: 10px;
+    row-gap: 15px; /* ช่องไฟแนวตั้ง */
+    padding: 10px;
+  }
+
+  .chat-panel {
+    height: 45vh;
+  }
+
+  button,
+  .btn {
+    min-height: 44px;
+    min-width: 44px;
+    margin-bottom: 8px;
+  }
+  .stock-num {
+    font-size: 1.2em;
+  }
+  .stock-status {
+    font-size: 0.65em;
+  }
+  .stock-price {
+    font-size: 0.6em;
+  }
+  .away-banner {
+    top: 60px;
+    padding: 12px 20px;
   }
 }

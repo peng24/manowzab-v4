@@ -1,262 +1,260 @@
 <template>
-  <div class="stock-panel" ref="stockPanelRef">
+  <div class="stock-panel">
     <div class="stock-header">
-      <div style="display: flex; align-items: center; gap: 10px">
+      <div class="stock-stats">
+        รายการทั้งหมด:
+        <span class="text-white">{{ stockStore.stockSize }}</span>
+      </div>
+      <div class="stock-stats">
+        ขายแล้ว: <span class="stat-sold">{{ soldCount }}</span>
+      </div>
+
+      <div class="flex gap-10">
         <input
           type="number"
           v-model.number="stockStore.stockSize"
-          style="
-            width: 60px;
-            background: #333;
-            border: none;
-            color: white;
-            text-align: center;
-            border-radius: 4px;
-            padding: 5px;
-          "
+          class="edit-input"
+          style="width: 80px"
           @change="saveStockSize"
         />
-        <span style="font-size: 0.8em; color: #aaa">รายการ</span>
-        <button class="btn btn-dark" @click="adjustGridZoom(-0.1)">-</button>
-        <button class="btn btn-dark" @click="adjustGridZoom(0.1)">+</button>
+        <button class="btn btn-dark" @click="confirmClear">
+          <i class="fa-solid fa-trash"></i> ล้าง
+        </button>
       </div>
-
-      <div class="stock-stats">
-        จอง <span class="stat-sold">{{ soldCount }}</span> /
-        {{ stockStore.stockSize }}
-      </div>
-
-      <button class="btn btn-dark" @click="clearAll">🗑️ ล้าง</button>
     </div>
 
-    <div class="stock-grid" :style="{ fontSize: gridSize + 'em' }">
+    <div class="stock-grid" ref="gridContainer">
       <div
-        v-for="num in stockStore.stockSize"
-        :key="num"
-        :ref="(el) => (stockItemRefs[num] = el)"
-        :id="`stock-${num}`"
-        :class="getStockClass(num)"
-        @click="handleStockClick(num)"
+        v-for="i in stockStore.stockSize"
+        :key="i"
+        :class="[
+          'stock-item',
+          getStockItem(i).owner ? 'sold' : '',
+          isNewOrder(i) ? 'new-order' : '',
+          highlightedId === i ? 'highlight' : '',
+        ]"
+        @click="handleItemClick(i)"
+        :id="`stock-${i}`"
       >
-        <span class="stock-num">{{ num }}</span>
+        <div class="stock-num">{{ i }}</div>
 
-        <div
-          v-if="stockStore.stockData[num]?.queue?.length"
-          class="queue-badge"
-        >
-          +{{ stockStore.stockData[num].queue.length }}
+        <div class="stock-status">
+          {{ getStockItem(i).owner || "ว่าง" }}
         </div>
 
-        <span class="stock-status">
-          {{ stockStore.stockData[num]?.owner || "ว่าง" }}
-        </span>
+        <div v-if="getStockItem(i).price" class="stock-price">
+          {{ getStockItem(i).price }}.-
+        </div>
 
-        <span
-          v-if="stockStore.stockData[num]?.price"
-          class="stock-price"
-          :style="{
-            color: stockStore.stockData[num]?.owner
-              ? '#ffd700'
-              : 'var(--vacant-price)',
-          }"
+        <div v-if="getQueueLength(i) > 0" class="queue-badge">
+          +{{ getQueueLength(i) }}
+        </div>
+
+        <div
+          v-if="getStockItem(i).source"
+          :class="['source-icon', getStockItem(i).source]"
         >
-          ฿{{ stockStore.stockData[num].price }}
-        </span>
-
-        <span v-if="stockStore.stockData[num]?.source" class="source-icon">
-          <i :class="getSourceIcon(stockStore.stockData[num].source)"></i>
-        </span>
+          <i :class="getSourceIcon(getStockItem(i).source)"></i>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from "vue";
+import { computed, ref, watch, nextTick } from "vue";
 import { useStockStore } from "../stores/stock";
 import Swal from "sweetalert2";
 
-const stockStore = useStockStore();
-const gridSize = ref(1);
-const stockPanelRef = ref(null);
-const stockItemRefs = ref({});
+// ==========================================
+// ✅ เพิ่มส่วน Logger ลงไปตรงนี้ครับ
+// ==========================================
+const DEBUG_MODE = true;
+const logger = {
+  log: (...args) => {
+    if (DEBUG_MODE) console.log(...args);
+  },
+  warn: (...args) => {
+    if (DEBUG_MODE) console.warn(...args);
+  },
+  error: (...args) => {
+    console.error(...args);
+  },
+};
+// ==========================================
 
+const stockStore = useStockStore();
+const gridContainer = ref(null);
+const highlightedId = ref(null);
+const newOrders = ref(new Set());
+
+// Computed
 const soldCount = computed(() => {
-  return Object.values(stockStore.stockData).filter((item) => item?.owner)
+  return Object.values(stockStore.stockData).filter((item) => item.owner)
     .length;
 });
 
-// ✅ Watch for new orders and auto-scroll
+// Helper Functions
+function getStockItem(num) {
+  return stockStore.stockData[num] || {};
+}
+
+function getQueueLength(num) {
+  const item = stockStore.stockData[num];
+  return item && item.queue ? item.queue.length : 0;
+}
+
+function getSourceIcon(source) {
+  if (source === "ai") return "fa-solid fa-robot";
+  if (source === "regex") return "fa-solid fa-code";
+  return "fa-solid fa-hand-pointer";
+}
+
+function isNewOrder(num) {
+  return newOrders.value.has(num);
+}
+
+// Save Stock Size
+function saveStockSize() {
+  stockStore.updateStockSize(stockStore.stockSize);
+}
+
+// Watch for new orders to trigger animation & scroll
 watch(
   () => stockStore.stockData,
-  (newData, oldData) => {
-    // หา item ที่เพิ่งจองใหม่
-    Object.keys(newData).forEach((num) => {
-      const newItem = newData[num];
-      const oldItem = oldData?.[num];
+  (newVal, oldVal) => {
+    // หาความแตกต่างเพื่อดูว่าเลขไหนเพิ่งขายออก
+    Object.keys(newVal).forEach((key) => {
+      const num = parseInt(key);
+      const newItem = newVal[key];
+      const oldItem = oldVal?.[key];
 
-      // ถ้ามีการจองใหม่
-      if (newItem?.owner && (!oldItem || !oldItem.owner)) {
-        console.log("🎯 New order detected:", num);
+      // ถ้าเป็นรายการใหม่ หรือ เพิ่งมีเจ้าของ
+      if (newItem.owner && (!oldItem || !oldItem.owner)) {
+        logger.log("🎯 New order detected:", num); // ✅ ใช้ logger ได้แล้ว
 
-        nextTick(() => {
-          const element = stockItemRefs.value[num];
-          if (element && stockPanelRef.value) {
-            // ✅ Scroll to center with smooth animation
-            element.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-              inline: "center",
-            });
+        // 1. Add to new orders set (for animation)
+        newOrders.value.add(num);
 
-            // เพิ่ม highlight effect
-            element.classList.add("highlight");
-            setTimeout(() => {
-              element.classList.remove("highlight");
-            }, 1000);
-          }
-        });
+        // Remove animation class after 15 seconds
+        setTimeout(() => {
+          newOrders.value.delete(num);
+        }, 15000);
+
+        // 2. Auto Scroll to item
+        scrollToItem(num);
       }
     });
   },
   { deep: true }
 );
 
-function getStockClass(num) {
-  const item = stockStore.stockData[num];
-  const classes = ["stock-item"];
-
-  if (item?.owner) {
-    classes.push("sold");
-
-    // ✅ New order animation (15 seconds only)
-    if (Date.now() - item.time < 15000) {
-      classes.push("new-order");
+function scrollToItem(num) {
+  nextTick(() => {
+    const el = document.getElementById(`stock-${num}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      highlightedId.value = num;
+      setTimeout(() => (highlightedId.value = null), 2000);
     }
-  }
-
-  return classes;
+  });
 }
 
-function getSourceIcon(source) {
-  const icons = {
-    ai: "fa-solid fa-robot",
-    regex: "fa-solid fa-bolt",
-    manual: "fa-solid fa-hand-pointer",
-    queue: "fa-solid fa-users",
-  };
-  return icons[source] || "fa-solid fa-users";
-}
+// Handle Click
+function handleItemClick(num) {
+  const item = getStockItem(num);
 
-function handleStockClick(num) {
-  const current = stockStore.stockData[num];
-
-  // ถ้ายังไม่มีคนจอง
-  if (!current || !current.owner) {
-    const currentPrice = current?.price || "";
+  if (!item.owner) {
+    // Case 1: Empty -> Manual Reserve
     Swal.fire({
-      title: `เบอร์ ${num}`,
-      text: "ใส่ชื่อเพื่อจอง หรือ ใส่ตัวเลขเพื่อตั้งราคา",
+      title: `จองรหัส ${num}`,
       input: "text",
-      inputValue: currentPrice,
+      inputPlaceholder: "ชื่อลูกค้า",
       showCancelButton: true,
-      confirmButtonText: "บันทึก",
+      confirmButtonText: "จอง",
+      confirmButtonColor: "#00e676",
       cancelButtonText: "ยกเลิก",
+      background: "#1e1e1e",
+      color: "#fff",
     }).then((result) => {
       if (result.isConfirmed && result.value) {
-        const val = result.value.trim();
-
-        if (/^\d+$/.test(val)) {
-          stockStore.updateStockPrice(num, val);
-        } else {
-          stockStore.processOrder(num, val, "manual-" + Date.now(), "manual");
-        }
+        stockStore.processOrder(
+          num,
+          result.value,
+          "manual-" + Date.now(),
+          "manual"
+        );
       }
     });
-    return;
-  }
-
-  // ถ้ามีคนจองแล้ว
-  let queueHtml = "";
-  if (current.queue && current.queue.length > 0) {
-    queueHtml =
-      '<div style="margin-top:10px; text-align:left; background:#eee; color:#000; padding:10px; border-radius:6px;"><strong>คิวต่อ:</strong><ul style="padding-left:0; margin:10px 0; list-style:none;">';
-    current.queue.forEach((q, idx) => {
-      queueHtml += `<li style="background:#fff; padding:8px; margin-bottom:4px; border-radius:4px;">
-        <strong>${idx + 1}.</strong> ${q.owner}
-      </li>`;
+  } else {
+    // Case 2: Occupied -> Manage (Cancel / Edit Price / Clear)
+    Swal.fire({
+      title: `จัดการรหัส ${num}`,
+      html: `
+        <p>เจ้าของ: <strong>${item.owner}</strong></p>
+        <p class="text-sm text-gray-400">วิธี: ${item.source || "Unknown"}</p>
+        ${
+          item.queue
+            ? `<p class="text-warn">คิวต่อ: ${item.queue.length} คน</p>`
+            : ""
+        }
+      `,
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: "แก้ไขราคา",
+      denyButtonText: "ยกเลิกจอง (หลุด)",
+      cancelButtonText: "ปิด",
+      confirmButtonColor: "#3085d6",
+      denyButtonColor: "#d33",
+      background: "#1e1e1e",
+      color: "#fff",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // Edit Price
+        Swal.fire({
+          title: "ใส่ราคา",
+          input: "number",
+          inputValue: item.price || "",
+          background: "#1e1e1e",
+          color: "#fff",
+        }).then((priceResult) => {
+          if (priceResult.isConfirmed) {
+            stockStore.updateStockPrice(num, parseInt(priceResult.value));
+          }
+        });
+      } else if (result.isDenied) {
+        // Cancel Order
+        stockStore.processCancel(num);
+      }
     });
-    queueHtml += "</ul></div>";
   }
-
-  Swal.fire({
-    title: `เบอร์ ${num}`,
-    html: `
-      <div style="font-size:1.2em; color:#00e676; margin-bottom:10px;">${current.owner}</div>
-      <div style="display:flex; gap:5px; justify-content:center; flex-wrap:wrap;">
-        <button onclick="editName(${num})" class="swal2-confirm swal2-styled" style="background:#1976d2; margin:0;">แก้ชื่อ</button>
-        <button onclick="editPrice(${num})" class="swal2-confirm swal2-styled" style="background:#555; margin:0;">แก้ราคา</button>
-        <button onclick="cancelOrder(${num})" class="swal2-confirm swal2-styled" style="background:#d32f2f; margin:0;">ยกเลิกจอง</button>
-      </div>
-      ${queueHtml}
-    `,
-    showConfirmButton: false,
-  });
 }
 
-// Global functions for Swal
-window.editName = (num) => {
-  Swal.close();
+// Clear All
+function confirmClear() {
   Swal.fire({
-    input: "text",
-    inputValue: stockStore.stockData[num].owner,
-    title: "แก้ไขชื่อ",
-  }).then((result) => {
-    if (result.value) {
-      const updates = {};
-      updates[`stock/${stockStore.stockData[num]}/owner`] = result.value;
-    }
-  });
-};
-
-window.editPrice = (num) => {
-  Swal.close();
-  Swal.fire({
-    input: "number",
-    title: "แก้ไขราคา",
-  }).then((result) => {
-    if (result.value) {
-      stockStore.updateStockPrice(num, result.value);
-    }
-  });
-};
-
-window.cancelOrder = (num) => {
-  Swal.close();
-  stockStore.processCancel(num);
-  Swal.fire({ icon: "success", title: "ยกเลิกรายการสำเร็จ", timer: 1500 });
-};
-
-function clearAll() {
-  Swal.fire({
-    title: "ล้างทั้งหมด?",
+    title: "ล้างข้อมูลทั้งหมด?",
+    text: "ข้อมูลการจองจะหายไปทั้งหมด!",
+    icon: "warning",
     showCancelButton: true,
-    confirmButtonText: "ใช่",
-    cancelButtonText: "ไม่",
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "ใช่, ล้างเลย",
+    cancelButtonText: "ยกเลิก",
+    background: "#1e1e1e",
+    color: "#fff",
   }).then((result) => {
     if (result.isConfirmed) {
       stockStore.clearAllStock();
+      Swal.fire({
+        title: "ล้างเรียบร้อย",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#1e1e1e",
+        color: "#fff",
+      });
     }
   });
-}
-
-function saveStockSize() {
-  // Save to Firebase
-}
-
-function adjustGridZoom(delta) {
-  gridSize.value += delta;
-  if (gridSize.value < 0.5) gridSize.value = 0.5;
-  if (gridSize.value > 2) gridSize.value = 2;
 }
 </script>

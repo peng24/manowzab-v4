@@ -2,7 +2,6 @@
   <div class="app-container">
     <Header />
 
-    <!-- ✅ Away Mode Banner -->
     <div v-if="systemStore.isAway" class="away-banner">
       <div class="away-content">
         <div class="away-icon">🌙</div>
@@ -35,7 +34,7 @@ import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
 import { useNicknameStore } from "./stores/nickname";
 import { ref as dbRef, onValue, onDisconnect, set } from "firebase/database";
-import { db } from "./composables/useFirebase";
+import { db } from "./firebase";
 import { useAudio } from "./composables/useAudio";
 import Header from "./components/Header.vue";
 import StockGrid from "./components/StockGrid.vue";
@@ -170,10 +169,13 @@ onMounted(() => {
   });
 
   // Listen to stock size
-  onValue(dbRef(db, "system/stockSize"), (snap) => {
-    const val = snap.val();
-    if (val) stockStore.stockSize = val;
-  });
+  onValue(
+    dbRef(db, "settings/" + systemStore.currentVideoId + "/stockSize"),
+    (snap) => {
+      const val = snap.val();
+      if (val) stockStore.stockSize = val;
+    }
+  );
 
   // Listen to AI Commander status
   onValue(dbRef(db, "system/aiCommander"), (snap) => {
@@ -255,12 +257,14 @@ onMounted(() => {
   z-index: 9999;
   animation: pulseAway 3s infinite;
   max-width: 90%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .away-content {
   display: flex;
   align-items: center;
   gap: 15px;
+  white-space: nowrap;
 }
 
 .away-icon {
@@ -354,7 +358,13 @@ onMounted(() => {
 
   .away-content {
     flex-wrap: wrap;
+    justify-content: center;
     gap: 10px;
+  }
+
+  .away-text {
+    align-items: center;
+    text-align: center;
   }
 
   .away-icon {
@@ -366,7 +376,7 @@ onMounted(() => {
   }
 
   .away-subtitle {
-    font-size: 0.75em;
+    display: none; /* ซ่อนข้อความยาวๆ ในมือถือเพื่อประหยัดที่ */
   }
 
   .away-timer {
@@ -378,6 +388,8 @@ onMounted(() => {
   .away-btn {
     padding: 6px 16px;
     font-size: 0.85em;
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>

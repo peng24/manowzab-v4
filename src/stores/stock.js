@@ -23,6 +23,15 @@ export const useStockStore = defineStore("stock", () => {
       const val = snapshot.val() || {};
       stockData.value = val;
     });
+
+    // 2. ✅ เพิ่ม: ดึงค่า Stock Size (จำนวนรายการ)
+    const sizeRef = dbRef(db, `settings/${videoId}/stockSize`);
+    onValue(sizeRef, (snapshot) => {
+      const val = snapshot.val();
+      if (val) {
+        stockSize.value = val;
+      }
+    });
   }
 
   async function processOrder(
@@ -98,6 +107,15 @@ export const useStockStore = defineStore("stock", () => {
     return update(dbRef(db), { [path]: price });
   }
 
+  function updateStockSize(newSize) {
+    if (!systemStore.currentVideoId) return;
+    const sizeRef = dbRef(
+      db,
+      `settings/${systemStore.currentVideoId}/stockSize`
+    );
+    set(sizeRef, newSize);
+  }
+
   return {
     stockData,
     stockSize,
@@ -106,5 +124,6 @@ export const useStockStore = defineStore("stock", () => {
     processCancel,
     clearAllStock,
     updateStockPrice,
+    updateStockSize,
   };
 });

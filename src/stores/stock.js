@@ -24,7 +24,6 @@ export const useStockStore = defineStore("stock", () => {
       stockData.value = val;
     });
 
-    // 2. ✅ เพิ่ม: ดึงค่า Stock Size (จำนวนรายการ)
     const sizeRef = dbRef(db, `settings/${videoId}/stockSize`);
     onValue(sizeRef, (snapshot) => {
       const val = snapshot.val();
@@ -77,9 +76,13 @@ export const useStockStore = defineStore("stock", () => {
     }
   }
 
-  function processCancel(num) {
+  // ✅ แก้ไข processCancel ให้คืนค่าชื่อคนเก่าและคนใหม่ (ถ้ามี)
+  async function processCancel(num) {
     const current = stockData.value[num];
-    if (!current) return;
+    if (!current) return null;
+
+    const previousOwner = current.owner;
+    let nextOwner = null;
 
     if (current.queue && current.queue.length > 0) {
       const next = current.queue[0];
@@ -92,10 +95,20 @@ export const useStockStore = defineStore("stock", () => {
         source: "queue",
       };
       if (current.price) newData.price = current.price;
-      set(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`), newData);
+
+      // อัปเดตข้อมูลคนใหม่
+      await set(
+        dbRef(db, `stock/${systemStore.currentVideoId}/${num}`),
+        newData
+      );
+      nextOwner = next.owner;
     } else {
-      remove(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`));
+      // ลบรายการ
+      await remove(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`));
     }
+
+    // Return ข้อมูลกลับไปให้ ChatProcessor พูดเสียง
+    return { previousOwner, nextOwner };
   }
 
   function clearAllStock() {
@@ -116,6 +129,12 @@ export const useStockStore = defineStore("stock", () => {
     set(sizeRef, newSize);
   }
 
+  // ✅ เพิ่มฟังก์ชันอัปเดตข้อมูลรายการทั้งหมด (สำหรับ Drag & Drop)
+  async function updateItemData(num, newData) {
+    if (!systemStore.currentVideoId) return;
+    await set(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`), newData);
+  }
+
   return {
     stockData,
     stockSize,
@@ -125,5 +144,6 @@ export const useStockStore = defineStore("stock", () => {
     clearAllStock,
     updateStockPrice,
     updateStockSize,
+    updateItemData, // Export ฟังก์ชันใหม่
   };
 });

@@ -4,14 +4,11 @@ import { useSystemStore } from "../stores/system";
 import { useGemini } from "./useGemini";
 import { useAudio } from "./useAudio";
 import { ref as dbRef, onValue } from "firebase/database";
-import { db } from "../firebase"; // ⚠️ ถ้า Error ตรงนี้ให้เปลี่ยนเป็น "./useFirebase"
+import { db } from "../firebase"; // เช็ค path ให้ถูกต้อง
 import { ref } from "vue";
 
-// ==========================================
-// ✅ ส่วนจัดการ Logger (รวมไว้ที่นี่เลย)
-// ==========================================
-const DEBUG_MODE = true; // ปรับเป็น false ถ้าไม่อยากเห็น Log รกๆ
-
+// Logger (Internal)
+const DEBUG_MODE = true;
 const logger = {
   log: (...args) => {
     if (DEBUG_MODE) console.log(...args);
@@ -23,12 +20,9 @@ const logger = {
     console.error(...args);
   },
 };
-// ==========================================
 
 // Saved names cache
 const savedNamesCache = ref({});
-
-// Initialize listener for saved names
 onValue(dbRef(db, "nicknames"), (snapshot) => {
   const data = snapshot.val() || {};
   savedNamesCache.value = data;
@@ -52,9 +46,7 @@ export function useChatProcessor() {
 
   async function processMessage(item) {
     // 1. Validate Message
-    if (!item.snippet || !item.authorDetails) {
-      return;
-    }
+    if (!item.snippet || !item.authorDetails) return;
 
     const msg = item.snippet.displayMessage || "";
     if (!msg) return;
@@ -65,10 +57,9 @@ export function useChatProcessor() {
       item.authorDetails.profileImageUrl ||
       "https://www.gstatic.com/youtube/img/creator/avatars/sample_avatar.png";
 
-    // ✅ Log แบบดูง่าย
     logger.log(`📩 [${realName}]: ${msg}`);
 
-    // Check if has nickname
+    // Check Nickname
     let displayName = realName;
     if (savedNamesCache.value[uid]) {
       displayName =
@@ -85,14 +76,12 @@ export function useChatProcessor() {
     let targetId = null;
     let targetPrice = null;
     let method = null;
-
     const stockSize = stockStore.stockSize;
 
-    // 2. Try AI Analysis first (if enabled)
+    // 2. AI Analysis
     if (systemStore.isAiCommander) {
       try {
         const aiResult = await analyzeChat(msg);
-
         if (aiResult) {
           logger.log("🤖 AI Result:", aiResult);
           if (aiResult.intent === "buy" && aiResult.id) {
@@ -144,7 +133,7 @@ export function useChatProcessor() {
       }
     }
 
-    // 4. Add message to chat (บันทึกเสมอ)
+    // 4. Add message to chat
     chatStore.addMessage({
       id: item.id,
       text: msg,
@@ -159,44 +148,37 @@ export function useChatProcessor() {
       timestamp: new Date(item.snippet.publishedAt).getTime(),
     });
 
-    // 5. Text-to-Speech
+    // 5. Text-to-Speech (✅ แก้ไขให้อ่านชื่อ...ข้อความ)
     let speakMsg = msg.replace(
-      /(?:[\u2700-\u27BF]|[\uE000-\uF8FF]|[\uD83C-\uD83E][\uDC00-\uDFFF]|[\u2011-\u26FF])+/g,
-      " "
-    );
-    speakMsg = speakMsg.replace(
-      /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g,
+      /(?:[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF])/g,
       ""
     );
 
-    if (speakMsg.trim().length > 0 && speakMsg.length < 100) {
-      queueSpeech(`${displayName} ... ${speakMsg}`);
+    // ถ้าไม่ใช่คำสั่งซื้อ/ยกเลิก ให้อ่านแชทปกติ
+    if (!intent) {
+      if (speakMsg.trim().length > 0 && speakMsg.length < 100) {
+        queueSpeech(`${displayName} ... ${speakMsg}`);
+      }
     }
 
     if (method === "ai-skip") return;
 
     // 6. Process Order/Cancel
     if (targetId && targetId > 0) {
-      if (targetId > stockSize) {
-        stockStore.stockSize = targetId;
-      }
+      if (targetId > stockSize) stockStore.stockSize = targetId;
 
       if (intent === "buy") {
         let ownerName = displayName;
         let ownerUid = uid;
 
         if (isAdmin) {
-          let cleanName = msg;
-          cleanName = cleanName
+          // ... Logic Admin Proxy เดิม ...
+          let cleanName = msg
             .replace(targetId.toString(), "")
             .replace(/f|cf|รับ|เอา|=/gi, "");
-
-          if (targetPrice) {
+          if (targetPrice)
             cleanName = cleanName.replace(targetPrice.toString(), "");
-          }
-
           cleanName = cleanName.replace(/^[:=\-\s]+|[:=\-\s]+$/g, "").trim();
-
           if (cleanName.length > 0) {
             ownerName = cleanName;
             ownerUid = "admin-proxy-" + Date.now();
@@ -208,6 +190,7 @@ export function useChatProcessor() {
 
         logger.log(`🛒 Order: ${ownerName} -> Item ${targetId}`);
 
+        // จองของ
         await stockStore.processOrder(
           targetId,
           ownerName,
@@ -217,19 +200,29 @@ export function useChatProcessor() {
           method
         );
 
+        // ✅ มีแค่เสียง ติ๊ง! ไม่ต้องพูดชื่อ
         playDing();
       } else if (intent === "cancel") {
         const currentItem = stockStore.stockData[targetId];
         if (isAdmin || (currentItem && currentItem.uid === uid)) {
           logger.log(`❌ Cancel: Item ${targetId}`);
-          stockStore.processCancel(targetId);
-          queueSpeech(`${displayName} ยกเลิกรายการที่ ${targetId}`);
+
+          // ✅ เรียกใช้แบบรับค่ากลับ
+          const result = await stockStore.processCancel(targetId);
+
+          // ✅ มีเสียงเตือน + พูดว่าใครหลุด ใครได้ต่อ
+          playDing();
+          if (result && result.nextOwner) {
+            queueSpeech(
+              `${result.previousOwner} ยกเลิก... ${result.nextOwner} ได้สิทธิ์ต่อค่ะ`
+            );
+          } else {
+            queueSpeech(`${displayName} ยกเลิกรายการที่ ${targetId} ค่ะ`);
+          }
         }
       }
     }
   }
 
-  return {
-    processMessage,
-  };
+  return { processMessage };
 }

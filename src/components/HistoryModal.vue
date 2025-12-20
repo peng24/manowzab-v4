@@ -1,233 +1,185 @@
 <template>
   <div class="dashboard-overlay" @click.self="$emit('close')">
-    <div class="dashboard-content">
+    <div class="history-modal">
       <div class="dashboard-header">
-        <div class="dash-title">🕒 ประวัติการไลฟ์</div>
-        <button class="btn btn-dark" @click="$emit('close')">ปิด</button>
+        <div class="flex gap-10" style="align-items: center">
+          <h2 class="dash-title">
+            <i class="fa-solid fa-clock-rotate-left"></i> ประวัติแชท
+          </h2>
+          <span class="text-secondary" style="font-size: 0.9em">
+            {{ systemStore.liveTitle || "กำลังโหลดชื่อไลฟ์..." }}
+          </span>
+        </div>
+
+        <button class="btn btn-dark" @click="$emit('close')">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
 
-      <div style="padding: 10px">
-        <input
-          type="text"
-          v-model="searchText"
-          class="history-search-box"
-          placeholder="🔍 ค้นหาชื่อไลฟ์..."
-        />
-      </div>
-
-      <div style="overflow-y: auto; flex: 1; padding: 0 10px">
-        <ul class="history-list">
-          <li
-            v-if="loading"
-            style="text-align: center; color: #888; padding: 20px"
+      <div
+        class="p-10"
+        style="background: #252525; border-bottom: 1px solid #333"
+      >
+        <div class="flex gap-10">
+          <input
+            v-model="searchQuery"
+            type="text"
+            class="history-search-box"
+            placeholder="🔍 ค้นหาชื่อ หรือ ข้อความ..."
+            autofocus
+          />
+          <button
+            class="btn btn-dark"
+            @click="confirmClearHistory"
+            title="ล้างประวัติ"
           >
-            <i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดประวัติ...
-          </li>
+            <i class="fa-solid fa-trash text-error"></i>
+          </button>
+        </div>
+      </div>
 
-          <li
-            v-for="item in filteredHistory"
-            :key="item.id"
+      <div
+        class="dashboard-content"
+        style="padding: 0; background: transparent; box-shadow: none"
+      >
+        <div class="history-list" style="overflow-y: auto; padding: 15px">
+          <div
+            v-if="filteredHistory.length === 0"
+            class="text-center text-secondary mt-10"
+          >
+            ไม่พบข้อมูล
+          </div>
+
+          <div
+            v-for="chat in filteredHistory"
+            :key="chat.id"
             class="history-item"
-            @click="loadHistory(item.id)"
           >
-            <div class="history-title">{{ item.title }}</div>
-            <div class="history-date">{{ formatDate(item.timestamp) }}</div>
-            <button
-              class="btn-delete-history"
-              @click.stop="deleteHistory(item.id)"
-              title="ลบประวัติ"
+            <div
+              class="flex"
+              style="justify-content: space-between; align-items: flex-start"
             >
-              <i class="fa-solid fa-trash"></i>
-            </button>
-          </li>
-
-          <li
-            v-if="!loading && filteredHistory.length === 0"
-            style="text-align: center; color: #888; padding: 20px"
-          >
-            <i class="fa-solid fa-inbox"></i><br />
-            ไม่พบประวัติ
-          </li>
-        </ul>
+              <div>
+                <div class="history-title">
+                  {{ chat.displayName }}
+                  <span
+                    v-if="chat.realName !== chat.displayName"
+                    class="real-name-sub"
+                  >
+                    ({{ chat.realName }})
+                  </span>
+                </div>
+                <div class="text-white">{{ chat.text }}</div>
+              </div>
+              <div
+                class="text-secondary"
+                style="font-size: 0.8em; white-space: nowrap"
+              >
+                {{ formatTime(chat.timestamp) }}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { ref as dbRef, onValue, remove } from "firebase/database";
-import { db } from "../composables/useFirebase";
-import { useSystemStore } from "../stores/system";
-import { useStockStore } from "../stores/stock";
+import { ref, computed } from "vue";
+import { useChatStore } from "../stores/chat";
+import { useSystemStore } from "../stores/system"; // ✅ เรียกใช้ System Store
 import Swal from "sweetalert2";
 
 const emit = defineEmits(["close"]);
+const chatStore = useChatStore();
+const systemStore = useSystemStore(); // ✅ ใช้งาน
+const searchQuery = ref("");
 
-const systemStore = useSystemStore();
-const stockStore = useStockStore();
-
-const historyData = ref([]);
-const searchText = ref("");
-const loading = ref(true);
-
+// Filter logic
 const filteredHistory = computed(() => {
-  if (!searchText.value) return historyData.value;
+  if (!searchQuery.value) return chatStore.fullChatLog.slice().reverse();
 
-  const search = searchText.value.toLowerCase();
-  return historyData.value.filter((item) =>
-    item.title.toLowerCase().includes(search)
-  );
+  const q = searchQuery.value.toLowerCase();
+  return chatStore.fullChatLog
+    .filter(
+      (c) =>
+        c.text.toLowerCase().includes(q) ||
+        c.displayName.toLowerCase().includes(q) ||
+        c.realName.toLowerCase().includes(q)
+    )
+    .slice()
+    .reverse();
 });
 
-function formatDate(timestamp) {
-  if (!timestamp) return "";
-
-  const date = new Date(timestamp);
-  const months = [
-    "ม.ค.",
-    "ก.พ.",
-    "มี.ค.",
-    "เม.ย.",
-    "พ.ค.",
-    "มิ.ย.",
-    "ก.ค.",
-    "ส.ค.",
-    "ก.ย.",
-    "ต.ค.",
-    "พ.ย.",
-    "ธ.ค.",
-  ];
-
-  return `${date.getDate()} ${months[date.getMonth()]} ${
-    date.getFullYear() + 543
-  } (${date.getHours().toString().padStart(2, "0")}:${date
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")})`;
-}
-
-function loadHistory(videoId) {
-  systemStore.currentVideoId = videoId;
-  stockStore.connectToStock(videoId);
-
-  Swal.fire({
-    icon: "success",
-    title: "โหลดประวัติสำเร็จ",
-    text: `Video ID: ${videoId}`,
-    timer: 2000,
-    showConfirmButton: false,
+function formatTime(timestamp) {
+  return new Date(timestamp).toLocaleTimeString("th-TH", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
-
-  emit("close");
 }
 
-function deleteHistory(videoId) {
+function confirmClearHistory() {
   Swal.fire({
-    title: "ลบประวัติ?",
-    text: "คุณต้องการลบประวัติการไลฟ์นี้หรือไม่?",
+    title: "ล้างประวัติแชททั้งหมด?",
+    text: "กู้คืนไม่ได้นะ!",
     icon: "warning",
     showCancelButton: true,
-    confirmButtonText: "ลบ",
+    confirmButtonColor: "#d33",
+    confirmButtonText: "ล้างเลย",
     cancelButtonText: "ยกเลิก",
-    confirmButtonColor: "#d32f2f",
+    background: "#1e1e1e",
+    color: "#fff",
+    // ✅ CSS ใน style.css จะช่วยดันให้ swal นี้อยู่บนสุดเองครับ
   }).then((result) => {
     if (result.isConfirmed) {
-      remove(dbRef(db, `history/${videoId}`))
-        .then(() => {
-          Swal.fire({
-            icon: "success",
-            title: "ลบประวัติแล้ว",
-            timer: 1500,
-            showConfirmButton: false,
-          });
-        })
-        .catch((error) => {
-          console.error("Error deleting history:", error);
-          Swal.fire("Error", "ลบไม่สำเร็จ", "error");
-        });
+      chatStore.clearChat();
+      Swal.fire({
+        title: "เรียบร้อย!",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#1e1e1e",
+        color: "#fff",
+      });
     }
   });
 }
-
-onMounted(() => {
-  onValue(dbRef(db, "history"), (snapshot) => {
-    const data = snapshot.val() || {};
-    historyData.value = Object.keys(data)
-      .map((key) => ({
-        id: key,
-        ...data[key],
-      }))
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-    loading.value = false;
-  });
-});
 </script>
 
 <style scoped>
-.dashboard-content {
-  background: #121212;
-  border-radius: 8px;
-  max-width: 600px;
-  max-height: 80vh;
-  overflow: hidden;
+/* ย้าย style หลักไปไว้ใน assets/style.css แล้ว */
+/* ปรับแต่งเพิ่มเติมเฉพาะหน้า */
+.history-modal {
+  background: #1e1e1e;
+  width: 90%;
+  max-width: 800px;
+  max-height: 85vh;
+  border-radius: 12px;
+  border: 1px solid #444;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+  position: relative;
+  z-index: 9999;
 }
 
-.history-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.history-search-box {
+  width: 100%;
+  padding: 10px 15px;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 1em;
+  font-family: "Kanit", sans-serif; /* ใช้ Font Kanit */
 }
 
 .history-item {
-  background: #1e1e1e;
-  padding: 15px;
-  margin-bottom: 10px;
+  background: #2a2a2a;
+  padding: 10px 15px;
   border-radius: 8px;
+  margin-bottom: 8px;
   border: 1px solid #333;
-  cursor: pointer;
-  transition: 0.2s;
-  position: relative;
-}
-
-.history-item:hover {
-  background: #252525;
-  border-color: #555;
-  transform: translateY(-2px);
-}
-
-.history-title {
-  font-size: 1.1em;
-  font-weight: bold;
-  color: #fff;
-  margin-bottom: 5px;
-  padding-right: 40px;
-}
-
-.history-date {
-  font-size: 0.9em;
-  color: #888;
-}
-
-.btn-delete-history {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: #d32f2f;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: 0.2s;
-}
-
-.btn-delete-history:hover {
-  background: #b71c1c;
 }
 </style>

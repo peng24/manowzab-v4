@@ -1,5 +1,9 @@
 <template>
-  <div class="app-container">
+  <div
+    class="app-container"
+    @click="handleFirstInteraction"
+    @touchstart="handleFirstInteraction"
+  >
     <Header />
 
     <div v-if="systemStore.isAway" class="away-banner">
@@ -21,6 +25,7 @@
     <div class="main-container">
       <StockGrid />
       <ChatPanel />
+
       <Dashboard v-if="showDashboard" @close="showDashboard = false" />
       <HistoryModal v-if="showHistory" @close="showHistory = false" />
     </div>
@@ -34,7 +39,7 @@ import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
 import { useNicknameStore } from "./stores/nickname";
 import { ref as dbRef, onValue, onDisconnect, set } from "firebase/database";
-import { db } from "./firebase";
+import { db } from "./firebase"; // ตรวจสอบ path ให้ตรงกับโปรเจคจริง (เช่น ./composables/useFirebase)
 import { useAudio } from "./composables/useAudio";
 import Header from "./components/Header.vue";
 import StockGrid from "./components/StockGrid.vue";
@@ -46,7 +51,9 @@ const systemStore = useSystemStore();
 const stockStore = useStockStore();
 const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
-const { queueSpeech } = useAudio();
+
+// ✅ ดึง unlockAudio มาใช้แทน playDing
+const { queueSpeech, unlockAudio } = useAudio();
 
 const showDashboard = ref(false);
 const showHistory = ref(false);
@@ -58,7 +65,7 @@ let awayStartTime = 0;
 provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
 
-// ✅ ข้อความเมื่อเปิดโหมด - สุ่ม 1 ใน 10 (บอกครั้งเดียว)
+// ✅ ข้อความเมื่อเปิดโหมด
 const awayStartMessages = [
   "แอดมินพาลูกนอนแล้ว รอแปปนะคะ",
   "แอดมินพาลูกนอนแล้วค่ะ ช่วยดูแลแชทหน่อยนะคะ",
@@ -72,7 +79,7 @@ const awayStartMessages = [
   "พาน้องนอนแล้ว ช่วยดูแลลูกค้าหน่อยนะคะ",
 ];
 
-// ✅ ข้อความเมื่อปิดโหมด - สุ่ม 1 ใน 8
+// ✅ ข้อความเมื่อปิดโหมด
 const awayEndMessages = [
   "ลูกหลับแล้ว แอดมินสแตนบายแล้วค่ะ",
   "ลูกหลับแล้ว กลับมาแล้วค่ะ",
@@ -84,12 +91,10 @@ const awayEndMessages = [
   "ลูกนอนแล้ว แอดมินพร้อมดูแลลูกค้าแล้วค่ะ",
 ];
 
-// ✅ สุ่มข้อความ
 function getRandomMessage(messageArray) {
   return messageArray[Math.floor(Math.random() * messageArray.length)];
 }
 
-// ✅ ฟังก์ชันปิด Away Mode
 function closeAwayMode() {
   set(dbRef(db, "system/awayMode"), {
     isAway: false,
@@ -105,7 +110,6 @@ function closeAwayMode() {
     });
 }
 
-// ✅ อัปเดต Timer (ไม่มีการแจ้งเตือนซ้ำ)
 function updateAwayTimer() {
   if (!systemStore.isAway || !awayStartTime) {
     awayTimer.value = "00:00";
@@ -128,30 +132,36 @@ function updateAwayTimer() {
   }
 }
 
+// ✅ Unlock Audio Function (Silent)
+function handleFirstInteraction() {
+  unlockAudio(); // ใช้ฟังก์ชันนี้แทน playDing เพื่อไม่ให้มีเสียงรบกวน
+
+  // ลบ Listener ออกเพื่อไม่ให้ทำงานซ้ำ
+  document.removeEventListener("click", handleFirstInteraction);
+  document.removeEventListener("touchstart", handleFirstInteraction);
+  console.log("🔊 Audio unlocked silently by user interaction");
+}
+
 onMounted(() => {
   console.log("🚀 App mounted");
 
-  // ✅ Initialize Nickname Listener ทันที
+  // ✅ Initialize Listeners
   nicknameStore.initNicknameListener();
-
-  // ✅ Initialize Firebase connections ทันที
   stockStore.connectToStock("demo");
 
-  // ✅ Listen to Firebase connection status ทันที
+  // ✅ Firebase Connection Status
   const connectedRef = dbRef(db, ".info/connected");
   onValue(connectedRef, (snap) => {
     if (snap.val() === true) {
       systemStore.statusDb = "ok";
       console.log("✅ Firebase Connected");
 
-      // Set presence
       const myConnectionRef = dbRef(db, `presence/${systemStore.myDeviceId}`);
       set(myConnectionRef, {
         online: true,
         lastSeen: Date.now(),
       }).catch((err) => console.error("Presence error:", err));
 
-      // Remove on disconnect
       onDisconnect(myConnectionRef).remove();
     } else {
       systemStore.statusDb = "err";
@@ -159,7 +169,7 @@ onMounted(() => {
     }
   });
 
-  // Listen to active video
+  // System Listeners
   onValue(dbRef(db, "system/activeVideo"), (snap) => {
     const vid = snap.val();
     if (vid && vid !== "demo") {
@@ -168,7 +178,6 @@ onMounted(() => {
     }
   });
 
-  // Listen to stock size
   onValue(
     dbRef(db, "settings/" + systemStore.currentVideoId + "/stockSize"),
     (snap) => {
@@ -177,7 +186,6 @@ onMounted(() => {
     }
   );
 
-  // Listen to AI Commander status
   onValue(dbRef(db, "system/aiCommander"), (snap) => {
     const data = snap.val();
     if (data && typeof data === "object" && data.enabled) {
@@ -189,7 +197,7 @@ onMounted(() => {
     }
   });
 
-  // ✅ Listen to Away Mode - ซิงค์ทุกเครื่อง
+  // Away Mode Listener
   onValue(dbRef(db, "system/awayMode"), (snap) => {
     const val = snap.val();
     const newState = val?.isAway || false;
@@ -198,37 +206,27 @@ onMounted(() => {
     console.log("🌙 Away mode changed:", { newState, prevState, data: val });
 
     if (newState && !prevState) {
-      // ✅ เปิดโหมดพาลูกนอน - พูดครั้งเดียว
       systemStore.isAway = true;
       awayStartTime = val?.startTime || Date.now();
 
-      // เริ่ม timer
       if (!awayInterval) {
         updateAwayTimer();
         awayInterval = setInterval(updateAwayTimer, 1000);
       }
 
-      // ✅ พูดข้อความเปิดโหมด (สุ่ม 1 ครั้ง)
       const startMessage = getRandomMessage(awayStartMessages);
       queueSpeech(startMessage);
-
-      console.log("✅ Away mode activated:", startMessage);
     } else if (!newState && prevState) {
-      // ✅ ปิดโหมดพาลูกนอน - พูดครั้งเดียว
       systemStore.isAway = false;
 
-      // หยุด timer
       if (awayInterval) {
         clearInterval(awayInterval);
         awayInterval = null;
       }
       awayTimer.value = "00:00";
 
-      // ✅ พูดข้อความปิดโหมด (สุ่ม 1 ครั้ง)
       const endMessage = getRandomMessage(awayEndMessages);
       queueSpeech(endMessage);
-
-      console.log("✅ Away mode deactivated:", endMessage);
     }
   });
 });
@@ -376,7 +374,7 @@ onMounted(() => {
   }
 
   .away-subtitle {
-    display: none; /* ซ่อนข้อความยาวๆ ในมือถือเพื่อประหยัดที่ */
+    display: none;
   }
 
   .away-timer {

@@ -1,8 +1,8 @@
 <template>
   <div class="stock-panel">
     <div class="stock-header">
-      <div class="stock-stats flex-center gap-10">
-        รายการทั้งหมด:
+      <div class="stock-input-group">
+        รายการ:
         <input
           type="number"
           v-model.lazy="stockStore.stockSize"
@@ -17,14 +17,12 @@
         />
       </div>
 
-      <div class="stock-stats">
-        ขายแล้ว: <span class="stat-sold">{{ soldCount }}</span> /
-        {{ stockStore.stockSize }}
+      <div class="header-center stock-stats">
+        ขายแล้ว: <span class="stat-sold">{{ soldCount }}</span>
+        <span style="opacity: 0.5">/ {{ stockStore.stockSize }}</span>
       </div>
 
-      <button class="btn btn-dark" @click="confirmClear">
-        <i class="fa-solid fa-trash"></i> ล้างกระดาน
-      </button>
+      <div></div>
     </div>
 
     <div class="stock-grid" ref="gridContainer">
@@ -48,7 +46,6 @@
         <div v-if="getQueueLength(i) > 0" class="queue-badge">
           +{{ getQueueLength(i) }}
         </div>
-
         <div
           v-if="getStockItem(i).source"
           :class="['source-icon', getStockItem(i).source]"
@@ -78,7 +75,6 @@
               <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
-
           <div class="queue-body">
             <div
               class="flex-center gap-10 mb-10 p-10"
@@ -93,7 +89,6 @@
               />
               <span>บาท</span>
             </div>
-
             <div class="queue-list">
               <div
                 v-if="tempQueue.length === 0"
@@ -101,7 +96,6 @@
               >
                 ไม่มีการจอง
               </div>
-
               <div
                 v-for="(person, index) in tempQueue"
                 :key="index"
@@ -135,7 +129,6 @@
               </div>
             </div>
           </div>
-
           <div
             class="queue-header"
             style="justify-content: flex-end; gap: 10px"
@@ -156,10 +149,9 @@
 <script setup>
 import { computed, ref, watch, nextTick } from "vue";
 import { useStockStore } from "../stores/stock";
-import { useAudio } from "../composables/useAudio"; // เรียกใช้เสียง
+import { useAudio } from "../composables/useAudio";
 import Swal from "sweetalert2";
 
-// Logger (ใส่ไว้เหมือนเดิม)
 const DEBUG_MODE = true;
 const logger = { log: (...args) => DEBUG_MODE && console.log(...args) };
 
@@ -169,7 +161,6 @@ const gridContainer = ref(null);
 const highlightedId = ref(null);
 const newOrders = ref(new Set());
 
-// Modal Variables
 const showModal = ref(false);
 const editingId = ref(null);
 const editingPrice = ref(0);
@@ -189,7 +180,7 @@ function getQueueLength(num) {
 }
 function getSourceIcon(source) {
   if (source === "ai") return "fa-solid fa-robot";
-  if (source === "regex") return "fa-solid fa-keyboard"; // เปลี่ยนไอคอน
+  if (source === "regex") return "fa-solid fa-keyboard";
   return "fa-solid fa-hand-pointer";
 }
 function isNewOrder(num) {
@@ -199,7 +190,6 @@ function saveStockSize() {
   stockStore.updateStockSize(stockStore.stockSize);
 }
 
-// Watcher (เหมือนเดิม)
 watch(
   () => stockStore.stockData,
   (newVal, oldVal) => {
@@ -224,16 +214,10 @@ function scrollToItem(num) {
   });
 }
 
-// ==========================================
-// ✅ Logic จัดการคิว (Drag & Drop)
-// ==========================================
-
 function openQueueModal(num) {
   const item = getStockItem(num);
   editingId.value = num;
   editingPrice.value = item.price || 0;
-
-  // แปลงข้อมูล Owner + Queue ให้เป็น Array เดียวกันเพื่อจัดการง่าย
   tempQueue.value = [];
   if (item.owner) {
     tempQueue.value.push({
@@ -246,15 +230,12 @@ function openQueueModal(num) {
   if (item.queue) {
     tempQueue.value.push(...JSON.parse(JSON.stringify(item.queue)));
   }
-
   showModal.value = true;
 }
 
 function closeModal() {
   showModal.value = false;
 }
-
-// Drag & Drop Handlers
 function dragStart(index) {
   draggingIndex = index;
 }
@@ -264,12 +245,9 @@ function drop(index) {
   tempQueue.value.splice(index, 0, itemToMove);
   draggingIndex = null;
 }
-
 function removeQueueItem(index) {
-  // ถ้าลบคนแรก (เจ้าของ) ให้ระบบเสียงแจ้งเตือนตอนบันทึก (ทำใน saveQueueChanges)
   tempQueue.value.splice(index, 1);
 }
-
 function manualReserve() {
   tempQueue.value.push({
     owner: "ลูกค้าใหม่",
@@ -286,12 +264,10 @@ async function saveQueueChanges() {
     tempQueue.value.length > 0 ? tempQueue.value[0].owner : null;
   const oldOwnerName = oldItem.owner;
 
-  // สร้าง Object ข้อมูลใหม่
   let newData = null;
   if (tempQueue.value.length > 0) {
     const first = tempQueue.value[0];
     const rest = tempQueue.value.slice(1);
-
     newData = {
       owner: first.owner,
       uid: first.uid,
@@ -302,23 +278,16 @@ async function saveQueueChanges() {
     };
   }
 
-  // เช็คว่ามีการเปลี่ยนคนได้ของหรือไม่ เพื่อเล่นเสียง
   if (oldOwnerName && !newOwnerName) {
-    // กรณีลบหมด
     playDing();
     queueSpeech(`ยกเลิกรายการที่ ${num} ค่ะ`);
   } else if (oldOwnerName && newOwnerName && oldOwnerName !== newOwnerName) {
-    // กรณีเปลี่ยนคน (ยกเลิกคนเก่า คนใหม่เสียบ)
     playDing();
     queueSpeech(`${oldOwnerName} หลุด... ${newOwnerName} ได้ต่อค่ะ`);
   }
 
-  // บันทึกลง Firebase
-  if (newData) {
-    await stockStore.updateItemData(num, newData);
-  } else {
-    await stockStore.processCancel(num); // ลบรายการ
-  }
+  if (newData) await stockStore.updateItemData(num, newData);
+  else await stockStore.processCancel(num);
 
   closeModal();
   Swal.fire({

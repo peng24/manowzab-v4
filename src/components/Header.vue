@@ -133,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, inject, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, inject, computed, onMounted, onBeforeUnmount, watch } from "vue"; // ✅ เพิ่ม watch
 import { useSystemStore } from "../stores/system";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
@@ -141,12 +141,10 @@ import { useYouTube } from "../composables/useYouTube";
 import { useGemini } from "../composables/useGemini";
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, update, set } from "firebase/database";
-import { db } from "../composables/useFirebase"; // หรือ "../firebase" ตามโครงสร้างไฟล์จริงของคุณ
+import { db } from "../composables/useFirebase"; // เช็ค path ให้ตรงกับเครื่องคุณ
 import Swal from "sweetalert2";
 
-// ==========================================
-// ✅ Logger Configuration
-// ==========================================
+// Logger Configuration (คงเดิม)
 const DEBUG_MODE = true;
 const logger = {
   log: (...args) => {
@@ -159,14 +157,13 @@ const logger = {
     console.error(...args);
   },
 };
-// ==========================================
 
 const systemStore = useSystemStore();
 const chatStore = useChatStore();
 const stockStore = useStockStore();
 const { connectVideo, disconnect } = useYouTube();
 const { setApiKey } = useGemini();
-const { queueSpeech } = useAudio();
+const { queueSpeech, unlockAudio } = useAudio(); // ✅ เพิ่ม unlockAudio
 
 const openDashboard = inject("openDashboard");
 const openHistory = inject("openHistory");
@@ -180,24 +177,33 @@ const dropdownRef = ref(null);
 const dropdownStyle = ref({});
 let simIntervalId = null;
 
-// ✅ คำนวณจำนวนลูกค้าที่พร้อมส่ง
+// ✅ Watcher: ซิงค์รหัส Video ID จาก Firebase (ถ้าเครื่องอื่นเปลี่ยน เครื่องนี้เปลี่ยนด้วย)
+watch(
+  () => systemStore.currentVideoId,
+  (newVal) => {
+    if (newVal && newVal !== "demo" && newVal !== videoId.value) {
+      videoId.value = newVal;
+      logger.log("🔄 Synced Video ID:", newVal);
+    }
+  }
+);
+
+// คำนวณ Shipping Count (คงเดิม)
 const shippingCount = computed(() => {
   const currentShipping = shippingData.value[systemStore.currentVideoId] || {};
   const activeBuyerUids = new Set();
-
   Object.keys(stockStore.stockData).forEach((key) => {
     if (stockStore.stockData[key]?.uid) {
       activeBuyerUids.add(stockStore.stockData[key].uid);
     }
   });
-
   return Object.keys(currentShipping).filter(
     (uid) => currentShipping[uid]?.ready && activeBuyerUids.has(uid)
   ).length;
 });
 
-// ✅ ฟังก์ชันแสดง Title ของ Status
 function getStatusTitle(type) {
+  // (Logic เดิม)
   const titles = {
     db: {
       ok: "✅ เชื่อมต่อ Firebase สำเร็จ",
@@ -215,26 +221,22 @@ function getStatusTitle(type) {
       err: "❌ ไม่สามารถดึงแชท",
     },
   };
-
   const status =
     type === "db"
       ? systemStore.statusDb
       : type === "api"
       ? systemStore.statusApi
       : systemStore.statusChat;
-
   return titles[type][status] || "ไม่ทราบสถานะ";
 }
 
-// ✅ Toggle Dropdown
 function toggleDropdown(event) {
+  // (Logic เดิม)
   event.preventDefault();
   event.stopPropagation();
-
   if (!showDropdown.value) {
     const btn = event.currentTarget;
     const rect = btn.getBoundingClientRect();
-
     dropdownStyle.value = {
       position: "fixed",
       top: `${rect.bottom + 5}px`,
@@ -242,22 +244,16 @@ function toggleDropdown(event) {
       zIndex: "9999",
     };
   }
-
   showDropdown.value = !showDropdown.value;
-  logger.log("🔽 Dropdown:", showDropdown.value);
 }
 
-// ✅ Close dropdown when clicking outside
 function handleClickOutside(event) {
-  if (showDropdown.value) {
-    showDropdown.value = false;
-  }
+  if (showDropdown.value) showDropdown.value = false;
 }
 
-// ✅ Toggle AI Commander
 function toggleAI() {
+  // (Logic เดิม + ซิงค์)
   const newState = !systemStore.isAiCommander;
-
   update(dbRef(db, "system/aiCommander"), {
     enabled: newState ? systemStore.myDeviceId : null,
   })
@@ -265,12 +261,9 @@ function toggleAI() {
       systemStore.isAiCommander = newState;
       queueSpeech(newState ? "เปิด AI Commander" : "ปิด AI Commander");
     })
-    .catch((error) => {
-      logger.error("Error toggling AI:", error);
-    });
+    .catch((error) => logger.error("Error toggling AI:", error));
 }
 
-// ✅ Toggle Connection
 async function toggleConnection() {
   if (systemStore.isConnected) {
     disconnect();
@@ -295,9 +288,16 @@ async function toggleConnection() {
   systemStore.currentVideoId = videoId.value;
   stockStore.connectToStock(videoId.value);
 
+  // ✅ เพิ่ม: Unlock Audio เพื่อให้เสียงพูดทำงาน
+  unlockAudio();
+
+  // ✅ เพิ่ม: ส่งรหัสไลฟ์ขึ้น Firebase เพื่อให้เครื่องอื่นรู้
+  set(dbRef(db, "system/activeVideo"), videoId.value).catch((err) =>
+    console.error("Sync Error:", err)
+  );
+
   try {
     const success = await connectVideo(videoId.value);
-
     if (success) {
       systemStore.statusChat = "ok";
       queueSpeech("เชื่อมต่อสำเร็จ กำลังอ่านคอมเมนต์");
@@ -333,8 +333,8 @@ async function toggleConnection() {
   }
 }
 
-// ✅ Download Chat CSV
 function downloadCSV() {
+  // (Logic เดิม)
   if (chatStore.fullChatLog.length === 0) {
     Swal.fire({
       icon: "warning",
@@ -345,7 +345,6 @@ function downloadCSV() {
     showDropdown.value = false;
     return;
   }
-
   chatStore.downloadChatCSV(systemStore.currentVideoId);
   Swal.fire({
     icon: "success",
@@ -357,13 +356,11 @@ function downloadCSV() {
   showDropdown.value = false;
 }
 
-// ✅ Test Voice
 function testVoice() {
   queueSpeech("ทดสอบเสียง หนึ่ง สอง สาม สี่ ห้า");
   showDropdown.value = false;
 }
 
-// ✅ Toggle Fullscreen
 function toggleFullScreen() {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch((err) => {
@@ -380,58 +377,45 @@ function toggleFullScreen() {
   showDropdown.value = false;
 }
 
-// ✅ Toggle Away Mode
 function toggleAwayMode() {
+  // (Logic เดิม)
   const currentState = systemStore.isAway;
   const awayRef = dbRef(db, "system/awayMode");
-
   if (!currentState) {
     set(awayRef, {
       isAway: true,
       startTime: Date.now(),
       deviceId: systemStore.myDeviceId,
-    })
-      .then(() => {
-        logger.log("✅ Away mode enabled");
-        Swal.fire({
-          icon: "info",
-          title: "โหมดพาลูกนอน",
-          text: "ระบบจะซิงค์ไปทุกเครื่อง",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-      })
-      .catch((err) => {
-        logger.error("Away mode error:", err);
+    }).then(() => {
+      logger.log("✅ Away mode enabled");
+      Swal.fire({
+        icon: "info",
+        title: "โหมดพาลูกนอน",
+        text: "ระบบจะซิงค์ไปทุกเครื่อง",
+        timer: 2000,
+        showConfirmButton: false,
       });
+    });
   } else {
     set(awayRef, {
       isAway: false,
       startTime: null,
       closedBy: systemStore.myDeviceId,
-    })
-      .then(() => {
-        logger.log("✅ Away mode disabled");
-      })
-      .catch((err) => {
-        logger.error("Away mode error:", err);
-      });
+    }).then(() => {
+      logger.log("✅ Away mode disabled");
+    });
   }
-
   showDropdown.value = false;
 }
 
-// ✅ Toggle Simulation
 async function toggleSimulation() {
+  // (Logic เดิม)
   isSimulating.value = !isSimulating.value;
-
   if (isSimulating.value) {
-    // Dynamic import to save load time
     const { useChatProcessor } = await import(
       "../composables/useChatProcessor"
     );
     const { processMessage } = useChatProcessor();
-
     Swal.fire({
       icon: "info",
       title: "เริ่มจำลองแชท",
@@ -439,7 +423,6 @@ async function toggleSimulation() {
       timer: 1500,
       showConfirmButton: false,
     });
-
     simIntervalId = setInterval(() => {
       const rNum = Math.floor(Math.random() * stockStore.stockSize) + 1;
       const actions = [
@@ -449,9 +432,7 @@ async function toggleSimulation() {
         `เอา ${rNum}`,
         `CF${rNum}`,
       ];
-
       const randomAction = actions[Math.floor(Math.random() * actions.length)];
-
       processMessage({
         id: "sim-" + Date.now(),
         snippet: {
@@ -477,14 +458,12 @@ async function toggleSimulation() {
       showConfirmButton: false,
     });
   }
-
   showDropdown.value = false;
 }
 
-// ✅ Ask AI Key
 function askAiKey() {
+  // (Logic เดิม)
   const currentKey = localStorage.getItem("geminiApiKey") || "";
-
   Swal.fire({
     title: "ตั้งค่า Gemini API Key",
     html: '<a href="https://aistudio.google.com/" target="_blank" style="color:#29b6f6">กดขอ Key ฟรีที่นี่</a>',
@@ -509,8 +488,8 @@ function askAiKey() {
   showDropdown.value = false;
 }
 
-// ✅ Force Update
 function forceUpdate() {
+  // (Logic เดิม)
   Swal.fire({
     title: "บังคับอัปเดต?",
     text: "ระบบจะโหลดหน้าเว็บใหม่",
@@ -528,36 +507,18 @@ function forceUpdate() {
   showDropdown.value = false;
 }
 
-// ✅ Get Version Tooltip
 function getVersionTooltip() {
   return `Manowzab Command Center ${systemStore.version}`;
 }
 
-// ✅ Show Changelog (ย้ายออกมาไว้ตรงนี้แล้ว)
 function showChangelog() {
+  // (Logic เดิม)
   Swal.fire({
     title: "🚀 v4.1.0 Patch Notes",
-    html: `
-      <div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ฟีเจอร์ใหม่ (New Features)</h4>
-        <ul style="margin-bottom: 10px;">
-          <li>📱 <strong>Mobile & iPad Ready:</strong> ปรับ UI ใหม่ แก้ปัญหาตารางซ้อนกัน ใช้งานบนจอสัมผัสได้ลื่นไหล</li>
-          <li>🔄 <strong>Multi-device Sync:</strong> ซิงค์ "จำนวนสต็อก" และ "โหมดพาลูกนอน" ข้ามเครื่องทันที</li>
-          <li>🧹 <strong>Console Cleaner:</strong> จัดการ Log ไม่ให้รกหน้าจอขณะใช้งานจริง</li>
-        </ul>
-
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🐛 การแก้ไขบั๊ก (Bug Fixes)</h4>
-        <ul>
-          <li>💬 แก้ปัญหาแชท "ทักทาย" หรือข้อความทั่วไปไม่ขึ้นในระบบ</li>
-          <li>🛡️ เพิ่มระบบป้องกัน AI Error ไม่ให้กระทบการทำงานหลัก</li>
-          <li>⚡ ปรับปรุงประสิทธิภาพการตัดสต็อกให้แม่นยำขึ้น</li>
-        </ul>
-        
-        <p style="margin-top: 15px; font-size: 0.8em; color: #888;">
-          Deploy Date: ${new Date().toLocaleDateString("th-TH")}
-        </p>
-      </div>
-    `,
+    html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ฟีเจอร์ใหม่</h4>
+        <ul><li>📱 Mobile & iPad Ready</li><li>🔄 Sync รหัส Video ID ทันที</li></ul>
+        </div>`,
     background: "#1e1e1e",
     color: "#fff",
     confirmButtonText: "รับทราบ!",
@@ -566,19 +527,12 @@ function showChangelog() {
   });
 }
 
-// ✅ Mounted & Unmounted
 onMounted(() => {
   logger.log("🎯 Header mounted");
-
-  // Listen to shipping data
   onValue(dbRef(db, "shipping"), (snapshot) => {
     shippingData.value = snapshot.val() || {};
   });
-
-  // Add click outside listener
   document.addEventListener("click", handleClickOutside);
-
-  // Load saved video ID
   const savedVideoId = localStorage.getItem("lastVideoId");
   if (savedVideoId) {
     videoId.value = savedVideoId;
@@ -587,18 +541,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   logger.log("👋 Header unmounting");
-
-  // Remove listener
   document.removeEventListener("click", handleClickOutside);
-
-  // Clear simulation
-  if (simIntervalId) {
-    clearInterval(simIntervalId);
-  }
-
-  // Save video ID
-  if (videoId.value) {
-    localStorage.setItem("lastVideoId", videoId.value);
-  }
+  if (simIntervalId) clearInterval(simIntervalId);
+  if (videoId.value) localStorage.setItem("lastVideoId", videoId.value);
 });
 </script>

@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:gh": "vite build --base=/manowzab-v4/",
     "preview": "vite preview",
-    "deploy": "gh-pages -d dist"
+    "deploy": "npm run build:gh && gh-pages -d dist"
   },
   "dependencies": {
     "firebase": "^12.7.0",

@@ -3,13 +3,10 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
-  plugins: [
-    vue(),
-    // ❌ เอา VitePWA ออกชั่วคราว (ไว้มีรูปครบค่อยมาเติมครับ)
-  ],
+  plugins: [vue()],
 
-  // ✅ ตั้งค่า Base URL สำหรับ GitHub Pages
-  base: "/manowzab-v4/",
+  // ❌ ลบบรรทัด base: "..." ทิ้งไปเลยครับ ไม่ต้องใส่ตรงนี้แล้ว
+  // base: "/manowzab-v4/",  <-- ลบออก
 
   resolve: {
     alias: {

@@ -4,7 +4,7 @@ import { useSystemStore } from "../stores/system";
 import { useGemini } from "./useGemini";
 import { useAudio } from "./useAudio";
 import { ref as dbRef, onValue } from "firebase/database";
-import { db } from "../firebase"; // ⚠️ ตรวจสอบ path ให้ตรงกับโปรเจคจริง (เช่น "../composables/useFirebase")
+import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 
 // Logger Config
@@ -76,7 +76,7 @@ export function useChatProcessor() {
     let method = null;
     const stockSize = stockStore.stockSize;
 
-    // 2. AI Analysis
+    // 2. AI Analysis (ถ้าเปิดใช้)
     if (systemStore.isAiCommander) {
       try {
         const aiResult = await analyzeChat(msg);
@@ -91,6 +91,7 @@ export function useChatProcessor() {
             targetId = aiResult.id;
             method = "ai";
           } else if (aiResult.intent === "shipping") {
+            intent = "shipping";
             method = "ai";
             queueSpeech(`${displayName} แจ้งส่งของ`);
           } else if (aiResult.intent === "question") {
@@ -102,29 +103,43 @@ export function useChatProcessor() {
       }
     }
 
-    // 3. Fallback to Regex
+    // 3. Fallback to Regex (Logic Upgrade!)
     if (!method) {
-      const buyRegex =
-        /(?:^|[\s])(?:F|f|cf|CF|รับ|เอา)?\s*(\d+)(?:[\s=\/]+(\d+))?(?:$|[\s])/;
-      const cancelRegex =
-        /(?:^|[\s])(?:cc|CC|cancel|ยกเลิก|ไม่เอา|ปล่อย|หลุด)\s*(\d+)(?:$|[\s])/i;
-      const isQuestion =
-        /อก|เอว|ยาว|ราคา|เท่าไหร่|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม/i.test(
-          msg
-        );
+      // ✅ 3.1 ดักจับการส่งของ/โอนเงินก่อน (ป้องกัน "ส่ง 25" ไปตัดสต็อก)
+      const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
 
-      const cMatch = msg.match(cancelRegex);
-      const bMatch = msg.match(buyRegex);
+      // ✅ 3.2 ดักจับคำถาม (เพิ่มคำให้ครอบคลุมภาษาพูด)
+      const questionRegex =
+        /อก|เอว|ยาว|ราคา|เท่าไหร่|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
 
-      if (cMatch) {
-        intent = "cancel";
-        targetId = parseInt(cMatch[1]);
-        method = "regex";
-      } else if (bMatch && !isQuestion) {
-        intent = "buy";
-        targetId = parseInt(bMatch[1]);
-        targetPrice = bMatch[2] ? parseInt(bMatch[2]) : null;
-        method = "regex";
+      if (shippingRegex.test(msg)) {
+        intent = "shipping";
+        method = "regex-ship";
+      } else if (questionRegex.test(msg)) {
+        method = "question-skip"; // เป็นคำถาม ข้ามเลย
+      } else {
+        // ✅ 3.3 Regex แบบใหม่: ใช้ [^0-9] เป็นตัวคั่นแทน \s (รองรับ Emoji, ขีด, ติดกัน)
+        // จับ Pattern: (เริ่ม หรือ ไม่ใช่เลข) + (คำสั่งจอง)? + (ตัวเลขสินค้า) + (ราคา)? + (จบ หรือ ไม่ใช่เลข)
+        const buyRegex =
+          /(?:^|[^0-9])(?:F|f|cf|CF|รับ|เอา)?\s*(\d+)(?:[\s=\/]+(\d+))?(?:$|[^0-9])/;
+
+        // จับ Pattern ยกเลิก
+        const cancelRegex =
+          /(?:^|[^0-9])(?:cc|CC|cancel|ยกเลิก|ไม่เอา|ปล่อย|หลุด)\s*(\d+)(?:$|[^0-9])/i;
+
+        const cMatch = msg.match(cancelRegex);
+        const bMatch = msg.match(buyRegex);
+
+        if (cMatch) {
+          intent = "cancel";
+          targetId = parseInt(cMatch[1]);
+          method = "regex";
+        } else if (bMatch) {
+          intent = "buy";
+          targetId = parseInt(bMatch[1]);
+          targetPrice = bMatch[2] ? parseInt(bMatch[2]) : null;
+          method = "regex";
+        }
       }
     }
 
@@ -139,7 +154,7 @@ export function useChatProcessor() {
       avatar,
       color: stringToColor(uid),
       isAdmin,
-      type: intent, // ส่ง intent ไปเป็น type (buy/cancel/null)
+      type: intent, // ส่ง intent ไปเป็น type (buy/cancel/shipping/null)
       detectionMethod: method,
       timestamp: new Date(item.snippet.publishedAt).getTime(),
     });
@@ -160,12 +175,17 @@ export function useChatProcessor() {
       let ownerUid = uid;
 
       if (isAdmin) {
+        // Clean Name Logic (ปรับปรุงให้รองรับตัวคั่นใหม่ๆ)
         let cleanName = msg
           .replace(targetId.toString(), "")
           .replace(/f|cf|รับ|เอา|=/gi, "");
         if (targetPrice)
           cleanName = cleanName.replace(targetPrice.toString(), "");
-        cleanName = cleanName.replace(/^[:=\-\s]+|[:=\-\s]+$/g, "").trim();
+        // ลบอักขระพิเศษตอนต้น/ท้าย (รวมถึง Emoji และ -)
+        cleanName = cleanName
+          .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
+          .trim();
+
         if (cleanName.length > 0) {
           ownerName = cleanName;
           ownerUid = "admin-proxy-" + Date.now();
@@ -194,14 +214,14 @@ export function useChatProcessor() {
         // ✅ Action: ยกเลิกทันที
         await stockStore.processCancel(targetId);
 
-        // ✅ Audio: เสียงติ๊ง + อ่านข้อความแชทปกติ (ไม่พูดระบบแจ้งเตือนแล้ว)
+        // ✅ Audio: เสียงติ๊ง + อ่านข้อความแชทปกติ (ตามคำขอ)
         playDing();
         if (speakMsg.trim().length > 0)
           queueSpeech(`${displayName} ... ${speakMsg}`);
       }
     } else {
       // --- กรณีข้อความทั่วไป ---
-      if (method !== "ai" || intent !== "shipping") {
+      if (method !== "ai" && intent !== "shipping") {
         if (speakMsg.trim().length > 0 && speakMsg.length < 100) {
           queueSpeech(`${displayName} ... ${speakMsg}`);
         }

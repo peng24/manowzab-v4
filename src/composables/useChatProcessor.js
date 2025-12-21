@@ -4,10 +4,10 @@ import { useSystemStore } from "../stores/system";
 import { useGemini } from "./useGemini";
 import { useAudio } from "./useAudio";
 import { ref as dbRef, onValue } from "firebase/database";
-import { db } from "../firebase"; // เช็ค path ให้ถูกต้อง
+import { db } from "../firebase"; // ⚠️ ตรวจสอบ path ให้ตรงกับโปรเจคจริง (เช่น "../composables/useFirebase")
 import { ref } from "vue";
 
-// Logger (Internal)
+// Logger Config
 const DEBUG_MODE = true;
 const logger = {
   log: (...args) => {
@@ -57,8 +57,6 @@ export function useChatProcessor() {
       item.authorDetails.profileImageUrl ||
       "https://www.gstatic.com/youtube/img/creator/avatars/sample_avatar.png";
 
-    logger.log(`📩 [${realName}]: ${msg}`);
-
     // Check Nickname
     let displayName = realName;
     if (savedNamesCache.value[uid]) {
@@ -83,7 +81,6 @@ export function useChatProcessor() {
       try {
         const aiResult = await analyzeChat(msg);
         if (aiResult) {
-          logger.log("🤖 AI Result:", aiResult);
           if (aiResult.intent === "buy" && aiResult.id) {
             intent = "buy";
             targetId = aiResult.id;
@@ -123,17 +120,15 @@ export function useChatProcessor() {
         intent = "cancel";
         targetId = parseInt(cMatch[1]);
         method = "regex";
-        logger.log(`✅ Regex Cancel: ${targetId}`);
       } else if (bMatch && !isQuestion) {
         intent = "buy";
         targetId = parseInt(bMatch[1]);
         targetPrice = bMatch[2] ? parseInt(bMatch[2]) : null;
         method = "regex";
-        logger.log(`✅ Regex Buy: ${targetId}`);
       }
     }
 
-    // 4. Add message to chat
+    // 4. Add message to chat (ส่ง type ไปทำสีพื้นหลัง)
     chatStore.addMessage({
       id: item.id,
       text: msg,
@@ -144,81 +139,71 @@ export function useChatProcessor() {
       avatar,
       color: stringToColor(uid),
       isAdmin,
-      detectionMethod: method === "ai" || method === "regex" ? method : null,
+      type: intent, // ส่ง intent ไปเป็น type (buy/cancel/null)
+      detectionMethod: method,
       timestamp: new Date(item.snippet.publishedAt).getTime(),
     });
 
-    // 5. Text-to-Speech (✅ แก้ไขให้อ่านชื่อ...ข้อความ)
+    // 5. Process Order & Audio Logic
+
+    // เตรียมข้อความสำหรับอ่าน (ตัด Emoji ออก)
     let speakMsg = msg.replace(
       /(?:[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF])/g,
       ""
     );
 
-    // ถ้าไม่ใช่คำสั่งซื้อ/ยกเลิก ให้อ่านแชทปกติ
-    if (!intent) {
-      if (speakMsg.trim().length > 0 && speakMsg.length < 100) {
-        queueSpeech(`${displayName} ... ${speakMsg}`);
-      }
-    }
-
-    if (method === "ai-skip") return;
-
-    // 6. Process Order/Cancel
-    if (targetId && targetId > 0) {
+    if (intent === "buy" && targetId > 0) {
+      // --- กรณีจอง ---
       if (targetId > stockSize) stockStore.stockSize = targetId;
 
-      if (intent === "buy") {
-        let ownerName = displayName;
-        let ownerUid = uid;
+      let ownerName = displayName;
+      let ownerUid = uid;
 
-        if (isAdmin) {
-          // ... Logic Admin Proxy เดิม ...
-          let cleanName = msg
-            .replace(targetId.toString(), "")
-            .replace(/f|cf|รับ|เอา|=/gi, "");
-          if (targetPrice)
-            cleanName = cleanName.replace(targetPrice.toString(), "");
-          cleanName = cleanName.replace(/^[:=\-\s]+|[:=\-\s]+$/g, "").trim();
-          if (cleanName.length > 0) {
-            ownerName = cleanName;
-            ownerUid = "admin-proxy-" + Date.now();
-          } else {
-            ownerName = "ลูกค้า (Admin)";
-            ownerUid = "admin-proxy-" + Date.now();
-          }
+      if (isAdmin) {
+        let cleanName = msg
+          .replace(targetId.toString(), "")
+          .replace(/f|cf|รับ|เอา|=/gi, "");
+        if (targetPrice)
+          cleanName = cleanName.replace(targetPrice.toString(), "");
+        cleanName = cleanName.replace(/^[:=\-\s]+|[:=\-\s]+$/g, "").trim();
+        if (cleanName.length > 0) {
+          ownerName = cleanName;
+          ownerUid = "admin-proxy-" + Date.now();
+        } else {
+          ownerName = "ลูกค้า (Admin)";
+          ownerUid = "admin-proxy-" + Date.now();
         }
+      }
 
-        logger.log(`🛒 Order: ${ownerName} -> Item ${targetId}`);
+      await stockStore.processOrder(
+        targetId,
+        ownerName,
+        ownerUid,
+        "chat",
+        targetPrice,
+        method
+      );
 
-        // จองของ
-        await stockStore.processOrder(
-          targetId,
-          ownerName,
-          ownerUid,
-          "chat",
-          targetPrice,
-          method
-        );
+      playDing(); // เสียงติ๊ง
+      if (speakMsg.trim().length > 0)
+        queueSpeech(`${displayName} ... ${speakMsg}`);
+    } else if (intent === "cancel" && targetId > 0) {
+      // --- กรณียกเลิก ---
+      const currentItem = stockStore.stockData[targetId];
+      if (isAdmin || (currentItem && currentItem.uid === uid)) {
+        // ✅ Action: ยกเลิกทันที
+        await stockStore.processCancel(targetId);
 
-        // ✅ มีแค่เสียง ติ๊ง! ไม่ต้องพูดชื่อ
+        // ✅ Audio: เสียงติ๊ง + อ่านข้อความแชทปกติ (ไม่พูดระบบแจ้งเตือนแล้ว)
         playDing();
-      } else if (intent === "cancel") {
-        const currentItem = stockStore.stockData[targetId];
-        if (isAdmin || (currentItem && currentItem.uid === uid)) {
-          logger.log(`❌ Cancel: Item ${targetId}`);
-
-          // ✅ เรียกใช้แบบรับค่ากลับ
-          const result = await stockStore.processCancel(targetId);
-
-          // ✅ มีเสียงเตือน + พูดว่าใครหลุด ใครได้ต่อ
-          playDing();
-          if (result && result.nextOwner) {
-            queueSpeech(
-              `${result.previousOwner} ยกเลิก... ${result.nextOwner} ได้สิทธิ์ต่อค่ะ`
-            );
-          } else {
-            queueSpeech(`${displayName} ยกเลิกรายการที่ ${targetId} ค่ะ`);
-          }
+        if (speakMsg.trim().length > 0)
+          queueSpeech(`${displayName} ... ${speakMsg}`);
+      }
+    } else {
+      // --- กรณีข้อความทั่วไป ---
+      if (method !== "ai" || intent !== "shipping") {
+        if (speakMsg.trim().length > 0 && speakMsg.length < 100) {
+          queueSpeech(`${displayName} ... ${speakMsg}`);
         }
       }
     }

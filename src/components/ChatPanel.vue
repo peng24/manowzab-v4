@@ -1,225 +1,95 @@
 <template>
   <div class="chat-panel">
     <div class="tools-bar">
-      <button
-        :class="['btn', 'btn-mute', systemStore.isSoundOn ? 'active' : '']"
-        @click="toggleSound"
-      >
-        {{ systemStore.isSoundOn ? "🔊 เสียง: เปิด" : "🔇 เสียง: ปิด" }}
-      </button>
-
-      <button class="btn btn-dark" @click="resetVoice">🔇 Reset</button>
-
-      <!-- ✅ ปุ่มบันทึกแชท -->
-      <button class="btn btn-success" @click="downloadCSV">
-        <i class="fa-solid fa-file-csv"></i> CSV
-      </button>
-
-      <div style="margin-left: auto; display: flex; gap: 2px">
-        <button class="btn btn-dark" @click="adjustZoom(-2)">A-</button>
-        <button class="btn btn-dark" @click="adjustZoom(2)">A+</button>
-      </div>
+      <h3 style="color: #fff; margin: 0">
+        <i class="fa-solid fa-comments"></i> แชทสด
+      </h3>
     </div>
 
     <div id="chat-viewport" ref="chatViewport" @scroll="handleScroll">
       <div id="chat-list">
         <div
-          v-if="chatStore.messages.length === 0"
-          style="text-align: center; color: #888; padding: 20px"
+          v-for="chat in chatStore.messages"
+          :key="chat.id"
+          :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type]"
         >
-          ยังไม่มีข้อความ
-        </div>
-
-        <div
-          v-for="msg in chatStore.messages"
-          :key="msg.id"
-          :class="['chat-row', msg.isAdmin ? 'admin' : 'normal']"
-        >
-          <img :src="msg.avatar" class="avatar" />
+          <img :src="chat.avatar" class="avatar" loading="lazy" />
           <div class="chat-content">
             <div class="chat-header">
-              <span
-                :class="['badge-nick', msg.isAdmin ? 'vip-admin' : '']"
-                :style="{ background: msg.color }"
-                @click="
-                  askNickname(
-                    msg.uid,
-                    getCurrentNickname(msg.uid, msg.realName)
-                  )
-                "
-                style="cursor: pointer"
-                :title="'คลิกเพื่อตั้งชื่อเล่น'"
-              >
-                {{ getCurrentNickname(msg.uid, msg.realName) }}
-              </span>
+              <span class="badge-nick" :style="{ backgroundColor: chat.color }">
+                {{ chat.displayName }}
 
-              <span
-                v-if="
-                  msg.realName &&
-                  getCurrentNickname(msg.uid, msg.realName) !== msg.realName
-                "
-                class="real-name-sub"
-              >
-                ({{ msg.realName }})
-              </span>
-
-              <span
-                v-if="msg.detectionMethod"
-                class="tag-source"
-                :class="msg.detectionMethod"
-              >
                 <i
-                  :class="
-                    msg.detectionMethod === 'ai'
-                      ? 'fa-solid fa-robot'
-                      : 'fa-solid fa-bolt'
-                  "
+                  v-if="chat.detectionMethod"
+                  class="fa-solid fa-hand-point-up"
+                  style="margin-left: 4px; opacity: 0.6"
                 ></i>
               </span>
+              <span
+                v-if="chat.realName !== chat.displayName"
+                class="real-name-sub"
+              >
+                ({{ chat.realName }})
+              </span>
             </div>
-            <div class="chat-msg">{{ msg.text }}</div>
+            <div class="chat-msg">{{ chat.text }}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <button
-      v-if="showScrollButton"
-      class="scroll-bottom-btn"
-      @click="scrollToBottom"
-    >
-      ⬇️ แชทใหม่
+    <button v-if="showScrollButton" class="new-msg-btn" @click="scrollToBottom">
+      ข้อความใหม่ ⬇
     </button>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
-import { useSystemStore } from "../stores/system";
+import { ref, onMounted, watch, nextTick } from "vue";
 import { useChatStore } from "../stores/chat";
-import { useNicknameStore } from "../stores/nickname";
-import { useAudio } from "../composables/useAudio";
-import { ref as dbRef, update } from "firebase/database";
-import { db } from "../composables/useFirebase";
-import Swal from "sweetalert2";
 
-const systemStore = useSystemStore();
 const chatStore = useChatStore();
-const nicknameStore = useNicknameStore();
-const { queueSpeech, resetVoice: resetAudio } = useAudio();
-
 const chatViewport = ref(null);
 const showScrollButton = ref(false);
-const fontSize = ref(16);
+let isUserScrolling = false;
 
-// ✅ ฟังก์ชันดึง nickname แบบ Real-time
-function getCurrentNickname(uid, realName) {
-  return nicknameStore.getNickname(uid, realName);
-}
-
-function toggleSound() {
-  systemStore.isSoundOn = !systemStore.isSoundOn;
-  if (systemStore.isSoundOn) {
-    queueSpeech("เปิดเสียงค่ะ");
-  }
-}
-
-function resetVoice() {
-  resetAudio();
-  if (systemStore.isSoundOn) {
-    queueSpeech("รีเซ็ตเสียงแล้ว");
-  }
-}
-
-// ✅ เพิ่มฟังก์ชันบันทึก CSV
-function downloadCSV() {
-  if (chatStore.fullChatLog.length === 0) {
-    Swal.fire({
-      icon: "warning",
-      title: "ไม่มีข้อมูล",
-      text: "ยังไม่มีข้อความแชทเข้ามา",
-      timer: 2000,
-    });
-    return;
-  }
-
-  chatStore.downloadChatCSV(systemStore.currentVideoId);
-  Swal.fire({
-    icon: "success",
-    title: "บันทึกแล้ว",
-    timer: 1500,
-    showConfirmButton: false,
-  });
-}
-
-function adjustZoom(delta) {
-  fontSize.value += delta;
-  document.documentElement.style.setProperty(
-    "--chat-size",
-    fontSize.value + "px"
-  );
-}
-
-// ✅ แก้ไขฟังก์ชัน handleScroll (เอา 100 มารวมกับบรรทัดเดียวกัน)
+// ตรวจจับการ Scroll
 function handleScroll() {
-  if (!chatViewport.value) return;
-  const isAtBottom =
-    chatViewport.value.scrollHeight -
-    chatViewport.value.scrollTop -
-    chatViewport.value.clientHeight;
-  100;
-  showScrollButton.value = !isAtBottom;
+  const el = chatViewport.value;
+  if (!el) return;
+
+  // ถ้า Scroll ขึ้นไปเกิน 100px จากด้านล่าง ถือว่า user กำลังดูประวัติ
+  const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+  isUserScrolling = distanceToBottom > 100;
+  showScrollButton.value = isUserScrolling;
 }
 
+// เลื่อนลงล่างสุด
 function scrollToBottom() {
-  if (chatViewport.value) {
-    chatViewport.value.scrollTop = chatViewport.value.scrollHeight;
+  const el = chatViewport.value;
+  if (el) {
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    showScrollButton.value = false;
+    isUserScrolling = false;
   }
 }
 
-function askNickname(uid, currentName) {
-  if (!uid) return;
-
-  Swal.fire({
-    title: "ตั้งชื่อเล่น",
-    input: "text",
-    inputValue: currentName,
-    inputPlaceholder: "ใส่ชื่อเล่นใหม่",
-    showCancelButton: true,
-    confirmButtonText: "บันทึก",
-    cancelButtonText: "ยกเลิก",
-  }).then((result) => {
-    if (result.isConfirmed && result.value) {
-      const nickname = result.value.trim();
-      if (nickname) {
-        update(dbRef(db, `nicknames/${uid}`), { nick: nickname })
-          .then(() => {
-            Swal.fire({
-              icon: "success",
-              title: "บันทึกแล้ว",
-              text: `เปลี่ยนชื่อเป็น "${nickname}"`,
-              timer: 1500,
-              showConfirmButton: false,
-            });
-          })
-          .catch((error) => {
-            console.error("Error saving nickname:", error);
-            Swal.fire("Error", "บันทึกไม่สำเร็จ", "error");
-          });
-      }
-    }
-  });
-}
-
-// Auto-scroll on new messages
+// เมื่อมีข้อความใหม่
 watch(
   () => chatStore.messages.length,
-  () => {
-    if (!showScrollButton.value && chatViewport.value) {
-      setTimeout(() => {
-        chatViewport.value.scrollTop = chatViewport.value.scrollHeight;
-      }, 50);
+  async () => {
+    await nextTick();
+    // ถ้า User ไม่ได้เลื่อนดูประวัติอยู่ ให้เลื่อนลงอัตโนมัติ
+    if (!isUserScrolling) {
+      scrollToBottom();
+    } else {
+      // ถ้าดูประวัติอยู่ ให้โชว์ปุ่มแจ้งเตือน
+      showScrollButton.value = true;
     }
   }
 );
+
+onMounted(() => {
+  scrollToBottom();
+});
 </script>

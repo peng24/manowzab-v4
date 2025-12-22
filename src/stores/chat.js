@@ -25,6 +25,11 @@ export const useChatStore = defineStore("chat", () => {
       comment: message.text,
       videoTime: calculateVideoTime(message.timestamp),
       messageTime: new Date(message.timestamp).toLocaleString("en-US"),
+      // ✅ เพิ่มข้อมูล Raw เพื่อให้ HistoryModal เอาไปใช้ได้
+      displayName: message.displayName || message.authorName,
+      realName: message.realName || message.displayName || message.authorName,
+      text: message.text,
+      timestamp: message.timestamp, // Raw timestamp for Date formatting
     });
   }
 

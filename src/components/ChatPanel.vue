@@ -4,6 +4,24 @@
       <h3 style="color: #fff; margin: 0; font-size: 1.1em;">
         <i class="fa-solid fa-comments"></i> Live Chat
       </h3>
+      <div class="chat-controls">
+        <button 
+          class="btn-tool" 
+          :class="{ 'muted': !systemStore.isSoundOn }"
+          @click="toggleSound"
+        >
+          <i :class="systemStore.isSoundOn ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark'"></i>
+          {{ systemStore.isSoundOn ? 'เสียง: เปิด' : 'เสียง: ปิด' }}
+        </button>
+        
+        <button class="btn-tool" @click="stopVoice">
+          <i class="fa-solid fa-stop"></i> หยุดเสียง
+        </button>
+        
+        <button class="btn-tool btn-csv" @click="exportCSV">
+          <i class="fa-solid fa-file-csv"></i> CSV
+        </button>
+      </div>
     </div>
 
     <div id="chat-viewport" ref="chatViewport" @scroll="handleScroll">
@@ -61,6 +79,7 @@ import { ref, onMounted, watch, nextTick } from "vue";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
+import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
@@ -68,6 +87,7 @@ import Swal from "sweetalert2";
 const chatStore = useChatStore();
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
+const { resetVoice } = useAudio();
 
 const chatViewport = ref(null);
 const showScrollButton = ref(false);
@@ -190,6 +210,42 @@ async function forceProcess(chat) {
     Swal.fire("เรียบร้อย", `ตัดสต็อกเบอร์ ${num} ให้ ${chat.displayName} แล้ว`, "success");
   }
 }
+
+// ✅ Button Logic
+function toggleSound() {
+  systemStore.isSoundOn = !systemStore.isSoundOn;
+}
+
+function stopVoice() {
+  resetVoice();
+  Swal.fire({
+    icon: "success",
+    title: "หยุดเสียงแล้ว",
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 1000
+  });
+}
+
+function exportCSV() {
+  if (chatStore.fullChatLog.length === 0) {
+    Swal.fire({
+      icon: "warning",
+      title: "ไม่มีข้อมูล",
+      text: "ยังไม่มีข้อความให้บันทึก",
+      timer: 1500
+    });
+    return;
+  }
+  chatStore.downloadChatCSV(systemStore.currentVideoId || "chat-log");
+  Swal.fire({
+    icon: "success",
+    title: "บันทึก CSV แล้ว",
+    timer: 1500,
+    showConfirmButton: false
+  });
+}
 </script>
 
 <style scoped>
@@ -212,6 +268,50 @@ async function forceProcess(chat) {
   align-items: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   z-index: 10;
+}
+
+.chat-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-tool {
+  background: #334155;
+  color: #e2e8f0;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-family: 'Kanit', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s;
+}
+
+.btn-tool:hover {
+  background: #475569;
+  transform: translateY(-1px);
+}
+
+.btn-tool:active {
+  transform: translateY(0);
+}
+
+.btn-tool.muted {
+  background: #475569;
+  opacity: 0.7;
+}
+
+.btn-tool.btn-csv {
+  background: #10b981; /* Green */
+  color: white;
+  font-weight: 500;
+}
+
+.btn-tool.btn-csv:hover {
+  background: #059669;
 }
 
 #chat-viewport {

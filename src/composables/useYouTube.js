@@ -1,6 +1,6 @@
 import { ref, onUnmounted } from "vue";
 import { useSystemStore } from "../stores/system";
-import { ref as dbRef, set, serverTimestamp } from "firebase/database";
+import { ref as dbRef, set, serverTimestamp, onChildAdded, off, onValue, get } from "firebase/database";
 import { db } from "./useFirebase";
 
 const API_KEYS = [
@@ -18,6 +18,8 @@ export function useYouTube() {
   const chatTimeoutId = ref(null);
   const viewerIntervalId = ref(null);
   let processMessageFunc = null;
+  let displaySyncedMessageFunc = null; // ✅ New function for Client
+  let firebaseChatRef = null; // ✅ Ref for Firebase Listener
 
   async function smartFetch(url) {
     try {
@@ -29,13 +31,12 @@ export function useYouTube() {
 
       if (data.error) {
         console.error("❌ API Error:", data.error.message);
-        systemStore.statusApi = "warn"; // ✅ เปลี่ยนเป็น warn
+        systemStore.statusApi = "warn";
 
         if (systemStore.currentKeyIndex < API_KEYS.length - 1) {
           systemStore.currentKeyIndex++;
-          console.log("🔑 Switching to Key:", systemStore.currentKeyIndex + 1);
+          console.log(`🔑 API Key Limit Reached! Switching to Key #${systemStore.currentKeyIndex + 1}`);
 
-          // ✅ รอ 1 วินาทีก่อนลองใหม่
           await new Promise((resolve) => setTimeout(resolve, 1000));
           return smartFetch(url);
         } else {
@@ -56,6 +57,9 @@ export function useYouTube() {
     try {
       console.log("🔌 Connecting to video:", videoId);
 
+      // ✅ Always Fetch YouTube API (Direct Mode)
+      console.log("🚀 Direct Mode: Fetching YouTube API...");
+
       const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${videoId}`;
       const data = await smartFetch(url);
 
@@ -67,7 +71,6 @@ export function useYouTube() {
       systemStore.liveTitle = item.snippet.title;
       console.log("✅ Video title:", item.snippet.title);
 
-      // ✅ บันทึกประวัติ
       if (videoId && videoId !== "demo") {
         set(dbRef(db, `history/${videoId}`), {
           title: item.snippet.title,
@@ -77,7 +80,6 @@ export function useYouTube() {
         });
       }
 
-      // Set stream start time
       const chatStore = await import("../stores/chat").then((m) =>
         m.useChatStore()
       );
@@ -95,15 +97,12 @@ export function useYouTube() {
 
         console.log("✅ Live Chat ID:", activeChatId.value);
 
-        // Import processMessage dynamically
         const { useChatProcessor } = await import("./useChatProcessor");
         const { processMessage } = useChatProcessor();
         processMessageFunc = processMessage;
 
-        // Start polling chat
         loadChatLoop();
 
-        // Start viewer count update
         updateViewerCount(videoId);
         viewerIntervalId.value = setInterval(
           () => updateViewerCount(videoId),
@@ -123,7 +122,6 @@ export function useYouTube() {
   }
 
   async function loadChatLoop() {
-    // ✅ ตรวจสอบให้แน่ใจว่า isConnected = true
     if (!systemStore.isConnected) {
       console.log("⚠️ Chat loop stopped: not connected");
       return;
@@ -140,11 +138,9 @@ export function useYouTube() {
       ")"
     );
 
-    const url = `https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${
-      activeChatId.value
-    }&part=snippet,authorDetails${
-      chatToken.value ? "&pageToken=" + chatToken.value : ""
-    }`;
+    const url = `https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${activeChatId.value
+      }&part=snippet,authorDetails${chatToken.value ? "&pageToken=" + chatToken.value : ""
+      }`;
 
     try {
       const data = await smartFetch(url);
@@ -173,7 +169,6 @@ export function useYouTube() {
       const delay = data.pollingIntervalMillis || 5000;
       console.log("⏱️ Next poll in", delay, "ms");
 
-      // ✅ เช็คอีกครั้งก่อน schedule ต่อ
       if (systemStore.isConnected) {
         chatTimeoutId.value = setTimeout(loadChatLoop, Math.max(delay, 3000));
       }
@@ -181,7 +176,6 @@ export function useYouTube() {
       console.error("❌ Load Chat Error:", e);
       systemStore.statusChat = "err";
 
-      // Retry after 10s if still connected
       if (systemStore.isConnected) {
         chatTimeoutId.value = setTimeout(loadChatLoop, 10000);
       }
@@ -206,7 +200,6 @@ export function useYouTube() {
   function disconnect() {
     console.log("🔌 Disconnecting...");
 
-    // ✅ ต้อง set isConnected = false ก่อน
     systemStore.isConnected = false;
 
     if (chatTimeoutId.value) {
@@ -219,12 +212,18 @@ export function useYouTube() {
       viewerIntervalId.value = null;
     }
 
+    // ✅ Stop Firebase Listener
+    if (firebaseChatRef) {
+      off(firebaseChatRef);
+      firebaseChatRef = null;
+    }
+
     activeChatId.value = "";
     chatToken.value = "";
     processMessageFunc = null;
+    displaySyncedMessageFunc = null;
   }
 
-  // Cleanup on unmount
   onUnmounted(() => {
     disconnect();
   });

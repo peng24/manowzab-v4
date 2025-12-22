@@ -158,7 +158,7 @@ import { useStockStore } from "../stores/stock";
 import { useAudio } from "../composables/useAudio";
 import Swal from "sweetalert2";
 
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 const logger = { log: (...args) => DEBUG_MODE && console.log(...args) };
 
 const stockStore = useStockStore();
@@ -417,7 +417,8 @@ function confirmClear() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center; /* ✅ Centered vertically */
+  gap: 5px; /* ✅ Spacing between elements */
   cursor: pointer;
   position: relative;
   padding: 6px;
@@ -494,12 +495,12 @@ function confirmClear() {
   font-size: 1.15em;
   color: #fff;
   font-weight: 500;
-  text-align: center; /* ✅ Centered */
+  text-align: center;
   width: 100%;
-  display: flex; /* ✅ Use flex for perfect centering */
+  display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 2.4em; /* Ensure height for 2 lines */
+  min-height: 2.4em;
   
   /* Multi-line truncation logic */
   display: -webkit-box;
@@ -510,40 +511,17 @@ function confirmClear() {
   text-overflow: ellipsis;
   white-space: normal;
   line-height: 1.2;
-  margin-top: 15px;
-}
-.stock-item.sold .stock-status {
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.95em;
+  margin-top: 0; /* ✅ Remove margin to allow true centering */
 }
 
-.stock-price {
-  font-size: 0.85em;
-  font-weight: 600;
-  margin-top: 2px;
-  color: #ffd700;
-}
+/* ... */
 
-.queue-badge {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  background: #ff9800;
-  color: #000;
-  font-size: 0.8em;
-  font-weight: bold;
-  padding: 1px 4px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  line-height: 1;
-}
 .source-icon {
   position: absolute;
   bottom: 5px;
   left: 5px;
   top: auto;
-  font-size: 0.85em;
+  font-size: 0.4em; /* ✅ ลดขนาดลงอีก */
   opacity: 0.7;
   background: rgba(0, 0, 0, 0.5);
   padding: 2px 4px;

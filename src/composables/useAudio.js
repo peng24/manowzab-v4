@@ -37,7 +37,7 @@ export function useAudio() {
 
   function queueSpeech(text) {
     // ถ้าปิดเสียง ไม่ต้องพูด
-    // if (!systemStore.isSoundOn) return;
+    if (!systemStore.isSoundOn) return;
 
     initAudio();
 
@@ -82,7 +82,7 @@ export function useAudio() {
   }
 
   function playDing() {
-    // if (!systemStore.isSoundOn) return;
+    if (!systemStore.isSoundOn) return;
     initAudio();
 
     if (audioCtx.value && audioCtx.value.state === "suspended") {

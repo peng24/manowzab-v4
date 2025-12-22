@@ -145,7 +145,7 @@ import { db } from "../composables/useFirebase"; // เช็ค path ให้�
 import Swal from "sweetalert2";
 
 // Logger Configuration (คงเดิม)
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 const logger = {
   log: (...args) => {
     if (DEBUG_MODE) console.log(...args);

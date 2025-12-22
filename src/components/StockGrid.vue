@@ -26,38 +26,40 @@
     </div>
 
     <div class="stock-grid" ref="gridContainer">
-      <div
-        v-for="i in stockStore.stockSize"
-        :key="i"
-        :class="[
-          'stock-item',
-          getStockItem(i).owner ? 'sold' : '',
-          isNewOrder(i) ? 'new-order' : '',
-          highlightedId === i ? 'highlight' : '',
-        ]"
-        @click="openQueueModal(i)"
-        :id="`stock-${i}`"
-      >
-        <div class="stock-num">{{ i }}</div>
-        <div class="stock-status">{{ getStockItem(i).owner || "ว่าง" }}</div>
-        <div v-if="getStockItem(i).price" class="stock-price">
-          {{ getStockItem(i).price }}.-
-        </div>
-        <div v-if="getQueueLength(i) > 0" class="queue-badge">
-          +{{ getQueueLength(i) }}
-        </div>
+      <TransitionGroup name="stock-list">
         <div
-          v-if="getStockItem(i).source"
-          :class="['source-icon', getStockItem(i).source]"
+          v-for="i in stockStore.stockSize"
+          :key="i"
+          :class="[
+            'stock-item',
+            getStockItem(i).owner ? 'sold' : '',
+            isNewOrder(i) ? 'new-order' : '',
+            highlightedId === i ? 'highlight' : '',
+          ]"
+          @click="openQueueModal(i)"
+          :id="`stock-${i}`"
         >
-          <i :class="getSourceIcon(getStockItem(i).source)"></i>
-          <span
-            v-if="getStockItem(i).source === 'regex'"
-            style="margin-left: 2px; font-size: 0.9em"
-            >พิมพ์รหัส</span
+          <div class="stock-num">{{ i }}</div>
+          <div class="stock-status">{{ getStockItem(i).owner || "ว่าง" }}</div>
+          <div v-if="getStockItem(i).price" class="stock-price">
+            {{ getStockItem(i).price }}.-
+          </div>
+          <div v-if="getQueueLength(i) > 0" class="queue-badge">
+            +{{ getQueueLength(i) }}
+          </div>
+          <div
+            v-if="getStockItem(i).source"
+            :class="['source-icon', getStockItem(i).source]"
           >
+            <i :class="getSourceIcon(getStockItem(i).source)"></i>
+            <span
+              v-if="getStockItem(i).source === 'regex'"
+              style="margin-left: 2px; font-size: 0.9em"
+              >พิมพ์รหัส</span
+            >
+          </div>
         </div>
-      </div>
+      </TransitionGroup>
     </div>
 
     <Teleport to="body">
@@ -115,7 +117,11 @@
                     type="text"
                     v-model="person.owner"
                     class="queue-input"
+                    list="buyer-options"
                   />
+                  <datalist id="buyer-options">
+                    <option v-for="name in uniqueBuyerNames" :key="name" :value="name" />
+                  </datalist>
                 </div>
                 <div class="queue-actions">
                   <button
@@ -170,6 +176,14 @@ let draggingIndex = null;
 const soldCount = computed(
   () => Object.values(stockStore.stockData).filter((item) => item.owner).length
 );
+
+const uniqueBuyerNames = computed(() => {
+  const names = new Set();
+  Object.values(stockStore.stockData).forEach((item) => {
+    if (item.owner) names.add(item.owner);
+  });
+  return Array.from(names).sort();
+});
 
 function getStockItem(num) {
   return stockStore.stockData[num] || {};
@@ -313,3 +327,283 @@ function confirmClear() {
   });
 }
 </script>
+
+<style scoped>
+/* Stock Panel & Header */
+.stock-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.stock-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: #252525;
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+  height: 70px;
+}
+
+.stock-input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-secondary);
+  z-index: 2;
+}
+
+.header-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.stat-sold {
+  color: #00e676;
+  font-size: 1.8em;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
+.stock-stats {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Animations */
+.stock-list-enter-active,
+.stock-list-leave-active {
+  transition: all 0.4s ease;
+}
+.stock-list-enter-from,
+.stock-list-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+.stock-list-move {
+  transition: transform 0.4s ease;
+}
+
+/* Stock Grid & Items */
+.stock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); /* Wider columns */
+  gap: 15px;
+  row-gap: 20px;
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.stock-item {
+  aspect-ratio: 1.4; /* Wider cards (Landscape) */
+  background: #2a2a2a;
+  border: 2px solid #444;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  position: relative;
+  padding: 6px;
+  overflow: hidden;
+  min-height: 90px; /* Back to original height */
+  z-index: 0;
+  transition: transform 0.1s, border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+@media (hover: hover) {
+  .stock-item:hover {
+    border-color: #777;
+    background: #333;
+    transform: translateY(-2px) scale(1.02);
+    z-index: 10;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.stock-item:active {
+  transform: scale(0.96);
+  background: #333;
+}
+.stock-item.sold {
+  background: rgba(211, 47, 47, 0.15);
+  border-color: var(--primary);
+}
+.stock-item.sold.new-order {
+  animation: newOrderBlink 1s infinite;
+  z-index: 2;
+}
+.stock-item.highlight {
+  animation: highlightBox 1s ease-out;
+  z-index: 5;
+  border-color: #ffeb3b !important;
+}
+
+@keyframes newOrderBlink {
+  0%,
+  100% {
+    border-color: #ffd700;
+    box-shadow: 0 0 15px #ffd700;
+    background-color: rgba(255, 215, 0, 0.3);
+  }
+  50% {
+    border-color: var(--primary);
+    box-shadow: none;
+    background-color: rgba(211, 47, 47, 0.15);
+  }
+}
+@keyframes highlightBox {
+  0% {
+    transform: scale(1.15);
+    box-shadow: 0 0 25px #ffeb3b;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(211, 47, 47, 0.3);
+  }
+}
+
+.stock-num {
+  font-size: 1.45em;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.3);
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  line-height: 1;
+}
+
+.stock-status {
+  font-size: 1.15em;
+  color: #fff;
+  font-weight: 500;
+  text-align: center; /* ✅ Centered */
+  width: 100%;
+  display: flex; /* ✅ Use flex for perfect centering */
+  justify-content: center;
+  align-items: center;
+  min-height: 2.4em; /* Ensure height for 2 lines */
+  
+  /* Multi-line truncation logic */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.2;
+  margin-top: 15px;
+}
+.stock-item.sold .stock-status {
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95em;
+}
+
+.stock-price {
+  font-size: 0.85em;
+  font-weight: 600;
+  margin-top: 2px;
+  color: #ffd700;
+}
+
+.queue-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: #ff9800;
+  color: #000;
+  font-size: 0.8em;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  line-height: 1;
+}
+.source-icon {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  top: auto;
+  font-size: 0.85em;
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.source-icon.ai {
+  color: #ce93d8;
+}
+.source-icon.regex {
+  color: #ffb74d;
+}
+.source-icon.manual {
+  color: #64b5f6;
+}
+.source-icon.regex i::before {
+  content: "\f11c";
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1180px) {
+  .stock-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* Wider on tablet */
+    gap: 8px;
+    padding: 10px;
+  }
+  
+  .stock-item {
+    min-height: 70px; /* Shorter height */
+    border-radius: 8px;
+  }
+
+  .stock-num {
+    font-size: 1.2em;
+  }
+
+  .stock-status {
+    font-size: 0.9em;
+    margin-top: 10px;
+  }
+  
+  .stock-price {
+    font-size: 0.75em;
+  }
+  
+  .queue-badge {
+    font-size: 0.7em;
+    padding: 1px 3px;
+  }
+}
+
+@media (max-width: 600px) {
+  .stock-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* Wider on mobile */
+    gap: 5px;
+    padding: 5px;
+  }
+  
+  .stock-item {
+    min-height: 60px; /* Shorter height */
+  }
+}
+</style>

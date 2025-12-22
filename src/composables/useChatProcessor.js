@@ -3,7 +3,7 @@ import { useChatStore } from "../stores/chat";
 import { useSystemStore } from "../stores/system";
 import { useGemini } from "./useGemini";
 import { useAudio } from "./useAudio";
-import { ref as dbRef, onValue } from "firebase/database";
+import { ref as dbRef, onValue, set } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 
@@ -27,6 +27,19 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
   const data = snapshot.val() || {};
   savedNamesCache.value = data;
   Object.assign(savedNamesCache, data);
+
+  // ✅ Reactive Update: อัปเดตชื่อในแชทเก่าทันที
+  const chatStore = useChatStore();
+  if (chatStore.messages && chatStore.messages.length > 0) {
+    chatStore.messages.forEach((msg) => {
+      if (data[msg.uid]) {
+        const newNick = typeof data[msg.uid] === "object" ? data[msg.uid].nick : data[msg.uid];
+        if (msg.displayName !== newNick) {
+          msg.displayName = newNick;
+        }
+      }
+    });
+  }
 });
 
 export function useChatProcessor() {
@@ -214,10 +227,9 @@ export function useChatProcessor() {
         // ✅ Action: ยกเลิกทันที
         await stockStore.processCancel(targetId);
 
-        // ✅ Audio: เสียงติ๊ง + อ่านข้อความแชทปกติ (ตามคำขอ)
+        // ✅ Audio: เสียงติ๊ง + อ่านข้อความแชทแบบใหม่
         playDing();
-        if (speakMsg.trim().length > 0)
-          queueSpeech(`${displayName} ... ${speakMsg}`);
+        queueSpeech(`${displayName} ยกเลิก รายการที่ ${targetId}`);
       }
     } else {
       // --- กรณีข้อความทั่วไป ---

@@ -27,7 +27,11 @@
             class="history-search-box"
             placeholder="🔍 ค้นหาชื่อ หรือ ข้อความ..."
             autofocus
+            list="history-options"
           />
+          <datalist id="history-options">
+            <option v-for="name in uniqueHistoryNames" :key="name" :value="name" />
+          </datalist>
           <button
             class="btn btn-dark"
             @click="confirmClearHistory"
@@ -97,6 +101,15 @@ const systemStore = useSystemStore(); // ✅ ใช้งาน
 const searchQuery = ref("");
 
 // Filter logic
+const uniqueHistoryNames = computed(() => {
+  const names = new Set();
+  chatStore.fullChatLog.forEach((c) => {
+    if (c.displayName) names.add(c.displayName);
+    if (c.realName) names.add(c.realName);
+  });
+  return Array.from(names).slice(0, 50); // Limit to 50 suggestions
+});
+
 const filteredHistory = computed(() => {
   if (!searchQuery.value) return chatStore.fullChatLog.slice().reverse();
 

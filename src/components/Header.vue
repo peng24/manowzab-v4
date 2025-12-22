@@ -219,6 +219,7 @@ function getStatusTitle(type) {
       ok: "✅ กำลังดึงแชทสด",
       warn: "⚠️ แชทมีปัญหา",
       err: "❌ ไม่สามารถดึงแชท",
+      idle: "⚪ ยังไม่เชื่อมต่อ",
     },
   };
   const status =
@@ -227,7 +228,7 @@ function getStatusTitle(type) {
       : type === "api"
       ? systemStore.statusApi
       : systemStore.statusChat;
-  return titles[type][status] || "ไม่ทราบสถานะ";
+  return titles[type][status] || titles[type].idle || "ไม่ทราบสถานะ";
 }
 
 function toggleDropdown(event) {
@@ -268,7 +269,8 @@ async function toggleConnection() {
   if (systemStore.isConnected) {
     disconnect();
     systemStore.isConnected = false;
-    systemStore.statusChat = "err";
+    systemStore.statusChat = "idle"; // ✅ Changed from 'err' to 'idle'
+    systemStore.statusApi = "idle";   // ✅ Reset API status too
     queueSpeech("หยุดการเชื่อมต่อ");
     return;
   }
@@ -357,6 +359,7 @@ function downloadCSV() {
 }
 
 function testVoice() {
+  unlockAudio(); // ✅ Unlock audio context explicitly
   queueSpeech("ทดสอบเสียง หนึ่ง สอง สาม สี่ ห้า");
   showDropdown.value = false;
 }
@@ -461,6 +464,8 @@ async function toggleSimulation() {
   showDropdown.value = false;
 }
 
+
+
 function askAiKey() {
   // (Logic เดิม)
   const currentKey = localStorage.getItem("geminiApiKey") || "";
@@ -514,10 +519,14 @@ function getVersionTooltip() {
 function showChangelog() {
   // (Logic เดิม)
   Swal.fire({
-    title: "🚀 v4.1.0 Patch Notes",
+    title: "🚀 v4.2.0 Patch Notes",
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
         <h4 style="color: #00e676; margin-bottom: 5px;">✨ ฟีเจอร์ใหม่</h4>
-        <ul><li>📱 Mobile & iPad Ready</li><li>🔄 Sync รหัส Video ID ทันที</li></ul>
+        <ul>
+          <li>✏️ <b>แก้ไขชื่อเล่นในแชทได้</b> (คลิกที่ชื่อ)</li>
+          <li>🎨 <b>ชื่อลูกค้าเป็น Badge สีดำ</b> (ดูง่ายขึ้น)</li>
+          <li>🔊 <b>อ่านเสียงยกเลิกแบบใหม่</b> ("ชื่อ... ยกเลิก รายการที่...")</li>
+        </ul>
         </div>`,
     background: "#1e1e1e",
     color: "#fff",

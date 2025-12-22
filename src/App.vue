@@ -39,8 +39,10 @@ import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
 import { useNicknameStore } from "./stores/nickname";
 import { ref as dbRef, onValue, onDisconnect, set } from "firebase/database";
-import { db } from "./firebase"; // ตรวจสอบ path ให้ตรงกับโปรเจคจริง (เช่น ./composables/useFirebase)
+import { db } from "./firebase";
 import { useAudio } from "./composables/useAudio";
+import { useAwayMode } from "./composables/useAwayMode";
+import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup
 import Header from "./components/Header.vue";
 import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
@@ -53,84 +55,20 @@ const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
 
 // ✅ ดึง unlockAudio มาใช้แทน playDing
-const { queueSpeech, unlockAudio } = useAudio();
+const { unlockAudio } = useAudio();
+
+// ✅ Use Away Mode Composable
+const { awayTimer, closeAwayMode, initAwayListener } = useAwayMode();
+
+// ✅ Use Auto Cleanup Composable
+const { initAutoCleanup } = useAutoCleanup();
 
 const showDashboard = ref(false);
 const showHistory = ref(false);
-const awayTimer = ref("00:00");
-let awayInterval = null;
-let awayStartTime = 0;
 
 // Provide functions for child components
 provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
-
-// ✅ ข้อความเมื่อเปิดโหมด
-const awayStartMessages = [
-  "แอดมินพาลูกนอนแล้ว รอแปปนะคะ",
-  "แอดมินพาลูกนอนแล้วค่ะ ช่วยดูแลแชทหน่อยนะคะ",
-  "พาน้องนอนก่อนนะคะ ช่วยดูแลลูกค้าด้วยนะคะ",
-  "แอดมินพาลูกนอนแล้ว ฝากดูแลแชทด้วยนะคะ",
-  "พาลูกนอนแล้วนะคะ กลับมาเร็วๆ",
-  "ขอโทษค่ะ แอดมินพาลูกนอนก่อน รอสักครู่นะคะ",
-  "แอดมินพาน้องนอนแล้วค่ะ รอแปปเดียว",
-  "พาลูกนอนก่อนนะคะ กลับมาตอบเลยนะคะ",
-  "แอดมินยังไม่อยู่หน้าจอค่ะ กำลังพาลูกนอน",
-  "พาน้องนอนแล้ว ช่วยดูแลลูกค้าหน่อยนะคะ",
-];
-
-// ✅ ข้อความเมื่อปิดโหมด
-const awayEndMessages = [
-  "ลูกหลับแล้ว แอดมินสแตนบายแล้วค่ะ",
-  "ลูกหลับแล้ว กลับมาแล้วค่ะ",
-  "ลูกหลับสบายแล้ว แอดมินกลับมาดูแลแชทแล้วค่ะ",
-  "ลูกหลับแล้วค่ะ แอดมินพร้อมแล้ว",
-  "ลูกนอนหลับแล้ว แอดมินสแตนบายแล้ว",
-  "ลูกหลับแล้วค่ะ กลับมาแล้ว",
-  "แอดมินกลับมาแล้วค่ะ ลูกหลับสบาย",
-  "ลูกนอนแล้ว แอดมินพร้อมดูแลลูกค้าแล้วค่ะ",
-];
-
-function getRandomMessage(messageArray) {
-  return messageArray[Math.floor(Math.random() * messageArray.length)];
-}
-
-function closeAwayMode() {
-  set(dbRef(db, "system/awayMode"), {
-    isAway: false,
-    startTime: null,
-    closedBy: systemStore.myDeviceId,
-    closedAt: Date.now(),
-  })
-    .then(() => {
-      console.log("✅ Away mode closed by user");
-    })
-    .catch((err) => {
-      console.error("Error closing away mode:", err);
-    });
-}
-
-function updateAwayTimer() {
-  if (!systemStore.isAway || !awayStartTime) {
-    awayTimer.value = "00:00";
-    return;
-  }
-
-  const diff = Math.floor((Date.now() - awayStartTime) / 1000);
-  const hours = Math.floor(diff / 3600);
-  const minutes = Math.floor((diff % 3600) / 60);
-  const seconds = diff % 60;
-
-  if (hours > 0) {
-    awayTimer.value = `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
-      .toString()
-      .padStart(2, "0")}`;
-  } else {
-    awayTimer.value = `${minutes.toString().padStart(2, "0")}:${seconds
-      .toString()
-      .padStart(2, "0")}`;
-  }
-}
 
 // ✅ Unlock Audio Function (Silent)
 function handleFirstInteraction() {
@@ -148,6 +86,14 @@ onMounted(() => {
   // ✅ Initialize Listeners
   nicknameStore.initNicknameListener();
   stockStore.connectToStock("demo");
+  initAwayListener(); // ✅ Init Away Mode Listener
+  initAutoCleanup(); // ✅ Init Auto Cleanup (Admin Only)
+  systemStore.initHostListener(); // ✅ Init Host Listener (Take Over Logic)
+
+  // ✅ Reset Connection State (Ensure YouTube starts disconnected)
+  systemStore.isConnected = false;
+  systemStore.statusApi = "idle";
+  systemStore.statusChat = "idle";
 
   // ✅ Firebase Connection Status
   const connectedRef = dbRef(db, ".info/connected");
@@ -194,39 +140,6 @@ onMounted(() => {
       systemStore.isAiCommander = true;
     } else {
       systemStore.isAiCommander = false;
-    }
-  });
-
-  // Away Mode Listener
-  onValue(dbRef(db, "system/awayMode"), (snap) => {
-    const val = snap.val();
-    const newState = val?.isAway || false;
-    const prevState = systemStore.isAway;
-
-    console.log("🌙 Away mode changed:", { newState, prevState, data: val });
-
-    if (newState && !prevState) {
-      systemStore.isAway = true;
-      awayStartTime = val?.startTime || Date.now();
-
-      if (!awayInterval) {
-        updateAwayTimer();
-        awayInterval = setInterval(updateAwayTimer, 1000);
-      }
-
-      const startMessage = getRandomMessage(awayStartMessages);
-      queueSpeech(startMessage);
-    } else if (!newState && prevState) {
-      systemStore.isAway = false;
-
-      if (awayInterval) {
-        clearInterval(awayInterval);
-        awayInterval = null;
-      }
-      awayTimer.value = "00:00";
-
-      const endMessage = getRandomMessage(awayEndMessages);
-      queueSpeech(endMessage);
     }
   });
 });

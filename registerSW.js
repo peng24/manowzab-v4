@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/manowzab-v4/sw.js', { scope: '/manowzab-v4/' })})}

@@ -227,11 +227,11 @@ export function useChatProcessor() {
       }
     } else {
       // --- กรณีข้อความทั่วไป ---
-      if (method !== "ai" && intent !== "shipping" && method !== "question-skip" && method !== "ai-skip") {
-        speak(displayName, msg);
-      }
-      else if (intent === "shipping") {
+      if (intent === "shipping") {
         speak(displayName, "แจ้งโอนเงิน");
+      } else {
+        // Read EVERYTHING else
+        speak(displayName, msg);
       }
     }
   }

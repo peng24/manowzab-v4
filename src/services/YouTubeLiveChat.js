@@ -112,15 +112,24 @@ export class YouTubeLiveChat {
             const data = await response.json();
 
             if (data.error) {
-                console.error("API Error during poll:", data.error.message);
+                console.error("API Error during poll:", data.error.message, "Code:", data.error.code);
                 if (this.onStatusChange) this.onStatusChange("err");
 
-                if (this.rotateKey()) {
-                    // Retry immediately with new key
-                    this.loadChat();
-                    return;
+                // ✅ Smarter Rotation Logic
+                const errorCode = data.error.code;
+                const shouldRotate = errorCode === 403 || errorCode === 429;
+
+                if (shouldRotate) {
+                    if (this.rotateKey()) {
+                        // Retry immediately with new key
+                        this.loadChat();
+                        return;
+                    }
+                } else {
+                    console.warn(`⚠️ API Error ${errorCode}: Retrying without rotation...`);
                 }
-                // If critical error or no keys, wait 10s and retry
+
+                // If critical error or no keys, wait 10s and retry (same key if not rotated, or next/same if rotated failed/skipped)
                 this.timeoutId = setTimeout(() => this.loadChat(), 10000);
                 return;
             }

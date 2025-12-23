@@ -4,7 +4,12 @@
     @click="handleFirstInteraction"
     @touchstart="handleFirstInteraction"
   >
-    <Header />
+    <!-- ✅ Voice Price Mode -->
+    <VoicePricePage v-if="isVoiceMode" />
+
+    <!-- ✅ Normal Mode -->
+    <template v-else>
+       <Header />
 
     <div v-if="systemStore.isAway" class="away-banner">
       <div class="away-content">
@@ -29,6 +34,7 @@
       <Dashboard v-if="showDashboard" @close="showDashboard = false" />
       <HistoryModal v-if="showHistory" @close="showHistory = false" />
     </div>
+    </template>
   </div>
 </template>
 
@@ -48,11 +54,14 @@ import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import Dashboard from "./components/Dashboard.vue";
 import HistoryModal from "./components/HistoryModal.vue";
+import VoicePricePage from "./components/VoicePricePage.vue"; // ✅ Import Voice Page
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
 const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
+
+const isVoiceMode = new URLSearchParams(window.location.search).get("mode") === "voice"; // ✅ Check Mode
 
 // ✅ ดึง unlockAudio มาใช้แทน playDing
 const { unlockAudio } = useAudio();

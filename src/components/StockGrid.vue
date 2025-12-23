@@ -40,24 +40,16 @@
           :id="`stock-${i}`"
         >
           <div class="stock-num">{{ i }}</div>
-          <div class="stock-status">{{ getStockItem(i).owner || "ว่าง" }}</div>
+          <div :class="['stock-status', { empty: !getStockItem(i).owner }]">
+            {{ getStockItem(i).owner || "ว่าง" }}
+          </div>
           <div v-if="getStockItem(i).price" class="stock-price">
-            {{ getStockItem(i).price }}.-
+            {{ getStockItem(i).price }} บาท
           </div>
           <div v-if="getQueueLength(i) > 0" class="queue-badge">
             +{{ getQueueLength(i) }}
           </div>
-          <div
-            v-if="getStockItem(i).source"
-            :class="['source-icon', getStockItem(i).source]"
-          >
-            <i :class="getSourceIcon(getStockItem(i).source)"></i>
-            <span
-              v-if="getStockItem(i).source === 'regex'"
-              style="margin-left: 2px; font-size: 0.9em"
-              >พิมพ์รหัส</span
-            >
-          </div>
+
         </div>
       </TransitionGroup>
     </div>
@@ -300,8 +292,18 @@ async function saveQueueChanges() {
     queueSpeech(`${oldOwnerName} หลุด... ${newOwnerName} ได้ต่อค่ะ`);
   }
 
-  if (newData) await stockStore.updateItemData(num, newData);
-  else await stockStore.processCancel(num);
+  if (newData) {
+    await stockStore.updateItemData(num, newData);
+  } else if (editingPrice.value > 0) {
+    // ✅ Case: Empty item but Price is set
+    await stockStore.updateStockPrice(num, editingPrice.value);
+    
+    // Play sound for price update
+    playDing();
+    // queueSpeech(`ราคา ${editingPrice.value} บาท`);
+  } else {
+    await stockStore.processCancel(num);
+  }
 
   closeModal();
   Swal.fire({
@@ -418,7 +420,7 @@ function confirmClear() {
   flex-direction: column;
   align-items: center;
   justify-content: center; /* ✅ Centered vertically */
-  gap: 5px; /* ✅ Spacing between elements */
+  gap: 0px; /* ✅ Spacing between elements */
   cursor: pointer;
   position: relative;
   padding: 6px;
@@ -491,16 +493,29 @@ function confirmClear() {
   line-height: 1;
 }
 
+.stock-price {
+    font-size: 0.75em;
+    color: #ffd700;
+    font-weight: bold;
+}
+
 .stock-status {
   font-size: 1.15em;
-  color: #fff;
+  color: #00e676; /* Changed to Green Accent */
   font-weight: 500;
   text-align: center;
   width: 100%;
+}
+
+.stock-status.empty {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.stock-status {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 2.4em;
+  min-height: 1.4em;
   
   /* Multi-line truncation logic */
   display: -webkit-box;
@@ -516,30 +531,7 @@ function confirmClear() {
 
 /* ... */
 
-.source-icon {
-  position: absolute;
-  bottom: 5px;
-  left: 5px;
-  top: auto;
-  font-size: 0.4em; /* ✅ ลดขนาดลงอีก */
-  opacity: 0.7;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 2px 4px;
-  border-radius: 4px;
-  line-height: 1;
-}
-.source-icon.ai {
-  color: #ce93d8;
-}
-.source-icon.regex {
-  color: #ffb74d;
-}
-.source-icon.manual {
-  color: #64b5f6;
-}
-.source-icon.regex i::before {
-  content: "\f11c";
-}
+
 
 /* Responsive Adjustments */
 @media (max-width: 1180px) {
@@ -565,6 +557,8 @@ function confirmClear() {
   
   .stock-price {
     font-size: 0.75em;
+    color: #ffd700;
+    font-weight: bold;
   }
   
   .queue-badge {

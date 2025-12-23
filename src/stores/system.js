@@ -30,8 +30,8 @@ export const useSystemStore = defineStore("system", () => {
     localStorage.setItem("device_id", myDeviceId.value);
   }
 
-  // ✅ Version (อัปเดตเป็น v4.2.2)
-  const version = ref("v4.2.2");
+  // ✅ Version (อัปเดตเป็น v4.2.3)
+  const version = ref("v4.2.3");
 
   // Actions
   function setStatus(type, status) {

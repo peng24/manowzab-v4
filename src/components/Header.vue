@@ -103,6 +103,9 @@
             <a @click="askAiKey">
               <i class="fa-solid fa-key"></i> ตั้งค่า API Key
             </a>
+            <a @click="openVoicePricePage" style="color: #60a5fa">
+              <i class="fa-solid fa-microphone"></i> เปิดหน้าตรวจเสียงราคา
+            </a>
             <a @click="forceUpdate" style="color: #00e676">
               <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
             </a>
@@ -490,6 +493,11 @@ function askAiKey() {
       });
     }
   });
+  showDropdown.value = false;
+}
+
+function openVoicePricePage() {
+  window.open(window.location.origin + window.location.pathname + "?mode=voice", "_blank");
   showDropdown.value = false;
 }
 

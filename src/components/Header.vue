@@ -106,6 +106,9 @@
             <a @click="openVoicePricePage" style="color: #60a5fa">
               <i class="fa-solid fa-microphone"></i> เปิดหน้าตรวจเสียงราคา
             </a>
+            <a @click="openOverlayPage" style="color: #a855f7">
+              <i class="fa-solid fa-layer-group"></i> เปิดหน้าจอ Overlay (OBS)
+            </a>
             <a @click="forceUpdate" style="color: #00e676">
               <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
             </a>
@@ -498,6 +501,11 @@ function askAiKey() {
 
 function openVoicePricePage() {
   window.open(window.location.origin + window.location.pathname + "?mode=voice", "_blank");
+  showDropdown.value = false;
+}
+
+function openOverlayPage() {
+  window.open(window.location.origin + window.location.pathname + "?mode=overlay", "_blank");
   showDropdown.value = false;
 }
 

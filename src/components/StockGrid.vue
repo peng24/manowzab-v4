@@ -295,8 +295,8 @@ async function saveQueueChanges() {
   if (newData) {
     await stockStore.updateItemData(num, newData);
   } else if (editingPrice.value > 0) {
-    // ✅ Case: Empty item but Price is set
-    await stockStore.updateStockPrice(num, editingPrice.value);
+    // ✅ Case: Empty item but Price is set (OVERWRITE to clear owner)
+    await stockStore.updateItemData(num, { price: editingPrice.value });
     
     // Play sound for price update
     playDing();

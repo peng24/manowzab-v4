@@ -132,7 +132,7 @@ export const useStockStore = defineStore("stock", () => {
   // ✅ เพิ่มฟังก์ชันอัปเดตข้อมูลรายการทั้งหมด (สำหรับ Drag & Drop)
   async function updateItemData(num, newData) {
     if (!systemStore.currentVideoId) return;
-    await set(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`), newData);
+    await update(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`), newData);
   }
 
   return {

@@ -130,9 +130,23 @@ export const useStockStore = defineStore("stock", () => {
   }
 
   // ✅ เพิ่มฟังก์ชันอัปเดตข้อมูลรายการทั้งหมด (สำหรับ Drag & Drop)
+  // ✅ เพิ่มฟังก์ชันอัปเดตข้อมูลรายการทั้งหมด (สำหรับ Drag & Drop)
   async function updateItemData(num, newData) {
     if (!systemStore.currentVideoId) return;
+
+    // 1. Update Stock Item
     await update(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`), newData);
+
+    // 2. Update Overlay "Current Item" (Only if we have price/size)
+    // This allows the OBS Overlay to react instantly
+    if (newData.price || newData.size) {
+      await update(dbRef(db, `overlay/${systemStore.currentVideoId}/current_item`), {
+        id: num,
+        price: newData.price || null,
+        size: newData.size || null,
+        updatedAt: Date.now()
+      });
+    }
   }
 
   return {

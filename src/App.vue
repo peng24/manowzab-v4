@@ -7,6 +7,9 @@
     <!-- ✅ Voice Price Mode -->
     <VoicePricePage v-if="isVoiceMode" />
 
+    <!-- ✅ Live Overlay Mode -->
+    <LiveOverlay v-else-if="isOverlayMode" />
+
     <!-- ✅ Normal Mode -->
     <template v-else>
        <Header />
@@ -55,13 +58,16 @@ import ChatPanel from "./components/ChatPanel.vue";
 import Dashboard from "./components/Dashboard.vue";
 import HistoryModal from "./components/HistoryModal.vue";
 import VoicePricePage from "./components/VoicePricePage.vue"; // ✅ Import Voice Page
+import LiveOverlay from "./components/LiveOverlay.vue"; // ✅ Import Overlay
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
 const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
 
-const isVoiceMode = new URLSearchParams(window.location.search).get("mode") === "voice"; // ✅ Check Mode
+const urlParams = new URLSearchParams(window.location.search);
+const isVoiceMode = urlParams.get("mode") === "voice"; 
+const isOverlayMode = urlParams.get("mode") === "overlay"; // ✅ Check Overlay Mode
 
 // ✅ ดึง unlockAudio มาใช้แทน playDing
 const { unlockAudio } = useAudio();

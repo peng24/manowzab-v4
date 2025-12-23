@@ -172,13 +172,8 @@ export function useChatProcessor() {
       timestamp: new Date(item.snippet.publishedAt).getTime(),
     });
 
-    // 5. Process Order & Audio Logic
-
-    // เตรียมข้อความสำหรับอ่าน (ตัด Emoji ออก)
-    let speakMsg = msg.replace(
-      /(?:[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF])/g,
-      ""
-    );
+    // 5. Process Order & Audio Logic (Updated for TextToSpeech Service)
+    const { speak } = useAudio(); // Destructure confirm
 
     if (intent === "buy" && targetId > 0) {
       // --- กรณีจอง ---
@@ -188,13 +183,12 @@ export function useChatProcessor() {
       let ownerUid = uid;
 
       if (isAdmin) {
-        // Clean Name Logic (ปรับปรุงให้รองรับตัวคั่นใหม่ๆ)
+        // Clean Name Logic
         let cleanName = msg
           .replace(targetId.toString(), "")
           .replace(/f|cf|รับ|เอา|=/gi, "");
         if (targetPrice)
           cleanName = cleanName.replace(targetPrice.toString(), "");
-        // ลบอักขระพิเศษตอนต้น/ท้าย (รวมถึง Emoji และ -)
         cleanName = cleanName
           .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
           .trim();
@@ -218,25 +212,26 @@ export function useChatProcessor() {
       );
 
       playDing(); // เสียงติ๊ง
-      if (speakMsg.trim().length > 0)
-        queueSpeech(`${displayName} ... ${speakMsg}`);
+
+      // ✅ Use New TTS Service (No manual sanitization needed here)
+      speak(displayName, msg);
+
     } else if (intent === "cancel" && targetId > 0) {
       // --- กรณียกเลิก ---
       const currentItem = stockStore.stockData[targetId];
       if (isAdmin || (currentItem && currentItem.uid === uid)) {
-        // ✅ Action: ยกเลิกทันที
         await stockStore.processCancel(targetId);
 
-        // ✅ Audio: เสียงติ๊ง + อ่านข้อความแชทแบบใหม่
         playDing();
-        queueSpeech(`${displayName} ยกเลิก รายการที่ ${targetId}`);
+        speak(displayName, `ยกเลิก รายการที่ ${targetId}`);
       }
     } else {
       // --- กรณีข้อความทั่วไป ---
-      if (method !== "ai" && intent !== "shipping") {
-        if (speakMsg.trim().length > 0 && speakMsg.length < 100) {
-          queueSpeech(`${displayName} ... ${speakMsg}`);
-        }
+      if (method !== "ai" && intent !== "shipping" && method !== "question-skip" && method !== "ai-skip") {
+        speak(displayName, msg);
+      }
+      else if (intent === "shipping") {
+        speak(displayName, "แจ้งโอนเงิน");
       }
     }
   }

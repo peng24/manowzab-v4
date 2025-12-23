@@ -1,12 +1,11 @@
 import { ref } from "vue";
 import { useSystemStore } from "../stores/system";
+import { ttsService } from "../services/TextToSpeech";
 
 export function useAudio() {
   const systemStore = useSystemStore();
   const audioCtx = ref(null);
-  const synth = window.speechSynthesis;
-  const speechQueue = ref([]);
-  const isSpeaking = ref(false);
+  const isSpeaking = ref(false); // Reactive wrapper for UI if needed
 
   function initAudio() {
     if (!audioCtx.value) {
@@ -14,7 +13,7 @@ export function useAudio() {
     }
   }
 
-  // ✅ เพิ่ม: ฟังก์ชันปลดล็อคเสียงแบบเงียบ (ไม่ติ๊ง)
+  // ✅ ฟังก์ชันปลดล็อคเสียงแบบเงียบ (ไม่ติ๊ง)
   function unlockAudio() {
     initAudio();
     if (audioCtx.value && audioCtx.value.state === "suspended") {
@@ -36,49 +35,23 @@ export function useAudio() {
   }
 
   function queueSpeech(text) {
-    // ถ้าปิดเสียง ไม่ต้องพูด
+    // NOTE: Overloading legacy function to support simple text calls
+    // But ideally should use full (name, msg)
+    // For compatibility, if we receive one string, we treat it as message with no name (or parse it?)
+    // However, ChatProcessor will be updated to call speak(name, msg) if possible.
+    // Let's keep this compatible:
+
     if (!systemStore.isSoundOn) return;
 
-    initAudio();
-
-    if (audioCtx.value && audioCtx.value.state === "suspended") {
-      audioCtx.value.resume();
-    }
-
-    speechQueue.value.push(text);
-    if (!isSpeaking.value) processQueue();
+    // Legacy support: if text is the only arg, pass it as message
+    // If it contains " ... ", try to split? No, let's just pass it through.
+    ttsService.speak("", text);
   }
 
-  function processQueue() {
-    if (speechQueue.value.length === 0) {
-      isSpeaking.value = false;
-      return;
-    }
-
-    if (synth.speaking && !isSpeaking.value) {
-      synth.cancel();
-    }
-
-    isSpeaking.value = true;
-    const utterance = new SpeechSynthesisUtterance(speechQueue.value.shift());
-    utterance.lang = "th-TH";
-    utterance.rate = 1.0; // ความเร็วปกติ
-
-    const voices = synth.getVoices();
-    const thVoice = voices.find((v) => v.lang.includes("th"));
-    if (thVoice) utterance.voice = thVoice;
-
-    utterance.onend = () => {
-      isSpeaking.value = false;
-      processQueue();
-    };
-
-    utterance.onerror = () => {
-      isSpeaking.value = false;
-      processQueue();
-    };
-
-    synth.speak(utterance);
+  // New API
+  function speak(author, message) {
+    if (!systemStore.isSoundOn) return;
+    ttsService.speak(author, message);
   }
 
   function playDing() {
@@ -115,15 +88,15 @@ export function useAudio() {
   }
 
   function resetVoice() {
-    synth.cancel();
-    speechQueue.value = [];
-    isSpeaking.value = false;
+    ttsService.reset();
   }
 
   return {
-    queueSpeech,
+    queueSpeech, // Kept for backward compatibility
+    speak,       // New preferred method
     playDing,
     resetVoice,
-    unlockAudio, // ✅ Export ฟังก์ชันนี้ไปให้ App.vue ใช้
+    unlockAudio,
   };
 }
+

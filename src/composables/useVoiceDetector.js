@@ -75,54 +75,73 @@ export function useVoiceDetector() {
     }
 
     function processCommand(rawText) {
-        // Step 1: Noise Removal - Remove measurement keywords to prevent false positives
-        // Remove patterns like "อก 54", "ยาว 30", "ไซส์ 40"
-        let cleanText = rawText.replace(/(?:อก|เอว|ยาว|ไซส์|size)\s*\d+/gi, '').trim();
-
-        // Step 2: Digit Merging (The "Connect Mind" Logic)
-        // Detect single digits separated by spaces (e.g., "6 5") and merge them.
-        // Loop until no more merges can be made.
-        let mergedText = cleanText;
+        // Step 1: Digit Merging (Fix Split Digits)
+        // Input: "6 5 100" -> Output: "65 100"
+        let mergedText = rawText;
         let prevText = "";
         while (prevText !== mergedText) {
             prevText = mergedText;
-            mergedText = mergedText.replace(/\b(\d)\s+(\d)\b/g, '$1$2');
+            mergedText = mergedText.replace(/\b(\d)\s+(\d)\b/u, '$1$2');
         }
 
-        console.log(`🗣️ Processed: "${rawText}" -> "${cleanText}" -> "${mergedText}"`);
-        transcript.value = mergedText; // Update UI with processed text
+        // Step 2: Size Extraction
+        // Extract patterns starting with: อก, เอว, ยาว, สะโพก, ไซส์, Size
+        const sizeKeywords = ["อก", "เอว", "ยาว", "สะโพก", "ไซส์", "Size"];
+        const sizeRegex = new RegExp(`(?:${sizeKeywords.join("|")})\\s*\\S+`, "gi");
 
-        // Step 3: Pattern Matching
+        let sizeString = "";
+        const sizeMatches = mergedText.match(sizeRegex);
+        if (sizeMatches) {
+            sizeString = sizeMatches.join(" ");
+            // Remove from mergedText
+            mergedText = mergedText.replace(sizeRegex, "").trim();
+            // Clean up extra spaces left behind
+            mergedText = mergedText.replace(/\s+/g, " ").trim();
+        }
 
-        // 3.1 Set Price: "รหัส 1 ราคา 100", "50 100", "53 80" (Implicit Price)
-        // Regex logic:
-        // - Optional prefix (rหัส/no/etc)
-        // - Group 1: ID (\d+)
-        // - Optional separator (price/baht) OR just whitespace
-        // - Group 2: Price (\d+)
-        const priceRegex = /(?:รหัส|เบอร์|ตัวที่|ที่|^)\s*(\d+)\s*(?:ราคา|ละ)?\s*(\d+)/;
+        console.log(`🗣️ Cleaned: "${mergedText}" | Size: "${sizeString}"`);
+        transcript.value = `${mergedText} ${sizeString ? `[${sizeString}]` : ""}`;
+
+        // Step 3: Item & Price Extraction
+        // Regex: /(?:รายการที่|รหัส|เบอร์|ตัวที่|ที่|^)\s*(\d+)\s*(?:ราคา|ละ)?\s*(\d+)/
+        const priceRegex = /(?:รายการที่|รหัส|เบอร์|ตัวที่|ที่|^)\s*(\d+)\s*(?:ราคา|ละ)?\s*(\d+)/;
         const priceMatch = mergedText.match(priceRegex);
 
         if (priceMatch) {
             const stockId = parseInt(priceMatch[1]);
             const price = parseInt(priceMatch[2]);
 
-            // Allow if valid ID (between 1 and stockSize)
             if (stockId > 0 && stockId <= stockStore.stockSize) {
-                stockStore.updateStockPrice(stockId, price);
-                lastAction.value = `✅ ตั้งราคา #${stockId} = ${price} บาท`;
+                const updateData = { price: price };
+                if (sizeString) updateData.size = sizeString;
+
+                stockStore.updateItemData(stockId, updateData);
+
+                // Use 'รายการที่' in output to align with user preference
+                lastAction.value = `✅ รายการที่ ${stockId} | ${price}.- ${sizeString ? `| ${sizeString}` : ""}`;
                 playDing();
                 return;
             }
         }
 
-        // 3.2 Cancel/Clear: "ยกเลิก 1", "ลบ 5"
+        // Keep existing logic for Cancel/Booking as fallback or parallel?
+        // User request says "Modify processVoiceCommand to ... strict logic".
+        // It doesn't explicitly say "Remove other commands" but usually strictly following the pipeline implies this is the main flow.
+        // However, standard admin commands like "cancel" or "book" might still be needed. 
+        // The prompt says "Step 1... Step 2... Step 3... Action...".
+        // It focuses on the Price Detector feature. 
+        // I should probably preserve the other commands (Cancel/Book) as they are useful admin helpers, 
+        // OR if the prompt implies this is purely for the "Price Detector" mode.
+        // Given the prompt "Logic Upgrade... to support Product Size Detection", I should likely preserve the other admin capabilities (Cancel, Manual Book) if they don't conflict.
+        // I will append the Cancel/Book checks AFTER the Price check failure, or verify if I should include them.
+        // The original code had Price Check -> Cancel -> Manual Book.
+        // I will retain Cancel and Manual Book logic for completeness as "Admin" tools, applied on 'mergedText'.
+
+        // 3.2 Cancel/Clear
         const cancelRegex = /(?:ยกเลิก|ลบ|เคลียร์|ล้าง|ไม่เอา)\s*(\d+)/;
         const cancelMatch = mergedText.match(cancelRegex);
-
         if (cancelMatch) {
             const stockId = parseInt(cancelMatch[1]);
-            // Only cancel if data exists
             if (stockStore.stockData[stockId]) {
                 stockStore.processCancel(stockId);
                 lastAction.value = `🗑️ ยกเลิก #${stockId}`;
@@ -131,17 +150,13 @@ export function useVoiceDetector() {
             }
         }
 
-        // 3.3 Manual Book: "จอง 1", "เอา 5", "เอฟ 10"
+        // 3.3 Manual Book
         const bookRegex = /(?:จอง|เอฟ|เอา|รับ)\s*(\d+)/;
         const bookMatch = mergedText.match(bookRegex);
-
         if (bookMatch) {
             const stockId = parseInt(bookMatch[1]);
-
             if (stockId > 0 && stockId <= stockStore.stockSize) {
                 const item = stockStore.stockData[stockId];
-
-                // Force book for 'Admin Voice' using processOrder
                 if (!item || !item.owner) {
                     stockStore.processOrder(stockId, "Admin Voice", "manual-voice", "manual-voice", null, "manual-voice");
                     lastAction.value = `✅ จอง #${stockId} ให้ Admin`;

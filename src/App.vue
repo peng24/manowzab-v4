@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, provide } from "vue";
+import { ref, onMounted, onUnmounted, provide } from "vue";
 import { useSystemStore } from "./stores/system";
 import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
@@ -98,12 +98,40 @@ function handleFirstInteraction() {
 onMounted(() => {
   console.log("🚀 App mounted");
 
-  // ✅ Initialize Listeners
-  nicknameStore.initNicknameListener();
-  stockStore.connectToStock("demo");
-  initAwayListener(); // ✅ Init Away Mode Listener
-  initAutoCleanup(); // ✅ Init Auto Cleanup (Admin Only)
-  systemStore.initHostListener(); // ✅ Init Host Listener (Take Over Logic)
+  const cleanupFns = [];
+
+  // ✅ Initialize Listeners (Capture cleanup functions)
+  const unsubNick = nicknameStore.initNicknameListener();
+  if (unsubNick) cleanupFns.push(unsubNick);
+
+  const unsubStock = stockStore.connectToStock("demo");
+  if (unsubStock) cleanupFns.push(unsubStock);
+
+  const unsubAway = initAwayListener(); // ✅ Init Away Mode Listener
+  if (unsubAway) cleanupFns.push(unsubAway);
+
+  // ✅ Auto Cleanup
+  // initAutoCleanup is async but returns a cleanup function immediately if successful
+  // We need to handle the fact it's async in the original code? 
+  // No, useAutoCleanup.js: initAutoCleanup is async. It returns a promise.
+  // Wait, I updated it to return a function, but it's an ASYNC function.
+  // The logic inside `initAutoCleanup` in `useAutoCleanup.js` is `async function ...`.
+  // Returning a value from an async function wraps it in a Promise.
+  // So `const cleanup = await initAutoCleanup()` would be needed. 
+  // But onMounted callback is sync usually. 
+  
+  // Let's refactor initAutoCleanup in App.vue to handle this or just fire and forget if it returns void (if not admin).
+  // Ideally, I should change initAutoCleanup to NOT be async if it just sets a timeout.
+  // Looking at useAutoCleanup.js:
+  // `async function initAutoCleanup() { ... const timerId = setTimeout(...) ... return () => clearTimeout(...) }`
+  // Since it's async, it returns `Promise<() => void>`.
+  
+  initAutoCleanup().then((cleanup) => {
+    if (cleanup) cleanupFns.push(cleanup);
+  });
+
+  const unsubHost = systemStore.initHostListener(); // ✅ Init Host Listener
+  if (unsubHost) cleanupFns.push(unsubHost);
 
   // ✅ Reset Connection State (Ensure YouTube starts disconnected)
   systemStore.isConnected = false;
@@ -112,7 +140,7 @@ onMounted(() => {
 
   // ✅ Firebase Connection Status
   const connectedRef = dbRef(db, ".info/connected");
-  onValue(connectedRef, (snap) => {
+  const unsubConnected = onValue(connectedRef, (snap) => {
     if (snap.val() === true) {
       systemStore.statusDb = "ok";
       console.log("✅ Firebase Connected");
@@ -129,25 +157,28 @@ onMounted(() => {
       console.log("❌ Firebase Disconnected");
     }
   });
+  cleanupFns.push(unsubConnected);
 
   // System Listeners
-  onValue(dbRef(db, "system/activeVideo"), (snap) => {
+  const unsubActiveVideo = onValue(dbRef(db, "system/activeVideo"), (snap) => {
     const vid = snap.val();
     if (vid && vid !== "demo") {
       systemStore.currentVideoId = vid;
       stockStore.connectToStock(vid);
     }
   });
+  cleanupFns.push(unsubActiveVideo);
 
-  onValue(
+  const unsubSettings = onValue(
     dbRef(db, "settings/" + systemStore.currentVideoId + "/stockSize"),
     (snap) => {
       const val = snap.val();
       if (val) stockStore.stockSize = val;
     }
   );
+  cleanupFns.push(unsubSettings);
 
-  onValue(dbRef(db, "system/aiCommander"), (snap) => {
+  const unsubAi = onValue(dbRef(db, "system/aiCommander"), (snap) => {
     const data = snap.val();
     if (data && typeof data === "object" && data.enabled) {
       systemStore.isAiCommander = data.enabled === systemStore.myDeviceId;
@@ -156,6 +187,13 @@ onMounted(() => {
     } else {
       systemStore.isAiCommander = false;
     }
+  });
+  cleanupFns.push(unsubAi);
+
+  // ✅ Register Cleanup
+  onUnmounted(() => {
+    console.log("♻️ Cleaning up App.vue listeners...");
+    cleanupFns.forEach((fn) => fn && fn());
   });
 });
 </script>

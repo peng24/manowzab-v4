@@ -19,18 +19,23 @@ export const useStockStore = defineStore("stock", () => {
   function connectToStock(videoId) {
     const stockRef = dbRef(db, `stock/${videoId}`);
 
-    onValue(stockRef, (snapshot) => {
+    const unsubStock = onValue(stockRef, (snapshot) => {
       const val = snapshot.val() || {};
       stockData.value = val;
     });
 
     const sizeRef = dbRef(db, `settings/${videoId}/stockSize`);
-    onValue(sizeRef, (snapshot) => {
+    const unsubSize = onValue(sizeRef, (snapshot) => {
       const val = snapshot.val();
       if (val) {
         stockSize.value = val;
       }
     });
+
+    return () => {
+      unsubStock();
+      unsubSize();
+    };
   }
 
   async function processOrder(

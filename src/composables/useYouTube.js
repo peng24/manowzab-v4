@@ -5,12 +5,13 @@ import { db } from "./useFirebase";
 import { YouTubeLiveChat } from "../services/YouTubeLiveChat";
 import { useAudio } from "./useAudio";
 
-const API_KEYS = [
-  "REMOVED_YOUTUBE_API_KEY_1",
-  "REMOVED_YOUTUBE_API_KEY_2",
-  "REMOVED_YOUTUBE_API_KEY_3",
-  "REMOVED_YOUTUBE_API_KEY_4",
-];
+const rawKeys = import.meta.env.VITE_YOUTUBE_API_KEYS || "";
+const API_KEYS = rawKeys.split(",").map((k) => k.trim()).filter((k) => k);
+
+if (API_KEYS.length === 0) {
+  throw new Error("Missing VITE_YOUTUBE_API_KEYS in environment variables");
+}
+
 
 export function useYouTube() {
   const systemStore = useSystemStore();

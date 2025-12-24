@@ -2,6 +2,53 @@ import { ref, onUnmounted } from 'vue';
 import { useStockStore } from '../stores/stock';
 import { useAudio } from './useAudio';
 
+// ============================================
+// PATTERN CONFIGURATION
+// ============================================
+const PATTERNS = {
+    // Corrections
+    corrections: {
+        chestFix: /(?:^|\s)(?:6|หก|โอ|อ)(?=\s*(?:3[0-9]|4[0-9]|5[0-9]|60)(?:\s|$))/g,
+        anchorStandardize: /(?:เบอร์|รหัส|ตัวที่|No\.)/gi,
+        priceStandardize: /(?:เอาไป|ขาย|เหลือ)/gi,
+        digitMerge: /\b(\d)\s+(\d)\b/g
+    },
+    
+    // Noise Removal
+    noise: [
+        /(?:ค่าส่ง|โอนเงิน|ปลายทาง|เริ่มต้น|ทั้งหมด|ซักรีด)\s*\d+(?:[-ถึง]*\d+)?\s*(?:บาท|ตัว|ครั้ง)?/gi,
+        /(?:กระดุม|สำรอง|ตำหนิ|รู)\s*\d+\s*(?:เม็ด|จุด|รู)?/gi
+    ],
+    
+    // Attributes
+    attributes: {
+        fabric: /\b(ผ้าเด้ง|ชีฟอง|โพลิเอสเตอร์|ไนลอน|เรยอน|คอตตอน|ลินิน|ยืด)\b/i,
+        bust: /(?:อก|รอบอก|ตึงหน้าผ้า)\s*(\d+)/i,
+        length: /(?:ยาว|ความยาว)\s*(\d+)/i,
+        sizeLetter: /\b(XXL|XL|L|M|S|XS)\b/i
+    },
+    
+    // Core Data
+    core: {
+        id: /รายการที่\s*(\d+)/i,
+        priceExplicit: /(?:ราคา)\s*(\d+)|(\d+)\s*(?:บาท|.-)/i,
+        freebie: /(?:ฟรี|แถม)/i
+    }
+};
+
+// ============================================
+// VALIDATORS
+// ============================================
+const VALIDATORS = {
+    bust: (num) => num >= 30 && num <= 70,
+    length: (num) => num >= 15 && num <= 60,
+    id: (num) => num >= 1 && num <= 1000,
+    price: (num) => {
+        const allowedPrices = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+        return allowedPrices.includes(num);
+    }
+};
+
 export function useVoiceDetector() {
     const stockStore = useStockStore();
     const { playDing } = useAudio();
@@ -42,7 +89,7 @@ export function useVoiceDetector() {
         recognition.value.onresult = (event) => {
             const text = event.results[event.results.length - 1][0].transcript.trim();
             transcript.value = `Raw: ${text}`;
-            processCommand(text);
+            processVoiceCommand(text);
         };
 
         recognition.value.onerror = (event) => {
@@ -72,160 +119,152 @@ export function useVoiceDetector() {
         }
     }
 
-    function processCommand(rawText) {
-        // --- STEP 1: PRE-PROCESSING ---
+    // ============================================
+    // PROCESS VOICE COMMAND
+    // ============================================
+    function processVoiceCommand(rawText) {
+        // STEP 1: CLEAN & NORMALIZE
         let cleanText = rawText;
 
-        // 1.1 Fix "Chest" Mishears (6, หก, โอ, อ followed by 30-60 range)
-        cleanText = cleanText.replace(/(?:^|\s)(?:6|หก|โอ|อ)(?=\s*(?:3[0-9]|4[0-9]|5[0-9]|60)(?:\s|$))/g, " อก ");
+        // Apply corrections
+        cleanText = cleanText.replace(PATTERNS.corrections.chestFix, " อก ");
+        cleanText = cleanText.replace(PATTERNS.corrections.anchorStandardize, " รายการที่ ");
+        cleanText = cleanText.replace(PATTERNS.corrections.priceStandardize, " ราคา ");
 
-        // 1.2 Standardize Keywords
-        cleanText = cleanText.replace(/(?:เบอร์|รหัส|ตัวที่)/g, " รายการที่ ");
-        cleanText = cleanText.replace(/(?:เอาไป|ขาย|เหลือ)/g, " ราคา ");
-
-        // 1.3 Merge Split Digits
+        // Merge split digits
         let prevText = "";
         while (prevText !== cleanText) {
             prevText = cleanText;
-            cleanText = cleanText.replace(/\b(\d)\s+(\d)\b/g, '$1$2');
+            cleanText = cleanText.replace(PATTERNS.corrections.digitMerge, '$1$2');
         }
 
-        // 1.4 Remove Noise
-        // Shipping/Rules
-        cleanText = cleanText.replace(/(?:ค่าส่ง|โอนเงิน|ปลายทาง|เริ่มต้น|ทั้งหมด|ซักรีด)\s*\d+(?:[-ถึง]*\d+)?\s*(?:บาท|ตัว|ครั้ง)?/g, "");
-        // Defects
-        cleanText = cleanText.replace(/(?:กระดุม|สำรอง|ตำหนิ|รู)\s*\d+\s*(?:เม็ด|จุด|รู)?/g, "");
+        // STEP 2: FILTER NOISE
+        PATTERNS.noise.forEach(noisePattern => {
+            cleanText = cleanText.replace(noisePattern, "");
+        });
 
-        // Cleanup spaces
         cleanText = cleanText.replace(/\s+/g, " ").trim();
         console.log(`🗣️ Raw: "${rawText}" -> Clean: "${cleanText}"`);
 
-        // --- STEP 2: EXTRACTION PIPELINE ---
+        // STEP 3: EXTRACT ATTRIBUTES (Hunter Mode)
         let workingText = cleanText;
         let fabric = null;
         let bust = null;
         let length = null;
         let sizeLetter = null;
-        let targetId = null;
-        let targetPrice = null;
 
-        // 2.1 Extract Fabric
-        const fabricKeywords = ["ผ้าเด้ง", "ชีฟอง", "โพลิเอสเตอร์", "ลินิน", "ซาติน", "ผ้าฝ้าย", "ยืด"];
-        const fabricRegex = new RegExp(`(${fabricKeywords.join("|")})`, "i");
-        const fabricMatch = workingText.match(fabricRegex);
+        // Extract Fabric
+        const fabricMatch = workingText.match(PATTERNS.attributes.fabric);
         if (fabricMatch) {
             fabric = fabricMatch[1];
             workingText = workingText.replace(fabricMatch[0], "").trim();
         }
 
-        // 2.2 Extract Bust (อก)
-        const bustRegex = /(?:อก|ตึงหน้าผ้า)\s*(\d+)/i;
-        const bustMatch = workingText.match(bustRegex);
+        // Extract Bust
+        const bustMatch = workingText.match(PATTERNS.attributes.bust);
         if (bustMatch) {
             const bustValue = parseInt(bustMatch[1]);
-            if (bustValue >= 30 && bustValue <= 70) {
+            if (VALIDATORS.bust(bustValue)) {
                 bust = bustValue;
                 workingText = workingText.replace(bustMatch[0], "").trim();
             }
         }
 
-        // 2.3 Extract Length (ยาว)
-        const lengthRegex = /ยาว\s*(\d+)/i;
-        const lengthMatch = workingText.match(lengthRegex);
+        // Extract Length
+        const lengthMatch = workingText.match(PATTERNS.attributes.length);
         if (lengthMatch) {
             const lengthValue = parseInt(lengthMatch[1]);
-            if (lengthValue >= 15 && lengthValue <= 60) {
+            if (VALIDATORS.length(lengthValue)) {
                 length = lengthValue;
                 workingText = workingText.replace(lengthMatch[0], "").trim();
             }
         }
 
-        // 2.4 Extract Size Letter
-        const sizeRegex = /\b(XXL|XL|L|M|S)\b/i;
-        const sizeMatch = workingText.match(sizeRegex);
+        // Extract Size Letter
+        const sizeMatch = workingText.match(PATTERNS.attributes.sizeLetter);
         if (sizeMatch) {
             sizeLetter = sizeMatch[1].toUpperCase();
             workingText = workingText.replace(sizeMatch[0], "").trim();
         }
 
-        // 2.5 Extract Item ID
-        const idRegex = /รายการที่\s*(\d+)/i;
-        const idMatch = workingText.match(idRegex);
+        // STEP 4: EXTRACT ID & PRICE (Plan A - Anchor)
+        let targetId = null;
+        let targetPrice = null;
+
+        // Extract ID
+        const idMatch = workingText.match(PATTERNS.core.id);
         if (idMatch) {
             const idValue = parseInt(idMatch[1]);
-            if (idValue >= 1 && idValue <= 1000) {
+            if (VALIDATORS.id(idValue)) {
                 targetId = idValue;
                 workingText = workingText.replace(idMatch[0], "").trim();
             }
         }
 
-        // 2.6 Extract Price
-        const allowedPrices = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-        
-        // Check for freebie keywords first
-        if (/(?:ฟรี|แถม)/i.test(workingText)) {
+        // Extract Price
+        // Check freebie first
+        if (PATTERNS.core.freebie.test(workingText)) {
             targetPrice = 0;
-            workingText = workingText.replace(/(?:ฟรี|แถม)/gi, "").trim();
+            workingText = workingText.replace(PATTERNS.core.freebie, "").trim();
         } else {
-            // Try explicit price patterns
-            const priceRegex = /(?:ราคา|บาท)\s*(\d+)|(\d+)\s*(?:บาท|.-)/i;
-            const priceMatch = workingText.match(priceRegex);
+            const priceMatch = workingText.match(PATTERNS.core.priceExplicit);
             if (priceMatch) {
                 const priceValue = parseInt(priceMatch[1] || priceMatch[2]);
-                if (allowedPrices.includes(priceValue)) {
+                if (VALIDATORS.price(priceValue)) {
                     targetPrice = priceValue;
                     workingText = workingText.replace(priceMatch[0], "").trim();
                 }
             }
         }
 
-        // Cleanup working text
         workingText = workingText.replace(/\s+/g, " ").trim();
 
-        // --- STEP 3: IMPLICIT FALLBACK LOGIC ---
-        const remainingNumbers = [...workingText.matchAll(/\b(\d+)\b/g)].map(m => parseInt(m[1]));
+        // STEP 5: EXTRACT ID & PRICE (Plan B - Implicit Fallback)
+        if (targetId === null || targetPrice === null) {
+            const remainingNumbers = [...workingText.matchAll(/\b(\d+)\b/g)].map(m => parseInt(m[1]));
 
-        if (targetId === null && targetPrice === null && remainingNumbers.length > 0) {
-            if (remainingNumbers.length === 2) {
-                // Try as ID + Price
-                const [num1, num2] = remainingNumbers;
-                if (num1 >= 1 && num1 <= 1000 && allowedPrices.includes(num2)) {
-                    targetId = num1;
-                    targetPrice = num2;
-                }
-            } else if (remainingNumbers.length === 1) {
-                const num = remainingNumbers[0];
-                // Try splitting if 4 digits (e.g., 4350 -> 43, 50)
-                if (num >= 1000 && num <= 9999) {
-                    const idPart = Math.floor(num / 100);
-                    const pricePart = num % 100;
-                    if (idPart >= 1 && idPart <= 1000 && allowedPrices.includes(pricePart)) {
-                        targetId = idPart;
-                        targetPrice = pricePart;
+            if (remainingNumbers.length > 0) {
+                // Case 1: Pair (e.g., "53 80")
+                if (remainingNumbers.length >= 2 && targetId === null && targetPrice === null) {
+                    const [num1, num2] = remainingNumbers;
+                    if (VALIDATORS.id(num1) && VALIDATORS.price(num2)) {
+                        targetId = num1;
+                        targetPrice = num2;
                     }
-                } else if (num >= 1 && num <= 1000) {
-                    // Assume it's an ID
-                    targetId = num;
                 }
-            }
-        } else if (targetId === null && remainingNumbers.length > 0) {
-            // We have price but no ID, try first remaining number as ID
-            const num = remainingNumbers[0];
-            if (num >= 1 && num <= 1000) {
-                targetId = num;
-            }
-        } else if (targetPrice === null && remainingNumbers.length > 0) {
-            // We have ID but no price, try first remaining number as price
-            const num = remainingNumbers[0];
-            if (allowedPrices.includes(num)) {
-                targetPrice = num;
+                // Case 2: Merged (e.g., "4350" -> 43, 50)
+                else if (remainingNumbers.length === 1 && targetId === null && targetPrice === null) {
+                    const num = remainingNumbers[0];
+                    if (num >= 1000 && num <= 9999) {
+                        const idPart = Math.floor(num / 100);
+                        const pricePart = num % 100;
+                        if (VALIDATORS.id(idPart) && VALIDATORS.price(pricePart)) {
+                            targetId = idPart;
+                            targetPrice = pricePart;
+                        }
+                    } else if (VALIDATORS.id(num)) {
+                        // Case 3: Single ID
+                        targetId = num;
+                    }
+                }
+                // Fill missing ID or Price
+                else if (targetId === null && remainingNumbers.length > 0) {
+                    const num = remainingNumbers[0];
+                    if (VALIDATORS.id(num)) {
+                        targetId = num;
+                    }
+                } else if (targetPrice === null && remainingNumbers.length > 0) {
+                    const num = remainingNumbers[0];
+                    if (VALIDATORS.price(num)) {
+                        targetPrice = num;
+                    }
+                }
             }
         }
 
         console.log(`🔍 Extracted -> ID: ${targetId}, Price: ${targetPrice}, Bust: ${bust}, Length: ${length}, Fabric: ${fabric}, Size: ${sizeLetter}`);
 
-        // --- STEP 4: ADMIN COMMANDS (Fallback) ---
-        // Check Cancel
+        // ADMIN COMMANDS (Fallback)
         const cancelMatch = cleanText.match(/(?:ยกเลิก|ลบ|เคลียร์|ไม่เอา)\s*(?:รายการที่)?\s*(\d+)/i);
         if (cancelMatch) {
             const cancelId = parseInt(cancelMatch[1]);
@@ -238,7 +277,6 @@ export function useVoiceDetector() {
             }
         }
 
-        // Check Manual Book
         const bookMatch = cleanText.match(/(?:จอง|เอฟ|เอา|รับ)\s*(?:รายการที่)?\s*(\d+)/i);
         if (bookMatch) {
             const bookId = parseInt(bookMatch[1]);
@@ -257,22 +295,22 @@ export function useVoiceDetector() {
             }
         }
 
-        // --- STEP 5: STORE UPDATE ---
+        // FINAL ACTION
         if (targetId && (targetPrice !== null || bust || length || fabric || sizeLetter)) {
             if (targetId > 0 && targetId <= stockStore.stockSize) {
                 const updateData = {};
-                
+
                 if (targetPrice !== null) {
                     updateData.price = targetPrice;
                 }
-                
+
                 // Combine size components
                 let sizeString = "";
                 if (bust) sizeString += `อก ${bust}`;
                 if (length) sizeString += (sizeString ? " " : "") + `ยาว ${length}`;
                 if (sizeLetter) sizeString += (sizeString ? " " : "") + sizeLetter;
                 if (fabric) sizeString += (sizeString ? " " : "") + fabric;
-                
+
                 if (sizeString) {
                     updateData.size = sizeString;
                 }
@@ -293,7 +331,6 @@ export function useVoiceDetector() {
                 playDing();
             }
         } else {
-            // No valid data extracted
             lastAction.value = `⚠️ ไม่เข้าใจคำสั่ง`;
             transcript.value = cleanText;
         }

@@ -214,6 +214,10 @@ export function useVoiceDetector() {
                  lastAction.value = msg;
                  transcript.value = cleanText;
                  playDing(); 
+             } else {
+                 // Feedback for ID not found
+                 lastAction.value = `⚠️ ไม่พบรายการ #${targetId}`;
+                 playDing(); // Optional: Maybe a different sound? But simple is fine.
              }
         }
     }

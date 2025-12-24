@@ -19,9 +19,11 @@ export function useAutoCleanup() {
 
         // 2. Delay to avoid network contention at startup
         console.log("⏳ Auto Cleanup: Waiting 20s before check...");
-        setTimeout(async () => {
+        const timerId = setTimeout(async () => {
             await performCleanup();
         }, 20000);
+
+        return () => clearTimeout(timerId);
     }
 
     async function performCleanup() {

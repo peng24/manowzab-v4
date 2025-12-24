@@ -43,7 +43,7 @@ export const useSystemStore = defineStore("system", () => {
   // ✅ Host Listener (Take Over Logic)
   function initHostListener() {
     const hostRef = dbRef(db, "system/hostId");
-    onValue(hostRef, (snapshot) => {
+    return onValue(hostRef, (snapshot) => {
       const currentHostId = snapshot.val();
 
       // ถ้ามีคนอื่นยึด Host ไปแล้ว -> เราต้องหลุด

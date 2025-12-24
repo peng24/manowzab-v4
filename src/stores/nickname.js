@@ -8,7 +8,7 @@ export const useNicknameStore = defineStore("nickname", () => {
 
   // Listen to nicknames changes
   function initNicknameListener() {
-    onValue(dbRef(db, "nicknames"), (snapshot) => {
+    return onValue(dbRef(db, "nicknames"), (snapshot) => {
       const data = snapshot.val() || {};
       nicknames.value = data;
       console.log("📝 Nicknames updated:", Object.keys(data).length);

@@ -48,7 +48,7 @@ import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
 import { useNicknameStore } from "./stores/nickname";
 import { ref as dbRef, onValue, onDisconnect, set } from "firebase/database";
-import { db } from "./firebase";
+import { db } from "./composables/useFirebase";
 import { useAudio } from "./composables/useAudio";
 import { useAwayMode } from "./composables/useAwayMode";
 import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup

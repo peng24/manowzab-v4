@@ -3,11 +3,10 @@ import { getDatabase } from "firebase/database";
 import { getAuth, signInAnonymously } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "REMOVED_FIREBASE_API_KEY",
-  authDomain: "manowlive-chat.firebaseapp.com",
-  databaseURL:
-    "https://manowlive-chat-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "manowlive-chat",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
 };
 
 const app = initializeApp(firebaseConfig);

@@ -118,13 +118,32 @@ let phase = 0;
 // Watch lastAction
 watch(lastAction, (newVal) => {
     if (newVal && newVal.startsWith("✅")) {
-        // Regex: (?:รายการที่|รหัส) (\d+) \| (\d+)\.- (?:\| (.+))?
-        const match = newVal.match(/(?:รายการที่|รหัส) (\d+) \| (\d+)\.-\s*(?:\|\s*(.+))?/);
-        if (match) {
+        let id = null;
+        let price = null;
+        let size = null;
+
+        // Extract ID: Matches "#50", "รายการที่ 50"
+        const idMatch = newVal.match(/(?:#|รายการที่|รหัส)\s*(\d+)/);
+        if (idMatch) {
+            id = idMatch[1];
+        }
+
+        // Split by pipe to find Price (ending with .-) and Size (the rest)
+        const parts = newVal.split("|").slice(1).map(p => p.trim());
+        
+        parts.forEach(part => {
+            if (part.endsWith(".-")) {
+                price = part.replace(".-", "").trim();
+            } else {
+                size = part;
+            }
+        });
+
+        if (id) {
             resultData.value = {
-                id: match[1],
-                price: match[2],
-                size: match[3] ? match[3].replace(/[\[\]]/g, '') : null 
+                id: id,
+                price: price,
+                size: size
             };
             isFlashing.value = true;
             setTimeout(() => isFlashing.value = false, 500);

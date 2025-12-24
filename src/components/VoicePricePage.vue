@@ -83,6 +83,10 @@
           <i class="fa-solid fa-shirt"></i>
           <span>ไซส์: "อก/เอว/ยาว/ไซส์ + เลข"</span>
        </div>
+       
+       <button class="download-btn" @click="downloadLogs" title="Download Debug Logs">
+           <i class="fa-solid fa-file-arrow-down"></i>
+       </button>
     </footer>
   </div>
 </template>
@@ -91,11 +95,13 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useSystemStore } from '../stores/system';
 import { useVoiceDetector } from '../composables/useVoiceDetector';
+import { useVoiceLogger } from '../composables/useVoiceLogger';
 import { useFirebase } from '../composables/useFirebase';
 import { ref as dbRef, onValue } from "firebase/database";
 
 const systemStore = useSystemStore();
 const { isListening, transcript, lastAction, toggleMic } = useVoiceDetector();
+const { downloadLogs } = useVoiceLogger();
 const isDbConnected = ref(false);
 
 const currentTime = ref("");
@@ -454,6 +460,23 @@ onUnmounted(() => {
 .cheat-sheet { margin: 20px; padding: 15px; display: flex; justify-content: center; gap: 30px; z-index: 10; }
 .cheat-item { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; opacity: 0.7; }
 .cheat-item i { color: #60a5fa; }
+
+.download-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    margin-left: auto; /* Push to right */
+}
+.download-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
 
 @media (max-width: 768px) {
   .result-card { padding: 20px; }

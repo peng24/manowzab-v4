@@ -1,6 +1,7 @@
 import { ref, onUnmounted } from 'vue';
 import { useStockStore } from '../stores/stock';
 import { useAudio } from './useAudio';
+import { useVoiceLogger } from './useVoiceLogger';
 
 // ============================================
 // PATTERN CONFIGURATION
@@ -52,6 +53,7 @@ const VALIDATORS = {
 export function useVoiceDetector() {
     const stockStore = useStockStore();
     const { playDing } = useAudio();
+    const { logEvent } = useVoiceLogger();
 
     const isListening = ref(false);
     const transcript = ref("");
@@ -152,12 +154,14 @@ export function useVoiceDetector() {
         let bust = null;
         let length = null;
         let sizeLetter = null;
+        let detectionLogic = "Unknown"; // For logging
 
         // Extract Fabric
         const fabricMatch = workingText.match(PATTERNS.attributes.fabric);
         if (fabricMatch) {
             fabric = fabricMatch[1];
             workingText = workingText.replace(fabricMatch[0], "").trim();
+            detectionLogic = "Fabric-Detection";
         }
 
         // Extract Bust
@@ -167,6 +171,7 @@ export function useVoiceDetector() {
             if (VALIDATORS.bust(bustValue)) {
                 bust = bustValue;
                 workingText = workingText.replace(bustMatch[0], "").trim();
+                detectionLogic = detectionLogic === "Unknown" ? "Attribute-Bust" : detectionLogic;
             }
         }
 
@@ -177,6 +182,7 @@ export function useVoiceDetector() {
             if (VALIDATORS.length(lengthValue)) {
                 length = lengthValue;
                 workingText = workingText.replace(lengthMatch[0], "").trim();
+                detectionLogic = detectionLogic === "Unknown" ? "Attribute-Length" : detectionLogic;
             }
         }
 
@@ -185,6 +191,7 @@ export function useVoiceDetector() {
         if (sizeMatch) {
             sizeLetter = sizeMatch[1].toUpperCase();
             workingText = workingText.replace(sizeMatch[0], "").trim();
+            detectionLogic = detectionLogic === "Unknown" ? "Attribute-Size" : detectionLogic;
         }
 
         // STEP 4: EXTRACT ID & PRICE (Plan A - Anchor)
@@ -198,6 +205,7 @@ export function useVoiceDetector() {
             if (VALIDATORS.id(idValue)) {
                 targetId = idValue;
                 workingText = workingText.replace(idMatch[0], "").trim();
+                detectionLogic = "Plan-A-Anchor";
             }
         }
 
@@ -213,6 +221,7 @@ export function useVoiceDetector() {
                 if (VALIDATORS.price(priceValue)) {
                     targetPrice = priceValue;
                     workingText = workingText.replace(priceMatch[0], "").trim();
+                    if (detectionLogic !== "Plan-A-Anchor") detectionLogic = "Plan-A-Price";
                 }
             }
         }
@@ -230,6 +239,7 @@ export function useVoiceDetector() {
                     if (VALIDATORS.id(num1) && VALIDATORS.price(num2)) {
                         targetId = num1;
                         targetPrice = num2;
+                        detectionLogic = "Plan-B-Pair";
                     }
                 }
                 // Case 2: Merged (e.g., "4350" -> 43, 50)
@@ -241,10 +251,12 @@ export function useVoiceDetector() {
                         if (VALIDATORS.id(idPart) && VALIDATORS.price(pricePart)) {
                             targetId = idPart;
                             targetPrice = pricePart;
+                            detectionLogic = "Plan-B-Merged";
                         }
                     } else if (VALIDATORS.id(num)) {
                         // Case 3: Single ID
                         targetId = num;
+                        detectionLogic = "Plan-B-SingleID";
                     }
                 }
                 // Fill missing ID or Price
@@ -252,11 +264,13 @@ export function useVoiceDetector() {
                     const num = remainingNumbers[0];
                     if (VALIDATORS.id(num)) {
                         targetId = num;
+                        detectionLogic = "Plan-B-FillID";
                     }
                 } else if (targetPrice === null && remainingNumbers.length > 0) {
                     const num = remainingNumbers[0];
                     if (VALIDATORS.price(num)) {
                         targetPrice = num;
+                        detectionLogic = "Plan-B-FillPrice";
                     }
                 }
             }
@@ -273,6 +287,14 @@ export function useVoiceDetector() {
                 lastAction.value = `🗑️ ยกเลิก #${cancelId}`;
                 transcript.value = cleanText;
                 playDing();
+
+                logEvent({
+                    raw: rawText,
+                    cleaned: cleanText,
+                    output: { action: "CANCEL", id: cancelId },
+                    logic: "Admin-Cancel",
+                    status: "MATCHED"
+                });
                 return;
             }
         }
@@ -287,9 +309,24 @@ export function useVoiceDetector() {
                     lastAction.value = `✅ จอง #${bookId} ให้ Admin`;
                     transcript.value = cleanText;
                     playDing();
+
+                     logEvent({
+                        raw: rawText,
+                        cleaned: cleanText,
+                        output: { action: "BOOK", id: bookId },
+                        logic: "Admin-Book",
+                        status: "MATCHED"
+                    });
                 } else {
                     lastAction.value = `⚠️ #${bookId} ไม่ว่าง`;
                     transcript.value = cleanText;
+                     logEvent({
+                        raw: rawText,
+                        cleaned: cleanText,
+                        output: { action: "BOOK_FAIL_BUSY", id: bookId },
+                        logic: "Admin-Book",
+                        status: "IGNORED" 
+                    });
                 }
                 return;
             }
@@ -325,14 +362,43 @@ export function useVoiceDetector() {
                 lastAction.value = msg;
                 transcript.value = cleanText;
                 playDing();
+
+                logEvent({
+                    raw: rawText,
+                    cleaned: cleanText,
+                    output: { id: targetId, price: targetPrice, size: sizeString },
+                    logic: detectionLogic,
+                    status: "MATCHED"
+                });
+
             } else {
                 lastAction.value = `⚠️ ไม่พบรายการ #${targetId}`;
                 transcript.value = cleanText;
                 playDing();
+
+                  logEvent({
+                    raw: rawText,
+                    cleaned: cleanText,
+                    output: { id: targetId, error: "Out of range" },
+                    logic: detectionLogic,
+                    status: "IGNORED"
+                });
             }
         } else {
             lastAction.value = `⚠️ ไม่เข้าใจคำสั่ง`;
             transcript.value = cleanText;
+
+             // Log ignored commands if they are substantial enough (not just background noise)
+            // Example: > 5 chars
+            if (cleanText.length > 5) {
+                logEvent({
+                    raw: rawText,
+                    cleaned: cleanText,
+                    output: null,
+                    logic: "None",
+                    status: "IGNORED"
+                });
+            }
         }
     }
 

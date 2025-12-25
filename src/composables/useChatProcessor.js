@@ -228,7 +228,7 @@ export function useChatProcessor() {
     } else {
       // --- กรณีข้อความทั่วไป ---
       if (intent === "shipping") {
-        speak(displayName, "แจ้งโอนเงิน");
+        speak(displayName, msg);
       } else {
         // Read EVERYTHING else
         speak(displayName, msg);

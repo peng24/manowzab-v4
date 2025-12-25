@@ -11,11 +11,24 @@ import {
 import { db } from "../composables/useFirebase";
 import { useSystemStore } from "./system";
 
+/**
+ * Stock Store
+ * Manages inventory, orders, and real-time syncing with Firebase.
+ */
 export const useStockStore = defineStore("stock", () => {
+  /** @type {import('vue').Ref<Object>} Dictionary of stock items */
   const stockData = ref({});
+  
+  /** @type {import('vue').Ref<number>} Total number of stock items */
   const stockSize = ref(70);
+  
   const systemStore = useSystemStore();
 
+  /**
+   * Connects to the stock node in Firebase for a specific video.
+   * @param {string} videoId - The YouTube Video ID or 'demo'.
+   * @returns {Function} Cleanup function to unsubscribe listeners.
+   */
   function connectToStock(videoId) {
     const stockRef = dbRef(db, `stock/${videoId}`);
 
@@ -38,6 +51,17 @@ export const useStockStore = defineStore("stock", () => {
     };
   }
 
+  /**
+   * Processes a new order (booking/buying).
+   * Used by both Manual input and Chat/AI processing.
+   * 
+   * @param {number} num - The item number to book.
+   * @param {string} owner - Display name of the buyer.
+   * @param {string} uid - Unique ID of the buyer (channelId).
+   * @param {string} [source="manual"] - Origin of the order (manual, chat, ai).
+   * @param {number|null} [price=null] - Price override if specified.
+   * @param {string} [method="manual"] - Detection method (regex, ai, manual).
+   */
   async function processOrder(
     num,
     owner,
@@ -51,6 +75,7 @@ export const useStockStore = defineStore("stock", () => {
     try {
       await runTransaction(itemRef, (currentData) => {
         if (currentData === null) {
+          // Create new item if not exists
           return {
             owner,
             uid,
@@ -60,6 +85,7 @@ export const useStockStore = defineStore("stock", () => {
             price: price || null,
           };
         } else if (!currentData.owner) {
+          // Claim empty item
           currentData.owner = owner;
           currentData.uid = uid;
           currentData.time = Date.now();
@@ -68,9 +94,10 @@ export const useStockStore = defineStore("stock", () => {
           if (!currentData.queue) currentData.queue = [];
           return currentData;
         } else {
-          if (currentData.owner === owner) return;
+          // Add to queue if occupied
+          if (currentData.owner === owner) return; // Already owns it
           const queue = currentData.queue || [];
-          if (queue.find((q) => q.owner === owner)) return;
+          if (queue.find((q) => q.owner === owner)) return; // Already in queue
           queue.push({ owner, uid, time: Date.now() });
           currentData.queue = queue;
           return currentData;
@@ -81,7 +108,12 @@ export const useStockStore = defineStore("stock", () => {
     }
   }
 
-  // ✅ แก้ไข processCancel ให้คืนค่าชื่อคนเก่าและคนใหม่ (ถ้ามี)
+  /**
+   * Cancels an order and promotes the next person in queue.
+   * 
+   * @param {number} num - The item number to cancel.
+   * @returns {Promise<{previousOwner: string, nextOwner: string|null}|null>} Info about the cancellation for TTS.
+   */
   async function processCancel(num) {
     const current = stockData.value[num];
     if (!current) return null;
@@ -90,6 +122,7 @@ export const useStockStore = defineStore("stock", () => {
     let nextOwner = null;
 
     if (current.queue && current.queue.length > 0) {
+      // Promote next in queue
       const next = current.queue[0];
       const nextQ = current.queue.slice(1);
       const newData = {
@@ -101,30 +134,40 @@ export const useStockStore = defineStore("stock", () => {
       };
       if (current.price) newData.price = current.price;
 
-      // อัปเดตข้อมูลคนใหม่
       await set(
         dbRef(db, `stock/${systemStore.currentVideoId}/${num}`),
         newData
       );
       nextOwner = next.owner;
     } else {
-      // ลบรายการ
+      // Delete item if no queue
       await remove(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`));
     }
 
-    // Return ข้อมูลกลับไปให้ ChatProcessor พูดเสียง
     return { previousOwner, nextOwner };
   }
 
+  /**
+   * Clears all stock for the current video.
+   */
   function clearAllStock() {
     remove(dbRef(db, `stock/${systemStore.currentVideoId}`));
   }
 
+  /**
+   * Updates only the price of a stock item.
+   * @param {number} num 
+   * @param {number} price 
+   */
   function updateStockPrice(num, price) {
     const path = `stock/${systemStore.currentVideoId}/${num}/price`;
     return update(dbRef(db), { [path]: price });
   }
 
+  /**
+   * Sets the total stock size (max items).
+   * @param {number} newSize 
+   */
   function updateStockSize(newSize) {
     if (!systemStore.currentVideoId) return;
     const sizeRef = dbRef(
@@ -134,8 +177,11 @@ export const useStockStore = defineStore("stock", () => {
     set(sizeRef, newSize);
   }
 
-  // ✅ เพิ่มฟังก์ชันอัปเดตข้อมูลรายการทั้งหมด (สำหรับ Drag & Drop)
-  // ✅ เพิ่มฟังก์ชันอัปเดตข้อมูลรายการทั้งหมด (สำหรับ Drag & Drop)
+  /**
+   * Updates generic item data (Price, Size, etc.) and syncs with Overlay.
+   * @param {number} num - Item ID
+   * @param {Object} newData - Data to update (e.g. { price: 100, size: "XL" })
+   */
   async function updateItemData(num, newData) {
     if (!systemStore.currentVideoId) return;
 
@@ -143,7 +189,6 @@ export const useStockStore = defineStore("stock", () => {
     await update(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`), newData);
 
     // 2. Update Overlay "Current Item" (Only if we have price/size)
-    // This allows the OBS Overlay to react instantly
     if (newData.price || newData.size) {
       await update(dbRef(db, `overlay/${systemStore.currentVideoId}/current_item`), {
         id: num,
@@ -163,6 +208,6 @@ export const useStockStore = defineStore("stock", () => {
     clearAllStock,
     updateStockPrice,
     updateStockSize,
-    updateItemData, // Export ฟังก์ชันใหม่
+    updateItemData,
   };
 });

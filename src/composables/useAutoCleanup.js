@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { ref as dbRef, get, query, orderByChild, endAt, remove } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useSystemStore } from "../stores/system";
+import { CONSTANTS } from "../config/constants";
 
 export function useAutoCleanup() {
     const systemStore = useSystemStore();
@@ -18,10 +19,10 @@ export function useAutoCleanup() {
         }
 
         // 2. Delay to avoid network contention at startup
-        console.log("⏳ Auto Cleanup: Waiting 20s before check...");
+        console.log(`⏳ Auto Cleanup: Waiting ${CONSTANTS.CLEANUP.STARTUP_DELAY_MS / 1000}s before check...`);
         const timerId = setTimeout(async () => {
             await performCleanup();
-        }, 20000);
+        }, CONSTANTS.CLEANUP.STARTUP_DELAY_MS);
 
         return () => clearTimeout(timerId);
     }
@@ -33,9 +34,9 @@ export function useAutoCleanup() {
         try {
             console.log("🧹 Auto Cleanup: Checking for old chats...");
 
-            // 3. Calculate Cutoff Date (30 days ago)
+            // 3. Calculate Cutoff Date
             const cutoffDate = new Date();
-            cutoffDate.setDate(cutoffDate.getDate() - 30);
+            cutoffDate.setDate(cutoffDate.getDate() - CONSTANTS.CLEANUP.HISTORY_RETENTION_DAYS);
             const cutoffTimestamp = cutoffDate.getTime();
 
             console.log(`📅 Cutoff Date: ${cutoffDate.toLocaleDateString()} (${cutoffTimestamp})`);

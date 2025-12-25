@@ -82,34 +82,34 @@
             :style="dropdownStyle"
             @click.stop
           >
-            <a @click="downloadCSV">
+            <a @click="downloadCSV" class="menu-csv">
               <i class="fa-solid fa-file-csv"></i> บันทึกแชท (CSV)
             </a>
-            <a @click="testVoice">
+            <a @click="testVoice" class="menu-voice">
               <i class="fa-solid fa-volume-high"></i> ทดสอบเสียง
             </a>
-            <a @click="toggleFullScreen">
+            <a @click="toggleFullScreen" class="menu-screen">
               <i class="fa-solid fa-expand"></i> เต็มจอ (iPad)
             </a>
-            <a @click="toggleAwayMode">
+            <a @click="toggleAwayMode" class="menu-away">
               <i class="fa-solid fa-moon"></i> โหมดพาลูกนอน
             </a>
-            <a @click="toggleSimulation">
+            <a @click="toggleSimulation" class="menu-sim">
               <i
                 :class="isSimulating ? 'fa-solid fa-stop' : 'fa-solid fa-bolt'"
               ></i>
               {{ isSimulating ? "หยุดจำลอง" : "เริ่มจำลองแชท" }}
             </a>
-            <a @click="askAiKey">
+            <a @click="askAiKey" class="menu-key">
               <i class="fa-solid fa-key"></i> ตั้งค่า API Key
             </a>
-            <a @click="openVoicePricePage" style="color: #60a5fa">
+            <a @click="openVoicePricePage" class="menu-voice-page">
               <i class="fa-solid fa-microphone"></i> เปิดหน้าตรวจเสียงราคา
             </a>
-            <a @click="openOverlayPage" style="color: #a855f7">
+            <a @click="openOverlayPage" class="menu-overlay">
               <i class="fa-solid fa-layer-group"></i> เปิดหน้าจอ Overlay (OBS)
             </a>
-            <a @click="forceUpdate" style="color: #00e676">
+            <a @click="forceUpdate" class="menu-update">
               <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
             </a>
           </div>

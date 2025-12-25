@@ -89,8 +89,45 @@ export function useChatProcessor() {
     let method = null;
     const stockSize = stockStore.stockSize;
 
-    // 2. AI Analysis (ถ้าเปิดใช้)
-    if (systemStore.isAiCommander) {
+    // 2. Regex-First Strategy (Priority)
+    // ✅ 2.1 Shipping / Transfer
+    const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
+    
+    // ✅ 2.2 Questions
+    const questionRegex =
+      /อก|เอว|ยาว|ราคา|เท่าไหร่|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
+      
+    // ✅ 2.3 Buy Pattern
+    const buyRegex =
+      /(?:^|[^0-9])(?:F|f|cf|CF|รับ|เอา)?\s*(\d+)(?:[\s=\/]+(\d+))?(?:$|[^0-9])/;
+
+    // ✅ 2.4 Cancel Pattern
+    const cancelRegex =
+      /(?:^|[^0-9])(?:cc|CC|cancel|ยกเลิก|ไม่เอา|ปล่อย|หลุด)\s*(\d+)(?:$|[^0-9])/i;
+
+    if (shippingRegex.test(msg)) {
+      intent = "shipping";
+      method = "regex-ship";
+    } else if (questionRegex.test(msg)) {
+      method = "question-skip"; 
+    } else {
+      const cMatch = msg.match(cancelRegex);
+      const bMatch = msg.match(buyRegex);
+
+      if (cMatch) {
+        intent = "cancel";
+        targetId = parseInt(cMatch[1]);
+        method = "regex";
+      } else if (bMatch) {
+        intent = "buy";
+        targetId = parseInt(bMatch[1]);
+        targetPrice = bMatch[2] ? parseInt(bMatch[2]) : null;
+        method = "regex";
+      }
+    }
+
+    // 3. AI Analysis (Fallback - Run ONLY if Regex failed)
+    if (!method && systemStore.isAiCommander) {
       try {
         const aiResult = await analyzeChat(msg);
         if (aiResult) {
@@ -113,46 +150,6 @@ export function useChatProcessor() {
         }
       } catch (error) {
         logger.error("❌ AI Error (Skipped):", error);
-      }
-    }
-
-    // 3. Fallback to Regex (Logic Upgrade!)
-    if (!method) {
-      // ✅ 3.1 ดักจับการส่งของ/โอนเงินก่อน (ป้องกัน "ส่ง 25" ไปตัดสต็อก)
-      const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
-
-      // ✅ 3.2 ดักจับคำถาม (เพิ่มคำให้ครอบคลุมภาษาพูด)
-      const questionRegex =
-        /อก|เอว|ยาว|ราคา|เท่าไหร่|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
-
-      if (shippingRegex.test(msg)) {
-        intent = "shipping";
-        method = "regex-ship";
-      } else if (questionRegex.test(msg)) {
-        method = "question-skip"; // เป็นคำถาม ข้ามเลย
-      } else {
-        // ✅ 3.3 Regex แบบใหม่: ใช้ [^0-9] เป็นตัวคั่นแทน \s (รองรับ Emoji, ขีด, ติดกัน)
-        // จับ Pattern: (เริ่ม หรือ ไม่ใช่เลข) + (คำสั่งจอง)? + (ตัวเลขสินค้า) + (ราคา)? + (จบ หรือ ไม่ใช่เลข)
-        const buyRegex =
-          /(?:^|[^0-9])(?:F|f|cf|CF|รับ|เอา)?\s*(\d+)(?:[\s=\/]+(\d+))?(?:$|[^0-9])/;
-
-        // จับ Pattern ยกเลิก
-        const cancelRegex =
-          /(?:^|[^0-9])(?:cc|CC|cancel|ยกเลิก|ไม่เอา|ปล่อย|หลุด)\s*(\d+)(?:$|[^0-9])/i;
-
-        const cMatch = msg.match(cancelRegex);
-        const bMatch = msg.match(buyRegex);
-
-        if (cMatch) {
-          intent = "cancel";
-          targetId = parseInt(cMatch[1]);
-          method = "regex";
-        } else if (bMatch) {
-          intent = "buy";
-          targetId = parseInt(bMatch[1]);
-          targetPrice = bMatch[2] ? parseInt(bMatch[2]) : null;
-          method = "regex";
-        }
       }
     }
 

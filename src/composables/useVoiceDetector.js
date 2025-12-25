@@ -4,64 +4,59 @@ import { useAudio } from './useAudio';
 import { useVoiceLogger } from './useVoiceLogger';
 
 // ============================================
-// PATTERN CONFIGURATION
+// CONFIG: SMART HUNTER
 // ============================================
-const PATTERNS = {
-    // Corrections
-    corrections: {
-        chestFix: /(?:^|\s)(?:6|หก|โอ|อ)(?=\s*(?:3[0-9]|4[0-9]|5[0-9]|60)(?:\s|$))/g,
-        anchorStandardize: /(?:เบอร์|รหัส|ตัวที่|No\.)/gi,
-        priceStandardize: /(?:เอาไป|ขาย|เหลือ)/gi,
-        digitMerge: /\b(\d)\s+(\d)\b/g
+const CONFIG = {
+    // Standard Validations
+    ranges: {
+        bust: { min: 30, max: 70 },
+        length: { min: 15, max: 60 },
+        id: { min: 1, max: 1000 },
+        price: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] // Strict steps + free
     },
-    
-    // Noise Removal
-    noise: [
-        /(?:ค่าส่ง|โอนเงิน|ปลายทาง|เริ่มต้น|ทั้งหมด|ซักรีด)\s*\d+(?:[-ถึง]*\d+)?\s*(?:บาท|ตัว|ครั้ง)?/gi,
-        /(?:กระดุม|สำรอง|ตำหนิ|รู)\s*\d+\s*(?:เม็ด|จุด|รู)?/gi
-    ],
-    
-    // Attributes
-    attributes: {
-        fabric: /\b(ผ้าเด้ง|ชีฟอง|โพลิเอสเตอร์|ไนลอน|เรยอน|คอตตอน|ลินิน|ยืด)\b/i,
-        bust: /(?:อก|รอบอก|ตึงหน้าผ้า)\s*(\d+)/i,
-        length: /(?:ยาว|ความยาว)\s*(\d+)/i,
-        sizeLetter: /\b(XXL|XL|L|M|S|XS)\b/i
-    },
-    
-    // Core Data
-    core: {
-        id: /รายการที่\s*(\d+)/i,
-        priceExplicit: /(?:ราคา)\s*(\d+)|(\d+)\s*(?:บาท|.-)/i,
-        freebie: /(?:ฟรี|แถม)/i
-    }
-};
-
-// ============================================
-// VALIDATORS
-// ============================================
-const VALIDATORS = {
-    bust: (num) => num >= 30 && num <= 70,
-    length: (num) => num >= 15 && num <= 60,
-    id: (num) => num >= 1 && num <= 1000,
-    price: (num) => {
-        const allowedPrices = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-        return allowedPrices.includes(num);
+    // Regex Patterns
+    patterns: {
+        corrections: [
+            { from: /(?:^|\s)(?:6|หก|โอ|อ)(?=\s*(?:3[0-9]|4[0-9]|5[0-9]|60)(?:\s|$))/g, to: " อก " }, // "6 40" -> "อก 40"
+            { from: /(?:เบอร์|รหัส|ตัวที่|No\.)/gi, to: " รายการที่ " },
+            { from: /(?:เอาไป|ขาย|เหลือ|ราคา)/gi, to: " ราคา " },
+            { from: /\b(\d)\s+(\d)\b/g, to: "$1$2" } // Merge separate digits "5 0" -> "50"
+        ],
+        noise: [
+            /(?:ค่าส่ง|โอนเงิน|ปลายทาง|เริ่มต้น|ทั้งหมด|ซักรีด|รับได้|สนใจ)\s*\d+(?:[-ถึง]*\d+)?\s*(?:บาท|ตัว|ครั้ง)?/gi,
+            /(?:กระดุม|สำรอง|ตำหนิ|รู)\s*\d+\s*(?:เม็ด|จุด|รู)?/gi,
+            /(?:ลูกค้า|พี่|น้อง|แม่ค้า)/gi
+        ],
+        attributes: {
+            fabric: /\b(ผ้าเด้ง|ชีฟอง|โพลิเอสเตอร์|ไนลอน|เรยอน|คอตตอน|ลินิน|ยืด|ไหมพรม|ซาติน|กำมะหยี่)\b/i,
+            bust: /(?:อก|รอบอก|ตึงหน้าผ้า)\s*(\d+)/i,
+            length: /(?:ยาว|ความยาว)\s*(\d+)/i,
+            sizeLetter: /\b(XXL|XL|L|M|S|XS)\b/i
+        },
+        anchors: {
+            id: /รายการที่\s*(\d+)/i,
+            price: /ราคา\s*(\d+)/i,
+            freebie: /(?:ฟรี|แถม)/i
+        }
     }
 };
 
 export function useVoiceDetector() {
+    // Dependencies
     const stockStore = useStockStore();
     const { playDing } = useAudio();
     const { logEvent } = useVoiceLogger();
 
+    // State
     const isListening = ref(false);
     const transcript = ref("");
     const lastAction = ref("");
     const recognition = ref(null);
     const manualStop = ref(false);
 
-    // Initialize Speech Recognition
+    // ============================================
+    // INITIALIZATION
+    // ============================================
     if ('webkitSpeechRecognition' in window) {
         const SpeechRecognition = window.webkitSpeechRecognition;
         recognition.value = new SpeechRecognition();
@@ -69,344 +64,294 @@ export function useVoiceDetector() {
         recognition.value.interimResults = false;
         recognition.value.lang = 'th-TH';
 
-        recognition.value.onstart = () => {
-            isListening.value = true;
-            manualStop.value = false;
-        };
-
+        recognition.value.onstart = () => { isListening.value = true; manualStop.value = false; };
         recognition.value.onend = () => {
             isListening.value = false;
             if (!manualStop.value) {
-                console.log("🔄 Recognition ended unexpectedly. Restarting...");
+                // Auto-restart for continuous listening
                 setTimeout(() => {
-                    try {
-                        recognition.value.start();
-                    } catch (e) {
-                        console.error("Restart failed:", e);
-                    }
+                    try { recognition.value.start(); } catch (e) { /* ignore */ }
                 }, 500);
             }
         };
 
         recognition.value.onresult = (event) => {
             const text = event.results[event.results.length - 1][0].transcript.trim();
-            transcript.value = `Raw: ${text}`;
+            // transcript.value will be updated in processVoiceCommand with the cleaned version
             processVoiceCommand(text);
         };
 
         recognition.value.onerror = (event) => {
             console.error("Speech Recognition Error:", event.error);
-            isListening.value = false;
             if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                isListening.value = false;
                 manualStop.value = true;
             }
         };
     } else {
-        lastAction.value = "⚠️ Browser does not support Web Speech API";
+        lastAction.value = "⚠️ Browser not supported";
     }
 
+    // ============================================
+    // CORE LOGIC: SMART HUNTER
+    // ============================================
+    function processVoiceCommand(rawText) {
+        // --- STEP 1: PRE-PROCESSING ---
+        let cleanText = rawText;
+
+        // 1.1 Apply Corrections
+        CONFIG.patterns.corrections.forEach(rule => {
+            cleanText = cleanText.replace(rule.from, rule.to);
+        });
+
+        // 1.2 Remove Noise
+        CONFIG.patterns.noise.forEach(pattern => {
+            cleanText = cleanText.replace(pattern, "");
+        });
+
+        // 1.3 Normalize Whitespace
+        cleanText = cleanText.replace(/\s+/g, " ").trim();
+
+        // --- STEP 2: HUNTER PHASE (Attributes) ---
+        let workingText = cleanText;
+        let detected = {
+            id: null,
+            price: null,
+            fabric: null,
+            bust: null,
+            length: null,
+            sizeLetter: null,
+            logic: "Unknown"
+        };
+
+        // Extract Fabric
+        const fabricMatch = workingText.match(CONFIG.patterns.attributes.fabric);
+        if (fabricMatch) {
+            detected.fabric = fabricMatch[1];
+            workingText = workingText.replace(fabricMatch[0], "").trim(); // Consume
+        }
+
+        // Extract Size Letter
+        const sizeMatch = workingText.match(CONFIG.patterns.attributes.sizeLetter);
+        if (sizeMatch) {
+            detected.sizeLetter = sizeMatch[1].toUpperCase();
+            workingText = workingText.replace(sizeMatch[0], "").trim(); // Consume
+        }
+
+        // Extract Bust
+        const bustMatch = workingText.match(CONFIG.patterns.attributes.bust);
+        if (bustMatch) {
+            const val = parseInt(bustMatch[1]);
+            if (val >= CONFIG.ranges.bust.min && val <= CONFIG.ranges.bust.max) {
+                detected.bust = val;
+                workingText = workingText.replace(bustMatch[0], "").trim(); // Consume
+            }
+        }
+
+        // Extract Length
+        const lengthMatch = workingText.match(CONFIG.patterns.attributes.length);
+        if (lengthMatch) {
+            const val = parseInt(lengthMatch[1]);
+            if (val >= CONFIG.ranges.length.min && val <= CONFIG.ranges.length.max) {
+                detected.length = val;
+                workingText = workingText.replace(lengthMatch[0], "").trim(); // Consume
+            }
+        }
+
+        // --- STEP 3: PLAN A (Anchor Logic) ---
+        // Look for explicit "Item X" or "Price Y"
+        const idAnchorMatch = workingText.match(CONFIG.patterns.anchors.id);
+        if (idAnchorMatch) {
+            const val = parseInt(idAnchorMatch[1]);
+            if (validateId(val)) {
+                detected.id = val;
+                workingText = workingText.replace(idAnchorMatch[0], "").trim(); // Consume
+                detected.logic = "Plan-A-Anchor";
+            }
+        }
+
+        // Check for Freebie/Giveaway
+        if (CONFIG.patterns.anchors.freebie.test(workingText)) {
+            detected.price = 0;
+            workingText = workingText.replace(CONFIG.patterns.anchors.freebie, "").trim();
+        } else {
+            // Check for explicit Price
+            const priceAnchorMatch = workingText.match(CONFIG.patterns.anchors.price);
+            if (priceAnchorMatch) {
+                const val = parseInt(priceAnchorMatch[1]);
+                if (validatePrice(val)) {
+                    detected.price = val;
+                    workingText = workingText.replace(priceAnchorMatch[0], "").trim(); // Consume
+                    detected.logic = "Plan-A-Price";
+                }
+            }
+        }
+
+        // --- STEP 4: PLAN B (Implicit Fallback) ---
+        // If Core Data (ID/Price) is missing, looks at remaining numbers
+        if (detected.id === null || detected.price === null) {
+            // Find all remaining independent numbers
+            const numbers = [...workingText.matchAll(/\b(\d+)\b/g)].map(m => parseInt(m[1]));
+
+            if (numbers.length > 0) {
+                // Strategy: PAIR (Two numbers exist -> ID, Price)
+                if (numbers.length >= 2 && detected.id === null && detected.price === null) {
+                    const [n1, n2] = numbers;
+                    if (validateId(n1) && validatePrice(n2)) {
+                        detected.id = n1;
+                        detected.price = n2;
+                        detected.logic = "Plan-B-Pair";
+                    }
+                }
+                // Strategy: MERGED (One big number -> ID + Price)
+                // e.g. "50100" -> Item 50, Price 100
+                else if (numbers.length === 1 && detected.id === null && detected.price === null) {
+                    const num = numbers[0];
+                    if (num >= 10010 && num <= 1000100) { // Plausible range checking
+                        // It's ambiguous, but let's try splitting last 2 or 3 digits for price?
+                        // Actually, simplified rule: If number > 1000, try split
+                        // ex: 5380 -> 53, 80
+                        const str = num.toString();
+                        if (str.length === 4) {
+                             const p1 = parseInt(str.substring(0, 2));
+                             const p2 = parseInt(str.substring(2));
+                             if (validateId(p1) && validatePrice(p2)) {
+                                 detected.id = p1;
+                                 detected.price = p2;
+                                 detected.logic = "Plan-B-Merged-4";
+                             }
+                        }
+                    } 
+                    // Strategy: SINGLE ID
+                    else if (validateId(num)) {
+                         detected.id = num;
+                         detected.logic = "Plan-B-SingleID";
+                    }
+                }
+                // Strategy: FILL (One missing)
+                else if (detected.id === null && numbers.length > 0) {
+                    if (validateId(numbers[0])) {
+                        detected.id = numbers[0];
+                        detected.logic = "Plan-B-FillID";
+                    }
+                } else if (detected.price === null && numbers.length > 0) {
+                    if (validatePrice(numbers[0])) {
+                        detected.price = numbers[0];
+                        detected.logic = "Plan-B-FillPrice";
+                    }
+                }
+            }
+        }
+
+        // --- STEP 5: EXECUTION ---
+        executeAction(rawText, cleanText, detected);
+    }
+
+    // ============================================
+    // VALIDATORS
+    // ============================================
+    function validateId(num) {
+        return num >= CONFIG.ranges.id.min && num <= CONFIG.ranges.id.max;
+    }
+
+    function validatePrice(num) {
+        return CONFIG.ranges.price.includes(num);
+    }
+
+    // ============================================
+    // ACTION HANDLER
+    // ============================================
+    function executeAction(rawText, cleanText, detected) {
+        // Admin Commands Check (Cancel/Book)
+        // Simple regex check on cleanText for these specific actions
+        const cancelMatch = cleanText.match(/(?:ยกเลิก|ลบ|เคลียร์|ไม่เอา)\s*(?:รายการที่)?\s*(\d+)/i);
+        if (cancelMatch) {
+            const id = parseInt(cancelMatch[1]);
+            if (stockStore.stockData[id]) {
+                const item = stockStore.stockData[id];
+                // Only if it's reserved manually or by voice? Actually just cancel it.
+                 // stockStore.processCancel usually checks if it's cancelable or just resets it.
+                 // Let's assume processCancel does the right thing.
+                stockStore.processCancel(id);
+                lastAction.value = `🗑️ ยกเลิก #${id}`;
+                playDing();
+                logEvent({ raw: rawText, cleaned: cleanText, output: { action: "CANCEL", id }, logic: "Admin-Cancel", status: "MATCHED" });
+                return;
+            }
+        }
+
+        // Logic: We MUST have an ID to do anything meaningful update-wise
+        if (detected.id) {
+            // Check existence
+            if (detected.id > stockStore.stockSize || detected.id < 1) {
+                lastAction.value = `⚠️ ไม่พบรายการ #${detected.id}`;
+                playDing(); // Error sound? 
+                 logEvent({ raw: rawText, cleaned: cleanText, output: { id: detected.id, error: "Out of range" }, logic: detected.logic, status: "IGNORED" });
+                return;
+            }
+
+            // Construct Update Payload
+            const updateData = {};
+            let sizeParts = [];
+            
+            if (detected.bust) sizeParts.push(`อก ${detected.bust}`);
+            if (detected.length) sizeParts.push(`ยาว ${detected.length}`);
+            if (detected.sizeLetter) sizeParts.push(detected.sizeLetter);
+            if (detected.fabric) sizeParts.push(detected.fabric);
+
+            if (sizeParts.length > 0) updateData.size = sizeParts.join(" ");
+            if (detected.price !== null) updateData.price = detected.price;
+
+            // Commit to Store
+            if (Object.keys(updateData).length > 0) {
+                stockStore.updateItemData(detected.id, updateData);
+                
+                // Feedback
+                let feedback = `✅ #${detected.id}`;
+                if (updateData.size) feedback += ` | ${updateData.size}`;
+                // Explicit check for undefined because Price can be 0
+                if (updateData.price !== undefined) feedback += ` | ${updateData.price}.-`;
+                
+                lastAction.value = feedback;
+                transcript.value = cleanText; // Show the clean version
+                playDing();
+
+                logEvent({
+                    raw: rawText,
+                    cleaned: cleanText,
+                    output: { id: detected.id, ...updateData },
+                    logic: detected.logic,
+                    status: "MATCHED"
+                });
+            } else {
+                // ID found but no data to update? (Just selecting?)
+                 lastAction.value = `ℹ️ เลือก #${detected.id} (ไม่มีข้อมูลใหม่)`;
+                 logEvent({ raw: rawText, cleaned: cleanText, output: { id: detected.id, msg: "No data" }, logic: detected.logic, status: "IGNORED" });
+            }
+
+        } else {
+            // No ID found
+             if (rawText.length > 5) {
+                // Only treat as error/feedback if it was substantial speech
+                // lastAction.value = "⚠️ ไม่เข้าใจคำสั่ง"; // Optional: Don't spam UI
+                logEvent({ raw: rawText, cleaned: cleanText, output: null, logic: "None", status: "IGNORED" });
+             }
+        }
+    }
+
+    // ============================================
+    // EXPORTS
+    // ============================================
     function toggleMic() {
         if (!recognition.value) return;
-
         if (isListening.value) {
             manualStop.value = true;
             recognition.value.stop();
         } else {
             manualStop.value = false;
-            try {
-                recognition.value.start();
-            } catch (e) {
-                console.error(e);
-            }
+            try { recognition.value.start(); } catch (e) { console.error(e); }
         }
     }
-
-    // ============================================
-    // PROCESS VOICE COMMAND
-    // ============================================
-    function processVoiceCommand(rawText) {
-        // STEP 1: CLEAN & NORMALIZE
-        let cleanText = rawText;
-
-        // Apply corrections
-        cleanText = cleanText.replace(PATTERNS.corrections.chestFix, " อก ");
-        cleanText = cleanText.replace(PATTERNS.corrections.anchorStandardize, " รายการที่ ");
-        cleanText = cleanText.replace(PATTERNS.corrections.priceStandardize, " ราคา ");
-
-        // Merge split digits
-        let prevText = "";
-        while (prevText !== cleanText) {
-            prevText = cleanText;
-            cleanText = cleanText.replace(PATTERNS.corrections.digitMerge, '$1$2');
-        }
-
-        // STEP 2: FILTER NOISE
-        PATTERNS.noise.forEach(noisePattern => {
-            cleanText = cleanText.replace(noisePattern, "");
-        });
-
-        cleanText = cleanText.replace(/\s+/g, " ").trim();
-        console.log(`🗣️ Raw: "${rawText}" -> Clean: "${cleanText}"`);
-
-        // STEP 3: EXTRACT ATTRIBUTES (Hunter Mode)
-        let workingText = cleanText;
-        let fabric = null;
-        let bust = null;
-        let length = null;
-        let sizeLetter = null;
-        let detectionLogic = "Unknown"; // For logging
-
-        // Extract Fabric
-        const fabricMatch = workingText.match(PATTERNS.attributes.fabric);
-        if (fabricMatch) {
-            fabric = fabricMatch[1];
-            workingText = workingText.replace(fabricMatch[0], "").trim();
-            detectionLogic = "Fabric-Detection";
-        }
-
-        // Extract Bust
-        const bustMatch = workingText.match(PATTERNS.attributes.bust);
-        if (bustMatch) {
-            const bustValue = parseInt(bustMatch[1]);
-            if (VALIDATORS.bust(bustValue)) {
-                bust = bustValue;
-                workingText = workingText.replace(bustMatch[0], "").trim();
-                detectionLogic = detectionLogic === "Unknown" ? "Attribute-Bust" : detectionLogic;
-            }
-        }
-
-        // Extract Length
-        const lengthMatch = workingText.match(PATTERNS.attributes.length);
-        if (lengthMatch) {
-            const lengthValue = parseInt(lengthMatch[1]);
-            if (VALIDATORS.length(lengthValue)) {
-                length = lengthValue;
-                workingText = workingText.replace(lengthMatch[0], "").trim();
-                detectionLogic = detectionLogic === "Unknown" ? "Attribute-Length" : detectionLogic;
-            }
-        }
-
-        // Extract Size Letter
-        const sizeMatch = workingText.match(PATTERNS.attributes.sizeLetter);
-        if (sizeMatch) {
-            sizeLetter = sizeMatch[1].toUpperCase();
-            workingText = workingText.replace(sizeMatch[0], "").trim();
-            detectionLogic = detectionLogic === "Unknown" ? "Attribute-Size" : detectionLogic;
-        }
-
-        // STEP 4: EXTRACT ID & PRICE (Plan A - Anchor)
-        let targetId = null;
-        let targetPrice = null;
-
-        // Extract ID
-        const idMatch = workingText.match(PATTERNS.core.id);
-        if (idMatch) {
-            const idValue = parseInt(idMatch[1]);
-            if (VALIDATORS.id(idValue)) {
-                targetId = idValue;
-                workingText = workingText.replace(idMatch[0], "").trim();
-                detectionLogic = "Plan-A-Anchor";
-            }
-        }
-
-        // Extract Price
-        // Check freebie first
-        if (PATTERNS.core.freebie.test(workingText)) {
-            targetPrice = 0;
-            workingText = workingText.replace(PATTERNS.core.freebie, "").trim();
-        } else {
-            const priceMatch = workingText.match(PATTERNS.core.priceExplicit);
-            if (priceMatch) {
-                const priceValue = parseInt(priceMatch[1] || priceMatch[2]);
-                if (VALIDATORS.price(priceValue)) {
-                    targetPrice = priceValue;
-                    workingText = workingText.replace(priceMatch[0], "").trim();
-                    if (detectionLogic !== "Plan-A-Anchor") detectionLogic = "Plan-A-Price";
-                }
-            }
-        }
-
-        workingText = workingText.replace(/\s+/g, " ").trim();
-
-        // STEP 5: EXTRACT ID & PRICE (Plan B - Implicit Fallback)
-        if (targetId === null || targetPrice === null) {
-            const remainingNumbers = [...workingText.matchAll(/\b(\d+)\b/g)].map(m => parseInt(m[1]));
-
-            if (remainingNumbers.length > 0) {
-                // Case 1: Pair (e.g., "53 80")
-                if (remainingNumbers.length >= 2 && targetId === null && targetPrice === null) {
-                    const [num1, num2] = remainingNumbers;
-                    if (VALIDATORS.id(num1) && VALIDATORS.price(num2)) {
-                        targetId = num1;
-                        targetPrice = num2;
-                        detectionLogic = "Plan-B-Pair";
-                    }
-                }
-                // Case 2: Merged (e.g., "4350" -> 43, 50)
-                else if (remainingNumbers.length === 1 && targetId === null && targetPrice === null) {
-                    const num = remainingNumbers[0];
-                    if (num >= 1000 && num <= 9999) {
-                        const idPart = Math.floor(num / 100);
-                        const pricePart = num % 100;
-                        if (VALIDATORS.id(idPart) && VALIDATORS.price(pricePart)) {
-                            targetId = idPart;
-                            targetPrice = pricePart;
-                            detectionLogic = "Plan-B-Merged";
-                        }
-                    } else if (VALIDATORS.id(num)) {
-                        // Case 3: Single ID
-                        targetId = num;
-                        detectionLogic = "Plan-B-SingleID";
-                    }
-                }
-                // Fill missing ID or Price
-                else if (targetId === null && remainingNumbers.length > 0) {
-                    const num = remainingNumbers[0];
-                    if (VALIDATORS.id(num)) {
-                        targetId = num;
-                        detectionLogic = "Plan-B-FillID";
-                    }
-                } else if (targetPrice === null && remainingNumbers.length > 0) {
-                    const num = remainingNumbers[0];
-                    if (VALIDATORS.price(num)) {
-                        targetPrice = num;
-                        detectionLogic = "Plan-B-FillPrice";
-                    }
-                }
-            }
-        }
-
-        console.log(`🔍 Extracted -> ID: ${targetId}, Price: ${targetPrice}, Bust: ${bust}, Length: ${length}, Fabric: ${fabric}, Size: ${sizeLetter}`);
-
-        // ADMIN COMMANDS (Fallback)
-        const cancelMatch = cleanText.match(/(?:ยกเลิก|ลบ|เคลียร์|ไม่เอา)\s*(?:รายการที่)?\s*(\d+)/i);
-        if (cancelMatch) {
-            const cancelId = parseInt(cancelMatch[1]);
-            if (stockStore.stockData[cancelId]) {
-                stockStore.processCancel(cancelId);
-                lastAction.value = `🗑️ ยกเลิก #${cancelId}`;
-                transcript.value = cleanText;
-                playDing();
-
-                logEvent({
-                    raw: rawText,
-                    cleaned: cleanText,
-                    output: { action: "CANCEL", id: cancelId },
-                    logic: "Admin-Cancel",
-                    status: "MATCHED"
-                });
-                return;
-            }
-        }
-
-        const bookMatch = cleanText.match(/(?:จอง|เอฟ|เอา|รับ)\s*(?:รายการที่)?\s*(\d+)/i);
-        if (bookMatch) {
-            const bookId = parseInt(bookMatch[1]);
-            if (bookId > 0 && bookId <= stockStore.stockSize) {
-                const item = stockStore.stockData[bookId];
-                if (!item || !item.owner) {
-                    stockStore.processOrder(bookId, "Admin Voice", "manual-voice", "manual-voice", null, "manual-voice");
-                    lastAction.value = `✅ จอง #${bookId} ให้ Admin`;
-                    transcript.value = cleanText;
-                    playDing();
-
-                     logEvent({
-                        raw: rawText,
-                        cleaned: cleanText,
-                        output: { action: "BOOK", id: bookId },
-                        logic: "Admin-Book",
-                        status: "MATCHED"
-                    });
-                } else {
-                    lastAction.value = `⚠️ #${bookId} ไม่ว่าง`;
-                    transcript.value = cleanText;
-                     logEvent({
-                        raw: rawText,
-                        cleaned: cleanText,
-                        output: { action: "BOOK_FAIL_BUSY", id: bookId },
-                        logic: "Admin-Book",
-                        status: "IGNORED" 
-                    });
-                }
-                return;
-            }
-        }
-
-        // FINAL ACTION
-        if (targetId && (targetPrice !== null || bust || length || fabric || sizeLetter)) {
-            if (targetId > 0 && targetId <= stockStore.stockSize) {
-                const updateData = {};
-
-                if (targetPrice !== null) {
-                    updateData.price = targetPrice;
-                }
-
-                // Combine size components
-                let sizeString = "";
-                if (bust) sizeString += `อก ${bust}`;
-                if (length) sizeString += (sizeString ? " " : "") + `ยาว ${length}`;
-                if (sizeLetter) sizeString += (sizeString ? " " : "") + sizeLetter;
-                if (fabric) sizeString += (sizeString ? " " : "") + fabric;
-
-                if (sizeString) {
-                    updateData.size = sizeString;
-                }
-
-                stockStore.updateItemData(targetId, updateData);
-
-                // Feedback
-                let msg = `✅ #${targetId}`;
-                if (sizeString) msg += ` | ${sizeString}`;
-                if (targetPrice !== null) msg += ` | ${targetPrice}.-`;
-
-                lastAction.value = msg;
-                transcript.value = cleanText;
-                playDing();
-
-                logEvent({
-                    raw: rawText,
-                    cleaned: cleanText,
-                    output: { id: targetId, price: targetPrice, size: sizeString },
-                    logic: detectionLogic,
-                    status: "MATCHED"
-                });
-
-            } else {
-                lastAction.value = `⚠️ ไม่พบรายการ #${targetId}`;
-                transcript.value = cleanText;
-                playDing();
-
-                  logEvent({
-                    raw: rawText,
-                    cleaned: cleanText,
-                    output: { id: targetId, error: "Out of range" },
-                    logic: detectionLogic,
-                    status: "IGNORED"
-                });
-            }
-        } else {
-            lastAction.value = `⚠️ ไม่เข้าใจคำสั่ง`;
-            transcript.value = cleanText;
-
-             // Log ignored commands if they are substantial enough (not just background noise)
-            // Example: > 5 chars
-            if (cleanText.length > 5) {
-                logEvent({
-                    raw: rawText,
-                    cleaned: cleanText,
-                    output: null,
-                    logic: "None",
-                    status: "IGNORED"
-                });
-            }
-        }
-    }
-
-    onUnmounted(() => {
-        if (recognition.value && isListening.value) {
-            recognition.value.stop();
-        }
-    });
 
     return {
         isListening,

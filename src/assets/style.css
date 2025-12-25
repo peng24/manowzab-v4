@@ -1279,3 +1279,8 @@ body {
     break-inside: avoid;
   }
 }
+/*  Shipping Color (Blue) */
+.chat-row.shipping .chat-bubble {
+  background: rgba(33, 150, 243, 0.15);
+  border-left: 3px solid #2196f3;
+}

@@ -578,4 +578,24 @@ function confirmClear() {
     min-height: 60px; /* Shorter height */
   }
 }
+/* ✅ Queue Badge (Red Circle) */
+.queue-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #d32f2f;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85em;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+  border: 2px solid #2a2a2a; /* Border matching card bg to make it pop */
+}
+
 </style>

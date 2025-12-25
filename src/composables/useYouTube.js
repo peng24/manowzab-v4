@@ -13,7 +13,10 @@ if (API_KEYS.length === 0) {
   throw new Error("Missing VITE_YOUTUBE_API_KEYS in environment variables");
 }
 
-
+/**
+ * Composable for managing YouTube Live connection.
+ * Handles API connection, chat polling, viewer counts, and disconnect logic.
+ */
 export function useYouTube() {
   const systemStore = useSystemStore();
   const { speak } = useAudio();
@@ -21,13 +24,19 @@ export function useYouTube() {
   const activeChatId = ref("");
   const viewerIntervalId = ref(null);
   const chatService = new YouTubeLiveChat(API_KEYS);
+  
+  // Link Service Status to Store
   chatService.onStatusChange = (status) => { systemStore.statusChat = status; };
 
   let processMessageFunc = null;
 
+  /**
+   * Helper to fetch YouTube API with key rotation.
+   * @param {string} url - The API URL (without key).
+   * @returns {Promise<Object>} JSON response from API.
+   * @throws Will throw error if all keys are exhausted.
+   */
   async function smartFetch(url) {
-    // Helper used only for Viewer Count & Initial Video Details now
-    // Chat logic is handled by specific Service
     try {
       systemStore.statusApi = "ok";
       let res = await fetch(
@@ -39,7 +48,7 @@ export function useYouTube() {
         console.error("❌ API Error:", data.error.message);
         systemStore.statusApi = "warn";
 
-        // Simple rotation for manual calls
+        // Rotate Key
         if (systemStore.currentKeyIndex < API_KEYS.length - 1) {
           systemStore.currentKeyIndex++;
           return smartFetch(url);
@@ -55,6 +64,13 @@ export function useYouTube() {
     }
   }
 
+  /**
+   * Connects to a YouTube Video.
+   * Fetches metadata, initializes chat polling, and starts viewer tracking.
+   * 
+   * @param {string} videoId - The YouTube Video ID.
+   * @returns {Promise<boolean>} True if connection successful, false otherwise.
+   */
   async function connectVideo(videoId) {
     try {
       console.log("🔌 Connecting to video:", videoId);
@@ -71,7 +87,7 @@ export function useYouTube() {
       systemStore.liveTitle = item.snippet.title;
       console.log("✅ Video title:", item.snippet.title);
 
-      // Save History
+      // Save History to Firebase
       if (videoId && videoId !== "demo") {
         set(dbRef(db, `history/${videoId}`), {
           title: item.snippet.title,
@@ -79,7 +95,7 @@ export function useYouTube() {
         }).catch((error) => console.error("Error saving history:", error));
       }
 
-      // Init Chat Store
+      // Initialize Chat Store
       const chatStore = await import("../stores/chat").then((m) => m.useChatStore());
       if (item.liveStreamingDetails?.actualStartTime) {
         chatStore.streamStartTime = new Date(item.liveStreamingDetails.actualStartTime).getTime();
@@ -87,18 +103,18 @@ export function useYouTube() {
         chatStore.streamStartTime = Date.now();
       }
 
-      // Check Live Chat
+      // Check for Live Chat ID
       if (item.liveStreamingDetails?.activeLiveChatId) {
         activeChatId.value = item.liveStreamingDetails.activeLiveChatId;
         console.log("✅ Live Chat ID:", activeChatId.value);
 
-        // Load Processor
+        // Dynamic parameters for Message Processor
         const { useChatProcessor } = await import("./useChatProcessor");
         const { processMessage } = useChatProcessor();
         processMessageFunc = processMessage;
 
-        // ✅ Start Chat Service
-        chatService.liveChatId = activeChatId.value; // Pre-set ID
+        // Start Chat Service
+        chatService.liveChatId = activeChatId.value;
         chatService.startPolling(videoId, async (msg) => {
           if (processMessageFunc) await processMessageFunc(msg);
         });
@@ -107,7 +123,7 @@ export function useYouTube() {
         updateViewerCount(videoId);
         viewerIntervalId.value = setInterval(() => updateViewerCount(videoId), CONSTANTS.YOUTUBE.VIEWER_POLL_INTERVAL_MS);
 
-        // ✅ Voice Announcement
+        // Voice Announcement
         speak("", `การเชื่อมต่อสำเร็จ กำลังอ่านแชดสดจาก ${item.snippet.title}`);
 
         return true;
@@ -122,6 +138,10 @@ export function useYouTube() {
     }
   }
 
+  /**
+   * Updates Concurrent Viewers and Detects Stream End.
+   * @param {string} videoId 
+   */
   async function updateViewerCount(videoId) {
     try {
       const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${videoId}`;
@@ -129,24 +149,20 @@ export function useYouTube() {
       const details = data.items?.[0]?.liveStreamingDetails;
 
       if (details) {
-        // Update Viewers
         if (details.concurrentViewers) {
           systemStore.viewerCount = parseInt(details.concurrentViewers);
         }
 
-        // ✅ Check if Stream Ended
+        // Check if Stream Ended
         if (details.actualEndTime) {
           console.log("🏁 Stream Finished:", details.actualEndTime);
 
-          // Check if we already handled the ending to avoid duplicate triggers
           if (viewerIntervalId.value) {
             clearInterval(viewerIntervalId.value);
-            viewerIntervalId.value = null; // Mark as handled
+            viewerIntervalId.value = null;
 
-            // 1. Speak "Live finished"
             speak("", "ไลฟ์จบแล้ว");
 
-            // 2. Schedule Auto-Disconnect
             const delaySec = CONSTANTS.YOUTUBE.DISCONNECT_DELAY_MS / 1000;
             console.log(`⏳ Disconnecting in ${delaySec} seconds...`);
             setTimeout(() => {
@@ -163,11 +179,13 @@ export function useYouTube() {
     }
   }
 
+  /**
+   * Disconnects from YouTube, stops polling, and resets state.
+   */
   function disconnect() {
     console.log("🔌 Disconnecting...");
     systemStore.isConnected = false;
 
-    // Stop Chat Service
     chatService.stopPolling();
 
     if (viewerIntervalId.value) {

@@ -4,6 +4,7 @@ import { ref as dbRef, set } from "firebase/database";
 import { db } from "./useFirebase";
 import { YouTubeLiveChat } from "../services/YouTubeLiveChat";
 import { useAudio } from "./useAudio";
+import { CONSTANTS } from "../config/constants";
 
 const rawKeys = import.meta.env.VITE_YOUTUBE_API_KEYS || "";
 const API_KEYS = rawKeys.split(",").map((k) => k.trim()).filter((k) => k);
@@ -104,7 +105,7 @@ export function useYouTube() {
 
         // Start Viewer Count Loop
         updateViewerCount(videoId);
-        viewerIntervalId.value = setInterval(() => updateViewerCount(videoId), 15000);
+        viewerIntervalId.value = setInterval(() => updateViewerCount(videoId), CONSTANTS.YOUTUBE.VIEWER_POLL_INTERVAL_MS);
 
         // ✅ Voice Announcement
         speak("", `การเชื่อมต่อสำเร็จ กำลังอ่านแชดสดจาก ${item.snippet.title}`);
@@ -145,14 +146,15 @@ export function useYouTube() {
             // 1. Speak "Live finished"
             speak("", "ไลฟ์จบแล้ว");
 
-            // 2. Schedule Auto-Disconnect in 1.30 min (90s)
-            console.log("⏳ Disconnecting in 90 seconds...");
+            // 2. Schedule Auto-Disconnect
+            const delaySec = CONSTANTS.YOUTUBE.DISCONNECT_DELAY_MS / 1000;
+            console.log(`⏳ Disconnecting in ${delaySec} seconds...`);
             setTimeout(() => {
               if (systemStore.isConnected) {
                 speak("", "กำลังตัดการเชื่อมต่อครับ");
                 disconnect();
               }
-            }, 90000); // 1.5 * 60 * 1000
+            }, CONSTANTS.YOUTUBE.DISCONNECT_DELAY_MS);
           }
         }
       }

@@ -15,9 +15,14 @@
         <div class="sidebar">
           <div class="sidebar-header">
             <span>รายการย้อนหลัง</span>
-            <button class="btn-icon-sm" @click="history.fetchHistoryList" title="รีเฟรช">
-              <i class="fa-solid fa-rotate-right"></i>
-            </button>
+            <div class="flex gap-1">
+                 <button class="btn-icon-sm" @click="fixHistoryData" title="คำนวณยอดใหม่ (Fix Data)">
+                   <i class="fa-solid fa-wrench"></i>
+                 </button>
+                 <button class="btn-icon-sm" @click="history.fetchHistoryList" title="รีเฟรช">
+                   <i class="fa-solid fa-rotate-right"></i>
+                 </button>
+            </div>
           </div>
           
           <div v-if="history.isLoading.value" class="text-center p-10 text-muted">
@@ -57,7 +62,11 @@
           <div v-else class="content-wrapper">
              <!-- Top Stats -->
              <div class="stats-bar">
-                <div class="stat-box">
+                <div v-if="isDetailsLoading" class="flex items-center justify-center p-4 w-full text-muted">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังโหลดข้อมูล...
+                </div>
+                <template v-else>
+                 <div class="stat-box">
                    <div class="stat-label">ยอดขายรวม</div>
                    <div class="stat-value text-success">{{ formatCurrency(totalRevenue) }}</div>
                 </div>
@@ -73,6 +82,7 @@
                      <i class="fa-solid fa-file-csv"></i> Export CSV
                    </button>
                 </div>
+                </template>
              </div>
 
              <!-- Controls -->
@@ -86,10 +96,38 @@
                     placeholder="ค้นหาชื่อลูกค้า, รหัสสินค้า..."
                   >
                 </div>
+                
+                <div class="view-toggles flex gap-2 ml-4">
+                    <button 
+                        class="btn btn-sm" 
+                        :class="viewMode === 'list' ? 'btn-primary' : 'btn-outline'"
+                        @click="viewMode = 'list'"
+                        title="List View"
+                    >
+                        <i class="fa-solid fa-list"></i>
+                    </button>
+                    <button 
+                        class="btn btn-sm" 
+                        :class="viewMode === 'grid' ? 'btn-primary' : 'btn-outline'"
+                        @click="viewMode = 'grid'"
+                        title="Grid View"
+                    >
+                        <i class="fa-solid fa-th"></i>
+                    </button>
+                    <button 
+                        v-if="viewMode === 'grid'"
+                        class="btn btn-sm btn-outline" 
+                        @click="isFullscreen = !isFullscreen"
+                        title="Full Screen"
+                    >
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                </div>
              </div>
 
              <!-- Table -->
-             <div class="table-container">
+             <!-- Table (List View) -->
+             <div v-if="viewMode === 'list'" class="table-container">
                <table class="data-table">
                  <thead>
                    <tr>
@@ -105,7 +143,7 @@
                    <tr v-if="filteredOrders.length === 0">
                       <td colspan="6" class="text-center py-20 text-muted">ไม่พบข้อมูลคำสั่งซื้อ</td>
                    </tr>
-                   <tr v-for="(order, index) in filteredOrders" :key="order.stockId">
+                   <tr v-for="(order, index) in filteredOrders" :key="order.stockId" @click="openEditModal({ id: order.stockId, ...order })" class="cursor-pointer hover:bg-slate-700">
                      <td class="text-muted">#{{ index + 1 }}</td>
                      <td class="font-bold">{{ order.stockId }}</td>
                      <td>
@@ -125,12 +163,69 @@
                  </tbody>
                </table>
              </div>
+             
+             <!-- Grid View -->
+             <div v-else class="grid-container" :class="{ 'fullscreen-grid': isFullscreen }">
+                <div v-if="isFullscreen" class="fullscreen-header">
+                     <h2>รายการขาย {{ selectedItem.title }}</h2>
+                     <button class="btn btn-danger" @click="isFullscreen = false">
+                        <i class="fa-solid fa-compress"></i> ออก
+                     </button>
+                </div>
+             
+                <div class="grid-content">
+                    <div 
+                        v-for="item in allGridItems" 
+                        :key="item.id"
+                        class="grid-item cursor-pointer hover:border-blue-400"
+                        :class="{ 'empty': item.isEmpty, 'sold': !item.isEmpty }"
+                        @click="openEditModal(item)"
+                    >
+                        <div class="item-num">{{ item.id }}</div>
+                        <div class="item-status">{{ item.isEmpty ? '-ว่าง-' : item.owner }}</div>
+                        <div v-if="!item.isEmpty && item.price" class="item-price">{{ item.price }}</div>
+                    </div>
+                </div>
+             </div>
           </div>
         </div>
 
       </div>
+
     </div>
   </div>
+
+  <!-- Edit Modal (Teleport or Overlay) -->
+  <Teleport to="body">
+    <div v-if="isEditModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]" @click.self="closeEditModal">
+        <div class="bg-[#1e293b] p-6 rounded-lg w-[90%] max-w-sm shadow-2xl border border-slate-600">
+            <h3 class="text-xl text-white mb-4 flex items-center gap-2">
+              <i class="fa-solid fa-pen-to-square"></i> แก้ไขรายการที่ {{ editingItem?.id }}
+            </h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-slate-400 text-sm mb-1">ชื่อลูกค้า</label>
+                    <input v-model="editForm.owner" type="text" class="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white" placeholder="ใส่ชื่อลูกค้า">
+                </div>
+                <div>
+                    <label class="block text-slate-400 text-sm mb-1">ราคา</label>
+                    <input v-model.number="editForm.price" type="number" class="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white">
+                </div>
+            </div>
+            
+            <div class="mt-6 flex gap-2 justify-end">
+               <button class="btn btn-danger mr-auto" @click="clearItem">
+                  <i class="fa-solid fa-eraser"></i> ล้าง
+               </button>
+               <button class="btn btn-outline" @click="closeEditModal">ยกเลิก</button>
+               <button class="btn btn-success" @click="saveEdit">
+                  <i class="fa-solid fa-save"></i> บันทึก
+               </button>
+            </div>
+        </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -144,15 +239,34 @@ const history = useHistory();
 const selectedId = ref(null);
 const selectedItem = ref(null);
 const searchQuery = ref("");
+const viewMode = ref("list"); // 'list' | 'grid'
+const isFullscreen = ref(false);
+
+const isDetailsLoading = ref(false);
+
+// Edit Modal State
+const isEditModalOpen = ref(false);
+const editingItem = ref(null); // { id, owner, price, uid, ... }
+const editForm = ref({
+  owner: "",
+  price: 0
+});
 
 onMounted(() => {
   history.fetchHistoryList();
 });
 
-function selectLive(item) {
+async function selectLive(item) {
   selectedId.value = item.videoId;
-  selectedItem.value = item;
+  selectedItem.value = { ...item }; // Copy basic info
   searchQuery.value = ""; // Reset search
+  
+  // Fetch details from stock node
+  isDetailsLoading.value = true;
+  const { orders, stockSize } = await history.fetchHistoryDetails(item.videoId);
+  selectedItem.value.orders = orders;
+  selectedItem.value.stockSize = stockSize;
+  isDetailsLoading.value = false;
 }
 
 // Convert orders object to array
@@ -174,6 +288,36 @@ const filteredOrders = computed(() => {
      o.stockId.toString().includes(q) ||
      (o.owner && o.owner.toLowerCase().includes(q))
   );
+});
+
+// Grid Items Logic (Fill gaps 1..stockSize)
+const allGridItems = computed(() => {
+    if (!selectedItem.value) return [];
+    const size = selectedItem.value.stockSize || 70;
+    const orders = selectedItem.value.orders || {};
+    const items = [];
+
+    for (let i = 1; i <= size; i++) {
+        // Find if order exists for this number
+        const order = orders[i];
+        
+        items.push({
+            id: i,
+            ...order,
+            isEmpty: !order || !order.owner
+        });
+    }
+    
+    // If search exists, filter the list?
+    if (searchQuery.value) {
+        const q = searchQuery.value.toLowerCase();
+        return items.filter(item => 
+           item.id.toString().includes(q) || 
+           (item.owner && item.owner.toLowerCase().includes(q))
+        );
+    }
+
+    return items;
 });
 
 // Stats Logic (Recalculate based on filtered view or all? Usually all is better for Summary)
@@ -247,6 +391,85 @@ function exportCSV() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// Edit Modal Functions
+function openEditModal(item) {
+    editingItem.value = { ...item };
+    editForm.value = {
+        owner: item.owner || "",
+        price: item.price || 0
+    };
+    isEditModalOpen.value = true;
+}
+
+function closeEditModal() {
+    isEditModalOpen.value = false;
+    editingItem.value = null;
+}
+
+async function saveEdit() {
+    if (!editingItem.value) return;
+    
+    // Optimistic Update
+    const updatedData = {
+        owner: editForm.value.owner,
+        price: editForm.value.price,
+        uid: editingItem.value.uid || 'manual-' + Date.now(),
+        method: editingItem.value.method || 'manual-edit'
+    };
+
+    // Update Local State
+    if (!selectedItem.value.orders) selectedItem.value.orders = {};
+    selectedItem.value.orders[editingItem.value.id] = {
+        ...updatedData,
+        timestamp: editingItem.value.timestamp || Date.now()
+    };
+
+    // Update Firebase
+    await history.updateHistoryItem(selectedId.value, editingItem.value.id, updatedData);
+    
+    closeEditModal();
+}
+
+async function clearItem() {
+     if (!editingItem.value) return;
+     
+      const result = await Swal.fire({
+        title: "ล้างรายการนี้?",
+        text: `ต้องการเคลียร์รายการที่ ${editingItem.value.id} ใช่ไหม?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        confirmButtonText: "ล้างเลย",
+        cancelButtonText: "ยกเลิก"
+      });
+      
+      if (result.isConfirmed) {
+          // Local Update
+           if (selectedItem.value.orders) {
+               delete selectedItem.value.orders[editingItem.value.id];
+           }
+           
+           // Firebase Update
+           await history.updateHistoryItem(selectedId.value, editingItem.value.id, null);
+           closeEditModal();
+      }
+}
+async function fixHistoryData() {
+    const result = await Swal.fire({
+        title: "คำนวณยอดใหม่?",
+        text: "ระบบจะสแกนรายการทั้งหมดและคำนวณยอดขายใหม่ (อาจใช้เวลาสักครู่)",
+        icon: "info",
+        showCancelButton: true,
+        confirmButtonText: "เริ่มคำนวณ",
+        cancelButtonText: "ยกเลิก"
+    });
+
+    if (result.isConfirmed) {
+        await history.recalculateAllHistory();
+        Swal.fire("เสร็จสิ้น", "คำนวณยอดขายทั้งหมดใหม่เรียบร้อยแล้ว", "success");
+    }
 }
 </script>
 
@@ -490,5 +713,113 @@ function exportCSV() {
   }
   .sidebar { width: 100%; height: 200px; border-right: none; border-bottom: 1px solid #334155; }
   .modal-body { flex-direction: column; }
+}
+
+/* Grid View CSS */
+.grid-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: #0f172a;
+}
+
+.grid-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 15px;
+    padding-bottom: 50px;
+}
+
+.grid-item {
+    aspect-ratio: 1.4;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 5px;
+}
+
+.grid-item.empty {
+    opacity: 0.4;
+    border-style: dashed;
+}
+
+.grid-item.sold {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: #10b981;
+}
+
+.item-num {
+    position: absolute;
+    top: 4px;
+    left: 8px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #64748b;
+}
+
+.item-status {
+    font-size: 1.1em;
+    font-weight: 500;
+    color: #e2e8f0;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.grid-item.empty .item-status {
+    color: #64748b;
+    font-style: italic;
+}
+
+.item-price {
+    font-size: 0.85em;
+    color: #fbbf24;
+    font-weight: bold;
+    margin-top: 2px;
+}
+
+/* Toggle Buttons */
+.btn-primary { background: #3b82f6; color: white; border: none; }
+.btn-outline { background: transparent; border: 1px solid #475569; color: #94a3b8; }
+.btn-outline:hover { background: #334155; color: white; }
+.btn-sm { padding: 4px 8px; font-size: 0.9em; }
+
+/* Fullscreen Grid */
+.fullscreen-grid {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: #0f172a;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.fullscreen-header {
+    padding: 15px 20px;
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fullscreen-header h2 { margin: 0; color: white; font-size: 1.25em; }
+
+.fullscreen-grid .grid-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
 }
 </style>

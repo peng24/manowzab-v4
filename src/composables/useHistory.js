@@ -40,6 +40,70 @@ export function useHistory() {
     }
 
     /**
+     * Fetch Details for a specific Live (from stock node)
+     * @param {string} videoId 
+     * @returns {Promise<Object>} Object of orders/stock items
+     */
+    async function fetchHistoryDetails(videoId) {
+        if (!videoId) return { orders: {}, stockSize: 70 };
+        
+        try {
+            const stockRef = dbRef(db, `stock/${videoId}`);
+            const sizeRef = dbRef(db, `settings/${videoId}/stockSize`);
+
+            const [stockSnap, sizeSnap] = await Promise.all([
+                get(stockRef),
+                get(sizeRef)
+            ]);
+            
+            return {
+                orders: stockSnap.exists() ? stockSnap.val() : {},
+                stockSize: sizeSnap.exists() ? sizeSnap.val() : 70
+            };
+        } catch (error) {
+            console.error("❌ Fetch History Details Error:", error);
+            return { orders: {}, stockSize: 70 };
+        }
+    }
+
+    /**
+     * Update History Item (Edit/Clear)
+     * @param {string} videoId 
+     * @param {string|number} itemId 
+     * @param {Object|null} data - { owner, price, ... } or null to clear owner
+     */
+    async function updateHistoryItem(videoId, itemId, data) {
+        if (!videoId || !itemId) return;
+
+        try {
+            const itemRef = dbRef(db, `stock/${videoId}/${itemId}`);
+            
+            if (data) {
+                // Update existing or set new
+                // We use 'update' to merge, but ensuring crucial fields
+                const updateData = {
+                    ...data,
+                    updatedAt: Date.now() // Track edit time
+                };
+                // If it's a new entry (was empty), ensure time exists if not provided
+                if (!updateData.time && !updateData.updatedAt) updateData.time = Date.now();
+                
+                await update(itemRef, updateData);
+            } else {
+                // Clear Owner (Soft Delete: Remove owner, uid, but maybe keep history? Or just remove node?)
+                // Requirement usually implies making it "Empty".
+                // In this system, Empty = No Owner.
+                // We can't just remove the node if we want to keep it "in the grid" structure? 
+                // The grid is 1..N based on stockSize. Removing the node makes it empty.
+                await remove(itemRef);
+            }
+        } catch (error) {
+            console.error("❌ Update Item Error:", error);
+            throw error;
+        }
+    }
+
+    /**
      * Delete History
      * Removes from both 'history/' and 'chats/' nodes
      */
@@ -61,10 +125,55 @@ export function useHistory() {
         }
     }
 
+    /**
+     * Recalculate Totals for ALL history items (Batch Fix)
+     */
+    async function recalculateAllHistory() {
+        if (!historyList.value.length) return;
+        
+        isLoading.value = true;
+        try {
+            for (const item of historyList.value) {
+                const stockRef = dbRef(db, `stock/${item.videoId}`);
+                const snap = await get(stockRef);
+                
+                if (snap.exists()) {
+                    const stockData = snap.val();
+                    let totalSales = 0;
+                    let totalItems = 0;
+                    
+                    Object.values(stockData).forEach(order => {
+                        if (order.owner && order.price) {
+                            totalSales += parseInt(order.price);
+                            totalItems++;
+                        }
+                    });
+
+                    // Update History Node
+                    await update(dbRef(db, `history/${item.videoId}`), {
+                        totalSales,
+                        totalItems
+                    });
+                }
+            }
+            // Refresh list
+            await fetchHistoryList();
+            return true;
+        } catch (error) {
+            console.error("❌ Recalculate Error:", error);
+            throw error;
+        } finally {
+            isLoading.value = false;
+        }
+    }
+
     return {
         historyList,
         isLoading,
         fetchHistoryList,
+        fetchHistoryDetails,
+        updateHistoryItem,
         deleteHistory,
+        recalculateAllHistory // ✅ Export
     };
 }

@@ -35,6 +35,26 @@ export const useStockStore = defineStore("stock", () => {
     const unsubStock = onValue(stockRef, (snapshot) => {
       const val = snapshot.val() || {};
       stockData.value = val;
+
+      // ✅ Real-time History Sync: Update Total Sales & Item Count
+      if (videoId && videoId !== "demo") {
+         let totalSales = 0;
+         let totalItems = 0;
+         
+         Object.values(val).forEach(item => {
+             if (item.owner && item.price) {
+                 totalSales += parseInt(item.price);
+                 totalItems++;
+             }
+         });
+
+         const historyRef = dbRef(db, `history/${videoId}`);
+         update(historyRef, {
+             totalSales: totalSales,
+             totalItems: totalItems,
+             lastUpdated: Date.now()
+         }).catch(err => console.error("History Sync Error:", err));
+      }
     });
 
     const sizeRef = dbRef(db, `settings/${videoId}/stockSize`);

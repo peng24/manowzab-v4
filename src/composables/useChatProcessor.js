@@ -3,7 +3,7 @@ import { useChatStore } from "../stores/chat";
 import { useSystemStore } from "../stores/system";
 import { useGemini } from "./useGemini";
 import { useAudio } from "./useAudio";
-import { ref as dbRef, onValue, set } from "firebase/database";
+import { ref as dbRef, onValue, set, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 
@@ -140,10 +140,26 @@ export function useChatProcessor() {
             intent = "cancel";
             targetId = aiResult.id;
             method = "ai";
-          } else if (aiResult.intent === "shipping") {
             intent = "shipping";
             method = "ai";
-            queueSpeech(`${displayName} แจ้งส่งของ`);
+            // Check if user has orders before adding to queue
+            const hasOrders = Object.values(stockStore.stockData).some(
+              (item) => item.uid === uid
+            );
+
+            if (hasOrders) {
+              const shippingRef = dbRef(
+                db,
+                `shipping/${systemStore.currentVideoId}/${uid}`
+              );
+              update(shippingRef, {
+                ready: true,
+                timestamp: Date.now(),
+              }).catch((e) => logger.error("Shipping update error:", e));
+              queueSpeech(`รับทราบ แจ้งโอนแล้ว`);
+            } else {
+              queueSpeech(`${displayName} แจ้งโอน แต่ไม่มียอด`);
+            }
           } else if (aiResult.intent === "question") {
             method = "ai-skip";
           }
@@ -225,7 +241,24 @@ export function useChatProcessor() {
     } else {
       // --- กรณีข้อความทั่วไป ---
       if (intent === "shipping") {
-        speak(displayName, msg);
+        // Auto-add to shipping queue if user has orders
+        const hasOrders = Object.values(stockStore.stockData).some(
+          (item) => item.uid === uid
+        );
+
+        if (hasOrders) {
+          const shippingRef = dbRef(
+            db,
+            `shipping/${systemStore.currentVideoId}/${uid}`
+          );
+          update(shippingRef, {
+            ready: true,
+            timestamp: Date.now(),
+          }).catch((e) => logger.error("Shipping update error:", e));
+          speak(displayName, "รับทราบ แจ้งโอนแล้ว");
+        } else {
+          speak(displayName, msg); // Read original message if no orders
+        }
       } else {
         // Read EVERYTHING else
         speak(displayName, msg);

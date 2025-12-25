@@ -1,6 +1,6 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { ref as dbRef, onValue, set } from "firebase/database";
-import { db } from "../firebase";
+import { db } from "./useFirebase";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "./useAudio";
 import { AWAY_START_MESSAGES, AWAY_END_MESSAGES } from "../constants";

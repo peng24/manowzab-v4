@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { ref as dbRef, get, remove, child } from "firebase/database";
+import { ref as dbRef, get, remove, child, update } from "firebase/database";
 import { db } from "./useFirebase";
 
 export function useHistory() {

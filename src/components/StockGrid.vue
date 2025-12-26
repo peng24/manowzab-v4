@@ -424,7 +424,7 @@ function confirmClear() {
   cursor: pointer;
   position: relative;
   padding: 6px;
-  overflow: hidden;
+  /* overflow: hidden; Removed to show badge */
   min-height: 90px; /* Back to original height */
   z-index: 0;
   transition: transform 0.1s, border-color 0.2s, box-shadow 0.2s;
@@ -581,8 +581,8 @@ function confirmClear() {
 /* ✅ Queue Badge (Red Circle) */
 .queue-badge {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -6px;
+  right: -6px;
   background: #d32f2f;
   color: white;
   border-radius: 50%;

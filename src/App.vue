@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="app-container"
-    @click="handleFirstInteraction"
-    @touchstart="handleFirstInteraction"
-  >
+  <div class="app-container">
     <!-- ✅ Voice Price Mode -->
     <VoicePricePage v-if="isVoiceMode" />
 
@@ -86,19 +82,35 @@ provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
 
 // ✅ Unlock Audio Function (Silent)
-function handleFirstInteraction() {
-  unlockAudio(); // ใช้ฟังก์ชันนี้แทน playDing เพื่อไม่ให้มีเสียงรบกวน
+  // ✅ Unlock Audio Function (Silent)
+  async function handleFirstInteraction() {
+    const unlocked = await unlockAudio(); // ใช้ฟังก์ชันนี้แทน playDing เพื่อไม่ให้มีเสียงรบกวน
 
-  // ลบ Listener ออกเพื่อไม่ให้ทำงานซ้ำ
-  document.removeEventListener("click", handleFirstInteraction);
-  document.removeEventListener("touchstart", handleFirstInteraction);
-  console.log("🔊 Audio unlocked silently by user interaction");
-}
+    if (unlocked) {
+        // ลบ Listener ออกเพื่อไม่ให้ทำงานซ้ำ
+        document.removeEventListener("click", handleFirstInteraction);
+        document.removeEventListener("touchstart", handleFirstInteraction);
+        document.removeEventListener("keydown", handleFirstInteraction);
+        console.log("🔊 Audio unlocked silently by user interaction");
+    }
+  }
 
-onMounted(() => {
-  console.log("🚀 App mounted");
+  onMounted(() => {
+    console.log("🚀 App mounted");
 
-  const cleanupFns = [];
+    // Add global listeners for audio unlock
+    document.addEventListener("click", handleFirstInteraction);
+    document.addEventListener("touchstart", handleFirstInteraction);
+    document.addEventListener("keydown", handleFirstInteraction);
+
+    const cleanupFns = [];
+    
+    // Clean up these specific listeners on unmount (if not yet removed)
+    cleanupFns.push(() => {
+        document.removeEventListener("click", handleFirstInteraction);
+        document.removeEventListener("touchstart", handleFirstInteraction);
+        document.removeEventListener("keydown", handleFirstInteraction);
+    });
 
   // ✅ Initialize Listeners (Capture cleanup functions)
   const unsubNick = nicknameStore.initNicknameListener();

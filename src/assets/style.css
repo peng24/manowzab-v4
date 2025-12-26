@@ -1277,32 +1277,12 @@ body {
   /* Note: chat-bubble might not exist if using background on chat-row directly. The previous code targeted .chat-row.shipping .chat-bubble but usage seems to be .chat-row.shipping directly? Let's check usage. */
   /* Wait, in 1283 it was .chat-row.shipping .chat-bubble. But wait, let me check HTML structure if visible? 
      The chat row is: <div class="chat-row shipping">...</div>
-     Wait, I don't see .chat-bubble in the CSS I read earlier for generic items. 
-     Let me check previous read of style.css around line 537. 
-     .chat-row.buy { background... } 
-     So the background is on .chat-row.
-     But the user asked: .chat-row.shipping .chat-bubble 
-     Let me assume the User knows what they are doing or maybe I missed where .chat-bubble is defined.
-     However, looking at lines 537, 542, the background is on .chat-row. 
-     The User specifically asked:
-     ```css
-     .chat-row.shipping .chat-bubble {
-       background-color: #581c87; 
-       border: 1px solid #a855f7; 
-       box-shadow: 0 0 5px rgba(168, 85, 247, 0.2);
-     }
-     ```
-     But in my previous `view_file` of `style.css`, line 1283 was:
-     .chat-row.shipping .chat-bubble { ... }
-     So it seems existing code DOES use .chat-bubble selector there?
-     Let me re-read line 1283 in step 69 output.
-     Yes: `.chat-row.shipping .chat-bubble`.
-     So I will just replace it as requested.
-  */
-  background-color: #581c87; /* สีม่วงเข้ม */
-  border: 1px solid #a855f7; /* ขอบสีม่วงสว่าง */
-  box-shadow: 0 0 5px rgba(168, 85, 247, 0.2);
-  color: #fff; /* Ensure text is readable */
+/*  Shipping Color (Purple) */
+.chat-row.shipping .chat-bubble {
+  background-color: #581c87 !important; /* สีม่วงเข้ม */
+  border: 1px solid #a855f7 !important; /* ขอบสีม่วงสว่าง */
+  box-shadow: 0 0 5px rgba(168, 85, 247, 0.2) !important;
+  color: #fff !important;
 }
 
 /* ===== TOOLS LIST COLORS ===== */

@@ -3,7 +3,7 @@ import { useChatStore } from "../stores/chat";
 import { useSystemStore } from "../stores/system";
 import { useGemini } from "./useGemini";
 import { useAudio } from "./useAudio";
-import { ref as dbRef, onValue, set, update } from "firebase/database";
+import { ref as dbRef, onValue, set, update, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 
@@ -236,6 +236,17 @@ export function useChatProcessor() {
           timestamp: Date.now(),
           lastMessage: msg, // ✅ Store last message
         }).catch((e) => logger.error("Shipping update error:", e));
+
+        // ✅ Save to History
+        const historyRef = dbRef(
+          db,
+          `shipping/${systemStore.currentVideoId}/${uid}/history`
+        );
+        push(historyRef, {
+          text: msg,
+          timestamp: Date.now(),
+          type: "user",
+        });
 
         speak(displayName, msg); // ✅ Read original message
       } else {

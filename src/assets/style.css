@@ -1271,12 +1271,6 @@ body {
     break-inside: avoid;
   }
 }
-/*  Shipping Color (Blue) */
-/*  Shipping Color (Purple) */
-.chat-row.shipping .chat-bubble {
-  /* Note: chat-bubble might not exist if using background on chat-row directly. The previous code targeted .chat-row.shipping .chat-bubble but usage seems to be .chat-row.shipping directly? Let's check usage. */
-  /* Wait, in 1283 it was .chat-row.shipping .chat-bubble. But wait, let me check HTML structure if visible? 
-     The chat row is: <div class="chat-row shipping">...</div>
 /*  Shipping Color (Purple) */
 .chat-row.shipping .chat-bubble {
   background-color: #581c87 !important; /* สีม่วงเข้ม */

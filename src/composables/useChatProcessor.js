@@ -242,25 +242,18 @@ export function useChatProcessor() {
     } else {
       // --- กรณีข้อความทั่วไป ---
       if (intent === "shipping") {
-        // Auto-add to shipping queue if user has orders
-        const hasOrders = Object.values(stockStore.stockData).some(
-          (item) => item.uid === uid
+        // ✅ Auto-add to shipping queue (Always)
+        const shippingRef = dbRef(
+          db,
+          `shipping/${systemStore.currentVideoId}/${uid}`
         );
+        update(shippingRef, {
+          ready: true,
+          timestamp: Date.now(),
+          lastMessage: msg, // ✅ Store last message
+        }).catch((e) => logger.error("Shipping update error:", e));
 
-        if (hasOrders) {
-          const shippingRef = dbRef(
-            db,
-            `shipping/${systemStore.currentVideoId}/${uid}`
-          );
-          update(shippingRef, {
-            ready: true,
-            timestamp: Date.now(),
-          }).catch((e) => logger.error("Shipping update error:", e));
-          // speak(displayName, "รับทราบ แจ้งโอนแล้ว");
-          speak(displayName, msg); // ✅ Read original message
-        } else {
-          speak(displayName, msg); // Read original message if no orders
-        }
+        speak(displayName, msg); // ✅ Read original message
       } else {
         // Read EVERYTHING else
         speak(displayName, msg);

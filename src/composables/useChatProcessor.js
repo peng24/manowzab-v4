@@ -131,7 +131,6 @@ export function useChatProcessor() {
       try {
         const aiResult = await analyzeChat(msg);
         if (aiResult) {
-        if (aiResult) {
           if (aiResult.intent === "buy" && aiResult.id) {
             intent = "buy";
             targetId = aiResult.id;
@@ -148,7 +147,6 @@ export function useChatProcessor() {
           } else if (aiResult.intent === "question") {
             method = "ai-skip";
           }
-        }
         }
       } catch (error) {
         logger.error("❌ AI Error (Skipped):", error);

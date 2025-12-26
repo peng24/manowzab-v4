@@ -149,7 +149,6 @@ body {
 }
 
 @keyframes statusBlink {
-
   0%,
   50%,
   100% {
@@ -210,7 +209,6 @@ body {
 }
 
 @keyframes pulse {
-
   0%,
   100% {
     box-shadow: 0 0 8px var(--success);
@@ -309,7 +307,6 @@ body {
 }
 
 @keyframes pulseAi {
-
   0%,
   100% {
     box-shadow: 0 0 5px rgba(156, 39, 176, 0.5);
@@ -594,7 +591,6 @@ body {
 }
 
 @keyframes adminGlow {
-
   0%,
   100% {
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
@@ -994,7 +990,6 @@ body {
 }
 
 @keyframes moonSway {
-
   0%,
   100% {
     transform: rotate(-10deg);
@@ -1063,7 +1058,6 @@ body {
 }
 
 @keyframes pulseAway {
-
   0%,
   100% {
     box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
@@ -1183,7 +1177,6 @@ body {
    RESPONSIVE DESIGN (Forced Side-by-Side)
    ======================================== */
 @media (max-width: 1024px) {
-
   /* ✅ บังคับแนวนอนเสมอ ไม่ว่าจะจอเล็กแค่ไหน */
   .main-container {
     flex-direction: row;
@@ -1263,7 +1256,6 @@ body {
 }
 
 @media print {
-
   .header,
   .tools-bar,
   .btn,
@@ -1280,22 +1272,72 @@ body {
   }
 }
 /*  Shipping Color (Blue) */
+/*  Shipping Color (Purple) */
 .chat-row.shipping .chat-bubble {
-  background: rgba(33, 150, 243, 0.15);
-  border-left: 3px solid #2196f3;
+  /* Note: chat-bubble might not exist if using background on chat-row directly. The previous code targeted .chat-row.shipping .chat-bubble but usage seems to be .chat-row.shipping directly? Let's check usage. */
+  /* Wait, in 1283 it was .chat-row.shipping .chat-bubble. But wait, let me check HTML structure if visible? 
+     The chat row is: <div class="chat-row shipping">...</div>
+     Wait, I don't see .chat-bubble in the CSS I read earlier for generic items. 
+     Let me check previous read of style.css around line 537. 
+     .chat-row.buy { background... } 
+     So the background is on .chat-row.
+     But the user asked: .chat-row.shipping .chat-bubble 
+     Let me assume the User knows what they are doing or maybe I missed where .chat-bubble is defined.
+     However, looking at lines 537, 542, the background is on .chat-row. 
+     The User specifically asked:
+     ```css
+     .chat-row.shipping .chat-bubble {
+       background-color: #581c87; 
+       border: 1px solid #a855f7; 
+       box-shadow: 0 0 5px rgba(168, 85, 247, 0.2);
+     }
+     ```
+     But in my previous `view_file` of `style.css`, line 1283 was:
+     .chat-row.shipping .chat-bubble { ... }
+     So it seems existing code DOES use .chat-bubble selector there?
+     Let me re-read line 1283 in step 69 output.
+     Yes: `.chat-row.shipping .chat-bubble`.
+     So I will just replace it as requested.
+  */
+  background-color: #581c87; /* สีม่วงเข้ม */
+  border: 1px solid #a855f7; /* ขอบสีม่วงสว่าง */
+  box-shadow: 0 0 5px rgba(168, 85, 247, 0.2);
+  color: #fff; /* Ensure text is readable */
 }
 
 /* ===== TOOLS LIST COLORS ===== */
-.menu-csv i { color: #00e676; }
-.menu-voice i { color: #29b6f6; }
-.menu-screen i { color: #ff9800; }
-.menu-away i { color: #7c4dff; }
-.menu-sim i { color: #ffca28; }
-.menu-key i { color: #bdbdbd; }
-.menu-voice-page i { color: #60a5fa; }
-.menu-overlay i { color: #d500f9; }
-.menu-update i { color: #ff5252; }
+.menu-csv i {
+  color: #00e676;
+}
+.menu-voice i {
+  color: #29b6f6;
+}
+.menu-screen i {
+  color: #ff9800;
+}
+.menu-away i {
+  color: #7c4dff;
+}
+.menu-sim i {
+  color: #ffca28;
+}
+.menu-key i {
+  color: #bdbdbd;
+}
+.menu-voice-page i {
+  color: #60a5fa;
+}
+.menu-overlay i {
+  color: #d500f9;
+}
+.menu-update i {
+  color: #ff5252;
+}
 
-.dropdown-content a:hover i { color: #fff; }
-.dropdown-content a:hover { padding-left: 28px; background: #444; }
-
+.dropdown-content a:hover i {
+  color: #fff;
+}
+.dropdown-content a:hover {
+  padding-left: 28px;
+  background: #444;
+}

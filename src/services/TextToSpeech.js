@@ -3,7 +3,7 @@ export class TextToSpeech {
         this.synth = window.speechSynthesis;
         this.queue = [];
         this.isSpeaking = false;
-        this.maxMessageLength = 100; // Limit long messages
+        this.maxMessageLength = 500; // Limit long messages
     }
 
     /**

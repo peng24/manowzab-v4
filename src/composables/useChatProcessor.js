@@ -131,6 +131,7 @@ export function useChatProcessor() {
       try {
         const aiResult = await analyzeChat(msg);
         if (aiResult) {
+        if (aiResult) {
           if (aiResult.intent === "buy" && aiResult.id) {
             intent = "buy";
             targetId = aiResult.id;
@@ -140,29 +141,14 @@ export function useChatProcessor() {
             intent = "cancel";
             targetId = aiResult.id;
             method = "ai";
+          } else if (aiResult.intent === "shipping") {
+            // ✅ ถ้า AI ระบุว่าเป็น Shipping ให้ตั้งค่า intent แล้วปล่อยผ่านไป Step 5
             intent = "shipping";
             method = "ai";
-            // Check if user has orders before adding to queue
-            const hasOrders = Object.values(stockStore.stockData).some(
-              (item) => item.uid === uid
-            );
-
-            if (hasOrders) {
-              const shippingRef = dbRef(
-                db,
-                `shipping/${systemStore.currentVideoId}/${uid}`
-              );
-              update(shippingRef, {
-                ready: true,
-                timestamp: Date.now(),
-              }).catch((e) => logger.error("Shipping update error:", e));
-              queueSpeech(`รับทราบ แจ้งโอนแล้ว`);
-            } else {
-              queueSpeech(`${displayName} แจ้งโอน แต่ไม่มียอด`);
-            }
           } else if (aiResult.intent === "question") {
             method = "ai-skip";
           }
+        }
         }
       } catch (error) {
         logger.error("❌ AI Error (Skipped):", error);

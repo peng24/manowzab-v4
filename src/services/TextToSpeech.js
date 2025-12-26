@@ -33,8 +33,10 @@ export class TextToSpeech {
         const cleanMessage = this.sanitize(message);
         if (!cleanMessage) return;
 
-        // Format: "Username ... Message"
-        const textToSpeak = `${authorName} ... ${cleanMessage}`;
+        // Format: "Username ... Message" (Only if name exists)
+        const textToSpeak = authorName 
+            ? `${authorName} ... ${cleanMessage}` 
+            : cleanMessage;
 
         this.queue.push(textToSpeak);
 

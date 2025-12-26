@@ -14,24 +14,38 @@ export function useAudio() {
   }
 
   // ✅ ฟังก์ชันปลดล็อคเสียงแบบเงียบ (ไม่ติ๊ง)
-  function unlockAudio() {
+  // ✅ ฟังก์ชันปลดล็อคเสียงแบบเงียบ (ไม่ติ๊ง)
+  async function unlockAudio() {
     initAudio();
-    if (audioCtx.value && audioCtx.value.state === "suspended") {
-      audioCtx.value.resume();
+    if (!audioCtx.value) return false;
+
+    try {
+      if (audioCtx.value.state === "suspended") {
+        await audioCtx.value.resume();
+      }
+    } catch (err) {
+      console.warn("Audio resume failed:", err);
     }
-    if (!audioCtx.value) return;
 
-    // สร้าง Oscillator เปล่าๆ ขึ้นมาสั้นๆ เพื่อหลอก Browser ว่ามีการใช้เสียงแล้ว
-    const oscillator = audioCtx.value.createOscillator();
-    const gainNode = audioCtx.value.createGain();
+    if (audioCtx.value.state !== "running") return false;
 
-    gainNode.gain.value = 0; // 🔇 ปิดเสียงเงียบกริบ
+    try {
+        // สร้าง Oscillator เปล่าๆ ขึ้นมาสั้นๆ เพื่อหลอก Browser ว่ามีการใช้เสียงแล้ว
+        const oscillator = audioCtx.value.createOscillator();
+        const gainNode = audioCtx.value.createGain();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.value.destination);
+        gainNode.gain.value = 0; // 🔇 ปิดเสียงเงียบกริบ
 
-    oscillator.start();
-    oscillator.stop(audioCtx.value.currentTime + 0.001);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.value.destination);
+
+        oscillator.start();
+        oscillator.stop(audioCtx.value.currentTime + 0.001);
+        return true;
+    } catch (e) {
+        console.error("Silent unlock failed:", e);
+        return false;
+    }
   }
 
   function queueSpeech(text) {

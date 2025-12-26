@@ -236,7 +236,8 @@ export function useChatProcessor() {
         await stockStore.processCancel(targetId);
 
         playDing();
-        speak(displayName, `ยกเลิก รายการที่ ${targetId}`);
+        // speak(displayName, `ยกเลิก รายการที่ ${targetId}`);
+        speak(displayName, msg); // ✅ Read original message
       }
     } else {
       // --- กรณีข้อความทั่วไป ---
@@ -255,7 +256,8 @@ export function useChatProcessor() {
             ready: true,
             timestamp: Date.now(),
           }).catch((e) => logger.error("Shipping update error:", e));
-          speak(displayName, "รับทราบ แจ้งโอนแล้ว");
+          // speak(displayName, "รับทราบ แจ้งโอนแล้ว");
+          speak(displayName, msg); // ✅ Read original message
         } else {
           speak(displayName, msg); // Read original message if no orders
         }

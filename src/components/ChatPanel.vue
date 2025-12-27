@@ -152,7 +152,11 @@ function handleScroll() {
 function scrollToBottom() {
   const el = chatViewport.value;
   if (el) {
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    // ✅ Add small timeout to ensure DOM is ready
+    setTimeout(() => {
+           el.scrollTo({ top: el.scrollHeight + 1000, behavior: "smooth" }); // Add extra offset
+    }, 100);
+ 
     showScrollButton.value = false;
     isUserScrolling = false;
   }
@@ -318,6 +322,8 @@ function exportCSV() {
   flex: 1;
   overflow-y: auto;
   padding: 15px 5px; /* ✅ Reduced side padding */
+  padding-bottom: calc(20px + env(safe-area-inset-bottom)); /* ✅ Safe Area for Mobile */
+  scroll-behavior: smooth;
   scroll-behavior: smooth;
 }
 

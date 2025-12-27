@@ -407,6 +407,7 @@ function confirmClear() {
   gap: 15px;
   row-gap: 20px;
   padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
   overflow-y: auto;
   flex: 1;
 }

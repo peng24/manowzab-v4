@@ -49,7 +49,6 @@
           <div v-if="getQueueLength(i) > 0" class="queue-badge">
             +{{ getQueueLength(i) }}
           </div>
-
         </div>
       </TransitionGroup>
     </div>
@@ -112,7 +111,11 @@
                     list="buyer-options"
                   />
                   <datalist id="buyer-options">
-                    <option v-for="name in uniqueBuyerNames" :key="name" :value="name" />
+                    <option
+                      v-for="name in uniqueBuyerNames"
+                      :key="name"
+                      :value="name"
+                    />
                   </datalist>
                 </div>
                 <div class="queue-actions">
@@ -296,8 +299,15 @@ async function saveQueueChanges() {
     await stockStore.updateItemData(num, newData);
   } else if (editingPrice.value > 0) {
     // ✅ Case: Empty item but Price is set (OVERWRITE to clear owner)
-    await stockStore.updateItemData(num, { price: editingPrice.value });
-    
+    await stockStore.updateItemData(num, {
+      price: editingPrice.value,
+      owner: null,
+      uid: null,
+      queue: null,
+      time: null,
+      source: null,
+    });
+
     // Play sound for price update
     playDing();
     // queueSpeech(`ราคา ${editingPrice.value} บาท`);
@@ -403,7 +413,10 @@ function confirmClear() {
 /* Stock Grid & Items */
 .stock-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); /* Wider columns */
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(130px, 1fr)
+  ); /* Wider columns */
   gap: 15px;
   row-gap: 20px;
   padding: 20px;
@@ -495,9 +508,9 @@ function confirmClear() {
 }
 
 .stock-price {
-    font-size: 0.75em;
-    color: #ffd700;
-    font-weight: bold;
+  font-size: 0.75em;
+  color: #ffd700;
+  font-weight: bold;
 }
 
 .stock-status {
@@ -517,7 +530,7 @@ function confirmClear() {
   justify-content: center;
   align-items: center;
   min-height: 1.4em;
-  
+
   /* Multi-line truncation logic */
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -532,16 +545,17 @@ function confirmClear() {
 
 /* ... */
 
-
-
 /* Responsive Adjustments */
 @media (max-width: 1180px) {
   .stock-grid {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* Wider on tablet */
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(100px, 1fr)
+    ); /* Wider on tablet */
     gap: 8px;
     padding: 10px;
   }
-  
+
   .stock-item {
     min-height: 70px; /* Shorter height */
     border-radius: 8px;
@@ -555,13 +569,13 @@ function confirmClear() {
     font-size: 0.9em;
     margin-top: 10px;
   }
-  
+
   .stock-price {
     font-size: 0.75em;
     color: #ffd700;
     font-weight: bold;
   }
-  
+
   .queue-badge {
     font-size: 0.7em;
     padding: 1px 3px;
@@ -570,11 +584,14 @@ function confirmClear() {
 
 @media (max-width: 600px) {
   .stock-grid {
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* Wider on mobile */
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(90px, 1fr)
+    ); /* Wider on mobile */
     gap: 5px;
     padding: 5px;
   }
-  
+
   .stock-item {
     min-height: 60px; /* Shorter height */
   }
@@ -598,5 +615,4 @@ function confirmClear() {
   z-index: 20;
   border: 2px solid #2a2a2a; /* Border matching card bg to make it pop */
 }
-
 </style>

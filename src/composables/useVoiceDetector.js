@@ -4,7 +4,7 @@ import { useAudio } from './useAudio';
 import { useVoiceLogger } from './useVoiceLogger';
 
 // ============================================
-// CONFIG: SMART HUNTER
+// CONFIG: SMART HUNTER V2
 // ============================================
 const CONFIG = {
     // Standard Validations
@@ -12,20 +12,29 @@ const CONFIG = {
         bust: { min: 30, max: 70 },
         length: { min: 15, max: 60 },
         id: { min: 1, max: 1000 },
-        price: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] // Strict steps + free
+        // "Split-Price must be in [20, 30...100, 120, 150] OR end in 0"
+        // We will implement this logic in a helper function, but define the base set here if needed.
     },
     // Regex Patterns
     patterns: {
         corrections: [
-            { from: /(?:^|\s)(?:6|หก|โอ|อ)(?=\s*(?:3[0-9]|4[0-9]|5[0-9]|60)(?:\s|$))/g, to: " อก " }, // "6 40" -> "อก 40"
-            { from: /(?:เบอร์|รหัส|ตัวที่|No\.)/gi, to: " รายการที่ " },
-            { from: /(?:เอาไป|ขาย|เหลือ|ราคา)/gi, to: " ราคา " },
-            { from: /\b(\d)\s+(\d)\b/g, to: "$1$2" } // Merge separate digits "5 0" -> "50"
+            // Fix "Chest" Misinterpretation: "6 52" -> "อก 52"
+            { from: /(?:^|\s)(?:6|หก)(?=\s*[3-6]\d\b)/g, to: " อก " },
+            // Fix "Polyester" Noise
+            { from: /(?:โพลิ|โพรี|Poly)\S*/gi, to: "" },
+            // Fix "Price" Keywords
+            { from: /(?:เอาไป|ขาย|เหลือ|ราคา)/g, to: " ราคา " },
+            // Fix "Item" Keywords
+            { from: /(?:เบอร์|รหัส|ตัวที่|ที่|No\.?)/gi, to: " รายการที่ " },
+            // Standardize synonyms
+            { from: /อก/g, to: " อก " }, // Ensure spaces around keywords
+            { from: /ยาว/g, to: " ยาว " }
         ],
         noise: [
-            /(?:ค่าส่ง|โอนเงิน|ปลายทาง|เริ่มต้น|ทั้งหมด|ซักรีด|รับได้|สนใจ)\s*\d+(?:[-ถึง]*\d+)?\s*(?:บาท|ตัว|ครั้ง)?/gi,
-            /(?:กระดุม|สำรอง|ตำหนิ|รู)\s*\d+\s*(?:เม็ด|จุด|รู)?/gi,
-            /(?:ลูกค้า|พี่|น้อง|แม่ค้า)/gi
+            // Context Noise
+            /(?:ค่าส่ง|โอน|ปลายทาง|ทั้งหมด|เหลืออีก|มี)\s*\d+/g,
+            /(?:กระดุม|ตำหนิ|สำรอง)\s*\d+/g,
+            /(?:ลูกค้า|พี่|น้อง|แม่ค้า|ครับ|ค่ะ|จ้า)/gi
         ],
         attributes: {
             fabric: /\b(ผ้าเด้ง|ชีฟอง|โพลิเอสเตอร์|ไนลอน|เรยอน|คอตตอน|ลินิน|ยืด|ไหมพรม|ซาติน|กำมะหยี่)\b/i,
@@ -34,8 +43,9 @@ const CONFIG = {
             sizeLetter: /\b(XXL|XL|L|M|S|XS)\b/i
         },
         anchors: {
+            // Explicit Anchors
             id: /รายการที่\s*(\d+)/i,
-            price: /ราคา\s*(\d+)/i,
+            price: /(?:ราคา\s*(\d+)|(\d+)\s*บาท)/i, // Matches "ราคา 80" or "80 บาท"
             freebie: /(?:ฟรี|แถม)/i
         }
     }
@@ -77,7 +87,6 @@ export function useVoiceDetector() {
 
         recognition.value.onresult = (event) => {
             const text = event.results[event.results.length - 1][0].transcript.trim();
-            // transcript.value will be updated in processVoiceCommand with the cleaned version
             processVoiceCommand(text);
         };
 
@@ -96,7 +105,7 @@ export function useVoiceDetector() {
     // CORE LOGIC: SMART HUNTER
     // ============================================
     function processVoiceCommand(rawText) {
-        // --- STEP 1: PRE-PROCESSING ---
+        // --- STEP 1: PRE-PROCESSING (The Cleaner) ---
         let cleanText = rawText;
 
         // 1.1 Apply Corrections
@@ -112,7 +121,7 @@ export function useVoiceDetector() {
         // 1.3 Normalize Whitespace
         cleanText = cleanText.replace(/\s+/g, " ").trim();
 
-        // --- STEP 2: HUNTER PHASE (Attributes) ---
+        // --- STEP 2: EXTRACTION PIPELINE (Priority Order) ---
         let workingText = cleanText;
         let detected = {
             id: null,
@@ -124,138 +133,150 @@ export function useVoiceDetector() {
             logic: "Unknown"
         };
 
-        // Extract Fabric
+        // 2.1 Attributes (Get these out first)
+        // Fabric
         const fabricMatch = workingText.match(CONFIG.patterns.attributes.fabric);
         if (fabricMatch) {
             detected.fabric = fabricMatch[1];
-            workingText = workingText.replace(fabricMatch[0], "").trim(); // Consume
+            workingText = workingText.replace(fabricMatch[0], "").trim();
         }
-
-        // Extract Size Letter
+        // Size Letter
         const sizeMatch = workingText.match(CONFIG.patterns.attributes.sizeLetter);
         if (sizeMatch) {
             detected.sizeLetter = sizeMatch[1].toUpperCase();
-            workingText = workingText.replace(sizeMatch[0], "").trim(); // Consume
+            workingText = workingText.replace(sizeMatch[0], "").trim();
         }
-
-        // Extract Bust
+        // Bust
         const bustMatch = workingText.match(CONFIG.patterns.attributes.bust);
         if (bustMatch) {
             const val = parseInt(bustMatch[1]);
             if (val >= CONFIG.ranges.bust.min && val <= CONFIG.ranges.bust.max) {
                 detected.bust = val;
-                workingText = workingText.replace(bustMatch[0], "").trim(); // Consume
+                workingText = workingText.replace(bustMatch[0], "").trim();
             }
         }
-
-        // Extract Length
+        // Length
         const lengthMatch = workingText.match(CONFIG.patterns.attributes.length);
         if (lengthMatch) {
             const val = parseInt(lengthMatch[1]);
             if (val >= CONFIG.ranges.length.min && val <= CONFIG.ranges.length.max) {
                 detected.length = val;
-                workingText = workingText.replace(lengthMatch[0], "").trim(); // Consume
+                workingText = workingText.replace(lengthMatch[0], "").trim();
             }
         }
 
-        // --- STEP 3: PLAN A (Anchor Logic) ---
-        // Look for explicit "Item X" or "Price Y"
-        const idAnchorMatch = workingText.match(CONFIG.patterns.anchors.id);
-        if (idAnchorMatch) {
-            const val = parseInt(idAnchorMatch[1]);
-            if (validateId(val)) {
-                detected.id = val;
-                workingText = workingText.replace(idAnchorMatch[0], "").trim(); // Consume
-                detected.logic = "Plan-A-Anchor";
-            }
-        }
-
-        // Check for Freebie/Giveaway
+        // 2.2 Explicit Price (The Anchor)
         if (CONFIG.patterns.anchors.freebie.test(workingText)) {
             detected.price = 0;
             workingText = workingText.replace(CONFIG.patterns.anchors.freebie, "").trim();
         } else {
-            // Check for explicit Price
-            const priceAnchorMatch = workingText.match(CONFIG.patterns.anchors.price);
-            if (priceAnchorMatch) {
-                const val = parseInt(priceAnchorMatch[1]);
-                if (validatePrice(val)) {
+            const priceMatch = workingText.match(CONFIG.patterns.anchors.price);
+            if (priceMatch) {
+                // Match could be group 1 (ราคา X) or group 2 (X บาท)
+                const val = parseInt(priceMatch[1] || priceMatch[2]);
+                if (isValidPrice(val)) {
                     detected.price = val;
-                    workingText = workingText.replace(priceAnchorMatch[0], "").trim(); // Consume
-                    detected.logic = "Plan-A-Price";
+                    workingText = workingText.replace(priceMatch[0], "").trim();
                 }
             }
         }
 
-        // --- STEP 4: PLAN B (Implicit Fallback) ---
-        // If Core Data (ID/Price) is missing, looks at remaining numbers
+        // 2.3 Explicit ID (The Anchor)
+        const idMatch = workingText.match(CONFIG.patterns.anchors.id);
+        if (idMatch) {
+            const val = parseInt(idMatch[1]);
+            if (isValidId(val)) {
+                detected.id = val;
+                workingText = workingText.replace(idMatch[0], "").trim();
+                detected.logic = "Explicit-ID";
+            }
+        }
+
+        // --- STEP 3: IMPLICIT LOGIC (The Smart Splitter) ---
+        // Only run if we are missing ID or Price
         if (detected.id === null || detected.price === null) {
+            
             // Find all remaining independent numbers
             const numbers = [...workingText.matchAll(/\b(\d+)\b/g)].map(m => parseInt(m[1]));
 
             if (numbers.length > 0) {
-                // Strategy: PAIR (Two numbers exist -> ID, Price)
-                if (numbers.length >= 2 && detected.id === null && detected.price === null) {
+                // Case A: Glued Numbers (e.g., "680", "4350")
+                if (numbers.length === 1 && detected.id === null && detected.price === null) {
+                    const num = numbers[0];
+                    const str = num.toString();
+                    
+                    // Logic: If 3-4 digits, try splitting last 2 digits as Price
+                    if (str.length >= 3 && str.length <= 4) {
+                        const p2Val = parseInt(str.slice(-2)); // Last 2 digits
+                        const p1Val = parseInt(str.slice(0, -2)); // The rest
+
+                        if (isValidPrice(p2Val) && isValidId(p1Val)) {
+                             detected.id = p1Val;
+                             detected.price = p2Val;
+                             detected.logic = "Implicit-Glued-Split";
+                        } else if (isValidId(num)) {
+                            // Single Number Fallback
+                             // Case C: Single Number -> ID
+                             detected.id = num;
+                             detected.logic = "Implicit-Single-ID";
+                        }
+                    } else if (isValidId(num)) {
+                        // Case C: Single Number -> ID
+                        detected.id = num;
+                        detected.logic = "Implicit-Single-ID";
+                    }
+                }
+                // Case B: Two Separate Numbers (e.g., "53 80")
+                else if (numbers.length >= 2 && detected.id === null && detected.price === null) {
                     const [n1, n2] = numbers;
-                    if (validateId(n1) && validatePrice(n2)) {
+                    if (isValidId(n1) && isValidPrice(n2)) {
                         detected.id = n1;
                         detected.price = n2;
-                        detected.logic = "Plan-B-Pair";
+                        detected.logic = "Implicit-Pair";
+                    } else if (isValidId(n1)) {
+                         // Fallback?
+                         detected.id = n1;
                     }
                 }
-                // Strategy: MERGED (One big number -> ID + Price)
-                // e.g. "50100" -> Item 50, Price 100
-                else if (numbers.length === 1 && detected.id === null && detected.price === null) {
-                    const num = numbers[0];
-                    if (num >= 10010 && num <= 1000100) { // Plausible range checking
-                        // It's ambiguous, but let's try splitting last 2 or 3 digits for price?
-                        // Actually, simplified rule: If number > 1000, try split
-                        // ex: 5380 -> 53, 80
-                        const str = num.toString();
-                        if (str.length === 4) {
-                             const p1 = parseInt(str.substring(0, 2));
-                             const p2 = parseInt(str.substring(2));
-                             if (validateId(p1) && validatePrice(p2)) {
-                                 detected.id = p1;
-                                 detected.price = p2;
-                                 detected.logic = "Plan-B-Merged-4";
-                             }
-                        }
-                    } 
-                    // Strategy: SINGLE ID
-                    else if (validateId(num)) {
-                         detected.id = num;
-                         detected.logic = "Plan-B-SingleID";
-                    }
+                // Case C (Variant): We have Price, missing ID, and have a number
+                else if (detected.id === null && detected.price !== null && numbers.length > 0) {
+                     if (isValidId(numbers[0])) {
+                         detected.id = numbers[0];
+                         detected.logic = "Implicit-ID-Only";
+                     }
                 }
-                // Strategy: FILL (One missing)
-                else if (detected.id === null && numbers.length > 0) {
-                    if (validateId(numbers[0])) {
-                        detected.id = numbers[0];
-                        detected.logic = "Plan-B-FillID";
-                    }
-                } else if (detected.price === null && numbers.length > 0) {
-                    if (validatePrice(numbers[0])) {
+                // Case C (Variant): We have ID, missing Price, and have a number
+                else if (detected.id !== null && detected.price === null && numbers.length > 0) {
+                    if (isValidPrice(numbers[0])) {
                         detected.price = numbers[0];
-                        detected.logic = "Plan-B-FillPrice";
+                        detected.logic = "Implicit-Price-Only";
                     }
                 }
             }
         }
 
-        // --- STEP 5: EXECUTION ---
+        // --- STEP 4: OUTPUT ACTION ---
         executeAction(rawText, cleanText, detected);
     }
 
     // ============================================
-    // VALIDATORS
+    // HELPERS & VALIDATORS
     // ============================================
-    function validateId(num) {
+    function isValidId(num) {
         return num >= CONFIG.ranges.id.min && num <= CONFIG.ranges.id.max;
     }
 
-    function validatePrice(num) {
-        return CONFIG.ranges.price.includes(num);
+    function isValidPrice(num) {
+        // "Split-Price must be in [20, 30...100, 120, 150] OR end in 0"
+        // And generally reasonable prices
+        if (num === 0) return true; // Free
+        if (num < 10) return false; // Too cheap (unless single digit bugs?)
+        if (num % 10 === 0) return true; // Ends in 0 (20, 30, 80, 120)
+        // Specific whitelist for common prices if needed:
+        const commonPrices = [120, 150, 199, 250, 290]; 
+        if (commonPrices.includes(num)) return true;
+        
+        return false; 
     }
 
     // ============================================
@@ -263,15 +284,10 @@ export function useVoiceDetector() {
     // ============================================
     function executeAction(rawText, cleanText, detected) {
         // Admin Commands Check (Cancel/Book)
-        // Simple regex check on cleanText for these specific actions
         const cancelMatch = cleanText.match(/(?:ยกเลิก|ลบ|เคลียร์|ไม่เอา)\s*(?:รายการที่)?\s*(\d+)/i);
         if (cancelMatch) {
             const id = parseInt(cancelMatch[1]);
             if (stockStore.stockData[id]) {
-                const item = stockStore.stockData[id];
-                // Only if it's reserved manually or by voice? Actually just cancel it.
-                 // stockStore.processCancel usually checks if it's cancelable or just resets it.
-                 // Let's assume processCancel does the right thing.
                 stockStore.processCancel(id);
                 lastAction.value = `🗑️ ยกเลิก #${id}`;
                 playDing();
@@ -285,7 +301,6 @@ export function useVoiceDetector() {
             // Check existence
             if (detected.id > stockStore.stockSize || detected.id < 1) {
                 lastAction.value = `⚠️ ไม่พบรายการ #${detected.id}`;
-                playDing(); // Error sound? 
                  logEvent({ raw: rawText, cleaned: cleanText, output: { id: detected.id, error: "Out of range" }, logic: detected.logic, status: "IGNORED" });
                 return;
             }
@@ -324,24 +339,20 @@ export function useVoiceDetector() {
                     status: "MATCHED"
                 });
             } else {
-                // ID found but no data to update? (Just selecting?)
-                 lastAction.value = `ℹ️ เลือก #${detected.id} (ไม่มีข้อมูลใหม่)`;
+                 // Just selecting? Or partial parse?
+                 lastAction.value = `ℹ️ เลือก #${detected.id}`;
                  logEvent({ raw: rawText, cleaned: cleanText, output: { id: detected.id, msg: "No data" }, logic: detected.logic, status: "IGNORED" });
             }
 
         } else {
-            // No ID found
-             if (rawText.length > 5) {
-                // Only treat as error/feedback if it was substantial speech
-                // lastAction.value = "⚠️ ไม่เข้าใจคำสั่ง"; // Optional: Don't spam UI
+             // No ID found - Ignore
+             // Only log substantial speech
+             if (rawText.length > 5 && !rawText.includes("แก้ไข")) {
                 logEvent({ raw: rawText, cleaned: cleanText, output: null, logic: "None", status: "IGNORED" });
              }
         }
     }
 
-    // ============================================
-    // EXPORTS
-    // ============================================
     function toggleMic() {
         if (!recognition.value) return;
         if (isListening.value) {

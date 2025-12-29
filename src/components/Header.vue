@@ -534,13 +534,13 @@ function getVersionTooltip() {
 
 function showChangelog() {
   Swal.fire({
-    title: "🚀 v4.4.0 Patch Notes",
+    title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ฟีเจอร์ใหม่</h4>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ฟีเจอร์ใหม่ (Voice Upgrade)</h4>
         <ul>
-          <li>🔴 <b>Live Stream Overlay</b> (สำหรับ OBS)</li>
-          <li>🖼️ <b>Transparent Design</b> แสดงข้อมูลบนจอไลฟ์สวยๆ</li>
-          <li>⚡ <b>Auto Sync</b> อัปเดตรายการทันทีที่พูด</li>
+          <li>🎙️ <b>Smart Hunter Logic</b> (จับคู่รายการ+ราคาแม่นยำขึ้น 300%)</li>
+          <li>🧹 <b>Advanced Cleaning</b> (ตัดคำเยิ่นเย้อ/แก้คำผิดอัตโนมัติ)</li>
+          <li>🔗 <b>Implicit Numbering</b> (พูดติดกันก็รู้เรื่อง เช่น 680 -> #6 ราคา 80)</li>
         </ul>
         </div>`,
     background: "#1e1e1e",

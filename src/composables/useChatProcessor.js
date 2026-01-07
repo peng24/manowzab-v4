@@ -49,6 +49,40 @@ export function useChatProcessor() {
   const { analyzeChat } = useGemini();
   const { queueSpeech, playDing } = useAudio();
 
+  // ✅ Local State for Implicit Buy Logic
+  const currentOverlayItem = ref(null);
+
+  // ✅ Watch & Listen for Overlay Changes
+  function setupOverlayListener() {
+    if (!systemStore.currentVideoId) return;
+
+    const overlayRef = dbRef(
+      db,
+      `overlay/${systemStore.currentVideoId}/current_item`
+    );
+    onValue(overlayRef, (snapshot) => {
+      const val = snapshot.val();
+      if (val && val.id) {
+        currentOverlayItem.value = val.id; // Store only ID for simplicity
+      } else {
+        currentOverlayItem.value = null;
+      }
+    });
+  }
+
+  // Initial Setup & Watch for Video ID change
+  setupOverlayListener();
+  // Note: If videoID changes dynamically without page reload, we might need a watcher here.
+  // Assuming systemStore.currentVideoId is reactive:
+  import("vue").then(({ watch }) => {
+    watch(
+      () => systemStore.currentVideoId,
+      (newId) => {
+        if (newId) setupOverlayListener();
+      }
+    );
+  });
+
   function stringToColor(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -89,45 +123,85 @@ export function useChatProcessor() {
     let method = null;
     const stockSize = stockStore.stockSize;
 
-    // 2. Regex-First Strategy (Priority)
-    // ✅ 2.1 Shipping / Transfer
+    // --- LOGIC V2: Prioritized Flow ---
+
+    // 1. Shipping / Transfer (Highest Priority for flow control)
     const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
     
-    // ✅ 2.2 Questions
+    // 2. Questions (Preserve existing logic)
     const questionRegex =
       /อก|เอว|ยาว|ราคา|เท่าไหร่|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
-      
-    // ✅ 2.3 Buy Pattern
-    const buyRegex =
-      /(?:^|[^0-9])(?:F|f|cf|CF|รับ|เอา)?\s*(\d+)(?:[\s=\/]+(\d+))?(?:$|[^0-9])/;
 
-    // ✅ 2.4 Cancel Pattern
-    const cancelRegex =
-      /(?:^|[^0-9])(?:cc|CC|cancel|ยกเลิก|ไม่เอา|ปล่อย|หลุด)\s*(\d+)(?:$|[^0-9])/i;
+    // 3. Strict "Pure Number" Logic (Pattern: just digits)
+    const pureNumberRegex = /^\s*(\d+)\s*$/;
+
+    // 4. Explicit "Buy Pattern" Logic (Prefix + Number)
+    // Matches: F 50, cf 50, รับ 50, f50 (case insensitive)
+    const explicitBuyRegex = /(?:F|f|cf|CF|รับ|เอา)\s*(\d+)/;
+
+    // 5. Cancel Logic (Refined)
+    const cancelRegex = /(?:^|\s)(?:cc|CC|cancel|ยกเลิก|ไม่เอา|หลุด)\s*(\d+)/;
+
+    // 6. Implicit "Current Item" Logic (Keyword ONLY)
+    // Matches: "รับ", "เอา", "F", "cf" (standing alone or surrounded by spaces)
+    const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
+
+    // --- Execution ---
 
     if (shippingRegex.test(msg)) {
       intent = "shipping";
       method = "regex-ship";
     } else if (questionRegex.test(msg)) {
+      // It's a question. Check if it accidentally contains a pure number? 
+      // Rule 6 says preserve question detection.
+      // But Rule 5 says ignore embedded numbers. 
+      // If it matches Pure Number, it is NOT a question usually (e.g. "34"). 
+      // If it says "อก 34" -> Question regex matches "อก". 
       method = "question-skip"; 
     } else {
-      const cMatch = msg.match(cancelRegex);
-      const bMatch = msg.match(buyRegex);
+      // Regex Matching
+      const matchPure = msg.match(pureNumberRegex);
+      const matchExplicit = msg.match(explicitBuyRegex);
+      const matchCancel = msg.match(cancelRegex);
+      const matchImplicit = msg.match(implicitBuyRegex);
 
-      if (cMatch) {
+      if (matchCancel) {
+        // Priority: Cancel
         intent = "cancel";
-        targetId = parseInt(cMatch[1]);
-        method = "regex";
-      } else if (bMatch) {
+        targetId = parseInt(matchCancel[1]);
+        method = "regex-cancel";
+      } else if (matchPure) {
+        // Priority: Pure Number
+        const num = parseInt(matchPure[1]);
+        // Rule: Validate if in range (1 to stockSize or reasonable limit)
+        // If number is huge (e.g. 555 for laugh), we might ignore? 
+        // For now, assume strict mapping.
         intent = "buy";
-        targetId = parseInt(bMatch[1]);
-        targetPrice = bMatch[2] ? parseInt(bMatch[2]) : null;
-        method = "regex";
+        targetId = num;
+        method = "regex-pure";
+      } else if (matchExplicit) {
+        // Priority: Explicit Buy
+        intent = "buy";
+        targetId = parseInt(matchExplicit[1]);
+        method = "regex-explicit";
+      } else if (matchImplicit) {
+        // Priority: Implicit Buy (Context Aware)
+        // Only if we know what the current item is
+        if (currentOverlayItem.value) {
+           intent = "buy";
+           targetId = parseInt(currentOverlayItem.value);
+           method = "regex-implicit";
+        }
       }
     }
 
-    // 3. AI Analysis (Fallback - Run ONLY if Regex failed)
-    if (!method && systemStore.isAiCommander) {
+    // Safety Net: If intent is still null, but msg has numbers, 
+    // OLD logic would sometimes extract them.
+    // NEW LOGIC: Rule 5 -> "Ignore it". 
+    // So we do nothing.
+
+    // 3. AI Analysis (Fallback)
+    if (!intent && !method && systemStore.isAiCommander) {
       try {
         const aiResult = await analyzeChat(msg);
         if (aiResult) {
@@ -141,7 +215,6 @@ export function useChatProcessor() {
             targetId = aiResult.id;
             method = "ai";
           } else if (aiResult.intent === "shipping") {
-            // ✅ ถ้า AI ระบุว่าเป็น Shipping ให้ตั้งค่า intent แล้วปล่อยผ่านไป Step 5
             intent = "shipping";
             method = "ai";
           } else if (aiResult.intent === "question") {
@@ -153,7 +226,7 @@ export function useChatProcessor() {
       }
     }
 
-    // 4. Add message to chat (ส่ง type ไปทำสีพื้นหลัง)
+    // 4. Add message to chat
     chatStore.addMessage({
       id: item.id,
       text: msg,
@@ -164,18 +237,16 @@ export function useChatProcessor() {
       avatar,
       color: stringToColor(uid),
       isAdmin,
-      type: intent, // ส่ง intent ไปเป็น type (buy/cancel/shipping/null)
+      type: intent,
       detectionMethod: method,
       timestamp: new Date(item.snippet.publishedAt).getTime(),
     });
 
     // 5. Process Order & Audio Logic (Updated for TextToSpeech Service)
-    const { speak } = useAudio(); // Destructure confirm
+    const { speak } = useAudio(); 
 
-    if (intent === "buy" && targetId > 0) {
-      // --- กรณีจอง ---
-      if (targetId > stockSize) stockStore.stockSize = targetId;
-
+    if (intent === "buy" && targetId > 0 && targetId <= stockStore.stockSize) {
+      // --- Buy Logic ---
       let ownerName = displayName;
       let ownerUid = uid;
 
@@ -208,25 +279,21 @@ export function useChatProcessor() {
         method
       );
 
-      playDing(); // เสียงติ๊ง
-
-      // ✅ Use New TTS Service (No manual sanitization needed here)
+      playDing(); 
       speak(displayName, msg);
 
     } else if (intent === "cancel" && targetId > 0) {
-      // --- กรณียกเลิก ---
+      // --- Cancel Logic ---
       const currentItem = stockStore.stockData[targetId];
       if (isAdmin || (currentItem && currentItem.uid === uid)) {
         await stockStore.processCancel(targetId);
 
         playDing();
-        // speak(displayName, `ยกเลิก รายการที่ ${targetId}`);
-        speak(displayName, msg); // ✅ Read original message
+        speak(displayName, msg);
       }
     } else {
-      // --- กรณีข้อความทั่วไป ---
+      // --- Other Intents / General Chat ---
       if (intent === "shipping") {
-        // ✅ Auto-add to shipping queue (Always)
         const shippingRef = dbRef(
           db,
           `shipping/${systemStore.currentVideoId}/${uid}`
@@ -234,10 +301,9 @@ export function useChatProcessor() {
         update(shippingRef, {
           ready: true,
           timestamp: Date.now(),
-          lastMessage: msg, // ✅ Store last message
+          lastMessage: msg,
         }).catch((e) => logger.error("Shipping update error:", e));
 
-        // ✅ Save to History
         const historyRef = dbRef(
           db,
           `shipping/${systemStore.currentVideoId}/${uid}/history`
@@ -248,7 +314,7 @@ export function useChatProcessor() {
           type: "user",
         });
 
-        speak(displayName, msg); // ✅ Read original message
+        speak(displayName, msg);
       } else {
         // Read EVERYTHING else
         speak(displayName, msg);

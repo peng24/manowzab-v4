@@ -125,6 +125,10 @@ export function useChatProcessor() {
 
     // --- LOGIC V2: Prioritized Flow ---
 
+    // 0. Admin Proxy Logic (Highest Priority for Admin)
+    const adminProxyRegex = /^(\d+)\s+(.+)$/;
+    let forcedOwnerName = null;
+
     // 1. Shipping / Transfer (Highest Priority for flow control)
     const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
     
@@ -147,8 +151,16 @@ export function useChatProcessor() {
     const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
 
     // --- Execution ---
-
-    if (shippingRegex.test(msg)) {
+    
+    // Special Check for Admin Proxy
+    if (isAdmin && adminProxyRegex.test(msg)) {
+       const matchProxy = msg.match(adminProxyRegex);
+       intent = "buy";
+       targetId = parseInt(matchProxy[1]);
+       forcedOwnerName = matchProxy[2].trim();
+       method = "admin-proxy";
+    }
+    else if (shippingRegex.test(msg)) {
       intent = "shipping";
       method = "regex-ship";
     } else if (questionRegex.test(msg)) {
@@ -203,7 +215,10 @@ export function useChatProcessor() {
     // 3. AI Analysis (Fallback)
     if (!intent && !method && systemStore.isAiCommander) {
       try {
-        const aiResult = await analyzeChat(msg);
+        const analyzeMsg = msg;
+        // Optimization: If Admin Proxy handled it, we don't go here.
+        // But if we did enter here, normal flow resumes.
+        const aiResult = await analyzeChat(analyzeMsg);
         if (aiResult) {
           if (aiResult.intent === "buy" && aiResult.id) {
             intent = "buy";
@@ -250,7 +265,12 @@ export function useChatProcessor() {
       let ownerName = displayName;
       let ownerUid = uid;
 
-      if (isAdmin) {
+      if (forcedOwnerName) {
+         // Admin Proxy Mode 
+         ownerName = forcedOwnerName;
+         ownerUid = "proxy-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+      } else if (isAdmin) {
+        // Regular Admin Mode (buying for self or using F syntax)
         // Clean Name Logic
         let cleanName = msg
           .replace(targetId.toString(), "")

@@ -7,6 +7,7 @@
             <span class="badge" :class="{ connected: isDbConnected }">
                {{ isDbConnected ? "ONLINE" : "OFFLINE" }}
             </span>
+            <span class="badge version">v4.3.0</span>
             <span class="video-id" v-if="systemStore.currentVideoId">
                 ID: {{ systemStore.currentVideoId }}
             </span>

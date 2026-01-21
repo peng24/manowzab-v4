@@ -5,6 +5,32 @@ export function useOllama() {
   const modelName = ref("scb10x/llama3.2-typhoon2-3b-instruct");
   const systemStore = useSystemStore();
 
+  async function checkConnection() {
+    try {
+      const response = await fetch("http://localhost:11434/api/tags");
+      
+      if (!response.ok) {
+        console.log("%c❌ Ollama Disconnected", "color: #ff5252; font-weight: bold; font-size: 14px;");
+        console.error("Error details:", {
+          status: response.status,
+          statusText: response.statusText
+        });
+        return false;
+      }
+
+      const data = await response.json();
+      
+      console.log("%c✅ Ollama Connected", "color: #00e676; font-weight: bold; font-size: 14px;");
+      console.log("Available models:", data.models || []);
+      
+      return true;
+    } catch (error) {
+      console.log("%c❌ Ollama Disconnected", "color: #ff5252; font-weight: bold; font-size: 14px;");
+      console.error("Error details:", error);
+      return false;
+    }
+  }
+
   async function analyzeChat(text) {
     // Set status to 'working' at the start
     systemStore.statusOllama = "working";
@@ -84,6 +110,6 @@ Input Message: "${text}"
     }
   }
 
-  return { modelName, analyzeChat };
+  return { modelName, analyzeChat, checkConnection };
 }
 

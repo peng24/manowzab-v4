@@ -6,6 +6,9 @@ export function useOllama() {
   const systemStore = useSystemStore();
 
   async function checkConnection() {
+    // Set status to 'warn' (connecting) before fetch
+    systemStore.statusOllama = "warn";
+
     try {
       const response = await fetch("http://localhost:11434/api/tags");
       
@@ -15,6 +18,7 @@ export function useOllama() {
           status: response.status,
           statusText: response.statusText
         });
+        systemStore.statusOllama = "err";
         return false;
       }
 
@@ -23,10 +27,12 @@ export function useOllama() {
       console.log("%c✅ Ollama Connected", "color: #00e676; font-weight: bold; font-size: 14px;");
       console.log("Available models:", data.models || []);
       
+      systemStore.statusOllama = "ok";
       return true;
     } catch (error) {
       console.log("%c❌ Ollama Disconnected", "color: #ff5252; font-weight: bold; font-size: 14px;");
       console.error("Error details:", error);
+      systemStore.statusOllama = "err";
       return false;
     }
   }

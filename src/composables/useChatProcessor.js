@@ -1,7 +1,7 @@
 import { useStockStore } from "../stores/stock";
 import { useChatStore } from "../stores/chat";
 import { useSystemStore } from "../stores/system";
-import { useGemini } from "./useGemini";
+import { useOllama } from "./useOllama";
 import { useAudio } from "./useAudio";
 import { ref as dbRef, onValue, set, update, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
@@ -46,7 +46,7 @@ export function useChatProcessor() {
   const stockStore = useStockStore();
   const chatStore = useChatStore();
   const systemStore = useSystemStore();
-  const { analyzeChat } = useGemini();
+  const { analyzeChat } = useOllama();
   const { queueSpeech, playDing } = useAudio();
 
   // ✅ Local State for Implicit Buy Logic

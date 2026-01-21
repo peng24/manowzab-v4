@@ -1,6 +1,9 @@
 import { ref } from "vue";
 import { useSystemStore } from "../stores/system";
 
+// Reactive AI Logs Array
+export const aiLogs = ref([]);
+
 export function useOllama() {
   const modelName = ref("scb10x/llama3.2-typhoon2-3b-instruct");
   const systemStore = useSystemStore();
@@ -11,26 +14,35 @@ export function useOllama() {
 
     try {
       const response = await fetch("http://localhost:11434/api/tags");
-      
+
       if (!response.ok) {
-        console.log("%c❌ Ollama Disconnected", "color: #ff5252; font-weight: bold; font-size: 14px;");
+        console.log(
+          "%c❌ Ollama Disconnected",
+          "color: #ff5252; font-weight: bold; font-size: 14px;",
+        );
         console.error("Error details:", {
           status: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
         });
         systemStore.statusOllama = "err";
         return false;
       }
 
       const data = await response.json();
-      
-      console.log("%c✅ Ollama Connected", "color: #00e676; font-weight: bold; font-size: 14px;");
+
+      console.log(
+        "%c✅ Ollama Connected",
+        "color: #00e676; font-weight: bold; font-size: 14px;",
+      );
       console.log("Available models:", data.models || []);
-      
+
       systemStore.statusOllama = "ok";
       return true;
     } catch (error) {
-      console.log("%c❌ Ollama Disconnected", "color: #ff5252; font-weight: bold; font-size: 14px;");
+      console.log(
+        "%c❌ Ollama Disconnected",
+        "color: #ff5252; font-weight: bold; font-size: 14px;",
+      );
       console.error("Error details:", error);
       systemStore.statusOllama = "err";
       return false;
@@ -40,6 +52,9 @@ export function useOllama() {
   async function analyzeChat(text) {
     // Set status to 'working' at the start
     systemStore.statusOllama = "working";
+
+    // Start tracking execution time
+    const startTime = performance.now();
 
     const prompt = `
 Role: You are an AI assistant for a Thai live commerce clothing shop (Manowzab). 
@@ -84,16 +99,20 @@ Input Message: "${text}"
       });
 
       if (!response.ok) {
-        console.error("Ollama API Error:", response.status, response.statusText);
+        console.error(
+          "Ollama API Error:",
+          response.status,
+          response.statusText,
+        );
         systemStore.statusOllama = "err";
         return null;
       }
 
       const result = await response.json();
-      
+
       // Ollama returns the generated text in `response.response`
       const generatedText = result.response;
-      
+
       if (!generatedText) {
         console.error("No response from Ollama");
         systemStore.statusOllama = "err";
@@ -103,20 +122,56 @@ Input Message: "${text}"
       // Parse JSON from the response
       const match = generatedText.match(/\{.*?\}/s);
       const parsedResult = match ? JSON.parse(match[0]) : null;
-      
+
       // Set status to 'ok' after successful response
       systemStore.statusOllama = "ok";
-      
+
+      // Calculate duration and log
+      const duration = performance.now() - startTime;
+      aiLogs.value.unshift({
+        id: Date.now(),
+        timestamp: new Date().toLocaleTimeString(),
+        input: text,
+        output: parsedResult,
+        duration: Math.round(duration),
+        status: "success",
+      });
+
+      // Keep only latest 20 logs
+      if (aiLogs.value.length > 20) {
+        aiLogs.value.pop();
+      }
+
       return parsedResult;
     } catch (e) {
       console.error("Ollama Error:", e);
       // Set status to 'err' on error
       systemStore.statusOllama = "err";
+
+      // Log error
+      const duration = performance.now() - startTime;
+      aiLogs.value.unshift({
+        id: Date.now(),
+        timestamp: new Date().toLocaleTimeString(),
+        input: text,
+        output: null,
+        duration: Math.round(duration),
+        status: "error",
+      });
+
+      // Keep only latest 20 logs
+      if (aiLogs.value.length > 20) {
+        aiLogs.value.pop();
+      }
+
       return null;
     }
   }
 
   async function extractPriceFromVoice(text) {
+    // Start tracking execution time
+    const startTime = performance.now();
+
     const prompt = `
 Role: You are a Thai voice commerce assistant for a live clothing shop (Manowzab). 
 Your task is to extract product ID and price from natural Thai speech.
@@ -157,13 +212,17 @@ Input Message: "${text}"
       });
 
       if (!response.ok) {
-        console.error("Ollama API Error:", response.status, response.statusText);
+        console.error(
+          "Ollama API Error:",
+          response.status,
+          response.statusText,
+        );
         return null;
       }
 
       const result = await response.json();
       const generatedText = result.response;
-      
+
       if (!generatedText) {
         console.error("No response from Ollama");
         return null;
@@ -172,14 +231,46 @@ Input Message: "${text}"
       // Parse JSON from the response
       const match = generatedText.match(/\{.*?\}/s);
       const parsedResult = match ? JSON.parse(match[0]) : null;
-      
+
+      // Calculate duration and log
+      const duration = performance.now() - startTime;
+      aiLogs.value.unshift({
+        id: Date.now(),
+        timestamp: new Date().toLocaleTimeString(),
+        input: text,
+        output: parsedResult,
+        duration: Math.round(duration),
+        status: "success",
+      });
+
+      // Keep only latest 20 logs
+      if (aiLogs.value.length > 20) {
+        aiLogs.value.pop();
+      }
+
       return parsedResult;
     } catch (e) {
       console.error("Ollama extractPriceFromVoice Error:", e);
+
+      // Log error
+      const duration = performance.now() - startTime;
+      aiLogs.value.unshift({
+        id: Date.now(),
+        timestamp: new Date().toLocaleTimeString(),
+        input: text,
+        output: null,
+        duration: Math.round(duration),
+        status: "error",
+      });
+
+      // Keep only latest 20 logs
+      if (aiLogs.value.length > 20) {
+        aiLogs.value.pop();
+      }
+
       return null;
     }
   }
 
   return { modelName, analyzeChat, checkConnection, extractPriceFromVoice };
 }
-

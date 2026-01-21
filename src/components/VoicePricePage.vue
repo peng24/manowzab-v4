@@ -103,6 +103,60 @@
         <i class="fa-solid fa-file-arrow-down"></i>
       </button>
     </footer>
+
+    <!-- AI Monitor Panel -->
+    <section class="ai-monitor-section glass-panel">
+      <div class="monitor-header" @click="isMonitorOpen = !isMonitorOpen">
+        <span class="monitor-title">🧠 AI Monitor</span>
+        <i class="fa-solid" :class="isMonitorOpen ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+      </div>
+      
+      <transition name="slide">
+        <div v-show="isMonitorOpen" class="monitor-body">
+          <TransitionGroup name="log-item" tag="div" class="log-list">
+            <div 
+              v-for="log in aiLogs" 
+              :key="log.id" 
+              class="log-entry"
+              :class="{ 'log-error': log.status === 'error' }"
+            >
+              <!-- Desktop: Full layout -->
+              <div class="log-content desktop-only">
+                <span class="log-time">{{ log.timestamp }}</span>
+                <span class="log-input">"{{ log.input }}"</span>
+                <span class="log-output" v-if="log.output">
+                  <template v-if="log.output.id">ID: {{ log.output.id }}</template>
+                  <template v-if="log.output.price"> | ฿{{ log.output.price }}</template>
+                  <template v-if="log.output.intent"> | {{ log.output.intent }}</template>
+                </span>
+                <span class="log-output" v-else>Error</span>
+                <span class="log-duration">{{ log.duration }}ms</span>
+              </div>
+
+              <!-- Mobile: Compact layout -->
+              <div class="log-content mobile-only">
+                <div class="log-row">
+                  <span class="log-input">"{{ log.input }}"</span>
+                  <span class="log-duration">{{ log.duration }}ms</span>
+                </div>
+                <div class="log-row">
+                  <span class="log-output" v-if="log.output">
+                    <template v-if="log.output.id">ID: {{ log.output.id }}</template>
+                    <template v-if="log.output.price"> | ฿{{ log.output.price }}</template>
+                    <template v-if="log.output.intent"> | {{ log.output.intent }}</template>
+                  </span>
+                  <span class="log-output" v-else>Error</span>
+                </div>
+              </div>
+            </div>
+          </TransitionGroup>
+          
+          <div v-if="aiLogs.length === 0" class="log-empty">
+            รอข้อมูล AI...
+          </div>
+        </div>
+      </transition>
+    </section>
   </div>
 </template>
 
@@ -112,12 +166,14 @@ import { useSystemStore } from "../stores/system";
 import { useVoiceDetector } from "../composables/useVoiceDetector";
 import { useVoiceLogger } from "../composables/useVoiceLogger";
 import { useFirebase } from "../composables/useFirebase";
+import { aiLogs } from "../composables/useOllama";
 import { ref as dbRef, onValue } from "firebase/database";
 
 const systemStore = useSystemStore();
 const { isListening, transcript, lastAction, toggleMic } = useVoiceDetector();
 const { downloadLogs } = useVoiceLogger();
 const isDbConnected = ref(false);
+const isMonitorOpen = ref(false); // Closed by default on mobile
 
 // Ollama Status Display
 const ollamaStatusDisplay = computed(() => {
@@ -398,6 +454,11 @@ onMounted(() => {
 
   const connectedRef = dbRef(useFirebase().db, ".info/connected");
   onValue(connectedRef, (snap) => (isDbConnected.value = snap.val() === true));
+  
+  // Open monitor by default on desktop
+  if (window.innerWidth >= 768) {
+    isMonitorOpen.value = true;
+  }
 });
 
 onUnmounted(() => {
@@ -735,6 +796,192 @@ onUnmounted(() => {
   }
   .visualizer-container {
     height: 250px;
+  }
+}
+
+/* AI Monitor Panel */
+.ai-monitor-section {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+  z-index: 20;
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(20px);
+}
+
+.monitor-header {
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.monitor-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.monitor-title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #60a5fa;
+}
+
+.monitor-body {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+.log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.log-entry {
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 3px solid #10b981;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.log-entry.log-error {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.log-content {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.log-time {
+  color: #9ca3af;
+  min-width: 80px;
+  font-size: 0.75rem;
+}
+
+.log-input {
+  color: #fbbf24;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-output {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.log-error .log-output {
+  color: #ef4444;
+}
+
+.log-duration {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.log-empty {
+  text-align: center;
+  color: #6b7280;
+  padding: 20px;
+  font-style: italic;
+}
+
+/* Mobile-only / Desktop-only */
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: flex;
+}
+
+/* Transitions */
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.slide-enter-to,
+.slide-leave-from {
+  max-height: 300px;
+  opacity: 1;
+}
+
+.log-item-enter-active {
+  transition: all 0.4s ease;
+}
+
+.log-item-enter-from {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.log-item-leave-active {
+  transition: all 0.3s ease;
+  position: absolute;
+}
+
+.log-item-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+@media (max-width: 768px) {
+  .ai-monitor-section {
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+  }
+  
+  .monitor-body {
+    max-height: 200px;
+    font-size: 0.75rem;
+  }
+  
+  .mobile-only {
+    display: block;
+  }
+  
+  .desktop-only {
+    display: none;
+  }
+  
+  .log-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  
+  .log-row:last-child {
+    margin-bottom: 0;
   }
 }
 </style>

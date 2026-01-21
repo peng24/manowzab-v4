@@ -48,6 +48,7 @@ import { db } from "./composables/useFirebase";
 import { useAudio } from "./composables/useAudio";
 import { useAwayMode } from "./composables/useAwayMode";
 import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup
+import { useOllama } from "./composables/useOllama"; // ✅ Import Ollama
 import Header from "./components/Header.vue";
 import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
@@ -74,6 +75,9 @@ const { awayTimer, closeAwayMode, initAwayListener } = useAwayMode();
 // ✅ Use Auto Cleanup Composable
 const { initAutoCleanup } = useAutoCleanup();
 
+// ✅ Use Ollama for connection check
+const { checkConnection } = useOllama();
+
 const showDashboard = ref(false);
 const showHistory = ref(false);
 
@@ -97,6 +101,9 @@ provide("openHistory", () => (showHistory.value = true));
 
   onMounted(() => {
     console.log("🚀 App mounted");
+
+    // ✅ Check Ollama connection on startup
+    checkConnection();
 
     // Add global listeners for audio unlock
     document.addEventListener("click", handleFirstInteraction);

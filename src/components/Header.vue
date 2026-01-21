@@ -151,6 +151,7 @@ import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useYouTube } from "../composables/useYouTube";
 import { useGemini } from "../composables/useGemini";
+import { useOllama } from "../composables/useOllama"; // ✅ Import Ollama
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, update, set } from "firebase/database";
 import { db } from "../composables/useFirebase"; // เช็ค path ให้ตรงกับเครื่องคุณ
@@ -175,6 +176,7 @@ const chatStore = useChatStore();
 const stockStore = useStockStore();
 const { connectVideo, disconnect } = useYouTube();
 const { setApiKey } = useGemini();
+const { checkConnection } = useOllama(); // ✅ Destructure checkConnection
 const { queueSpeech, unlockAudio } = useAudio(); // ✅ เพิ่ม unlockAudio
 
 const openDashboard = inject("openDashboard");
@@ -294,6 +296,10 @@ function toggleAI() {
     .then(() => {
       systemStore.isAiCommander = newState;
       queueSpeech(newState ? "เปิด AI Commander" : "ปิด AI Commander");
+      // ✅ Re-check Ollama connection status when AI is turned on
+      if (newState) {
+        checkConnection();
+      }
     })
     .catch((error) => logger.error("Error toggling AI:", error));
 }

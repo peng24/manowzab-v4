@@ -2,6 +2,7 @@ import { ref, onUnmounted } from 'vue';
 import { useStockStore } from '../stores/stock';
 import { useAudio } from './useAudio';
 import { useVoiceLogger } from './useVoiceLogger';
+import { useOllama } from './useOllama';
 
 // ============================================
 // CONFIG: SMART HUNTER V2
@@ -56,6 +57,7 @@ export function useVoiceDetector() {
     const stockStore = useStockStore();
     const { playDing } = useAudio();
     const { logEvent } = useVoiceLogger();
+    const { extractPriceFromVoice } = useOllama();
 
     // State
     const isListening = ref(false);
@@ -85,9 +87,9 @@ export function useVoiceDetector() {
             }
         };
 
-        recognition.value.onresult = (event) => {
+        recognition.value.onresult = async (event) => {
             const text = event.results[event.results.length - 1][0].transcript.trim();
-            processVoiceCommand(text);
+            await processVoiceCommand(text);
         };
 
         recognition.value.onerror = (event) => {
@@ -104,7 +106,7 @@ export function useVoiceDetector() {
     // ============================================
     // CORE LOGIC: SMART HUNTER
     // ============================================
-    function processVoiceCommand(rawText) {
+    async function processVoiceCommand(rawText) {
         // --- STEP 1: PRE-PROCESSING (The Cleaner) ---
         let cleanText = rawText;
 
@@ -255,7 +257,44 @@ export function useVoiceDetector() {
             }
         }
 
-        // --- STEP 4: OUTPUT ACTION ---
+        // --- STEP 4: AI FALLBACK (Smart Hybrid Approach) ---
+        // Only activate AI if regex failed to detect ID AND text is substantial
+        if (detected.id === null && rawText.length > 5) {
+            // Show "Thinking..." UI feedback
+            lastAction.value = "🤔 กำลังคิด...";
+            
+            try {
+                const aiResult = await extractPriceFromVoice(rawText);
+                
+                if (aiResult) {
+                    // Update detection with AI results
+                    if (aiResult.id !== null && aiResult.id !== undefined) {
+                        // Handle special case: "current" means user wants current item
+                        if (aiResult.id === "current") {
+                            // Could integrate with overlay/current selection logic here
+                            // For now, just log it
+                            console.log("AI detected 'current item' reference");
+                        } else {
+                            detected.id = typeof aiResult.id === 'string' ? parseInt(aiResult.id) : aiResult.id;
+                        }
+                    }
+                    
+                    if (aiResult.price !== null && aiResult.price !== undefined) {
+                        detected.price = aiResult.price;
+                    }
+                    
+                    // Mark this as AI-detected
+                    if (detected.id !== null) {
+                        detected.logic = "AI-Ollama";
+                    }
+                }
+            } catch (error) {
+                console.error("AI Fallback Error:", error);
+                // Continue without AI result
+            }
+        }
+
+        // --- STEP 5: OUTPUT ACTION ---
         executeAction(rawText, cleanText, detected);
     }
 

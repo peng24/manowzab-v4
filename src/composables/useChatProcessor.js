@@ -143,10 +143,13 @@ export function useChatProcessor() {
     // Matches: F 50, cf 50, รับ 50, f50 (case insensitive)
     const explicitBuyRegex = /(?:F|f|cf|CF|รับ|เอา)\s*(\d+)/;
 
-    // 5. Cancel Logic (Refined)
-    const cancelRegex = /(?:^|\s)(?:cc|CC|cancel|ยกเลิก|ไม่เอา|หลุด)\s*(\d+)/;
+    // 5. Dash Buy Pattern (Name-Number)
+    const dashBuyRegex = /^(?:.+?)\s*[-]\s*(\d+)$/;
 
-    // 6. Implicit "Current Item" Logic (Keyword ONLY)
+    // 6. Cancel Logic (Refined - supports dash)
+    const cancelRegex = /(?:^|\s)(?:cc|CC|cancel|ยกเลิก|ไม่เอา|หลุด)\s*(?:[-]\s*)?(\d+)/;
+
+    // 7. Implicit "Current Item" Logic (Keyword ONLY)
     // Matches: "รับ", "เอา", "F", "cf" (standing alone or surrounded by spaces)
     const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
 
@@ -174,6 +177,7 @@ export function useChatProcessor() {
       // Regex Matching
       const matchPure = msg.match(pureNumberRegex);
       const matchExplicit = msg.match(explicitBuyRegex);
+      const matchDash = msg.match(dashBuyRegex);
       const matchCancel = msg.match(cancelRegex);
       const matchImplicit = msg.match(implicitBuyRegex);
 
@@ -196,6 +200,11 @@ export function useChatProcessor() {
         intent = "buy";
         targetId = parseInt(matchExplicit[1]);
         method = "regex-explicit";
+      } else if (matchDash) {
+        // Priority: Dash Buy (Name-Number pattern)
+        intent = "buy";
+        targetId = parseInt(matchDash[1]);
+        method = "regex-dash";
       } else if (matchImplicit) {
         // Priority: Implicit Buy (Context Aware)
         // Only if we know what the current item is

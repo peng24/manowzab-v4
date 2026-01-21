@@ -1,9 +1,14 @@
 import { ref } from "vue";
+import { useSystemStore } from "../stores/system";
 
 export function useOllama() {
   const modelName = ref("scb10x/llama3.2-typhoon2-3b-instruct");
+  const systemStore = useSystemStore();
 
   async function analyzeChat(text) {
+    // Set status to 'working' at the start
+    systemStore.statusOllama = "working";
+
     const prompt = `
 Role: You are an AI assistant for a Thai live commerce clothing shop (Manowzab). 
 Your task is to extract the user's intent from their chat message.
@@ -48,6 +53,7 @@ Input Message: "${text}"
 
       if (!response.ok) {
         console.error("Ollama API Error:", response.status, response.statusText);
+        systemStore.statusOllama = "err";
         return null;
       }
 
@@ -58,17 +64,26 @@ Input Message: "${text}"
       
       if (!generatedText) {
         console.error("No response from Ollama");
+        systemStore.statusOllama = "err";
         return null;
       }
 
       // Parse JSON from the response
       const match = generatedText.match(/\{.*?\}/s);
-      return match ? JSON.parse(match[0]) : null;
+      const parsedResult = match ? JSON.parse(match[0]) : null;
+      
+      // Set status to 'ok' after successful response
+      systemStore.statusOllama = "ok";
+      
+      return parsedResult;
     } catch (e) {
       console.error("Ollama Error:", e);
+      // Set status to 'err' on error
+      systemStore.statusOllama = "err";
       return null;
     }
   }
 
   return { modelName, analyzeChat };
 }
+

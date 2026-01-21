@@ -116,6 +116,70 @@ Input Message: "${text}"
     }
   }
 
-  return { modelName, analyzeChat, checkConnection };
+  async function extractPriceFromVoice(text) {
+    const prompt = `
+Role: You are a Thai voice commerce assistant for a live clothing shop (Manowzab). 
+Your task is to extract product ID and price from natural Thai speech.
+
+Key Patterns:
+- **Product ID**: Can be a number (e.g., 53, 680), alphanumeric (e.g., A1, CF10), or words like "ตัวนี้", "รายการนี้"
+- **Price**: Numbers followed by "บาท", Thai number words (e.g., "ร้อยเดียว" = 100, "แปดสิบ" = 80, "ห้าร้อย" = 500), or standalone numbers near price keywords
+
+Important Rules:
+1. IGNORE measurements like "อก 52", "ยาว 40" (these are size attributes, not prices)
+2. IGNORE color/fabric words like "สีดำ", "ผ้าเด้ง"
+3. If you see "รายการที่ X" or "เบอร์ X" or "รหัส X", extract X as the ID
+4. For "ตัวนี้" without a number, return id as "current" (means current/selected item)
+5. Thai number words: "ร้อยเดียว"=100, "สองร้อย"=200, "แปดสิบ"=80, "เจ็ดสิบ"=70, etc.
+
+Response Format (JSON only):
+{"id": number|string|null, "price": number|null}
+
+Examples:
+- "ตัวนี้ ร้อยเดียว" → {"id": "current", "price": 100}
+- "รายการที่ 53 แปดสิบบาท" → {"id": 53, "price": 80}
+- "รหัส A1 ห้าร้อย" → {"id": "A1", "price": 500}
+- "680" → {"id": 6, "price": 80} (implicit glued format)
+
+Input Message: "${text}"
+`;
+
+    try {
+      const response = await fetch("http://localhost:11434/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: modelName.value,
+          prompt: prompt,
+          format: "json",
+          stream: false,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Ollama API Error:", response.status, response.statusText);
+        return null;
+      }
+
+      const result = await response.json();
+      const generatedText = result.response;
+      
+      if (!generatedText) {
+        console.error("No response from Ollama");
+        return null;
+      }
+
+      // Parse JSON from the response
+      const match = generatedText.match(/\{.*?\}/s);
+      const parsedResult = match ? JSON.parse(match[0]) : null;
+      
+      return parsedResult;
+    } catch (e) {
+      console.error("Ollama extractPriceFromVoice Error:", e);
+      return null;
+    }
+  }
+
+  return { modelName, analyzeChat, checkConnection, extractPriceFromVoice };
 }
 

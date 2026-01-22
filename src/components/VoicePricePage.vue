@@ -108,15 +108,18 @@
     <section class="ai-monitor-section glass-panel">
       <div class="monitor-header" @click="isMonitorOpen = !isMonitorOpen">
         <span class="monitor-title">🧠 AI Monitor</span>
-        <i class="fa-solid" :class="isMonitorOpen ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+        <i
+          class="fa-solid"
+          :class="isMonitorOpen ? 'fa-chevron-down' : 'fa-chevron-up'"
+        ></i>
       </div>
-      
+
       <transition name="slide">
         <div v-show="isMonitorOpen" class="monitor-body">
           <TransitionGroup name="log-item" tag="div" class="log-list">
-            <div 
-              v-for="log in aiLogs" 
-              :key="log.id" 
+            <div
+              v-for="log in aiLogs"
+              :key="log.id"
               class="log-entry"
               :class="{ 'log-error': log.status === 'error' }"
             >
@@ -125,9 +128,15 @@
                 <span class="log-time">{{ log.timestamp }}</span>
                 <span class="log-input">"{{ log.input }}"</span>
                 <span class="log-output" v-if="log.output">
-                  <template v-if="log.output.id">ID: {{ log.output.id }}</template>
-                  <template v-if="log.output.price"> | ฿{{ log.output.price }}</template>
-                  <template v-if="log.output.intent"> | {{ log.output.intent }}</template>
+                  <template v-if="log.output.id"
+                    >ID: {{ log.output.id }}</template
+                  >
+                  <template v-if="log.output.price">
+                    | ฿{{ log.output.price }}</template
+                  >
+                  <template v-if="log.output.intent">
+                    | {{ log.output.intent }}</template
+                  >
                 </span>
                 <span class="log-output" v-else>Error</span>
                 <span class="log-duration">{{ log.duration }}ms</span>
@@ -141,19 +150,23 @@
                 </div>
                 <div class="log-row">
                   <span class="log-output" v-if="log.output">
-                    <template v-if="log.output.id">ID: {{ log.output.id }}</template>
-                    <template v-if="log.output.price"> | ฿{{ log.output.price }}</template>
-                    <template v-if="log.output.intent"> | {{ log.output.intent }}</template>
+                    <template v-if="log.output.id"
+                      >ID: {{ log.output.id }}</template
+                    >
+                    <template v-if="log.output.price">
+                      | ฿{{ log.output.price }}</template
+                    >
+                    <template v-if="log.output.intent">
+                      | {{ log.output.intent }}</template
+                    >
                   </span>
                   <span class="log-output" v-else>Error</span>
                 </div>
               </div>
             </div>
           </TransitionGroup>
-          
-          <div v-if="aiLogs.length === 0" class="log-empty">
-            รอข้อมูล AI...
-          </div>
+
+          <div v-if="aiLogs.length === 0" class="log-empty">รอข้อมูล AI...</div>
         </div>
       </transition>
     </section>
@@ -454,7 +467,7 @@ onMounted(() => {
 
   const connectedRef = dbRef(useFirebase().db, ".info/connected");
   onValue(connectedRef, (snap) => (isDbConnected.value = snap.val() === true));
-  
+
   // Open monitor by default on desktop
   if (window.innerWidth >= 768) {
     isMonitorOpen.value = true;
@@ -808,8 +821,8 @@ onUnmounted(() => {
   max-width: 900px;
   margin: 0 auto;
   z-index: 20;
-  background: rgba(17, 24, 39, 0.95);
-  backdrop-filter: blur(20px);
+  background: rgba(17, 24, 39, 0.3);
+  backdrop-filter: blur(10px);
 }
 
 .monitor-header {
@@ -818,7 +831,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   transition: background 0.2s;
 }
 
@@ -837,7 +850,7 @@ onUnmounted(() => {
   max-height: 300px;
   overflow-y: auto;
   padding: 10px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 0.85rem;
 }
 
@@ -848,7 +861,7 @@ onUnmounted(() => {
 }
 
 .log-entry {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.15);
   border-left: 3px solid #10b981;
   padding: 8px 12px;
   border-radius: 4px;
@@ -959,27 +972,27 @@ onUnmounted(() => {
     left: 10px;
     right: 10px;
   }
-  
+
   .monitor-body {
     max-height: 200px;
     font-size: 0.75rem;
   }
-  
+
   .mobile-only {
     display: block;
   }
-  
+
   .desktop-only {
     display: none;
   }
-  
+
   .log-row {
     display: flex;
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 4px;
   }
-  
+
   .log-row:last-child {
     margin-bottom: 0;
   }

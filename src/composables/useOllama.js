@@ -242,6 +242,9 @@ export function useOllama() {
   }
 
   async function extractPriceFromVoice(text) {
+    // Set status to 'working' at the start
+    systemStore.statusOllama = "working";
+
     // Start tracking execution time
     const startTime = performance.now();
 
@@ -285,6 +288,9 @@ export function useOllama() {
       // Parse JSON from the response
       const match = generatedText.match(/\{.*?\}/s);
       const parsedResult = match ? JSON.parse(match[0]) : null;
+
+      // Set status to 'ok' after successful response
+      systemStore.statusOllama = "ok";
 
       // Calculate duration and log
       const duration = performance.now() - startTime;

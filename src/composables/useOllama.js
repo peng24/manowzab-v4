@@ -1,6 +1,86 @@
 import { ref } from "vue";
 import { useSystemStore } from "../stores/system";
 
+// ============================================
+// CONFIGURATION CONSTANTS
+// ============================================
+
+// Request timeout in milliseconds (8 seconds)
+const REQUEST_TIMEOUT_MS = 8000;
+
+// ============================================
+// AI PROMPTS
+// ============================================
+
+/**
+ * Prompt for analyzing chat messages to extract user intent
+ * Used in: analyzeChat()
+ */
+const PROMPT_CHAT_ANALYSIS = (text) => `
+Role: You are an AI assistant for a Thai live commerce clothing shop (Manowzab). 
+Your task is to extract the user's intent from their chat message.
+
+Key Entities:
+- **Product ID**: Usually a number (e.g., 1, 15, 99) or starts with F/CF (e.g., F1, CF10).
+- **Price**: A number usually followed by "บาท" or appearing after the ID (e.g., 10=100).
+
+Intents:
+1. **buy**: User wants to purchase an item.
+   - Pattern: "[ID]", "F[ID]", "CF[ID]", "รับ [ID]", "[ID] [Name]", "[ID]=[Price]".
+   - CRITICAL EXCEPTION: If the message contains specific question words (เท่าไหร่, ไหม, หรอ, หรือ, ไง) OR specific attribute words (อก, เอว, ยาว, สี, ผ้า, ตำหนิ) appearing alongside a number, it is ALWAYS a "question", NOT a "buy".
+
+2. **cancel**: User wants to cancel an order.
+   - Pattern: "CC", "cancel", "ยกเลิก", "ไม่เอา".
+
+3. **question**: User is asking about product details.
+   - Keywords: อก, เอว, ยาว, ผ้า, ราคา, สี, ว่างไหม, ทันไหม, เท่าไหร่, กี่บาท, แบบไหน, ดู, ตำหนิ.
+
+4. **shipping**: User wants to ship items.
+   - Keywords: "พร้อมส่ง", "สรุปยอด", "ส่งของ", "คิดเงิน".
+
+5. **spam**: Greetings, chit-chat.
+
+Response Format (JSON only):
+{"intent": "buy"|"cancel"|"question"|"shipping"|"spam", "id": number|null, "price": number|null}
+
+Input Message: "${text}"
+`;
+
+/**
+ * Prompt for extracting product ID and price from natural Thai voice input
+ * Used in: extractPriceFromVoice()
+ */
+const PROMPT_VOICE_EXTRACTION = (text) => `
+Role: You are a Thai voice commerce assistant for a live clothing shop (Manowzab). 
+Your task is to extract product ID and price from natural Thai speech.
+
+Key Patterns:
+- **Product ID**: Can be a number (e.g., 53, 680), alphanumeric (e.g., A1, CF10), or words like "ตัวนี้", "รายการนี้"
+- **Price**: Numbers followed by "บาท", Thai number words (e.g., "ร้อยเดียว" = 100, "แปดสิบ" = 80, "ห้าร้อย" = 500), or standalone numbers near price keywords
+
+Important Rules:
+1. IGNORE measurements like "อก 52", "ยาว 40" (these are size attributes, not prices)
+2. IGNORE color/fabric words like "สีดำ", "ผ้าเด้ง"
+3. If you see "รายการที่ X" or "เบอร์ X" or "รหัส X", extract X as the ID
+4. For "ตัวนี้" without a number, return id as "current" (means current/selected item)
+5. Thai number words: "ร้อยเดียว"=100, "สองร้อย"=200, "แปดสิบ"=80, "เจ็ดสิบ"=70, etc.
+
+Response Format (JSON only):
+{"id": number|string|null, "price": number|null}
+
+Examples:
+- "ตัวนี้ ร้อยเดียว" → {"id": "current", "price": 100}
+- "รายการที่ 53 แปดสิบบาท" → {"id": 53, "price": 80}
+- "รหัส A1 ห้าร้อย" → {"id": "A1", "price": 500}
+- "680" → {"id": 6, "price": 80} (implicit glued format)
+
+Input Message: "${text}"
+`;
+
+// ============================================
+// REACTIVE STATE
+// ============================================
+
 // Reactive AI Logs Array
 export const aiLogs = ref([]);
 
@@ -56,35 +136,9 @@ export function useOllama() {
     // Start tracking execution time
     const startTime = performance.now();
 
-    const prompt = `
-Role: You are an AI assistant for a Thai live commerce clothing shop (Manowzab). 
-Your task is to extract the user's intent from their chat message.
-
-Key Entities:
-- **Product ID**: Usually a number (e.g., 1, 15, 99) or starts with F/CF (e.g., F1, CF10).
-- **Price**: A number usually followed by "บาท" or appearing after the ID (e.g., 10=100).
-
-Intents:
-1. **buy**: User wants to purchase an item.
-   - Pattern: "[ID]", "F[ID]", "CF[ID]", "รับ [ID]", "[ID] [Name]", "[ID]=[Price]".
-   - CRITICAL EXCEPTION: If the message contains specific question words (เท่าไหร่, ไหม, หรอ, หรือ, ไง) OR specific attribute words (อก, เอว, ยาว, สี, ผ้า, ตำหนิ) appearing alongside a number, it is ALWAYS a "question", NOT a "buy".
-
-2. **cancel**: User wants to cancel an order.
-   - Pattern: "CC", "cancel", "ยกเลิก", "ไม่เอา".
-
-3. **question**: User is asking about product details.
-   - Keywords: อก, เอว, ยาว, ผ้า, ราคา, สี, ว่างไหม, ทันไหม, เท่าไหร่, กี่บาท, แบบไหน, ดู, ตำหนิ.
-
-4. **shipping**: User wants to ship items.
-   - Keywords: "พร้อมส่ง", "สรุปยอด", "ส่งของ", "คิดเงิน".
-
-5. **spam**: Greetings, chit-chat.
-
-Response Format (JSON only):
-{"intent": "buy"|"cancel"|"question"|"shipping"|"spam", "id": number|null, "price": number|null}
-
-Input Message: "${text}"
-`;
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch("http://localhost:11434/api/generate", {
@@ -92,11 +146,14 @@ Input Message: "${text}"
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: modelName.value,
-          prompt: prompt,
+          prompt: PROMPT_CHAT_ANALYSIS(text),
           format: "json",
           stream: false,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.error(
@@ -144,7 +201,17 @@ Input Message: "${text}"
 
       return parsedResult;
     } catch (e) {
-      console.error("Ollama Error:", e);
+      clearTimeout(timeoutId);
+
+      // Check if error is due to timeout
+      const isTimeout = e.name === "AbortError";
+      const errorMessage = isTimeout ? "Request timed out" : e.message;
+
+      console.error(
+        isTimeout ? "Ollama Timeout:" : "Ollama Error:",
+        errorMessage,
+      );
+
       // Set status to 'err' on error
       systemStore.statusOllama = "err";
 
@@ -157,11 +224,17 @@ Input Message: "${text}"
         output: null,
         duration: Math.round(duration),
         status: "error",
+        error: errorMessage,
       });
 
       // Keep only latest 20 logs
       if (aiLogs.value.length > 20) {
         aiLogs.value.pop();
+      }
+
+      // Re-throw timeout error for caller to handle
+      if (isTimeout) {
+        throw new Error("Request timed out");
       }
 
       return null;
@@ -172,32 +245,9 @@ Input Message: "${text}"
     // Start tracking execution time
     const startTime = performance.now();
 
-    const prompt = `
-Role: You are a Thai voice commerce assistant for a live clothing shop (Manowzab). 
-Your task is to extract product ID and price from natural Thai speech.
-
-Key Patterns:
-- **Product ID**: Can be a number (e.g., 53, 680), alphanumeric (e.g., A1, CF10), or words like "ตัวนี้", "รายการนี้"
-- **Price**: Numbers followed by "บาท", Thai number words (e.g., "ร้อยเดียว" = 100, "แปดสิบ" = 80, "ห้าร้อย" = 500), or standalone numbers near price keywords
-
-Important Rules:
-1. IGNORE measurements like "อก 52", "ยาว 40" (these are size attributes, not prices)
-2. IGNORE color/fabric words like "สีดำ", "ผ้าเด้ง"
-3. If you see "รายการที่ X" or "เบอร์ X" or "รหัส X", extract X as the ID
-4. For "ตัวนี้" without a number, return id as "current" (means current/selected item)
-5. Thai number words: "ร้อยเดียว"=100, "สองร้อย"=200, "แปดสิบ"=80, "เจ็ดสิบ"=70, etc.
-
-Response Format (JSON only):
-{"id": number|string|null, "price": number|null}
-
-Examples:
-- "ตัวนี้ ร้อยเดียว" → {"id": "current", "price": 100}
-- "รายการที่ 53 แปดสิบบาท" → {"id": 53, "price": 80}
-- "รหัส A1 ห้าร้อย" → {"id": "A1", "price": 500}
-- "680" → {"id": 6, "price": 80} (implicit glued format)
-
-Input Message: "${text}"
-`;
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch("http://localhost:11434/api/generate", {
@@ -205,11 +255,14 @@ Input Message: "${text}"
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: modelName.value,
-          prompt: prompt,
+          prompt: PROMPT_VOICE_EXTRACTION(text),
           format: "json",
           stream: false,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.error(
@@ -217,6 +270,7 @@ Input Message: "${text}"
           response.status,
           response.statusText,
         );
+        systemStore.statusOllama = "err";
         return null;
       }
 
@@ -250,7 +304,21 @@ Input Message: "${text}"
 
       return parsedResult;
     } catch (e) {
-      console.error("Ollama extractPriceFromVoice Error:", e);
+      clearTimeout(timeoutId);
+
+      // Check if error is due to timeout
+      const isTimeout = e.name === "AbortError";
+      const errorMessage = isTimeout ? "Request timed out" : e.message;
+
+      console.error(
+        isTimeout
+          ? "Ollama Voice Timeout:"
+          : "Ollama extractPriceFromVoice Error:",
+        errorMessage,
+      );
+
+      // Set status to 'err' on error
+      systemStore.statusOllama = "err";
 
       // Log error
       const duration = performance.now() - startTime;
@@ -261,11 +329,17 @@ Input Message: "${text}"
         output: null,
         duration: Math.round(duration),
         status: "error",
+        error: errorMessage,
       });
 
       // Keep only latest 20 logs
       if (aiLogs.value.length > 20) {
         aiLogs.value.pop();
+      }
+
+      // Re-throw timeout error for caller to handle
+      if (isTimeout) {
+        throw new Error("Request timed out");
       }
 
       return null;

@@ -5,9 +5,7 @@
       <span>มีเวอร์ชั่นใหม่พร้อมใช้งาน</span>
     </div>
     <div class="actions">
-      <button class="btn-refresh" @click="updateServiceWorker()">
-        อัปเดตเลย
-      </button>
+      <button class="btn-refresh" @click="handleUpdate()">อัปเดตเลย</button>
       <button class="btn-close" @click="close">
         <i class="fa-solid fa-xmark"></i>
       </button>
@@ -19,6 +17,12 @@
 import { useRegisterSW } from "virtual:pwa-register/vue";
 
 const { needRefresh, updateServiceWorker } = useRegisterSW();
+
+async function handleUpdate() {
+  await updateServiceWorker();
+  // Force reload to apply the new version immediately
+  window.location.reload();
+}
 
 function close() {
   needRefresh.value = false;
@@ -47,7 +51,7 @@ function close() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Kanit', sans-serif;
+  font-family: "Kanit", sans-serif;
   font-size: 0.95rem;
 }
 
@@ -68,7 +72,7 @@ function close() {
   padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
-  font-family: 'Kanit', sans-serif;
+  font-family: "Kanit", sans-serif;
   font-weight: 500;
   font-size: 0.9rem;
   transition: background-color 0.2s;

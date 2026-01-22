@@ -65,6 +65,9 @@ export function useVoiceDetector() {
     const lastAction = ref("");
     const recognition = ref(null);
     const manualStop = ref(false);
+    
+    // Debounce Timer for AI Fallback
+    let aiDebounceTimer = null;
 
     // ============================================
     // INITIALIZATION
@@ -107,6 +110,12 @@ export function useVoiceDetector() {
     // CORE LOGIC: SMART HUNTER
     // ============================================
     async function processVoiceCommand(rawText) {
+        // Clear any pending AI debounce timer
+        if (aiDebounceTimer) {
+            clearTimeout(aiDebounceTimer);
+            aiDebounceTimer = null;
+        }
+        
         // --- STEP 1: PRE-PROCESSING (The Cleaner) ---
         let cleanText = rawText;
 
@@ -260,38 +269,51 @@ export function useVoiceDetector() {
         // --- STEP 4: AI FALLBACK (Smart Hybrid Approach) ---
         // Only activate AI if regex failed to detect ID AND text is substantial
         if (detected.id === null && rawText.length > 5) {
-            // Show "Thinking..." UI feedback
-            lastAction.value = "🤔 กำลังคิด...";
-            
-            try {
-                const aiResult = await extractPriceFromVoice(rawText);
+            // Debounce: Wait 800ms before calling Ollama
+            // This prevents spamming the AI when user is still speaking
+            aiDebounceTimer = setTimeout(async () => {
+                // Check if still listening (optional safety check)
+                if (!isListening.value) return;
                 
-                if (aiResult) {
-                    // Update detection with AI results
-                    if (aiResult.id !== null && aiResult.id !== undefined) {
-                        // Handle special case: "current" means user wants current item
-                        if (aiResult.id === "current") {
-                            // Could integrate with overlay/current selection logic here
-                            // For now, just log it
-                            console.log("AI detected 'current item' reference");
-                        } else {
-                            detected.id = typeof aiResult.id === 'string' ? parseInt(aiResult.id) : aiResult.id;
+                // Show "Thinking..." UI feedback
+                lastAction.value = "🤔 กำลังคิด...";
+                
+                try {
+                    const aiResult = await extractPriceFromVoice(rawText);
+                    
+                    if (aiResult) {
+                        // Update detection with AI results
+                        if (aiResult.id !== null && aiResult.id !== undefined) {
+                            // Handle special case: "current" means user wants current item
+                            if (aiResult.id === "current") {
+                                // Could integrate with overlay/current selection logic here
+                                // For now, just log it
+                                console.log("AI detected 'current item' reference");
+                            } else {
+                                detected.id = typeof aiResult.id === 'string' ? parseInt(aiResult.id) : aiResult.id;
+                            }
                         }
+                        
+                        if (aiResult.price !== null && aiResult.price !== undefined) {
+                            detected.price = aiResult.price;
+                        }
+                        
+                        // Mark this as AI-detected
+                        if (detected.id !== null) {
+                            detected.logic = "AI-Ollama";
+                        }
+                        
+                        // Execute action with AI results
+                        executeAction(rawText, cleanText, detected);
                     }
-                    
-                    if (aiResult.price !== null && aiResult.price !== undefined) {
-                        detected.price = aiResult.price;
-                    }
-                    
-                    // Mark this as AI-detected
-                    if (detected.id !== null) {
-                        detected.logic = "AI-Ollama";
-                    }
+                } catch (error) {
+                    console.error("AI Fallback Error:", error);
+                    // Continue without AI result - no action needed
                 }
-            } catch (error) {
-                console.error("AI Fallback Error:", error);
-                // Continue without AI result
-            }
+            }, 800);
+            
+            // Return early - AI will execute action when ready
+            return;
         }
 
         // --- STEP 5: OUTPUT ACTION ---

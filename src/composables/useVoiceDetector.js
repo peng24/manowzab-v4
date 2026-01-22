@@ -39,8 +39,8 @@ const CONFIG = {
         ],
         attributes: {
             fabric: /\b(ผ้าเด้ง|ชีฟอง|โพลิเอสเตอร์|ไนลอน|เรยอน|คอตตอน|ลินิน|ยืด|ไหมพรม|ซาติน|กำมะหยี่)\b/i,
-            bust: /(?:อก|รอบอก|ตึงหน้าผ้า)\s*(\d+)/i,
-            length: /(?:ยาว|ความยาว)\s*(\d+)/i,
+            bust: /(?:อก|รอบอก|ตึงหน้าผ้า)(?:\s*(?:ได้|ถึง|[-]|และ))?\s*((?:\d+[- ]\d+)|\d+)/i,
+            length: /(?:ยาว|ความยาว)\s*((?:\d+[- ]\d+)|\d+)/i,
             sizeLetter: /\b(XXL|XL|L|M|S|XS)\b/i
         },
         anchors: {
@@ -160,18 +160,22 @@ export function useVoiceDetector() {
         // Bust
         const bustMatch = workingText.match(CONFIG.patterns.attributes.bust);
         if (bustMatch) {
-            const val = parseInt(bustMatch[1]);
-            if (val >= CONFIG.ranges.bust.min && val <= CONFIG.ranges.bust.max) {
-                detected.bust = val;
+            const rangeStr = bustMatch[1];
+            // Check if it's a range or single number
+            const firstNum = parseInt(rangeStr.split(/[- ]/)[0]);
+            if (firstNum >= CONFIG.ranges.bust.min && firstNum <= CONFIG.ranges.bust.max) {
+                detected.bust = rangeStr; // Store full range string
                 workingText = workingText.replace(bustMatch[0], "").trim();
             }
         }
         // Length
         const lengthMatch = workingText.match(CONFIG.patterns.attributes.length);
         if (lengthMatch) {
-            const val = parseInt(lengthMatch[1]);
-            if (val >= CONFIG.ranges.length.min && val <= CONFIG.ranges.length.max) {
-                detected.length = val;
+            const rangeStr = lengthMatch[1];
+            // Check if it's a range or single number
+            const firstNum = parseInt(rangeStr.split(/[- ]/)[0]);
+            if (firstNum >= CONFIG.ranges.length.min && firstNum <= CONFIG.ranges.length.max) {
+                detected.length = rangeStr; // Store full range string
                 workingText = workingText.replace(lengthMatch[0], "").trim();
             }
         }
@@ -298,6 +302,24 @@ export function useVoiceDetector() {
                             detected.price = aiResult.price;
                         }
                         
+                        // Merge AI's size data if present
+                        if (aiResult.size !== null && aiResult.size !== undefined && aiResult.size !== "") {
+                            // Parse AI size and merge with detected attributes
+                            const sizeParts = [];
+                            if (detected.bust) sizeParts.push(`อก ${detected.bust}`);
+                            if (detected.length) sizeParts.push(`ยาว ${detected.length}`);
+                            if (detected.sizeLetter) sizeParts.push(detected.sizeLetter);
+                            if (detected.fabric) sizeParts.push(detected.fabric);
+                            
+                            // Add AI size if not already captured by regex
+                            if (sizeParts.length === 0 || !sizeParts.join(" ").includes(aiResult.size)) {
+                                sizeParts.push(aiResult.size);
+                            }
+                            
+                            // Override the detected size attributes with merged data
+                            detected.aiSize = sizeParts.join(" ");
+                        }
+                        
                         // Mark this as AI-detected
                         if (detected.id !== null) {
                             detected.logic = "AI-Ollama";
@@ -370,12 +392,18 @@ export function useVoiceDetector() {
             const updateData = {};
             let sizeParts = [];
             
-            if (detected.bust) sizeParts.push(`อก ${detected.bust}`);
-            if (detected.length) sizeParts.push(`ยาว ${detected.length}`);
-            if (detected.sizeLetter) sizeParts.push(detected.sizeLetter);
-            if (detected.fabric) sizeParts.push(detected.fabric);
+            // Use AI size if available, otherwise build from detected attributes
+            if (detected.aiSize) {
+                updateData.size = detected.aiSize;
+            } else {
+                if (detected.bust) sizeParts.push(`อก ${detected.bust}`);
+                if (detected.length) sizeParts.push(`ยาว ${detected.length}`);
+                if (detected.sizeLetter) sizeParts.push(detected.sizeLetter);
+                if (detected.fabric) sizeParts.push(detected.fabric);
 
-            if (sizeParts.length > 0) updateData.size = sizeParts.join(" ");
+                if (sizeParts.length > 0) updateData.size = sizeParts.join(" ");
+            }
+            
             if (detected.price !== null) updateData.price = detected.price;
 
             // Commit to Store

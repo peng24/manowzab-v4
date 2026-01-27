@@ -48,36 +48,48 @@ Input Message: "${text}"
 
 /**
  * Prompt for extracting product ID and price from natural Thai voice input
+ * Fine-tuned for Manowzab Shop (V4.5 - Based on actual live captions)
  * Used in: extractPriceFromVoice()
  */
-const PROMPT_VOICE_EXTRACTION = (text) => `
-Role: You are a Thai voice commerce assistant for a live clothing shop (Manowzab). 
-Your task is to extract product ID, price, and size measurements from natural Thai speech.
+const PROMPT_VOICE_EXTRACTION = (text, contextId = null) => `
+Role: You are a smart Thai voice commerce assistant for "Manowzab Shop" (Second-hand clothing live stream).
+Your task is to extract **Product ID**, **Price**, and **Size** from the transcriber output, which often contains errors and glued numbers.
 
-Key Patterns:
-- **Product ID**: Can be a number (e.g., 53, 680), alphanumeric (e.g., A1, CF10), or words like "ตัวนี้", "รายการนี้"
-- **Price**: Numbers followed by "บาท", Thai number words (e.g., "ร้อยเดียว" = 100, "แปดสิบ" = 80, "ห้าร้อย" = 500), or standalone numbers near price keywords
-- **Size**: Chest/Bust (อก, รอบอก, ตึงหน้าผ้า) or Length (ยาว, ความยาว) measurements. Can be single numbers or ranges (e.g., "52 54" or "52-54")
+Current Context:
+${contextId ? `- **FOCUSED ITEM ID**: ${contextId} (Use this if user says price/size without a new ID)` : "- No active item context."}
 
-Important Rules:
-1. EXTRACT size measurements like "อก 52", "อก 52 54", "ยาว 40" into the size field (NOT id or price)
-2. IGNORE color/fabric words like "สีดำ", "ผ้าเด้ง"
-3. If you see "รายการที่ X" or "เบอร์ X" or "รหัส X", extract X as the ID
-4. For "ตัวนี้" without a number, return id as "current" (means current/selected item)
-5. Thai number words: "ร้อยเดียว"=100, "สองร้อย"=200, "แปดสิบ"=80, "เจ็ดสิบ"=70, etc.
-6. **CRITICAL**: If the pattern is "[Number A] [Number B] บาท" (e.g., "21 50 บาท"), Number A is the ID and Number B is the Price
+**Specific Logic for Manowzab Shop:**
+1. **GLUED NUMBERS (CRITICAL)**: The speaker speaks fast, causing ID and Price to merge.
+   - If you see a 3-4 digit number ending in **30, 50, 60, 80**, SPLIT IT.
+   - Examples:
+     - "1180" -> ID: 11, Price: 80
+     - "2180" -> ID: 21, Price: 80
+     - "3950" -> ID: 39, Price: 50
+     - "4960" -> ID: 49, Price: 60
+     - "3830" -> ID: 38, Price: 30
+   - *Exception*: "100" is usually just Price 100.
+
+2. **Sequence Rule**: If two distinct numbers appear near each other, the **First is ID**, **Second is Price**.
+   - "21 80 บาท" -> ID: 21, Price: 80
+   - "46 50" -> ID: 46, Price: 50
+
+3. **Ignore Noise & Hallucinations**:
+   - IGNORE these misheard words: "poโพิเตอร์", "poat", "poor", "โพลิเลอเตอร์", "คุณแม่", "พี่", "ส่งสติ๊กเกอร์", "สวย".
+   - IGNORE "รหัส" or "รายการที่" if they just precede a number (just take the number).
+
+4. **Size Ranges**:
+   - Patterns like "54 56", "54 ได้ 56 ได้" -> Size: "อก 54-56"
+   - "อก 40 ยาว 28" -> Size: "อก 40 ยาว 28"
+
+5. **Self-Correction**:
+   - If the user repeats a number for the same category, use the **last mentioned** value.
+   - "47 ราคา 5 ราคา 60 บาท" -> ID: 47, Price: 60 (Ignore 5).
+
+6. **Price Defaults**:
+   - Common prices in this shop are **30, 50, 60, 80, 100**. If a number matches these and appears after an ID, it is 99% the Price.
 
 Response Format (JSON only):
 {"id": number|string|null, "price": number|null, "size": string|null}
-
-Examples:
-- "ตัวนี้ ร้อยเดียว" → {"id": "current", "price": 100, "size": null}
-- "รายการที่ 53 แปดสิบบาท" → {"id": 53, "price": 80, "size": null}
-- "รหัส A1 ห้าร้อย" → {"id": "A1", "price": 500, "size": null}
-- "680" → {"id": 6, "price": 80, "size": null}
-- "21 50 บาท" → {"id": 21, "price": 50, "size": null}
-- "อก 52 54 ราคา 100" → {"id": null, "price": 100, "size": "อก 52-54"}
-- "อก 52 ยาว 40 ราคา 80" → {"id": null, "price": 80, "size": "อก 52 ยาว 40"}
 
 Input Message: "${text}"
 `;
@@ -246,7 +258,7 @@ export function useOllama() {
     }
   }
 
-  async function extractPriceFromVoice(text) {
+  async function extractPriceFromVoice(text, contextId = null) {
     // Set status to 'working' at the start
     systemStore.statusOllama = "working";
 
@@ -263,7 +275,7 @@ export function useOllama() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: modelName.value,
-          prompt: PROMPT_VOICE_EXTRACTION(text),
+          prompt: PROMPT_VOICE_EXTRACTION(text, contextId),
           format: "json",
           stream: false,
         }),

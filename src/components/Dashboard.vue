@@ -6,6 +6,26 @@
         <button class="btn btn-dark" @click="$emit('close')">ปิด</button>
       </div>
 
+      <!-- Sales Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-value-row">
+            <span class="stat-label-inline">ขายแล้ว:</span>
+            <span class="main-number">{{ totalCF }}/{{ totalItems }}</span>
+            
+            <div class="progress-track">
+              <div class="progress-fill" :style="{ width: percentage + '%' }">
+                <div class="shimmer"></div>
+              </div>
+            </div>
+            
+            <div class="percent-text" :class="percentageColorClass">
+              {{ Math.round(percentage) }}% {{ motivationalEmoji }}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style="overflow-x: auto; flex: 1">
         <table class="shipping-table">
           <thead>
@@ -273,6 +293,37 @@ const notReadyCustomers = computed(() => {
     }));
 });
 
+// Sales Stats
+const totalCF = computed(() => {
+  return Object.values(stockStore.stockData).filter(item => item?.owner).length;
+});
+
+const totalItems = computed(() => {
+  return stockStore.stockSize || 0;
+});
+
+const percentage = computed(() => {
+  if (totalItems.value === 0) return 0;
+  return (totalCF.value / totalItems.value) * 100;
+});
+
+const motivationalEmoji = computed(() => {
+  const pct = percentage.value;
+  if (pct === 0) return "✌️";
+  if (pct <= 20) return "✌️";
+  if (pct <= 50) return "🔥";
+  if (pct <= 80) return "🚀";
+  return "💰";
+});
+
+const percentageColorClass = computed(() => {
+  const pct = percentage.value;
+  if (pct <= 20) return "color-low";
+  if (pct <= 50) return "color-medium";
+  if (pct <= 80) return "color-high";
+  return "color-complete";
+});
+
 function addToShipping() {
   if (!selectedCustomer.value) return;
 
@@ -446,4 +497,141 @@ onMounted(() => {
   flex-direction: column;
   padding: 20px;
 }
+
+/* Stats Section */
+.stats-section {
+  padding: 15px 0;
+  border-bottom: 1px solid #333;
+}
+
+.stat-card {
+  background: #1e1e1e;
+  border-radius: 8px;
+  padding: 12px 20px;
+  border: 1px solid #333;
+  min-width: 400px;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #999;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.stat-label-inline {
+  font-size: 1rem;
+  color: #999;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.stat-value-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: nowrap;
+}
+
+.main-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #00e676;
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.progress-track {
+  width: 120px;
+  height: 10px;
+  background: #374151;
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff6b35 0%, #ff4500 50%, #d32f2f 100%);
+  border-radius: 999px;
+  transition: width 0.6s ease-out;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(255, 107, 53, 0.5);
+}
+
+.shimmer {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.percent-text {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.percent-text.color-low {
+  color: #9ca3af;
+}
+
+.percent-text.color-medium {
+  color: #fbbf24;
+}
+
+.percent-text.color-high {
+  color: #fb923c;
+}
+
+.percent-text.color-complete {
+  color: #10b981;
+}
+
+@media (max-width: 600px) {
+  .stat-card {
+    min-width: unset;
+  }
+  
+  .stat-value-row {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  
+  .main-number {
+    font-size: 1.5rem;
+  }
+  
+  .progress-track {
+    width: 80px;
+  }
+  
+  .percent-text {
+    font-size: 0.75rem;
+  }
+}
+
 </style>

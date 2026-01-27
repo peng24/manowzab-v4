@@ -18,8 +18,17 @@
       </div>
 
       <div class="header-center stock-stats">
-        ขายแล้ว: <span class="stat-sold">{{ soldCount }}</span>
-        <span style="opacity: 0.5">/ {{ stockStore.stockSize }}</span>
+        <span class="stats-label">ขายแล้ว:</span>
+        <span class="stat-sold">{{ soldCount }}</span>
+        <span style="opacity: 0.5">/{{ stockStore.stockSize }}</span>
+        
+        <div class="progress-bar-container">
+          <div class="progress-bar" :style="{ width: soldPercentage + '%', background: progressBarColor }">
+            <div class="progress-shimmer"></div>
+          </div>
+        </div>
+        
+        <span class="percentage-text">{{ soldPercentage }}% {{ motivationalText }}</span>
       </div>
 
       <div></div>
@@ -171,6 +180,28 @@ let draggingIndex = null;
 const soldCount = computed(
   () => Object.values(stockStore.stockData).filter((item) => item.owner).length
 );
+
+const soldPercentage = computed(() => {
+  if (stockStore.stockSize === 0) return 0;
+  return Math.round((soldCount.value / stockStore.stockSize) * 100);
+});
+
+const motivationalText = computed(() => {
+  const percentage = soldPercentage.value;
+  if (percentage === 0) return "✌️ เริ่มต้นกันเลย!";
+  if (percentage <= 20) return "✌️ เริ่มต้นกันเลย!";
+  if (percentage <= 50) return "🔥 ไฟเริ่มติดแล้ว!";
+  if (percentage <= 80) return "🚀 ยอดพุ่งมากแม่!";
+  if (percentage < 100) return "💎 จะหมดแล้ว!";
+  return "🎉 ปังปุริเย่ หมดเกลี้ยง!";
+});
+
+const progressBarColor = computed(() => {
+  const percentage = soldPercentage.value;
+  if (percentage <= 30) return "linear-gradient(90deg, #ff6b35 0%, #ff4500 100%)"; // ส้ม-แดง
+  if (percentage <= 60) return "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)"; // เหลือง-ส้ม
+  return "linear-gradient(90deg, #10b981 0%, #059669 100%)"; // เขียว
+});
 
 const uniqueBuyerNames = computed(() => {
   const names = new Set();
@@ -394,6 +425,100 @@ function confirmClear() {
   font-size: 1.1em;
   font-weight: 600;
   color: var(--text-secondary);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.stats-label {
+  color: #999;
+  font-size: 0.95em;
+  white-space: nowrap;
+}
+
+.stat-sold {
+  color: #00e676;
+  font-size: 1.8em;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
+  margin: 0 3px;
+}
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.motivational-text {
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #ffd700;
+  text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+  animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.progress-bar-container {
+  width: 100px;
+  max-width: 100px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.6s ease-out, background 0.6s ease-out;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(255, 107, 53, 0.5);
+}
+
+.progress-shimmer {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.percentage-text {
+  font-size: 0.95em;
+  font-weight: 700;
+  color: #ffd700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Animations */

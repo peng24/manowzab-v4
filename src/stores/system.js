@@ -13,6 +13,7 @@ export const useSystemStore = defineStore("system", () => {
   const isAway = ref(false); // สถานะโหมดพาลูกนอน
   const isSoundOn = ref(true); // ✅ เปิด/ปิดเสียง
   const isHost = ref(false); // ✅ สถานะเครื่องแม่ข่าย (Host)
+  const isAiEnabled = ref(true); // ✅ เปิด/ปิด AI Assist สำหรับ Voice Detection
 
   // Status Indicators (ok, warn, err, working)
   const statusDb = ref("err");
@@ -25,7 +26,7 @@ export const useSystemStore = defineStore("system", () => {
 
   // Device Identity
   const myDeviceId = ref(
-    localStorage.getItem("device_id") || `device-${Date.now()}`
+    localStorage.getItem("device_id") || `device-${Date.now()}`,
   );
   if (!localStorage.getItem("device_id")) {
     localStorage.setItem("device_id", myDeviceId.value);
@@ -39,6 +40,10 @@ export const useSystemStore = defineStore("system", () => {
     if (type === "api") statusApi.value = status;
     if (type === "chat") statusChat.value = status;
     if (type === "ollama") statusOllama.value = status;
+  }
+
+  function toggleAi() {
+    isAiEnabled.value = !isAiEnabled.value;
   }
 
   // ✅ Host Listener (Take Over Logic)
@@ -68,6 +73,7 @@ export const useSystemStore = defineStore("system", () => {
     isAway,
     isSoundOn, // ✅ Export
     isHost, // ✅ Export
+    isAiEnabled, // ✅ Export
     statusDb,
     statusApi,
     statusChat,
@@ -76,6 +82,7 @@ export const useSystemStore = defineStore("system", () => {
     myDeviceId,
     version,
     setStatus,
+    toggleAi,
     initHostListener, // ✅ Export
   };
 });

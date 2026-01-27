@@ -1,5 +1,6 @@
 import { ref, onUnmounted } from 'vue';
 import { useStockStore } from '../stores/stock';
+import { useSystemStore } from '../stores/system';
 import { useAudio } from './useAudio';
 import { useVoiceLogger } from './useVoiceLogger';
 import { useOllama } from './useOllama';
@@ -55,6 +56,7 @@ const CONFIG = {
 export function useVoiceDetector() {
     // Dependencies
     const stockStore = useStockStore();
+    const systemStore = useSystemStore();
     const { playDing } = useAudio();
     const { logEvent } = useVoiceLogger();
     const { extractPriceFromVoice } = useOllama();
@@ -271,8 +273,8 @@ export function useVoiceDetector() {
         }
 
         // --- STEP 4: AI FALLBACK (Smart Hybrid Approach) ---
-        // Only activate AI if regex failed to detect ID AND text is substantial
-        if (detected.id === null && rawText.length > 5) {
+        // Only activate AI if regex failed to detect ID AND text is substantial AND AI is enabled
+        if (detected.id === null && rawText.length > 5 && systemStore.isAiEnabled) {
             // Debounce: Wait 800ms before calling Ollama
             // This prevents spamming the AI when user is still speaking
             aiDebounceTimer = setTimeout(async () => {
@@ -335,6 +337,11 @@ export function useVoiceDetector() {
             }, 800);
             
             // Return early - AI will execute action when ready
+            return;
+        } else if (detected.id === null && rawText.length > 5 && !systemStore.isAiEnabled) {
+            // AI is disabled - log and skip
+            console.log("⚠️ AI Disabled - No ID detected by regex");
+            logEvent({ raw: rawText, cleaned: cleanText, output: null, logic: "AI-Disabled", status: "IGNORED" });
             return;
         }
 

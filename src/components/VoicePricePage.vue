@@ -17,6 +17,19 @@
             }}</span>
           </div>
 
+          <!-- AI Assist Toggle -->
+          <div class="ai-toggle-wrapper">
+            <span class="toggle-label">AI Assist</span>
+            <label class="toggle-switch">
+              <input
+                type="checkbox"
+                v-model="systemStore.isAiEnabled"
+                @change="onAiToggleChange"
+              />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
           <span class="video-id" v-if="systemStore.currentVideoId">
             ID: {{ systemStore.currentVideoId }}
           </span>
@@ -453,6 +466,14 @@ function updateTime() {
   });
 }
 
+function onAiToggleChange() {
+  if (systemStore.isAiEnabled) {
+    console.log("✅ AI Assist Enabled");
+  } else {
+    console.log("⚠️ AI Assist Disabled - Regex only");
+  }
+}
+
 onMounted(() => {
   updateTime();
   timer = setInterval(updateTime, 1000);
@@ -606,6 +627,74 @@ onUnmounted(() => {
   background: rgba(156, 163, 175, 0.05);
   border-color: rgba(156, 163, 175, 0.2);
 }
+
+/* AI Toggle */
+.ai-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toggle-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.5px;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #4b5563;
+  transition: 0.3s;
+  border-radius: 34px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #10b981;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.toggle-slider:hover {
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
 
 /* Main */
 .main-content {

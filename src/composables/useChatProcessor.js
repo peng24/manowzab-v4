@@ -6,6 +6,7 @@ import { useAudio } from "./useAudio";
 import { ref as dbRef, onValue, set, update, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
+import Swal from "sweetalert2";
 
 // Logger Config
 const DEBUG_MODE = true;
@@ -53,6 +54,19 @@ const explicitBuyRegex = /(?:F|f|cf|CF|รับ|เอา)\s*(\d+)/;
 const dashBuyRegex = /^(?:.+?)\s*[-]\s*(\d+)$/;
 const cancelRegex = /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i; // Flexible: "cancel 46" or "46 cancel"
 const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
+
+// ✅ Toast Notification Mixin
+const Toast = Swal.mixin({
+  toast: true,
+  position: 'top-end',
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+  didOpen: (toast) => {
+    toast.addEventListener('mouseenter', Swal.stopTimer);
+    toast.addEventListener('mouseleave', Swal.resumeTimer);
+  }
+});
 
 export function useChatProcessor() {
   const stockStore = useStockStore();
@@ -191,6 +205,12 @@ export function useChatProcessor() {
             "multi-buy"
           );
         }
+
+        // ✅ Show Success Toast
+        Toast.fire({
+          icon: 'success',
+          title: `✅ ตัดรหัส ${itemIds.join(', ')} ให้ ${ownerName} แล้ว`
+        });
 
         // Add a summary message to chat
         chatStore.addMessage({
@@ -371,6 +391,12 @@ export function useChatProcessor() {
         targetPrice,
         method
       );
+
+      // ✅ Show Success Toast (Non-blocking)
+      Toast.fire({
+        icon: 'success',
+        title: `✅ ตัดรหัส ${targetId} ให้ ${ownerName} แล้ว`
+      });
 
       playDing();
       speak(displayName, msg);

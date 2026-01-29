@@ -76,6 +76,10 @@
         }}
       </button>
 
+      <button class="btn btn-dark" @click="reloadPage" title="Reload Page">
+        <i class="fa-solid fa-rotate-right"></i>
+      </button>
+
       <div class="dropdown" ref="dropdownRef">
         <button class="btn btn-sim" @click.stop="toggleDropdown">
           ⚡ Tools <i class="fa-solid fa-caret-down"></i>
@@ -563,6 +567,10 @@ function forceUpdate() {
 
 function getVersionTooltip() {
   return `Manowzab Command Center ${systemStore.version}`;
+}
+
+function reloadPage() {
+  window.location.reload();
 }
 
 function showChangelog() {

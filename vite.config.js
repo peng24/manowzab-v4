@@ -14,7 +14,7 @@ export default defineConfig({
         short_name: "Manowzab",
         description: "ระบบจัดการหลังบ้าน Manowzab",
         theme_color: "#121212",
-        background_color: "#121212",
+        background_color: "#0f172a",
         display: "standalone",
         icons: [
           {

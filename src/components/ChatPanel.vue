@@ -27,7 +27,7 @@
     <div id="chat-viewport" ref="chatViewport" @scroll="handleScroll">
       <div id="chat-list">
         <div
-          v-for="chat in chatStore.messages"
+          v-for="chat in visibleMessages"
           :key="chat.id"
           :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type]"
         >
@@ -75,7 +75,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
@@ -92,6 +92,11 @@ const { resetVoice } = useAudio();
 const chatViewport = ref(null);
 const showScrollButton = ref(false);
 let isUserScrolling = false;
+
+// 🚀 Performance: Render only the last 200 messages to prevent UI lag
+const visibleMessages = computed(() => {
+  return chatStore.messages.slice(-200);
+});
 
 function formatTime(timestamp) {
   if (!timestamp) return "";

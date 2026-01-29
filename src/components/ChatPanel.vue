@@ -25,7 +25,7 @@
     </div>
 
     <div id="chat-viewport" ref="chatViewport" @scroll="handleScroll">
-      <div id="chat-list">
+      <TransitionGroup name="chat-list" tag="div" id="chat-list">
         <div
           v-for="chat in visibleMessages"
           :key="chat.id"
@@ -48,6 +48,7 @@
               >
                 {{ chat.displayName }}
               </span>
+              <span v-if="chat.isAdmin" class="admin-badge">ADMIN</span>
               <span v-if="chat.realName !== chat.displayName" class="real-name">
                 ({{ chat.realName }})
               </span>
@@ -65,7 +66,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </TransitionGroup>
     </div>
 
     <button v-if="showScrollButton" class="new-msg-btn" @click="scrollToBottom">
@@ -342,12 +343,25 @@ function exportCSV() {
   display: flex;
   align-items: flex-start;
   gap: 5px; /* ✅ Reduced gap */
-  animation: fadeIn 0.3s ease-out;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* ✅ TransitionGroup Animations */
+.chat-list-enter-active {
+  transition: all 0.4s ease-out;
+}
+
+.chat-list-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.chat-list-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.chat-list-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
 }
 
 .avatar-container {
@@ -402,6 +416,17 @@ function exportCSV() {
   font-size: 0.9em;
 }
 
+.admin-badge {
+  background-color: #f59e0b; /* Gold background */
+  color: #000; /* Black text */
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 0.75em;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .chat-bubble {
   background-color: #1e293b; /* Bubble Color */
   color: #f1f5f9;
@@ -415,13 +440,17 @@ function exportCSV() {
 
 /* Special Types */
 .chat-row.buy .chat-bubble {
-  background-color: #064e3b; /* Green for Buy */
-  border: 1px solid #059669;
+  background-color: rgba(6, 78, 59, 0.4); /* Semi-transparent green */
+  border: 2px solid #10b981; /* Brighter green border */
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3); /* Subtle green glow */
+  color: #f1f5f9; /* Ensure white text */
 }
 
 .chat-row.cancel .chat-bubble {
-  background-color: #7f1d1d; /* Red for Cancel */
-  border: 1px solid #dc2626;
+  background-color: rgba(127, 29, 29, 0.4); /* Semi-transparent red */
+  border: 2px solid #ef4444; /* Brighter red border */
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3); /* Subtle red glow */
+  color: #f1f5f9; /* Ensure white text */
 }
 
 /* Shipping removed - uses default blue */
@@ -464,25 +493,45 @@ function exportCSV() {
 
 .new-msg-btn {
   position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 80px; /* ✅ Moved up from bottom */
+  right: 20px; /* ✅ Floating action button style */
   background-color: #3b82f6;
   color: white;
   border: none;
-  padding: 8px 16px;
-  border-radius: 20px;
+  padding: 10px 18px;
+  border-radius: 25px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
   z-index: 20;
   animation: bounce 2s infinite;
+  transition: all 0.3s ease;
+}
+
+.new-msg-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.6);
 }
 
 @keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {transform: translateX(-50%) translateY(0);}
-  40% {transform: translateX(-50%) translateY(-5px);}
-  60% {transform: translateX(-50%) translateY(-3px);}
+  0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+  40% {transform: translateY(-5px);}
+  60% {transform: translateY(-3px);}
+}
+
+/* ✅ Mobile Responsive */
+@media (max-width: 768px) {
+  .avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .new-msg-btn {
+    bottom: 70px;
+    right: 15px;
+    padding: 8px 14px;
+    font-size: 0.9em;
+  }
 }
 
 /* Scrollbar */

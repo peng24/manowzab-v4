@@ -44,7 +44,8 @@ import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
 import { useNicknameStore } from "./stores/nickname";
 import { ref as dbRef, onValue, onDisconnect, set } from "firebase/database";
-import { db } from "./composables/useFirebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { db, auth } from "./composables/useFirebase";
 import { useAudio } from "./composables/useAudio";
 import { useAwayMode } from "./composables/useAwayMode";
 import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup
@@ -157,13 +158,13 @@ provide("openHistory", () => (showHistory.value = true));
   systemStore.statusApi = "idle";
   systemStore.statusChat = "idle";
 
-  // ✅ Firebase Connection Status
-  const connectedRef = dbRef(db, ".info/connected");
-  const unsubConnected = onValue(connectedRef, (snap) => {
-    if (snap.val() === true) {
-      systemStore.statusDb = "ok";
-      console.log("✅ Firebase Connected");
+  // ✅ Track connection and auth state separately
+  const isDbConnected = ref(false);
+  const isUserAuthenticated = ref(false);
 
+  // ✅ Setup presence only when BOTH conditions are met
+  function setupPresence() {
+    if (isDbConnected.value && isUserAuthenticated.value) {
       const myConnectionRef = dbRef(db, `presence/${systemStore.myDeviceId}`);
       set(myConnectionRef, {
         online: true,
@@ -171,12 +172,33 @@ provide("openHistory", () => (showHistory.value = true));
       }).catch((err) => console.error("Presence error:", err));
 
       onDisconnect(myConnectionRef).remove();
+      console.log("✅ Presence setup complete");
+    }
+  }
+
+  // ✅ Firebase Connection Status
+  const connectedRef = dbRef(db, ".info/connected");
+  const unsubConnected = onValue(connectedRef, (snap) => {
+    if (snap.val() === true) {
+      systemStore.statusDb = "ok";
+      console.log("✅ Firebase Connected");
+      isDbConnected.value = true;
+      setupPresence();
     } else {
       systemStore.statusDb = "err";
       console.log("❌ Firebase Disconnected");
+      isDbConnected.value = false;
     }
   });
   cleanupFns.push(unsubConnected);
+
+  // ✅ Auth State Listener
+  const unsubAuth = onAuthStateChanged(auth, (user) => {
+    isUserAuthenticated.value = !!user;
+    console.log(`✅ Auth state changed: ${user ? 'authenticated' : 'not authenticated'}`);
+    setupPresence();
+  });
+  cleanupFns.push(unsubAuth);
 
   // System Listeners
   const unsubActiveVideo = onValue(dbRef(db, "system/activeVideo"), (snap) => {

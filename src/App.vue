@@ -50,6 +50,7 @@ import { useAudio } from "./composables/useAudio";
 import { useAwayMode } from "./composables/useAwayMode";
 import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup
 import { useOllama } from "./composables/useOllama"; // ✅ Import Ollama
+import { usePullToRefresh } from "./composables/usePullToRefresh"; // ✅ Import Pull to Refresh
 import Header from "./components/Header.vue";
 import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
@@ -102,6 +103,9 @@ provide("openHistory", () => (showHistory.value = true));
 
   onMounted(() => {
     console.log("🚀 App mounted");
+
+    // ✅ Enable Pull to Refresh for PWA
+    usePullToRefresh();
 
     // ✅ Check Ollama connection on startup
     checkConnection();

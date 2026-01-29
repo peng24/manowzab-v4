@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
+import pkg from "../../package.json";
 
 export const useSystemStore = defineStore("system", () => {
   // State
@@ -32,7 +33,7 @@ export const useSystemStore = defineStore("system", () => {
     localStorage.setItem("device_id", myDeviceId.value);
   }
 
-  const version = ref("v4.6.5");
+  const version = ref("v" + pkg.version);
 
   // Actions
   function setStatus(type, status) {

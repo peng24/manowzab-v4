@@ -42,6 +42,18 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
   }
 });
 
+// 🚀 Performance: Regex patterns at module level to prevent recreation on every message
+const multiBuyRegex = /^(\d+(?:\s+\d+)+)(?:\s+(.*))?$/; // Multi-Buy: "26 38 74" or "26 38 74 ClientName"
+const adminProxyRegex = /^(\d+)\s+(.+)$/;
+const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
+const questionRegex =
+  /อก|เอว|ยาว|ราคา|เท่าไหร่|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
+const pureNumberRegex = /^\s*(\d+)\s*$/;
+const explicitBuyRegex = /(?:F|f|cf|CF|รับ|เอา)\s*(\d+)/;
+const dashBuyRegex = /^(?:.+?)\s*[-]\s*(\d+)$/;
+const cancelRegex = /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i; // Flexible: "cancel 46" or "46 cancel"
+const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
+
 export function useChatProcessor() {
   const stockStore = useStockStore();
   const chatStore = useChatStore();
@@ -126,53 +138,104 @@ export function useChatProcessor() {
     // --- LOGIC V2: Prioritized Flow ---
 
     // 0. Admin Proxy Logic (Highest Priority for Admin)
-    const adminProxyRegex = /^(\d+)\s+(.+)$/;
     let forcedOwnerName = null;
 
     // 1. Shipping / Transfer (Highest Priority for flow control)
-    const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
-    
+
     // 2. Questions (Preserve existing logic)
-    const questionRegex =
-      /อก|เอว|ยาว|ราคา|เท่าไหร่|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
 
     // 3. Strict "Pure Number" Logic (Pattern: just digits)
-    const pureNumberRegex = /^\s*(\d+)\s*$/;
 
     // 4. Explicit "Buy Pattern" Logic (Prefix + Number)
     // Matches: F 50, cf 50, รับ 50, f50 (case insensitive)
-    const explicitBuyRegex = /(?:F|f|cf|CF|รับ|เอา)\s*(\d+)/;
 
     // 5. Dash Buy Pattern (Name-Number)
-    const dashBuyRegex = /^(?:.+?)\s*[-]\s*(\d+)$/;
 
     // 6. Cancel Logic (Refined - supports dash)
-    const cancelRegex = /(?:^|\s)(?:cc|CC|cancel|ยกเลิก|ไม่เอา|หลุด)\s*(?:[-]\s*)?(\d+)/;
 
     // 7. Implicit "Current Item" Logic (Keyword ONLY)
     // Matches: "รับ", "เอา", "F", "cf" (standing alone or surrounded by spaces)
-    const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
+
 
     // --- Execution ---
-    
-    // Special Check for Admin Proxy
+
+    // 🔥 HIGHEST PRIORITY: Multi-Buy Logic (before all other checks)
+    // Handles "26 38 74" or "26 38 74 ClientName"
+    const matchMultiBuy = msg.match(multiBuyRegex);
+    if (matchMultiBuy) {
+      const numbersStr = matchMultiBuy[1]; // "26 38 74"
+      const proxyName = matchMultiBuy[2] ? matchMultiBuy[2].trim() : null; // Optional client name
+
+      // Parse all IDs
+      const itemIds = numbersStr.split(/\s+/).map(n => parseInt(n)).filter(n => n > 0 && n <= stockStore.stockSize);
+
+      if (itemIds.length > 0) {
+        // Determine owner name and UID
+        let ownerName = displayName;
+        let ownerUid = uid;
+
+        if (proxyName && isAdmin) {
+          // Admin Proxy Mode
+          ownerName = proxyName;
+          ownerUid = "multi-proxy-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+        }
+
+        // Process all orders
+        for (const itemId of itemIds) {
+          await stockStore.processOrder(
+            itemId,
+            ownerName,
+            ownerUid,
+            "chat",
+            null, // No price for multi-buy
+            "multi-buy"
+          );
+        }
+
+        // Add a summary message to chat
+        chatStore.addMessage({
+          id: item.id,
+          text: msg,
+          authorName: realName,
+          displayName,
+          realName: realName,
+          uid: uid,
+          avatar,
+          color: stringToColor(uid),
+          isAdmin,
+          type: "buy",
+          detectionMethod: "multi-buy",
+          timestamp: new Date(item.snippet.publishedAt).getTime(),
+        });
+
+        // Play audio once
+        playDing();
+        const { speak } = useAudio();
+        speak(displayName, `ซื้อ ${itemIds.length} รายการ: ${itemIds.join(", ")}`);
+
+        // Exit early - don't process further
+        return;
+      }
+    }
+
+    // Special Check for Admin Proxy (Single Item)
     if (isAdmin && adminProxyRegex.test(msg)) {
-       const matchProxy = msg.match(adminProxyRegex);
-       intent = "buy";
-       targetId = parseInt(matchProxy[1]);
-       forcedOwnerName = matchProxy[2].trim();
-       method = "admin-proxy";
+      const matchProxy = msg.match(adminProxyRegex);
+      intent = "buy";
+      targetId = parseInt(matchProxy[1]);
+      forcedOwnerName = matchProxy[2].trim();
+      method = "admin-proxy";
     }
     else if (shippingRegex.test(msg)) {
       intent = "shipping";
       method = "regex-ship";
     } else if (questionRegex.test(msg)) {
-      // It's a question. Check if it accidentally contains a pure number? 
+      // It's a question. Check if it accidentally contains a pure number?
       // Rule 6 says preserve question detection.
       // But Rule 5 says ignore embedded numbers. 
       // If it matches Pure Number, it is NOT a question usually (e.g. "34"). 
       // If it says "อก 34" -> Question regex matches "อก". 
-      method = "question-skip"; 
+      method = "question-skip";
     } else {
       // Regex Matching
       const matchPure = msg.match(pureNumberRegex);
@@ -182,9 +245,10 @@ export function useChatProcessor() {
       const matchImplicit = msg.match(implicitBuyRegex);
 
       if (matchCancel) {
-        // Priority: Cancel
+        // Priority: Cancel (Flexible - supports both "cancel 46" and "46 cancel")
         intent = "cancel";
-        targetId = parseInt(matchCancel[1]);
+        // Check both groups: Group 1 for prefix pattern, Group 2 for suffix pattern
+        targetId = parseInt(matchCancel[1] || matchCancel[2]);
         method = "regex-cancel";
       } else if (matchPure) {
         // Priority: Pure Number
@@ -209,9 +273,9 @@ export function useChatProcessor() {
         // Priority: Implicit Buy (Context Aware)
         // Only if we know what the current item is
         if (currentOverlayItem.value) {
-           intent = "buy";
-           targetId = parseInt(currentOverlayItem.value);
-           method = "regex-implicit";
+          intent = "buy";
+          targetId = parseInt(currentOverlayItem.value);
+          method = "regex-implicit";
         }
       }
     }
@@ -267,7 +331,7 @@ export function useChatProcessor() {
     });
 
     // 5. Process Order & Audio Logic (Updated for TextToSpeech Service)
-    const { speak } = useAudio(); 
+    const { speak } = useAudio();
 
     if (intent === "buy" && targetId > 0 && targetId <= stockStore.stockSize) {
       // --- Buy Logic ---
@@ -275,9 +339,9 @@ export function useChatProcessor() {
       let ownerUid = uid;
 
       if (forcedOwnerName) {
-         // Admin Proxy Mode 
-         ownerName = forcedOwnerName;
-         ownerUid = "proxy-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+        // Admin Proxy Mode 
+        ownerName = forcedOwnerName;
+        ownerUid = "proxy-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
       } else if (isAdmin) {
         // Regular Admin Mode (buying for self or using F syntax)
         // Clean Name Logic
@@ -308,7 +372,7 @@ export function useChatProcessor() {
         method
       );
 
-      playDing(); 
+      playDing();
       speak(displayName, msg);
 
     } else if (intent === "cancel" && targetId > 0) {

@@ -231,7 +231,7 @@ export function useChatProcessor() {
         // Play audio once
         playDing();
         const { speak } = useAudio();
-        speak(displayName, `ซื้อ ${itemIds.length} รายการ: ${itemIds.join(", ")}`);
+        speak(displayName, `${msg} ... จองทั้งหมด ${itemIds.length} รายการ`);
 
         // Exit early - don't process further
         return;

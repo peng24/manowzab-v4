@@ -46,6 +46,7 @@ import { useNicknameStore } from "./stores/nickname";
 import { ref as dbRef, onValue, onDisconnect, set } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "./composables/useFirebase";
+import { logger } from "./utils/logger"; // ✅ Import Logger
 import { useAudio } from "./composables/useAudio";
 import { useAwayMode } from "./composables/useAwayMode";
 import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup
@@ -181,17 +182,28 @@ provide("openHistory", () => (showHistory.value = true));
   }
 
   // ✅ Firebase Connection Status
+  let hasConnectedOnce = false;
   const connectedRef = dbRef(db, ".info/connected");
   const unsubConnected = onValue(connectedRef, (snap) => {
-    if (snap.val() === true) {
+    const isOnline = snap.val() === true;
+    
+    if (isOnline) {
+      hasConnectedOnce = true;
       systemStore.statusDb = "ok";
-      console.log("✅ Firebase Connected");
+      logger.log("✅ Firebase Connected");
       isDbConnected.value = true;
       setupPresence();
     } else {
       systemStore.statusDb = "err";
-      console.log("❌ Firebase Disconnected");
       isDbConnected.value = false;
+      
+      // Only log warning if we were previously connected
+      if (hasConnectedOnce) {
+        logger.warn("❌ Firebase Disconnected");
+      } else {
+        // Silent debug log for initial connecting state
+        console.debug("⏳ Connecting to Firebase...");
+      }
     }
   });
   cleanupFns.push(unsubConnected);
@@ -247,10 +259,18 @@ provide("openHistory", () => (showHistory.value = true));
 @import "./assets/style.css";
 
 .app-container {
-  height: 100vh;
+  height: 100%;
+  width: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
+  
+  /* iOS Safe Area Support */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-top: env(safe-area-inset-top);
 }
 
 .away-banner {

@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
+import { logger } from "../utils/logger";
 
 export const useNicknameStore = defineStore("nickname", () => {
   const nicknames = ref({});
@@ -11,7 +12,7 @@ export const useNicknameStore = defineStore("nickname", () => {
     return onValue(dbRef(db, "nicknames"), (snapshot) => {
       const data = snapshot.val() || {};
       nicknames.value = data;
-      console.log("📝 Nicknames updated:", Object.keys(data).length);
+      logger.debug("📝 Nicknames updated:", Object.keys(data).length);
     });
   }
 

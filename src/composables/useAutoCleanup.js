@@ -14,12 +14,12 @@ export function useAutoCleanup() {
         const isAdmin = systemStore.isAiCommander || localStorage.getItem("isAdmin") === "true";
 
         if (!isAdmin) {
-            console.log("🧹 Auto Cleanup: Skipped (Not Admin)");
+            // Silent skip - no need to log this
             return;
         }
 
         // 2. Delay to avoid network contention at startup
-        console.log(`⏳ Auto Cleanup: Waiting ${CONSTANTS.CLEANUP.STARTUP_DELAY_MS / 1000}s before check...`);
+        console.debug(`⏳ Auto Cleanup: Waiting ${CONSTANTS.CLEANUP.STARTUP_DELAY_MS / 1000}s before check...`);
         const timerId = setTimeout(async () => {
             await performCleanup();
         }, CONSTANTS.CLEANUP.STARTUP_DELAY_MS);

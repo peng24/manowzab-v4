@@ -14,4 +14,7 @@ export const logger = {
     // Error ควรแสดงเสมอ เพื่อให้เรารู้ว่ามีปัญหา
     console.error(...args);
   },
+  debug: (...args) => {
+    if (DEBUG_MODE) console.debug(...args);
+  },
 };

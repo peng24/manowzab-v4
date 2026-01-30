@@ -16,6 +16,12 @@ export const useSystemStore = defineStore("system", () => {
   const isHost = ref(false); // ✅ สถานะเครื่องแม่ข่าย (Host)
   const isAiEnabled = ref(true); // ✅ เปิด/ปิด AI Assist สำหรับ Voice Detection
 
+  // ✅ Google Cloud TTS API Key - Load from .env only
+  const googleApiKey = ref(import.meta.env.VITE_GOOGLE_API_KEYS || '');
+
+  const useOnlineTts = ref(true); // ✅ เปิด/ปิด Online TTS (Google Cloud) - Default ON
+  const activeKeyIndex = ref(1); // ✅ Track which API key is currently active
+
   // Status Indicators (ok, warn, err, working)
   const statusDb = ref("err");
   const statusApi = ref("ok");
@@ -85,5 +91,8 @@ export const useSystemStore = defineStore("system", () => {
     setStatus,
     toggleAi,
     initHostListener, // ✅ Export
+    googleApiKey, // ✅ Export (from .env)
+    useOnlineTts, // ✅ Export
+    activeKeyIndex, // ✅ Export
   };
 });

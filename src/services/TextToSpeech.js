@@ -1,277 +1,316 @@
+import { useSystemStore } from "../stores/system";
+
 // ✅ Global Storage to Prevent Garbage Collection
-window.activeUtterances = [];
+window.ttsActiveUtterances = [];
 
 export class TextToSpeech {
     constructor() {
-        this.synth = window.speechSynthesis;
         this.queue = [];
         this.isSpeaking = false;
-        this.maxMessageLength = 500;
-        this.voices = []; // ✅ Store loaded voices
-        this.poller = null; // ✅ Polling interval reference
-        this.audioPlayer = new Audio(); // ✅ For online TTS playback
+        this.voices = [];
+        this.poller = null;
+        this.currentAudio = null; // Track current audio for cleanup
 
-        // ✅ Bind method to maintain 'this' context
+        // Bind methods
+        this.processQueue = this.processQueue.bind(this);
         this.loadVoices = this.loadVoices.bind(this);
 
-        // ✅ Set up event listener for async voice loading (Chrome)
+        // Set up voice loading
         window.speechSynthesis.onvoiceschanged = this.loadVoices;
-
-        // ✅ Attempt initial load
         this.loadVoices();
 
-        // ✅ Aggressive poller: Check every 500ms until voices load
+        // Aggressive poller: Check every 500ms until voices load
         this.poller = setInterval(this.loadVoices, 500);
     }
 
     /**
-     * Load voices and display comprehensive debug info
+     * Load voices
      */
     loadVoices() {
-        const vs = this.synth.getVoices();
+        const vs = window.speechSynthesis.getVoices();
 
-        // Return early if no voices yet
         if (vs.length === 0) {
             return;
         }
 
-        // ✅ Store voices
         this.voices = vs;
 
-        // ✅ Clear poller once voices are loaded
+        // Clear poller once voices are loaded
         if (this.poller) {
             clearInterval(this.poller);
             this.poller = null;
         }
 
-        // ✅ Crucial Debug: Log ALL voices in table format
-        console.table(this.voices.map(v => ({
-            name: v.name,
-            lang: v.lang,
-            default: v.default
-        })));
         console.log("🔍 Loaded " + this.voices.length + " voices.");
     }
 
     /**
-     * Name-based voice matching with fallback to lang check
+     * Get best Thai voice
      * Priority: Google Thai > Premwadee/Pattara > Narisa > lang=th
      */
     getBestVoice() {
-        // ✅ Try loading voices again if empty
         if (this.voices.length === 0) {
             this.loadVoices();
             return null;
         }
 
-        // Priority 1: Name includes "Google" AND ("Thai" or "ไทย")
+        // Priority 1: Google Thai
         let voice = this.voices.find(v =>
             v.name.includes('Google') && (v.name.includes('Thai') || v.name.includes('ไทย'))
         );
-        if (voice) {
-            console.log('🔊 Using voice:', voice.name, '(Google Thai)');
-            return voice;
-        }
+        if (voice) return voice;
 
-        // Priority 2: Name includes "Premwadee" or "Pattara"
+        // Priority 2: Microsoft (Premwadee/Pattara)
         voice = this.voices.find(v =>
             v.name.includes('Premwadee') || v.name.includes('Pattara')
         );
-        if (voice) {
-            console.log('🔊 Using voice:', voice.name, '(Microsoft)');
-            return voice;
-        }
+        if (voice) return voice;
 
-        // Priority 3: Name includes "Narisa"
+        // Priority 3: Apple Narisa
         voice = this.voices.find(v => v.name.includes('Narisa'));
-        if (voice) {
-            console.log('🔊 Using voice:', voice.name, '(Apple Narisa)');
-            return voice;
-        }
+        if (voice) return voice;
 
-        // Priority 4: Lang starts with "th"
+        // Priority 4: Any Thai voice
         voice = this.voices.find(v => v.lang.startsWith('th'));
-        if (voice) {
-            console.log('🔊 Using voice:', voice.name, '(Lang match)');
-            return voice;
-        }
+        if (voice) return voice;
 
-        // Still nothing found
         return null;
     }
 
     /**
-     * Filter and Sanitize Text
+     * Sanitize text for TTS
      */
     sanitize(text) {
         if (!text) return "";
 
-        // 1. Replace Emoji with "ส่งสติกเกอร์"
+        // Remove emojis
         const emojiRegex = /[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]/g;
-        let cleanText = text.replace(emojiRegex, " ส่งสติกเกอร์ ");
+        let cleanText = text.replace(emojiRegex, " ");
 
-        // 2. Truncate long text
-        if (cleanText.length > this.maxMessageLength) {
-            cleanText = cleanText.substring(0, this.maxMessageLength) + "... ตัดจบ";
+        // Limit length
+        if (cleanText.length > 500) {
+            cleanText = cleanText.substring(0, 500) + "... ตัดจบ";
         }
 
         return cleanText.trim();
     }
 
     /**
-     * Add message to queue
-     * @param {string} authorName 
-     * @param {string} message 
+     * Speak using Google Cloud TTS API with key rotation
      */
-    speak(authorName, message) {
-        const cleanMessage = this.sanitize(message);
-        if (!cleanMessage) return;
+    async speakOnline(text) {
+        const systemStore = useSystemStore();
 
-        // Format: "Username ... Message" (Only if name exists)
-        const textToSpeak = authorName
-            ? `${authorName} ... ${cleanMessage}`
-            : cleanMessage;
+        // Parse comma-separated keys
+        const rawKeys = systemStore.googleApiKey;
+        const keys = rawKeys.split(',').map(k => k.trim()).filter(k => k);
 
-        this.queue.push(textToSpeak);
-
-        if (!this.isSpeaking) {
-            this.processQueue();
-        }
-    }
-
-    /**
-     * Process queue with hybrid TTS (Native + Online Fallback)
-     */
-    processQueue() {
-        // Stop if queue empty
-        if (this.queue.length === 0) {
-            this.isSpeaking = false;
+        // Check if any keys exist
+        if (keys.length === 0) {
+            console.warn("⚠️ No Google API Keys found, falling back to Native TTS");
+            this.speakNative(text);
             return;
         }
 
-        this.isSpeaking = true;
-        const text = this.queue.shift();
+        // Sanitize and limit text
+        const sanitized = this.sanitize(text);
+        const safeText = sanitized.substring(0, 200); // Limit for API
 
-        // ✅ Step 1: Check for native Thai voice
-        const voice = this.getBestVoice();
+        console.log(`☁️ Google Cloud TTS: ${safeText.substring(0, 50)}... (${keys.length} keys available)`);
 
-        // ✅ Step 2: Decide path
-        if (voice) {
-            // Native voice available
-            this.speakNative(text, voice);
-        } else {
-            // No native voice - use online fallback
-            console.warn("⚠️ No native Thai voice found. Falling back to online TTS.");
-            this.speakOnline(text);
+        // Try each key sequentially
+        for (let i = 0; i < keys.length; i++) {
+            const currentKey = keys[i];
+
+            try {
+                console.log(`🔑 Trying key ${i + 1}/${keys.length}...`);
+
+                // Create AbortController with 3-second timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                // Call Google Cloud TTS API
+                const response = await fetch(
+                    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${currentKey}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            input: { text: safeText },
+                            voice: {
+                                languageCode: "th-TH",
+                                name: "th-TH-Neural2-C" // High-quality female voice
+                            },
+                            audioConfig: {
+                                audioEncoding: "MP3"
+                            }
+                        }),
+                        signal: controller.signal // Bind abort signal
+                    }
+                );
+
+                // Clear timeout on success
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Create audio from base64
+                const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
+                this.currentAudio = audio;
+
+                audio.onended = () => {
+                    this.currentAudio = null;
+                    this.isSpeaking = false;
+                    this.processQueue();
+                };
+
+                audio.onerror = (e) => {
+                    console.error("❌ Audio playback error:", e);
+                    this.currentAudio = null;
+                    this.isSpeaking = false;
+                    this.processQueue();
+                };
+
+                await audio.play();
+
+                // Update active key index in store
+                const systemStore = useSystemStore();
+                systemStore.activeKeyIndex = i + 1;
+
+                console.log(`✅ Success with key ${i + 1}`);
+                return; // Success! Exit the function
+
+            } catch (error) {
+                // Check if error is timeout
+                if (error.name === 'AbortError') {
+                    console.warn(`⏳ Key ${i + 1} timed out (3s limit exceeded)`);
+                } else {
+                    console.warn(`⚠️ Key ${i + 1} failed: ${error.message}`);
+                }
+
+                // If this was the last key, we'll fall through to Native
+                if (i === keys.length - 1) {
+                    console.error("❌ All Google API keys failed");
+                    console.warn("☁️ Falling back to Native TTS...");
+                    this.speakNative(text);
+                }
+                // Otherwise, continue to next key
+            }
         }
     }
 
     /**
      * Speak using native browser TTS
      */
-    speakNative(text, voice) {
-        // Cancel any previous speech
-        this.synth.cancel();
+    speakNative(text) {
+        const voice = this.getBestVoice();
 
-        // Create utterance
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'th-TH';
         utterance.volume = 1.0;
         utterance.rate = 1.0;
-        utterance.voice = voice;
 
-        console.log(`🎙️ Speaking (Native): "${text}" with ${voice.name}`);
+        if (voice) {
+            utterance.voice = voice;
+        }
 
-        // Prevent GC
-        window.activeUtterances.push(utterance);
+        console.log("🎙️ Native TTS:", text.substring(0, 50) + (text.length > 50 ? '...' : ''));
 
-        // Events
-        utterance.onstart = () => {
-            console.log("🔊 Started speaking (Native)");
-        };
+        // Push to global array to prevent garbage collection
+        window.ttsActiveUtterances.push(utterance);
 
+        // Handle end
         utterance.onend = () => {
-            console.log("✅ Finished (Native)");
-            window.activeUtterances.shift();
+            const index = window.ttsActiveUtterances.indexOf(utterance);
+            if (index > -1) {
+                window.ttsActiveUtterances.splice(index, 1);
+            }
             this.isSpeaking = false;
             this.processQueue();
         };
 
+        // Handle error
         utterance.onerror = (e) => {
             console.error("❌ Native TTS Error:", e);
-            window.activeUtterances.shift();
+            const index = window.ttsActiveUtterances.indexOf(utterance);
+            if (index > -1) {
+                window.ttsActiveUtterances.splice(index, 1);
+            }
             this.isSpeaking = false;
             this.processQueue();
         };
 
         // Speak
-        this.synth.speak(utterance);
+        window.speechSynthesis.speak(utterance);
     }
 
     /**
-     * Speak using Google Translate TTS API
+     * Process queue based on system store setting
      */
-    speakOnline(text) {
-        // Construct Google Translate TTS URL
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=th&client=tw-ob`;
+    processQueue() {
+        // Stop if queue empty or already speaking
+        if (this.queue.length === 0 || this.isSpeaking) {
+            return;
+        }
 
-        console.log("☁️ Playing Online TTS for:", text);
+        this.isSpeaking = true;
+        const text = this.queue.shift();
 
-        // Configure audio player
-        this.audioPlayer.src = url;
-        this.audioPlayer.playbackRate = 1.0;
+        // Check system store setting
+        const systemStore = useSystemStore();
 
-        // Events
-        this.audioPlayer.onended = () => {
-            console.log("✅ Finished (Online)");
-            this.isSpeaking = false;
-            this.processQueue();
-        };
-
-        this.audioPlayer.onerror = (e) => {
-            console.error("❌ Online TTS Error:", e);
-            this.isSpeaking = false;
-            this.processQueue();
-        };
-
-        // Play
-        this.audioPlayer.play().catch(e => {
-            console.error("❌ Failed to play online TTS:", e);
-            this.isSpeaking = false;
-            this.processQueue();
-        });
+        if (systemStore.useOnlineTts && systemStore.googleApiKey) {
+            this.speakOnline(text);
+        } else {
+            this.speakNative(text);
+        }
     }
 
     /**
-     * Clear Queue, Stop Speech, and Reset State
+     * Add message to queue
+     */
+    speak(author, message) {
+        const sanitized = this.sanitize(message);
+        if (!sanitized) return;
+
+        // Combine author and message
+        const textToSpeak = author
+            ? `${author} ... ${sanitized}`
+            : sanitized;
+
+        // Add to queue
+        this.queue.push(textToSpeak);
+
+        // Process queue
+        this.processQueue();
+    }
+
+    /**
+     * Reset TTS
      */
     reset() {
-        // Stop both native and online playback
-        this.synth.cancel();
-        this.audioPlayer.pause();
-        this.audioPlayer.currentTime = 0;
+        // Stop current audio if playing
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio.currentTime = 0;
+            this.currentAudio = null;
+        }
 
+        // Stop native speech synthesis
+        window.speechSynthesis.cancel();
+
+        // Clear queue and state
         this.queue = [];
         this.isSpeaking = false;
-        window.activeUtterances = []; // ✅ Clear global array
+        window.ttsActiveUtterances = [];
 
-        // Feedback
-        setTimeout(() => {
-            const utterance = new SpeechSynthesisUtterance("รีเซ็ตเสียงแล้ว");
-            utterance.lang = 'th-TH';
-            utterance.volume = 1.0;
-            utterance.rate = 0.95;
-            utterance.pitch = 1.0;
-
-            // Use best voice if available
-            const voice = this.getBestVoice();
-            if (voice) {
-                utterance.voice = voice;
-            }
-
-            this.synth.resume();
-            this.synth.speak(utterance);
-        }, 300);
+        console.log("🔄 TTS Reset");
     }
 }
 

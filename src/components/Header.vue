@@ -76,9 +76,44 @@
         }}
       </button>
 
-      <button class="btn btn-dark" @click="reloadPage" title="Reload Page">
-        <i class="fa-solid fa-rotate-right"></i>
+
+      <!-- TTS Toggle - Vibrant Blue Gradient (Fixed) -->
+      <button
+        :class="['btn', 'relative', 'border-0', 'text-white']"
+        :style="{
+          background: systemStore.useOnlineTts
+            ? 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)' // Vivid Blue Gradient
+            : 'linear-gradient(135deg, #4B5563 0%, #374151 100%)', // Dark Gray
+          boxShadow: systemStore.useOnlineTts
+            ? '0 4px 15px rgba(0, 114, 255, 0.4)'
+            : 'none'
+        }"
+        @click="toggleTtsMode"
+        :title="
+          systemStore.useOnlineTts
+            ? `Google Cloud TTS - Key #${systemStore.activeKeyIndex} Active`
+            : 'Native TTS (Offline)'
+        "
+      >
+        <!-- Icon -->
+        <i
+          :class="[
+            'text-lg drop-shadow-sm',
+            systemStore.useOnlineTts
+              ? 'fa-solid fa-cloud'
+              : 'fa-solid fa-robot'
+          ]"
+        ></i>
+
+        <!-- Key Index Number -->
+        <span 
+          v-if="systemStore.useOnlineTts" 
+          class="ml-2 text-lg font-bold font-mono drop-shadow-sm"
+        >
+          {{ systemStore.activeKeyIndex }}
+        </span>
       </button>
+
 
       <div class="dropdown" ref="dropdownRef">
         <button class="btn btn-sim" @click.stop="toggleDropdown">
@@ -569,8 +604,12 @@ function getVersionTooltip() {
   return `Manowzab Command Center ${systemStore.version}`;
 }
 
-function reloadPage() {
-  window.location.reload();
+function toggleTtsMode() {
+  systemStore.useOnlineTts = !systemStore.useOnlineTts;
+  const mode = systemStore.useOnlineTts ? "Google Cloud TTS" : "Native TTS";
+  logger.log("🔊 Switched to:", mode);
+  
+  queueSpeech(`เปลี่ยนเป็น ${mode}`);
 }
 
 function showChangelog() {

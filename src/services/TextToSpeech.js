@@ -10,6 +10,7 @@ export class TextToSpeech {
         this.voices = [];
         this.poller = null;
         this.audioPlayer = new Audio(); // Single reusable audio player
+        this.isNativeUnlocked = false; // Track Native TTS unlock status
 
         // Bind methods
         this.processQueue = this.processQueue.bind(this);
@@ -42,6 +43,19 @@ export class TextToSpeech {
         }
 
         console.log("🔍 Loaded " + this.voices.length + " voices.");
+    }
+
+    /**
+     * Unlock Native TTS by speaking a silent utterance
+     * This is needed on iOS to prime the TTS engine immediately upon user interaction
+     */
+    unlockNative() {
+        if (this.isNativeUnlocked) return;
+        console.log("🔓 Unlocking Native TTS...");
+        const utterance = new SpeechSynthesisUtterance('');
+        utterance.volume = 0; // Silent
+        utterance.onend = () => { this.isNativeUnlocked = true; };
+        window.speechSynthesis.speak(utterance);
     }
 
     /**
@@ -252,6 +266,9 @@ export class TextToSpeech {
 
         // Handle error
         utterance.onerror = (e) => {
+            // Ignore "interrupted" error to reduce console noise during mode switching
+            if (e.error === 'interrupted') return;
+            
             console.error("❌ Native TTS Error:", e);
             const index = window.ttsActiveUtterances.indexOf(utterance);
             if (index > -1) {

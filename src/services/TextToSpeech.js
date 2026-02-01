@@ -9,7 +9,7 @@ export class TextToSpeech {
         this.isSpeaking = false;
         this.voices = [];
         this.poller = null;
-        this.currentAudio = null; // Track current audio for cleanup
+        this.audioPlayer = new Audio(); // Single reusable audio player
 
         // Bind methods
         this.processQueue = this.processQueue.bind(this);
@@ -96,6 +96,18 @@ export class TextToSpeech {
     }
 
     /**
+     * Convert Base64 string to Blob object
+     */
+    base64ToBlob(base64, type = 'audio/mp3') {
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return new Blob([bytes], { type });
+    }
+
+    /**
      * Speak using Google Cloud TTS API with key rotation
      */
     async speakOnline(text) {
@@ -160,24 +172,27 @@ export class TextToSpeech {
 
                 const data = await response.json();
 
-                // Create audio from base64
-                const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
-                this.currentAudio = audio;
+                // Convert Base64 to Blob URL for memory efficiency
+                const blob = this.base64ToBlob(data.audioContent);
+                const blobUrl = URL.createObjectURL(blob);
 
-                audio.onended = () => {
-                    this.currentAudio = null;
+                // Set up single audio player
+                this.audioPlayer.src = blobUrl;
+
+                this.audioPlayer.onended = () => {
+                    URL.revokeObjectURL(blobUrl); // Free memory immediately
                     this.isSpeaking = false;
                     this.processQueue();
                 };
 
-                audio.onerror = (e) => {
+                this.audioPlayer.onerror = (e) => {
                     console.error("❌ Audio playback error:", e);
-                    this.currentAudio = null;
+                    URL.revokeObjectURL(blobUrl); // Free memory on error
                     this.isSpeaking = false;
                     this.processQueue();
                 };
 
-                await audio.play();
+                await this.audioPlayer.play();
 
                 // Update active key index in store
                 const systemStore = useSystemStore();
@@ -295,11 +310,11 @@ export class TextToSpeech {
      * Reset TTS
      */
     reset() {
-        // Stop current audio if playing
-        if (this.currentAudio) {
-            this.currentAudio.pause();
-            this.currentAudio.currentTime = 0;
-            this.currentAudio = null;
+        // Pause and reset the single audio player
+        if (this.audioPlayer) {
+            this.audioPlayer.pause();
+            this.audioPlayer.currentTime = 0;
+            this.audioPlayer.src = ''; // Clear source to release blob URL
         }
 
         // Stop native speech synthesis

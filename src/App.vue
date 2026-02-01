@@ -52,6 +52,7 @@ import { useAwayMode } from "./composables/useAwayMode";
 import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup
 import { useOllama } from "./composables/useOllama"; // ✅ Import Ollama
 import { usePullToRefresh } from "./composables/usePullToRefresh"; // ✅ Import Pull to Refresh
+import { ttsService } from "./services/TextToSpeech"; // ✅ Import TTS Service
 import Header from "./components/Header.vue";
 import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
@@ -92,6 +93,7 @@ provide("openHistory", () => (showHistory.value = true));
   // ✅ Unlock Audio Function (Silent)
   async function handleFirstInteraction() {
     const unlocked = await unlockAudio(); // ใช้ฟังก์ชันนี้แทน playDing เพื่อไม่ให้มีเสียงรบกวน
+    ttsService.unlockNative(); // ✅ Prime iOS Native TTS immediately
 
     if (unlocked) {
         // ลบ Listener ออกเพื่อไม่ให้ทำงานซ้ำ

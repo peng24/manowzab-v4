@@ -216,20 +216,24 @@ export class TextToSpeech {
                 return; // Success! Exit the function
 
             } catch (error) {
-                // Check if error is timeout
+                // 🚨 CASE 1: Timeout (Internet Lag)
                 if (error.name === 'AbortError') {
-                    console.warn(`⏳ Key ${i + 1} timed out (3s limit exceeded)`);
-                } else {
-                    console.warn(`⚠️ Key ${i + 1} failed: ${error.message}`);
+                    console.warn(`⏳ Key ${i + 1} timed out. Switching to Native for this message.`);
+                    this.speakNative(text);
+                    return; // Stop the loop, play Native, but KEEP useOnlineTts = true for next time.
                 }
 
-                // If this was the last key, we'll fall through to Native
+                // 🚨 CASE 2: API Error (403 Quota / 500)
+                console.warn(`⚠️ Key ${i + 1} failed: ${error.message}`);
+
+                // If this was the last key, and all failed
                 if (i === keys.length - 1) {
-                    console.error("❌ All Google API keys failed");
-                    console.warn("☁️ Falling back to Native TTS...");
+                    console.error("❌ All Google Keys failed/exhausted.");
                     this.speakNative(text);
+                    // Optional: If you want to disable Google permanently when keys are full:
+                    // useSystemStore().useOnlineTts = false;
+                    // (But for now, leave it true to keep trying as requested)
                 }
-                // Otherwise, continue to next key
             }
         }
     }
@@ -268,7 +272,7 @@ export class TextToSpeech {
         utterance.onerror = (e) => {
             // Ignore "interrupted" error to reduce console noise during mode switching
             if (e.error === 'interrupted') return;
-            
+
             console.error("❌ Native TTS Error:", e);
             const index = window.ttsActiveUtterances.indexOf(utterance);
             if (index > -1) {

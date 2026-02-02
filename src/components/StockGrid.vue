@@ -5,7 +5,7 @@
         รายการ:
         <input
           type="number"
-          v-model.lazy="stockStore.stockSize"
+          v-model.lazy="localStockSize"
           class="edit-input"
           style="
             width: 70px;
@@ -171,6 +171,22 @@ const gridContainer = ref(null);
 const highlightedId = ref(null);
 const newOrders = ref(new Set());
 
+// ✅ Local Stock Size for Input (Synced with Firebase)
+const localStockSize = ref(stockStore.stockSize || 100);
+
+// ✅ Watch Store Stock Size to Sync Input Field
+watch(
+  () => stockStore.stockSize,
+  (newVal) => {
+    if (newVal && newVal !== localStockSize.value) {
+      localStockSize.value = newVal;
+      logger.log("📦 Stock Size synced from Firebase:", newVal);
+    }
+  },
+  { immediate: true }
+);
+
+
 const showModal = ref(false);
 const editingId = ref(null);
 const editingPrice = ref(0);
@@ -226,8 +242,36 @@ function getSourceIcon(source) {
 function isNewOrder(num) {
   return newOrders.value.has(num);
 }
+
 function saveStockSize() {
-  stockStore.updateStockSize(stockStore.stockSize);
+  const newSize = parseInt(localStockSize.value);
+  
+  if (!newSize || newSize < 1) {
+    Swal.fire({
+      icon: "error",
+      title: "ข้อมูลไม่ถูกต้อง",
+      text: "จำนวนรายการต้องมากกว่า 0",
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+      timer: 2000,
+    });
+    return;
+  }
+  
+  stockStore.updateStockSize(newSize);
+  
+  Swal.fire({
+    icon: "success",
+    title: "บันทึกแล้ว",
+    text: `จำนวนรายการ: ${newSize}`,
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 1500,
+  });
+  
+  logger.log("✅ Stock size saved to Firebase:", newSize);
 }
 
 watch(

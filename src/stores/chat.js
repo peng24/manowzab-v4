@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, reactive } from "vue";
+import { ref as dbRef, onChildAdded, off } from "firebase/database";
+import { db } from "../composables/useFirebase";
 
 // 🧹 Memory management: Limit reactive messages to prevent RAM issues in long streams
 const MAX_DISPLAY_MESSAGES = 500;
@@ -9,6 +11,10 @@ export const useChatStore = defineStore("chat", () => {
   const seenMessageIds = ref({});
   const fullChatLog = ref([]);
   const streamStartTime = ref(null);
+
+  // ✅ Firebase sync state
+  let currentChatListener = null;
+  let currentVideoId = null;
 
   function addMessage(message) {
     if (seenMessageIds.value[message.id]) {
@@ -93,6 +99,51 @@ export const useChatStore = defineStore("chat", () => {
     document.body.removeChild(link);
   }
 
+  /**
+   * ✅ Sync chat messages from Firebase in real-time
+   * @param {string} videoId - The video ID to sync chats from
+   * @returns {Function} Cleanup function to remove listener
+   */
+  function syncFromFirebase(videoId) {
+    if (!videoId) {
+      console.warn("⚠️ No videoId provided for chat sync");
+      return;
+    }
+
+    // Clean up previous listener if switching videos
+    if (currentChatListener && currentVideoId !== videoId) {
+      console.log(`🧹 Cleaning up old chat listener for ${currentVideoId}`);
+      const oldRef = dbRef(db, `chats/${currentVideoId}`);
+      off(oldRef, "child_added", currentChatListener);
+      currentChatListener = null;
+    }
+
+    currentVideoId = videoId;
+    const chatRef = dbRef(db, `chats/${videoId}`);
+
+    console.log(`🔥 Starting Firebase chat sync for: ${videoId}`);
+
+    // Listen for new chat messages
+    const listener = onChildAdded(chatRef, (snapshot) => {
+      const messageData = snapshot.val();
+      if (messageData) {
+        // Add message through the existing addMessage function
+        // This handles deduplication and logging
+        addMessage(messageData);
+      }
+    });
+
+    // Store listener for cleanup
+    currentChatListener = listener;
+
+    // Return cleanup function
+    return () => {
+      console.log(`🧹 Cleaning up chat listener for ${videoId}`);
+      off(chatRef, "child_added", listener);
+      currentChatListener = null;
+    };
+  }
+
   return {
     messages,
     fullChatLog,
@@ -100,5 +151,7 @@ export const useChatStore = defineStore("chat", () => {
     addMessage,
     clearChat,
     downloadChatCSV,
+    syncFromFirebase,
   };
 });
+

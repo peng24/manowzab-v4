@@ -38,7 +38,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, provide } from "vue";
+import { ref, onMounted, onUnmounted, provide, watch } from "vue";
 import { useSystemStore } from "./stores/system";
 import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
@@ -65,6 +65,14 @@ const systemStore = useSystemStore();
 const stockStore = useStockStore();
 const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
+
+// ✅ Global Watcher: Silence immediately when Sound is toggled OFF
+watch(() => systemStore.isSoundOn, (isOn) => {
+  if (!isOn) {
+    console.log("🔇 Sound turned OFF - Silencing immediately (App Singleton).");
+    ttsService.reset();
+  }
+});
 
 const urlParams = new URLSearchParams(window.location.search);
 const isVoiceMode = urlParams.get("mode") === "voice"; 

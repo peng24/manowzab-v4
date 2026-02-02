@@ -62,24 +62,41 @@ export class TextToSpeech {
     /**
      * Unlock HTML5 Audio Element for Google TTS
      * iOS Safari requires Audio elements to be "blessed" by user interaction
-     * This plays a silent MP3 to unlock the audio player
+     * This plays a silent WAV to unlock the audio player
+     * Uses Blob URL with WAV format for maximum iOS compatibility
      */
     unlockAudioElement() {
         if (this.isGoogleUnlocked) return;
 
         console.log("🔓 Unlocking Google TTS Audio Element...");
 
-        // Tiny silent MP3 base64 (0.1s) to force-unlock iOS Audio
-        const SILENT_MP3 = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh//OEAAAAAAAAAAAAAAAAAAAAAAAAMGF1ZGljAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAAMGF1ZGljAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        // ✅ SWITCH TO WAV: A valid 0.1s silent WAV file (Universally supported)
+        // RIFF Header + FMT + DATA (PCM 8-bit, Mono, 8000Hz)
+        const SILENT_WAV_B64 = "UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==";
 
-        // Use the SAME audio player instance we use for TTS
-        this.audioPlayer.src = SILENT_MP3;
-        this.audioPlayer.play().then(() => {
-            console.log("✅ Google TTS Audio Element Unlocked");
-            this.isGoogleUnlocked = true;
-        }).catch(e => {
-            console.warn("⚠️ Audio unlock failed (User interaction needed):", e);
-        });
+        try {
+            // 1. Convert WAV Base64 to Blob (Correct MIME type: audio/wav)
+            const blob = this.base64ToBlob(SILENT_WAV_B64, 'audio/wav');
+            // 2. Create Object URL
+            const blobUrl = URL.createObjectURL(blob);
+
+            // 3. Set Source & Play
+            this.audioPlayer.src = blobUrl;
+
+            this.audioPlayer.play().then(() => {
+                console.log("✅ Google TTS Audio Element Unlocked (WAV)");
+                this.isGoogleUnlocked = true;
+
+                // 4. Cleanup Memory (revoke URL after a short delay)
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            }).catch(e => {
+                console.warn("⚠️ Audio unlock failed (User interaction needed):", e);
+                // Cleanup even on error
+                URL.revokeObjectURL(blobUrl);
+            });
+        } catch (e) {
+            console.error("❌ Audio unlock setup failed:", e);
+        }
     }
 
     /**

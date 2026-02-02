@@ -11,6 +11,7 @@ export class TextToSpeech {
         this.poller = null;
         this.audioPlayer = new Audio(); // Single reusable audio player
         this.isNativeUnlocked = false; // Track Native TTS unlock status
+        this.isGoogleUnlocked = false; // Track Google TTS Audio Element unlock status
 
         // Bind methods
         this.processQueue = this.processQueue.bind(this);
@@ -56,6 +57,29 @@ export class TextToSpeech {
         utterance.volume = 0; // Silent
         utterance.onend = () => { this.isNativeUnlocked = true; };
         window.speechSynthesis.speak(utterance);
+    }
+
+    /**
+     * Unlock HTML5 Audio Element for Google TTS
+     * iOS Safari requires Audio elements to be "blessed" by user interaction
+     * This plays a silent MP3 to unlock the audio player
+     */
+    unlockAudioElement() {
+        if (this.isGoogleUnlocked) return;
+
+        console.log("🔓 Unlocking Google TTS Audio Element...");
+
+        // Tiny silent MP3 base64 (0.1s) to force-unlock iOS Audio
+        const SILENT_MP3 = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh//OEAAAAAAAAAAAAAAAAAAAAAAAAMGF1ZGljAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAAMGF1ZGljAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+        // Use the SAME audio player instance we use for TTS
+        this.audioPlayer.src = SILENT_MP3;
+        this.audioPlayer.play().then(() => {
+            console.log("✅ Google TTS Audio Element Unlocked");
+            this.isGoogleUnlocked = true;
+        }).catch(e => {
+            console.warn("⚠️ Audio unlock failed (User interaction needed):", e);
+        });
     }
 
     /**

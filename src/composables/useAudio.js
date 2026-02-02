@@ -13,8 +13,7 @@ export function useAudio() {
     }
   }
 
-  // ✅ ฟังก์ชันปลดล็อคเสียงแบบเงียบ (ไม่ติ๊ง)
-  // ✅ ฟังก์ชันปลดล็อคเสียงแบบเงียบ (ไม่ติ๊ง)
+  // ✅ Unlock all audio types on iOS (AudioContext, Native TTS, HTML5 Audio)
   async function unlockAudio() {
     initAudio();
     if (!audioCtx.value) return false;
@@ -30,17 +29,25 @@ export function useAudio() {
     if (audioCtx.value.state !== "running") return false;
 
     try {
-      // สร้าง Oscillator เปล่าๆ ขึ้นมาสั้นๆ เพื่อหลอก Browser ว่ามีการใช้เสียงแล้ว
+      // 1. Unlock AudioContext (for SFX)
       const oscillator = audioCtx.value.createOscillator();
       const gainNode = audioCtx.value.createGain();
 
-      gainNode.gain.value = 0; // 🔇 ปิดเสียงเงียบกริบ
+      gainNode.gain.value = 0; // 🔇 Silent
 
       oscillator.connect(gainNode);
       gainNode.connect(audioCtx.value.destination);
 
       oscillator.start();
       oscillator.stop(audioCtx.value.currentTime + 0.001);
+
+      // 2. Unlock Native TTS (SpeechSynthesis API)
+      ttsService.unlockNative();
+
+      // 3. Unlock Google TTS Audio Element (HTML5 Audio)
+      ttsService.unlockAudioElement();
+
+      console.log("🔓 All audio systems unlocked!");
       return true;
     } catch (e) {
       console.error("Silent unlock failed:", e);

@@ -73,7 +73,7 @@ export function useChatProcessor() {
   const chatStore = useChatStore();
   const systemStore = useSystemStore();
   const { analyzeChat } = useOllama();
-  const { queueSpeech, playDing } = useAudio();
+  const { queueSpeech, playSfx, speak } = useAudio();
 
   // ✅ Local State for Implicit Buy Logic
   const currentOverlayItem = ref(null);
@@ -229,9 +229,8 @@ export function useChatProcessor() {
           timestamp: new Date(item.snippet.publishedAt).getTime(),
         });
 
-        // Play audio once
-        playDing();
-        const { speak } = useAudio();
+        // ✅ Play SFX BEFORE TTS
+        await playSfx('success');
         speak(displayName, `${msg} ... ทั้งหมด ${itemIds.length} รายการ`);
 
         // Exit early - don't process further
@@ -352,9 +351,7 @@ export function useChatProcessor() {
       timestamp: new Date(item.snippet.publishedAt).getTime(),
     });
 
-    // 5. Process Order & Audio Logic (Updated for TextToSpeech Service)
-    const { speak } = useAudio();
-
+    // 5. Process Order & Audio Logic (Updated with SFX)
     if (intent === "buy" && targetId > 0 && targetId <= stockStore.stockSize) {
       // --- Buy Logic ---
       let ownerName = displayName;
@@ -385,23 +382,40 @@ export function useChatProcessor() {
         }
       }
 
-      await stockStore.processOrder(
-        targetId,
-        ownerName,
-        ownerUid,
-        "chat",
-        targetPrice,
-        method
-      );
+      try {
+        // ✅ Try to process order
+        await stockStore.processOrder(
+          targetId,
+          ownerName,
+          ownerUid,
+          "chat",
+          targetPrice,
+          method
+        );
 
-      // ✅ Show Success Toast (Non-blocking)
-      Toast.fire({
-        icon: 'success',
-        title: `✅ ตัดรหัส ${targetId} ให้ ${ownerName} แล้ว`
-      });
+        // ✅ Success - Show Toast
+        Toast.fire({
+          icon: 'success',
+          title: `✅ ตัดรหัส ${targetId} ให้ ${ownerName} แล้ว`
+        });
 
-      playDing();
-      speak(displayName, msg);
+        // ✅ Play SUCCESS sound BEFORE TTS
+        await playSfx('success');
+        speak(displayName, msg);
+
+      } catch (error) {
+        // ✅ Error - Item might be sold out or other issue
+        logger.error("❌ Order failed:", error);
+
+        Toast.fire({
+          icon: 'error',
+          title: `❌ ตัดไม่ได้: ${error.message || 'เต็มแล้ว'}`
+        });
+
+        // ✅ Play ERROR sound BEFORE TTS
+        await playSfx('error');
+        speak(displayName, msg); // Still announce to admin
+      }
 
     } else if (intent === "cancel" && targetId > 0) {
       // --- Cancel Logic ---
@@ -409,7 +423,8 @@ export function useChatProcessor() {
       if (isAdmin || (currentItem && currentItem.uid === uid)) {
         await stockStore.processCancel(targetId);
 
-        playDing();
+        // ✅ Play CANCEL sound BEFORE TTS
+        await playSfx('cancel');
         speak(displayName, msg);
       }
     } else {

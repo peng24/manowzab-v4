@@ -212,8 +212,9 @@ export function useChatProcessor() {
           title: `✅ ตัดรหัส ${itemIds.join(', ')} ให้ ${ownerName} แล้ว`
         });
 
-        // Add a summary message to chat
-        chatStore.addMessage({
+        // ✅ Push message to Firebase (Listener will update UI)
+        const chatRef = dbRef(db, `chats/${systemStore.currentVideoId}`);
+        push(chatRef, {
           id: item.id,
           text: msg,
           authorName: realName,
@@ -334,8 +335,9 @@ export function useChatProcessor() {
       }
     }
 
-    // 4. Add message to chat
-    chatStore.addMessage({
+    // 4. ✅ Push message to Firebase (Listener will update UI)
+    const chatRef = dbRef(db, `chats/${systemStore.currentVideoId}`);
+    push(chatRef, {
       id: item.id,
       text: msg,
       authorName: realName,

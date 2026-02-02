@@ -185,7 +185,27 @@ watch(
 
 onMounted(() => {
   scrollToBottom();
+  
+  // ✅ Initialize Firebase Chat Sync
+  if (systemStore.currentVideoId) {
+    const cleanup = chatStore.syncFromFirebase(systemStore.currentVideoId);
+    console.log("✅ Chat sync initialized for:", systemStore.currentVideoId);
+    
+    // Store cleanup function for unmount (if needed)
+    // Note: The watcher below handles video ID changes
+  }
 });
+
+// ✅ Watch for Video ID changes to re-sync
+watch(
+  () => systemStore.currentVideoId,
+  (newVideoId, oldVideoId) => {
+    if (newVideoId && newVideoId !== oldVideoId) {
+      console.log(`🔄 Video ID changed from ${oldVideoId} to ${newVideoId}, re-syncing chat...`);
+      chatStore.syncFromFirebase(newVideoId);
+    }
+  }
+);
 
 // ✅ Force Process Logic
 async function forceProcess(chat) {

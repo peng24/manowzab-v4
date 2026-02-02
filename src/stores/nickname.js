@@ -17,6 +17,11 @@ export const useNicknameStore = defineStore("nickname", () => {
   }
 
   function getNickname(uid, realName) {
+    // ✅ Hardcoded Nickname Override (for TTS pronunciation)
+    if (realName === 'รุ่งนภา ชม') {
+      return 'รุ่งนภา เชียงใหม่';
+    }
+
     if (nicknames.value[uid]) {
       return typeof nicknames.value[uid] === "object"
         ? nicknames.value[uid].nick

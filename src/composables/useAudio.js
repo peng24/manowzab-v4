@@ -30,21 +30,21 @@ export function useAudio() {
     if (audioCtx.value.state !== "running") return false;
 
     try {
-        // สร้าง Oscillator เปล่าๆ ขึ้นมาสั้นๆ เพื่อหลอก Browser ว่ามีการใช้เสียงแล้ว
-        const oscillator = audioCtx.value.createOscillator();
-        const gainNode = audioCtx.value.createGain();
+      // สร้าง Oscillator เปล่าๆ ขึ้นมาสั้นๆ เพื่อหลอก Browser ว่ามีการใช้เสียงแล้ว
+      const oscillator = audioCtx.value.createOscillator();
+      const gainNode = audioCtx.value.createGain();
 
-        gainNode.gain.value = 0; // 🔇 ปิดเสียงเงียบกริบ
+      gainNode.gain.value = 0; // 🔇 ปิดเสียงเงียบกริบ
 
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.value.destination);
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.value.destination);
 
-        oscillator.start();
-        oscillator.stop(audioCtx.value.currentTime + 0.001);
-        return true;
+      oscillator.start();
+      oscillator.stop(audioCtx.value.currentTime + 0.001);
+      return true;
     } catch (e) {
-        console.error("Silent unlock failed:", e);
-        return false;
+      console.error("Silent unlock failed:", e);
+      return false;
     }
   }
 
@@ -68,37 +68,102 @@ export function useAudio() {
     ttsService.speak(author, message);
   }
 
-  function playDing() {
-    if (!systemStore.isSoundOn) return;
-    initAudio();
+  /**
+   * Play sound effect with proper async/await support
+   * @param {string} type - 'success', 'error', or 'cancel'
+   * @returns {Promise} Resolves when sound finishes playing
+   */
+  function playSfx(type = 'success') {
+    return new Promise((resolve) => {
+      if (!systemStore.isSoundOn) {
+        resolve();
+        return;
+      }
 
-    if (audioCtx.value && audioCtx.value.state === "suspended") {
-      audioCtx.value.resume();
-    }
-    if (!audioCtx.value) return;
+      initAudio();
 
-    const oscillator = audioCtx.value.createOscillator();
-    const gainNode = audioCtx.value.createGain();
+      if (audioCtx.value && audioCtx.value.state === "suspended") {
+        audioCtx.value.resume();
+      }
+      if (!audioCtx.value) {
+        resolve();
+        return;
+      }
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.value.destination);
+      const ctx = audioCtx.value;
+      const now = ctx.currentTime;
 
-    // เสียงติ๊ง (Sine Wave ความถี่สูงแล้วลดลงเร็วๆ)
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(1200, audioCtx.value.currentTime); // เริ่มสูง
-    oscillator.frequency.exponentialRampToValueAtTime(
-      400,
-      audioCtx.value.currentTime + 0.3
-    );
+      if (type === 'success') {
+        // 🎵 Ka-Ching! (Coin sound - Two ascending tones)
+        const duration = 0.5;
 
-    gainNode.gain.setValueAtTime(0.5, audioCtx.value.currentTime);
-    gainNode.gain.linearRampToValueAtTime(
-      0.01,
-      audioCtx.value.currentTime + 0.3
-    );
+        // First tone (lower)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(800, now);
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.2);
 
-    oscillator.start();
-    oscillator.stop(audioCtx.value.currentTime + 0.3);
+        // Second tone (higher)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(1200, now + 0.1);
+        gain2.gain.setValueAtTime(0.4, now + 0.1);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.1);
+        osc2.stop(now + 0.4);
+
+        setTimeout(resolve, duration * 1000);
+
+      } else if (type === 'error') {
+        // 🔴 Buzzer (Low harsh sound)
+        const duration = 0.6;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sawtooth"; // Harsh sound
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.linearRampToValueAtTime(150, now + 0.3);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.6);
+
+        setTimeout(resolve, duration * 1000);
+
+      } else if (type === 'cancel') {
+        // 🔵 Pop (Neutral quick sound)
+        const duration = 0.3;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.2);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.3);
+
+        setTimeout(resolve, duration * 1000);
+
+      } else {
+        // Unknown type - resolve immediately
+        resolve();
+      }
+    });
   }
 
   function resetVoice() {
@@ -108,7 +173,7 @@ export function useAudio() {
   return {
     queueSpeech, // Kept for backward compatibility
     speak,       // New preferred method
-    playDing,
+    playSfx,     // ✅ New sound effects system
     resetVoice,
     unlockAudio,
   };

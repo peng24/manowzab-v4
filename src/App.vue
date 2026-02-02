@@ -134,22 +134,7 @@ provide("openHistory", () => (showHistory.value = true));
   const unsubAway = initAwayListener(); // ✅ Init Away Mode Listener
   if (unsubAway) cleanupFns.push(unsubAway);
 
-  // ✅ Auto Cleanup
-  // initAutoCleanup is async but returns a cleanup function immediately if successful
-  // We need to handle the fact it's async in the original code? 
-  // No, useAutoCleanup.js: initAutoCleanup is async. It returns a promise.
-  // Wait, I updated it to return a function, but it's an ASYNC function.
-  // The logic inside `initAutoCleanup` in `useAutoCleanup.js` is `async function ...`.
-  // Returning a value from an async function wraps it in a Promise.
-  // So `const cleanup = await initAutoCleanup()` would be needed. 
-  // But onMounted callback is sync usually. 
-  
-  // Let's refactor initAutoCleanup in App.vue to handle this or just fire and forget if it returns void (if not admin).
-  // Ideally, I should change initAutoCleanup to NOT be async if it just sets a timeout.
-  // Looking at useAutoCleanup.js:
-  // `async function initAutoCleanup() { ... const timerId = setTimeout(...) ... return () => clearTimeout(...) }`
-  // Since it's async, it returns `Promise<() => void>`.
-  
+  // ✅ Auto Cleanup (Async initialization)
   initAutoCleanup().then((cleanup) => {
     if (cleanup) cleanupFns.push(cleanup);
   });

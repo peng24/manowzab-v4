@@ -372,11 +372,17 @@ export class TextToSpeech {
      * Reset TTS
      */
     reset() {
-        // Pause and reset the single audio player
         if (this.audioPlayer) {
+            // 1. Remove listeners FIRST to prevent error logging during cleanup
+            this.audioPlayer.onended = null;
+            this.audioPlayer.onerror = null;
+
+            // 2. Stop playback
             this.audioPlayer.pause();
             this.audioPlayer.currentTime = 0;
-            this.audioPlayer.src = ''; // Clear source to release blob URL
+
+            // 3. Clear source safely
+            this.audioPlayer.removeAttribute('src');
         }
 
         // Stop native speech synthesis
@@ -385,9 +391,9 @@ export class TextToSpeech {
         // Clear queue and state
         this.queue = [];
         this.isSpeaking = false;
-        window.ttsActiveUtterances = [];
+        window.ttsActiveUtterances = []; // Clear native utterances ref
 
-        console.log("🔄 TTS Reset");
+        console.log("🔄 TTS Reset (Clean)");
     }
 }
 

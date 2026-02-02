@@ -89,18 +89,15 @@ const showHistory = ref(false);
 provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
 
-// ✅ Unlock Audio Function (Silent)
-  // ✅ Unlock Audio Function (Silent)
+// ✅ Unlock Audio Function (All audio types: SFX, Native TTS, Google TTS)
   async function handleFirstInteraction() {
-    const unlocked = await unlockAudio(); // ใช้ฟังก์ชันนี้แทน playDing เพื่อไม่ให้มีเสียงรบกวน
-    ttsService.unlockNative(); // ✅ Prime iOS Native TTS immediately
+    const unlocked = await unlockAudio(); // Unlocks all audio systems
 
     if (unlocked) {
-        // ลบ Listener ออกเพื่อไม่ให้ทำงานซ้ำ
+        // Remove listeners to prevent duplicate calls
         document.removeEventListener("click", handleFirstInteraction);
         document.removeEventListener("touchstart", handleFirstInteraction);
-        document.removeEventListener("keydown", handleFirstInteraction);
-        console.log("🔊 Audio unlocked silently by user interaction");
+        logger.log("✅ Audio unlocked on first interaction");
     }
   }
 

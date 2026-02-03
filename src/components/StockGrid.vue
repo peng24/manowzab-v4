@@ -371,12 +371,26 @@ async function saveQueueChanges() {
     };
   }
 
+  // ✅ Logic Update: Smart TTS handling
   if (oldOwnerName && !newOwnerName) {
+    // Case 1: Cancel (Deleted)
     playSfx();
     queueSpeech(`ยกเลิกรายการที่ ${num} ค่ะ`);
   } else if (oldOwnerName && newOwnerName && oldOwnerName !== newOwnerName) {
-    playSfx();
-    queueSpeech(`${oldOwnerName} หลุด... ${newOwnerName} ได้ต่อค่ะ`);
+    // Case 2: Name Changed
+    playSfx(); // Always play "Ting" sound
+
+    // Check if it's the same UID (Typo fix) or different UID (New Person)
+    // We compare the UID of the item currently in stock vs the new data being saved
+    const isSamePerson = oldItem.uid === newData.uid;
+
+    if (!isSamePerson) {
+      // 📢 Different person -> Announce swap
+      queueSpeech(`${oldOwnerName} หลุดจอง ${newOwnerName}`);
+    } else {
+      // 🤫 Same person (Typo fix) -> Silent update (Only SFX played above)
+      logger.log("✏️ Typo fix detected. Silent update.");
+    }
   }
 
   if (newData) {
@@ -391,10 +405,7 @@ async function saveQueueChanges() {
       time: null,
       source: null,
     });
-
-    // Play sound for price update
     playSfx();
-    // queueSpeech(`ราคา ${editingPrice.value} บาท`);
   } else {
     await stockStore.processCancel(num);
   }

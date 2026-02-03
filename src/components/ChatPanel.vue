@@ -1,23 +1,29 @@
 <template>
   <div class="chat-panel">
     <div class="tools-bar">
-      <h3 style="color: #fff; margin: 0; font-size: 1.1em;">
+      <h3 style="color: #fff; margin: 0; font-size: 1.1em">
         <i class="fa-solid fa-comments"></i> Live Chat
       </h3>
       <div class="chat-controls">
-        <button 
-          class="btn-tool" 
-          :class="{ 'muted': !systemStore.isSoundOn }"
+        <button
+          class="btn-tool"
+          :class="{ muted: !systemStore.isSoundOn }"
           @click="toggleSound"
         >
-          <i :class="systemStore.isSoundOn ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark'"></i>
-          {{ systemStore.isSoundOn ? 'เสียง: เปิด' : 'เสียง: ปิด' }}
+          <i
+            :class="
+              systemStore.isSoundOn
+                ? 'fa-solid fa-volume-high'
+                : 'fa-solid fa-volume-xmark'
+            "
+          ></i>
+          {{ systemStore.isSoundOn ? "เสียง: เปิด" : "เสียง: ปิด" }}
         </button>
-        
+
         <button class="btn-tool" @click="stopVoice">
           <i class="fa-solid fa-stop"></i> หยุดเสียง
         </button>
-        
+
         <button class="btn-tool btn-csv" @click="exportCSV">
           <i class="fa-solid fa-file-csv"></i> CSV
         </button>
@@ -25,6 +31,16 @@
     </div>
 
     <div id="chat-viewport" ref="chatViewport" @scroll="handleScroll">
+      <!-- ✅ Load Previous Messages Button -->
+      <button
+        v-if="hasMoreMessages"
+        class="load-more-btn"
+        @click="loadMoreMessages"
+      >
+        ⬆️ โหลดข้อความเก่าเพิ่ม ({{ chatStore.messages.length - displayLimit }}
+        ข้อความ)
+      </button>
+
       <TransitionGroup name="chat-list" tag="div" id="chat-list">
         <div
           v-for="chat in visibleMessages"
@@ -40,8 +56,8 @@
           <div class="chat-bubble-container">
             <div class="chat-meta">
               <span class="chat-time">{{ formatTime(chat.timestamp) }}</span>
-              <span 
-                class="chat-name" 
+              <span
+                class="chat-name"
                 :style="{ backgroundColor: chat.color }"
                 @click="editNickname(chat)"
                 title="คลิกเพื่อแก้ไขชื่อเล่น"
@@ -56,12 +72,15 @@
 
             <div class="chat-bubble">
               <div class="chat-text">{{ chat.text }}</div>
-              
+
               <!-- Force Process Button -->
-              <div v-if="chat.isAdmin || systemStore.isAiCommander" class="force-process-btn">
-                 <button @click="forceProcess(chat)" class="btn-mini">
-                   <i class="fa-solid fa-bolt"></i>
-                 </button>
+              <div
+                v-if="chat.isAdmin || systemStore.isAiCommander"
+                class="force-process-btn"
+              >
+                <button @click="forceProcess(chat)" class="btn-mini">
+                  <i class="fa-solid fa-bolt"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -92,17 +111,28 @@ const { resetVoice } = useAudio();
 
 const chatViewport = ref(null);
 const showScrollButton = ref(false);
+const displayLimit = ref(200); // ✅ Pagination: Start with last 200 messages
 let isUserScrolling = false;
 
-// 🚀 Performance: Render only the last 200 messages to prevent UI lag
+// 🚀 Performance: Render based on displayLimit for pagination
 const visibleMessages = computed(() => {
-  return chatStore.messages.slice(-200);
+  const total = chatStore.messages.length;
+  const start = Math.max(0, total - displayLimit.value);
+  return chatStore.messages.slice(start);
+});
+
+// ✅ Check if there are more messages to load
+const hasMoreMessages = computed(() => {
+  return chatStore.messages.length > displayLimit.value;
 });
 
 function formatTime(timestamp) {
   if (!timestamp) return "";
   const date = new Date(timestamp);
-  return date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString("th-TH", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 // ✅ Edit Nickname Logic
@@ -122,9 +152,9 @@ async function editNickname(chat) {
     updates[`nicknames/${chat.uid}`] = {
       nick: newNick.trim(),
       realName: chat.realName,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
-    
+
     update(dbRef(db), updates)
       .then(() => {
         Swal.fire({
@@ -133,10 +163,10 @@ async function editNickname(chat) {
           toast: true,
           position: "top-end",
           showConfirmButton: false,
-          timer: 1500
+          timer: 1500,
         });
       })
-      .catch(err => {
+      .catch((err) => {
         console.error(err);
         Swal.fire("Error", "บันทึกไม่สำเร็จ", "error");
       });
@@ -160,12 +190,31 @@ function scrollToBottom() {
   if (el) {
     // ✅ Add small timeout to ensure DOM is ready
     setTimeout(() => {
-           el.scrollTo({ top: el.scrollHeight + 1000, behavior: "smooth" }); // Add extra offset
+      el.scrollTo({ top: el.scrollHeight + 1000, behavior: "smooth" }); // Add extra offset
     }, 100);
- 
+
     showScrollButton.value = false;
     isUserScrolling = false;
   }
+}
+
+// ✅ Load more messages (pagination)
+function loadMoreMessages() {
+  const el = chatViewport.value;
+  if (!el) return;
+
+  // Save current scroll height to preserve position
+  const oldScrollHeight = el.scrollHeight;
+
+  // Increase display limit by 200 messages
+  displayLimit.value += 200;
+
+  // Wait for DOM update, then adjust scroll to preserve position
+  nextTick(() => {
+    const newScrollHeight = el.scrollHeight;
+    const scrollDiff = newScrollHeight - oldScrollHeight;
+    el.scrollTop += scrollDiff;
+  });
 }
 
 // เมื่อมีข้อความใหม่
@@ -180,17 +229,17 @@ watch(
       // ถ้าดูประวัติอยู่ ให้โชว์ปุ่มแจ้งเตือน
       showScrollButton.value = true;
     }
-  }
+  },
 );
 
 onMounted(() => {
   scrollToBottom();
-  
+
   // ✅ Initialize Firebase Chat Sync
   if (systemStore.currentVideoId) {
     const cleanup = chatStore.syncFromFirebase(systemStore.currentVideoId);
     console.log("✅ Chat sync initialized for:", systemStore.currentVideoId);
-    
+
     // Store cleanup function for unmount (if needed)
     // Note: The watcher below handles video ID changes
   }
@@ -201,10 +250,12 @@ watch(
   () => systemStore.currentVideoId,
   (newVideoId, oldVideoId) => {
     if (newVideoId && newVideoId !== oldVideoId) {
-      console.log(`🔄 Video ID changed from ${oldVideoId} to ${newVideoId}, re-syncing chat...`);
+      console.log(
+        `🔄 Video ID changed from ${oldVideoId} to ${newVideoId}, re-syncing chat...`,
+      );
       chatStore.syncFromFirebase(newVideoId);
     }
-  }
+  },
 );
 
 // ✅ Force Process Logic
@@ -231,13 +282,17 @@ async function forceProcess(chat) {
     await stockStore.processOrder(
       parseInt(num),
       chat.displayName, // ใช้ชื่อจากแชท
-      chat.uid,         // ใช้ UID จากแชท
+      chat.uid, // ใช้ UID จากแชท
       "manual-force",
       price ? parseInt(price) : null,
-      "manual"
+      "manual",
     );
 
-    Swal.fire("เรียบร้อย", `ตัดสต็อกเบอร์ ${num} ให้ ${chat.displayName} แล้ว`, "success");
+    Swal.fire(
+      "เรียบร้อย",
+      `ตัดสต็อกเบอร์ ${num} ให้ ${chat.displayName} แล้ว`,
+      "success",
+    );
   }
 }
 
@@ -254,7 +309,7 @@ function stopVoice() {
     toast: true,
     position: "top-end",
     showConfirmButton: false,
-    timer: 1000
+    timer: 1000,
   });
 }
 
@@ -264,7 +319,7 @@ function exportCSV() {
       icon: "warning",
       title: "ไม่มีข้อมูล",
       text: "ยังไม่มีข้อความให้บันทึก",
-      timer: 1500
+      timer: 1500,
     });
     return;
   }
@@ -273,7 +328,7 @@ function exportCSV() {
     icon: "success",
     title: "บันทึก CSV แล้ว",
     timer: 1500,
-    showConfirmButton: false
+    showConfirmButton: false,
   });
 }
 </script>
@@ -296,7 +351,7 @@ function exportCSV() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   z-index: 10;
 }
 
@@ -313,7 +368,7 @@ function exportCSV() {
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.85em;
-  font-family: 'Kanit', sans-serif;
+  font-family: "Kanit", sans-serif;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -348,7 +403,9 @@ function exportCSV() {
   flex: 1;
   overflow-y: auto;
   padding: 15px 5px; /* ✅ Reduced side padding */
-  padding-bottom: calc(20px + env(safe-area-inset-bottom)); /* ✅ Safe Area for Mobile */
+  padding-bottom: calc(
+    20px + env(safe-area-inset-bottom)
+  ); /* ✅ Safe Area for Mobile */
   scroll-behavior: smooth;
   scroll-behavior: smooth;
 }
@@ -455,7 +512,7 @@ function exportCSV() {
   font-size: 0.95em;
   line-height: 1.5;
   position: relative;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* Special Types */
@@ -513,8 +570,12 @@ function exportCSV() {
 
 .new-msg-btn {
   position: absolute;
-  bottom: 80px; /* ✅ Moved up from bottom */
-  right: 20px; /* ✅ Floating action button style */
+  bottom: 20px; /* ✅ Adjusted position */
+  left: 0; /* ✅ Center alignment start */
+  right: 0; /* ✅ Center alignment end */
+  margin: 0 auto; /* ✅ Center alignment magic */
+  width: fit-content; /* ✅ Prevent full width */
+
   background-color: #3b82f6;
   color: white;
   border: none;
@@ -534,9 +595,46 @@ function exportCSV() {
 }
 
 @keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
-  40% {transform: translateY(-5px);}
-  60% {transform: translateY(-3px);}
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-5px);
+  }
+  60% {
+    transform: translateY(-3px);
+  }
+}
+
+/* ✅ Load Previous Messages Button */
+.load-more-btn {
+  display: block;
+  margin: 10px auto 15px;
+  padding: 8px 16px;
+  background: #334155;
+  color: #94a3b8;
+  border: 1px solid #475569;
+  border-radius: 20px;
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: "Kanit", sans-serif;
+}
+
+.load-more-btn:hover {
+  background: #475569;
+  color: #e2e8f0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.load-more-btn:active {
+  transform: translateY(0);
 }
 
 /* ✅ Mobile Responsive */
@@ -547,8 +645,8 @@ function exportCSV() {
   }
 
   .new-msg-btn {
-    bottom: 70px;
-    right: 15px;
+    bottom: 20px;
+    /* right removed - using centered positioning */
     padding: 8px 14px;
     font-size: 0.9em;
   }

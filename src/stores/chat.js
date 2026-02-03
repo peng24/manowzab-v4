@@ -3,9 +3,6 @@ import { ref, reactive } from "vue";
 import { ref as dbRef, onChildAdded, off } from "firebase/database";
 import { db } from "../composables/useFirebase";
 
-// 🧹 Memory management: Limit reactive messages to prevent RAM issues in long streams
-const MAX_DISPLAY_MESSAGES = 500;
-
 export const useChatStore = defineStore("chat", () => {
   const messages = reactive([]); // ✅ เปลี่ยนเป็น reactive
   const seenMessageIds = ref({});
@@ -24,14 +21,6 @@ export const useChatStore = defineStore("chat", () => {
 
     seenMessageIds.value[message.id] = true;
     messages.push(message); // ✅ Push เข้า reactive array
-
-    // 🧹 Auto-trim messages if exceeding limit
-    if (messages.length > MAX_DISPLAY_MESSAGES) {
-      messages.shift(); // Remove oldest message
-      if (import.meta.env.DEV) {
-        console.log("🧹 Auto-trimmed chat messages, keeping last", MAX_DISPLAY_MESSAGES);
-      }
-    }
 
     console.log("✅ Message added, total:", messages.length);
 
@@ -154,4 +143,3 @@ export const useChatStore = defineStore("chat", () => {
     syncFromFirebase,
   };
 });
-

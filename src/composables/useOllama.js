@@ -140,7 +140,7 @@ export function useOllama() {
         "%c❌ Ollama Disconnected",
         "color: #ff5252; font-weight: bold; font-size: 14px;",
       );
-      console.error("Error details:", error);
+      console.warn("⚠️ Ollama not detected (Optional feature disabled).");
       systemStore.statusOllama = "err";
       return false;
     }

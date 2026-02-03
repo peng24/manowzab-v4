@@ -21,14 +21,22 @@
         <span class="stats-label">ขายแล้ว:</span>
         <span class="stat-sold">{{ soldCount }}</span>
         <span style="opacity: 0.5">/{{ stockStore.stockSize }}</span>
-        
+
         <div class="progress-bar-container">
-          <div class="progress-bar" :style="{ width: soldPercentage + '%', background: progressBarColor }">
+          <div
+            class="progress-bar"
+            :style="{
+              width: soldPercentage + '%',
+              background: progressBarColor,
+            }"
+          >
             <div class="progress-shimmer"></div>
           </div>
         </div>
-        
-        <span class="percentage-text">{{ soldPercentage }}% {{ motivationalText }}</span>
+
+        <span class="percentage-text"
+          >{{ soldPercentage }}% {{ motivationalText }}</span
+        >
       </div>
 
       <div></div>
@@ -166,7 +174,7 @@ const DEBUG_MODE = false;
 const logger = { log: (...args) => DEBUG_MODE && console.log(...args) };
 
 const stockStore = useStockStore();
-const { playDing, queueSpeech } = useAudio();
+const { playSfx, queueSpeech } = useAudio();
 const gridContainer = ref(null);
 const highlightedId = ref(null);
 const newOrders = ref(new Set());
@@ -183,9 +191,8 @@ watch(
       logger.log("📦 Stock Size synced from Firebase:", newVal);
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
-
 
 const showModal = ref(false);
 const editingId = ref(null);
@@ -194,7 +201,7 @@ const tempQueue = ref([]);
 let draggingIndex = null;
 
 const soldCount = computed(
-  () => Object.values(stockStore.stockData).filter((item) => item.owner).length
+  () => Object.values(stockStore.stockData).filter((item) => item.owner).length,
 );
 
 const soldPercentage = computed(() => {
@@ -214,8 +221,10 @@ const motivationalText = computed(() => {
 
 const progressBarColor = computed(() => {
   const percentage = soldPercentage.value;
-  if (percentage <= 30) return "linear-gradient(90deg, #ff6b35 0%, #ff4500 100%)"; // ส้ม-แดง
-  if (percentage <= 60) return "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)"; // เหลือง-ส้ม
+  if (percentage <= 30)
+    return "linear-gradient(90deg, #ff6b35 0%, #ff4500 100%)"; // ส้ม-แดง
+  if (percentage <= 60)
+    return "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)"; // เหลือง-ส้ม
   return "linear-gradient(90deg, #10b981 0%, #059669 100%)"; // เขียว
 });
 
@@ -245,7 +254,7 @@ function isNewOrder(num) {
 
 function saveStockSize() {
   const newSize = parseInt(localStockSize.value);
-  
+
   if (!newSize || newSize < 1) {
     Swal.fire({
       icon: "error",
@@ -258,9 +267,9 @@ function saveStockSize() {
     });
     return;
   }
-  
+
   stockStore.updateStockSize(newSize);
-  
+
   Swal.fire({
     icon: "success",
     title: "บันทึกแล้ว",
@@ -270,7 +279,7 @@ function saveStockSize() {
     showConfirmButton: false,
     timer: 1500,
   });
-  
+
   logger.log("✅ Stock size saved to Firebase:", newSize);
 }
 
@@ -288,7 +297,7 @@ watch(
       }
     });
   },
-  { deep: true }
+  { deep: true },
 );
 
 function scrollToItem(num) {
@@ -363,10 +372,10 @@ async function saveQueueChanges() {
   }
 
   if (oldOwnerName && !newOwnerName) {
-    playDing();
+    playSfx();
     queueSpeech(`ยกเลิกรายการที่ ${num} ค่ะ`);
   } else if (oldOwnerName && newOwnerName && oldOwnerName !== newOwnerName) {
-    playDing();
+    playSfx();
     queueSpeech(`${oldOwnerName} หลุด... ${newOwnerName} ได้ต่อค่ะ`);
   }
 
@@ -384,7 +393,7 @@ async function saveQueueChanges() {
     });
 
     // Play sound for price update
-    playDing();
+    playSfx();
     // queueSpeech(`ราคา ${editingPrice.value} บาท`);
   } else {
     await stockStore.processCancel(num);
@@ -504,7 +513,8 @@ function confirmClear() {
 }
 
 @keyframes bounce {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -526,7 +536,9 @@ function confirmClear() {
 .progress-bar {
   height: 100%;
   border-radius: 99px;
-  transition: width 0.6s ease-out, background 0.6s ease-out;
+  transition:
+    width 0.6s ease-out,
+    background 0.6s ease-out;
   position: relative;
   overflow: hidden;
   box-shadow: 0 0 10px rgba(255, 107, 53, 0.5);
@@ -610,7 +622,10 @@ function confirmClear() {
   /* overflow: hidden; Removed to show badge */
   min-height: 90px; /* Back to original height */
   z-index: 0;
-  transition: transform 0.1s, border-color 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.1s,
+    border-color 0.2s,
+    box-shadow 0.2s;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 

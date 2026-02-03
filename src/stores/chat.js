@@ -58,9 +58,11 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   function clearChat() {
-    messages.splice(0); // ✅ Clear reactive array
-    seenMessageIds.value = {};
-    console.log("🗑️ Chat cleared");
+    messages.splice(0); // Clear UI messages
+    seenMessageIds.value = {}; // Clear deduplication cache
+    fullChatLog.value = []; // ✅ Clear CSV Log
+    streamStartTime.value = null; // ✅ Reset Timer
+    console.log("🗑️ Chat & Logs cleared completely");
   }
 
   function downloadChatCSV(videoId) {
@@ -97,6 +99,12 @@ export const useChatStore = defineStore("chat", () => {
     if (!videoId) {
       console.warn("⚠️ No videoId provided for chat sync");
       return;
+    }
+
+    // ✅ Auto-Clear if switching to a new video
+    if (currentVideoId && currentVideoId !== videoId) {
+      console.log(`🔄 Switching video from ${currentVideoId} to ${videoId}. Clearing chat...`);
+      clearChat();
     }
 
     // Clean up previous listener if switching videos

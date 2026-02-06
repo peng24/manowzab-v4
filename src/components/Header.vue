@@ -343,6 +343,22 @@ function toggleAI() {
     .catch((error) => logger.error("Error toggling AI:", error));
 }
 
+// ✅ Extract YouTube Video ID from various URL formats
+function extractVideoId(input) {
+  if (!input) return "";
+  
+  // Handle common YouTube URL formats:
+  // - youtube.com/watch?v=ID
+  // - youtu.be/ID
+  // - youtube.com/live/ID
+  // - youtube.com/shorts/ID
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
+  const match = input.match(regExp);
+  
+  // Return the extracted ID if it's 11 characters, otherwise return original input
+  return (match && match[2].length === 11) ? match[2] : input;
+}
+
 async function toggleConnection() {
   if (systemStore.isConnected) {
     disconnect();
@@ -351,6 +367,12 @@ async function toggleConnection() {
     systemStore.statusApi = "idle";   // ✅ Reset API status too
     queueSpeech("หยุดการเชื่อมต่อ");
     return;
+  }
+
+  // ✅ Auto-clean Video ID from URL before connecting
+  const cleanId = extractVideoId(videoId.value);
+  if (cleanId !== videoId.value) {
+    videoId.value = cleanId; // Update UI to show only the clean ID
   }
 
   if (!videoId.value.trim()) {

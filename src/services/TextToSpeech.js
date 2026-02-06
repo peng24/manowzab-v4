@@ -227,8 +227,8 @@ export class TextToSpeech {
               },
               audioConfig: {
                 audioEncoding: "MP3",
-                speakingRate: 1.15, // 🚀 Faster = Enthusiastic (Default 1.0)
-                pitch: 4.0, // 🎵 Higher Pitch = Bright/Younger (Default 0.0)
+                speakingRate: 1.0, // ✅ Standard Speed (Factory Default)
+                pitch: 0.0, // ✅ Natural Pitch (Factory Default)
               },
             }),
             signal: controller.signal, // Bind abort signal

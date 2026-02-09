@@ -34,7 +34,10 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
   if (chatStore.messages && chatStore.messages.length > 0) {
     chatStore.messages.forEach((msg) => {
       if (data[msg.uid]) {
-        const newNick = typeof data[msg.uid] === "object" ? data[msg.uid].nick : data[msg.uid];
+        const newNick =
+          typeof data[msg.uid] === "object"
+            ? data[msg.uid].nick
+            : data[msg.uid];
         if (msg.displayName !== newNick) {
           msg.displayName = newNick;
         }
@@ -52,20 +55,21 @@ const questionRegex =
 const pureNumberRegex = /^\s*(\d+)\s*$/;
 const explicitBuyRegex = /(?:F|f|cf|CF|รับ|เอา)\s*(\d+)/;
 const dashBuyRegex = /^(?:.+?)\s*[-]\s*(\d+)$/;
-const cancelRegex = /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i; // Flexible: "cancel 46" or "46 cancel"
+const cancelRegex =
+  /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i; // Flexible: "cancel 46" or "46 cancel"
 const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
 
 // ✅ Toast Notification Mixin
 const Toast = Swal.mixin({
   toast: true,
-  position: 'top-end',
+  position: "top-end",
   showConfirmButton: false,
   timer: 3000,
   timerProgressBar: true,
   didOpen: (toast) => {
-    toast.addEventListener('mouseenter', Swal.stopTimer);
-    toast.addEventListener('mouseleave', Swal.resumeTimer);
-  }
+    toast.addEventListener("mouseenter", Swal.stopTimer);
+    toast.addEventListener("mouseleave", Swal.resumeTimer);
+  },
 });
 
 export function useChatProcessor() {
@@ -84,7 +88,7 @@ export function useChatProcessor() {
 
     const overlayRef = dbRef(
       db,
-      `overlay/${systemStore.currentVideoId}/current_item`
+      `overlay/${systemStore.currentVideoId}/current_item`,
     );
     onValue(overlayRef, (snapshot) => {
       const val = snapshot.val();
@@ -105,7 +109,7 @@ export function useChatProcessor() {
       () => systemStore.currentVideoId,
       (newId) => {
         if (newId) setupOverlayListener();
-      }
+      },
     );
   });
 
@@ -170,7 +174,6 @@ export function useChatProcessor() {
     // 7. Implicit "Current Item" Logic (Keyword ONLY)
     // Matches: "รับ", "เอา", "F", "cf" (standing alone or surrounded by spaces)
 
-
     // --- Execution ---
 
     // 🔥 HIGHEST PRIORITY: Multi-Buy Logic (before all other checks)
@@ -180,10 +183,20 @@ export function useChatProcessor() {
       const numbersStr = matchMultiBuy[1]; // "26 38 74"
       const proxyName = matchMultiBuy[2] ? matchMultiBuy[2].trim() : null; // Optional client name
 
-      // Parse all IDs
-      const itemIds = numbersStr.split(/\s+/).map(n => parseInt(n)).filter(n => n > 0 && n <= stockStore.stockSize);
+      // Parse all IDs (Allow IDs > stockSize)
+      const itemIds = numbersStr
+        .split(/\s+/)
+        .map((n) => parseInt(n))
+        .filter((n) => n > 0);
 
       if (itemIds.length > 0) {
+        // ✅ Auto-Expand Stock for Multi-Buy
+        const maxId = Math.max(...itemIds);
+        if (maxId > stockStore.stockSize) {
+          const newSize = Math.ceil(maxId / 10) * 10;
+          await stockStore.updateStockSize(newSize);
+          logger.log(`📦 Auto-expanded stock to ${newSize} for multi-buy`);
+        }
         // Determine owner name and UID
         let ownerName = displayName;
         let ownerUid = uid;
@@ -191,7 +204,11 @@ export function useChatProcessor() {
         if (proxyName && isAdmin) {
           // Admin Proxy Mode
           ownerName = proxyName;
-          ownerUid = "multi-proxy-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+          ownerUid =
+            "multi-proxy-" +
+            Date.now() +
+            "-" +
+            Math.random().toString(36).substr(2, 5);
         }
 
         // Process all orders
@@ -202,14 +219,14 @@ export function useChatProcessor() {
             ownerUid,
             "chat",
             null, // No price for multi-buy
-            "multi-buy"
+            "multi-buy",
           );
         }
 
         // ✅ Show Success Toast
         Toast.fire({
-          icon: 'success',
-          title: `✅ ตัดรหัส ${itemIds.join(', ')} ให้ ${ownerName} แล้ว`
+          icon: "success",
+          title: `✅ ตัดรหัส ${itemIds.join(", ")} ให้ ${ownerName} แล้ว`,
         });
 
         // ✅ Push message to Firebase (Listener will update UI)
@@ -230,7 +247,7 @@ export function useChatProcessor() {
         });
 
         // ✅ Play SFX BEFORE TTS
-        await playSfx('success');
+        await playSfx("success");
         speak(displayName, `${msg} ... ทั้งหมด ${itemIds.length} รายการ`);
 
         // Exit early - don't process further
@@ -245,16 +262,15 @@ export function useChatProcessor() {
       targetId = parseInt(matchProxy[1]);
       forcedOwnerName = matchProxy[2].trim();
       method = "admin-proxy";
-    }
-    else if (shippingRegex.test(msg)) {
+    } else if (shippingRegex.test(msg)) {
       intent = "shipping";
       method = "regex-ship";
     } else if (questionRegex.test(msg)) {
       // It's a question. Check if it accidentally contains a pure number?
       // Rule 6 says preserve question detection.
-      // But Rule 5 says ignore embedded numbers. 
-      // If it matches Pure Number, it is NOT a question usually (e.g. "34"). 
-      // If it says "อก 34" -> Question regex matches "อก". 
+      // But Rule 5 says ignore embedded numbers.
+      // If it matches Pure Number, it is NOT a question usually (e.g. "34").
+      // If it says "อก 34" -> Question regex matches "อก".
       method = "question-skip";
     } else {
       // Regex Matching
@@ -274,7 +290,7 @@ export function useChatProcessor() {
         // Priority: Pure Number
         const num = parseInt(matchPure[1]);
         // Rule: Validate if in range (1 to stockSize or reasonable limit)
-        // If number is huge (e.g. 555 for laugh), we might ignore? 
+        // If number is huge (e.g. 555 for laugh), we might ignore?
         // For now, assume strict mapping.
         intent = "buy";
         targetId = num;
@@ -300,9 +316,9 @@ export function useChatProcessor() {
       }
     }
 
-    // Safety Net: If intent is still null, but msg has numbers, 
+    // Safety Net: If intent is still null, but msg has numbers,
     // OLD logic would sometimes extract them.
-    // NEW LOGIC: Rule 5 -> "Ignore it". 
+    // NEW LOGIC: Rule 5 -> "Ignore it".
     // So we do nothing.
 
     // 3. AI Analysis (Fallback)
@@ -352,15 +368,23 @@ export function useChatProcessor() {
     });
 
     // 5. Process Order & Audio Logic (Updated with SFX)
-    if (intent === "buy" && targetId > 0 && targetId <= stockStore.stockSize) {
+    if (intent === "buy" && targetId > 0) {
+      // ✅ Auto-Expand Stock for Single Buy
+      if (targetId > stockStore.stockSize) {
+        const newSize = Math.ceil(targetId / 10) * 10;
+        await stockStore.updateStockSize(newSize);
+        logger.log(`📦 Auto-expanded stock to ${newSize} for item ${targetId}`);
+      }
+
       // --- Buy Logic ---
       let ownerName = displayName;
       let ownerUid = uid;
 
       if (forcedOwnerName) {
-        // Admin Proxy Mode 
+        // Admin Proxy Mode
         ownerName = forcedOwnerName;
-        ownerUid = "proxy-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+        ownerUid =
+          "proxy-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
       } else if (isAdmin) {
         // Regular Admin Mode (buying for self or using F syntax)
         // Clean Name Logic
@@ -390,33 +414,31 @@ export function useChatProcessor() {
           ownerUid,
           "chat",
           targetPrice,
-          method
+          method,
         );
 
         // ✅ Success - Show Toast
         Toast.fire({
-          icon: 'success',
-          title: `✅ ตัดรหัส ${targetId} ให้ ${ownerName} แล้ว`
+          icon: "success",
+          title: `✅ ตัดรหัส ${targetId} ให้ ${ownerName} แล้ว`,
         });
 
         // ✅ Play SUCCESS sound BEFORE TTS
-        await playSfx('success');
+        await playSfx("success");
         speak(displayName, msg);
-
       } catch (error) {
         // ✅ Error - Item might be sold out or other issue
         logger.error("❌ Order failed:", error);
 
         Toast.fire({
-          icon: 'error',
-          title: `❌ ตัดไม่ได้: ${error.message || 'เต็มแล้ว'}`
+          icon: "error",
+          title: `❌ ตัดไม่ได้: ${error.message || "เต็มแล้ว"}`,
         });
 
         // ✅ Play ERROR sound BEFORE TTS
-        await playSfx('error');
+        await playSfx("error");
         speak(displayName, msg); // Still announce to admin
       }
-
     } else if (intent === "cancel" && targetId > 0) {
       // --- Cancel Logic ---
       const currentItem = stockStore.stockData[targetId];
@@ -424,7 +446,7 @@ export function useChatProcessor() {
         await stockStore.processCancel(targetId);
 
         // ✅ Play CANCEL sound BEFORE TTS
-        await playSfx('cancel');
+        await playSfx("cancel");
         speak(displayName, msg);
       }
     } else {
@@ -432,7 +454,7 @@ export function useChatProcessor() {
       if (intent === "shipping") {
         const shippingRef = dbRef(
           db,
-          `shipping/${systemStore.currentVideoId}/${uid}`
+          `shipping/${systemStore.currentVideoId}/${uid}`,
         );
         update(shippingRef, {
           ready: true,
@@ -442,7 +464,7 @@ export function useChatProcessor() {
 
         const historyRef = dbRef(
           db,
-          `shipping/${systemStore.currentVideoId}/${uid}/history`
+          `shipping/${systemStore.currentVideoId}/${uid}/history`,
         );
         push(historyRef, {
           text: msg,

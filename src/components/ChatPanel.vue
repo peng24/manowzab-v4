@@ -530,7 +530,12 @@ function exportCSV() {
   color: #f1f5f9; /* Ensure white text */
 }
 
-/* Shipping removed - uses default blue */
+.chat-row.shipping .chat-bubble {
+  background-color: #581c87 !important; /* Solid purple background */
+  border: 2px solid #a855f7; /* Brighter purple border */
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3); /* Subtle purple glow */
+  color: #f1f5f9; /* Ensure white text */
+}
 
 .chat-row.admin .chat-bubble {
   border: 1px solid #f59e0b; /* Gold border for Admin */

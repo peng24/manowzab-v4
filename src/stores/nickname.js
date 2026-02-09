@@ -23,6 +23,16 @@ export const useNicknameStore = defineStore("nickname", () => {
       return "รุ่งนภา เชียงใหม่";
     }
 
+    // Atchara pronunciation override
+    if (realName === "อัจฉรา จิน") {
+      return "อัจฉรา จินดาธรรม";
+    }
+
+    // Jiraporn pronunciation override
+    if (realName === "จิราพร เต") {
+      return "จิราพร เตชาทวีวรรณ";
+    }
+
     if (nicknames.value[uid]) {
       return typeof nicknames.value[uid] === "object"
         ? nicknames.value[uid].nick

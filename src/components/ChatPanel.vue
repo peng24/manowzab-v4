@@ -30,7 +30,25 @@
       </div>
     </div>
 
-    <div id="chat-viewport" ref="chatViewport" @scroll="handleScroll">
+    <!-- ✅ Pull-to-Refresh Indicator -->
+    <div
+      class="pull-indicator"
+      :class="{ pulling: isPulling, refreshing: isRefreshing }"
+      :style="{ height: pullDistance + 'px' }"
+    >
+      <i class="fa-solid fa-sync" :class="{ spinning: isRefreshing }"></i>
+      <span v-if="pullDistance > pullThreshold">ปล่อยเพื่อรีเฟรช</span>
+      <span v-else-if="isPulling">ดึงลงเพื่อรีเฟรช</span>
+    </div>
+
+    <div
+      id="chat-viewport"
+      ref="chatViewport"
+      @scroll="handleScroll"
+      @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd"
+    >
       <!-- ✅ Load Previous Messages Button -->
       <button
         v-if="hasMoreMessages"
@@ -113,6 +131,14 @@ const chatViewport = ref(null);
 const showScrollButton = ref(false);
 const displayLimit = ref(200); // ✅ Pagination: Start with last 200 messages
 let isUserScrolling = false;
+
+// ✅ Pull-to-Refresh State
+const isPulling = ref(false);
+const isRefreshing = ref(false);
+const pullDistance = ref(0);
+const pullThreshold = 80; // Minimum pull distance to trigger refresh
+let touchStartY = 0;
+let canPull = false;
 
 // 🚀 Performance: Render based on displayLimit for pagination
 const visibleMessages = computed(() => {
@@ -331,6 +357,79 @@ function exportCSV() {
     showConfirmButton: false,
   });
 }
+
+// ✅ Pull-to-Refresh Touch Handlers
+function handleTouchStart(e) {
+  const el = chatViewport.value;
+  if (!el) return;
+
+  // Only allow pull when at the top of the scroll
+  canPull = el.scrollTop === 0;
+  if (canPull) {
+    touchStartY = e.touches[0].clientY;
+  }
+}
+
+function handleTouchMove(e) {
+  if (!canPull || isRefreshing.value) return;
+
+  const touchY = e.touches[0].clientY;
+  const delta = touchY - touchStartY;
+
+  // Only trigger pull when dragging down
+  if (delta > 0) {
+    isPulling.value = true;
+    pullDistance.value = Math.min(delta * 0.5, 120); // Add resistance
+
+    // Prevent native pull-to-refresh on iOS
+    if (pullDistance.value > 10) {
+      e.preventDefault();
+    }
+  }
+}
+
+async function handleTouchEnd() {
+  if (!isPulling.value || isRefreshing.value) return;
+
+  isPulling.value = false;
+
+  // Trigger refresh if pulled beyond threshold
+  if (pullDistance.value >= pullThreshold) {
+    isRefreshing.value = true;
+
+    // Perform refresh
+    await refreshChat();
+
+    // Reset after delay
+    setTimeout(() => {
+      isRefreshing.value = false;
+      pullDistance.value = 0;
+    }, 500);
+  } else {
+    // Spring back
+    pullDistance.value = 0;
+  }
+
+  canPull = false;
+}
+
+async function refreshChat() {
+  try {
+    // Re-sync from Firebase
+    if (systemStore.currentVideoId) {
+      await chatStore.syncFromFirebase(systemStore.currentVideoId);
+    }
+
+    // Scroll to bottom after refresh
+    await nextTick();
+    scrollToBottom();
+
+    // Show success feedback
+    playSfx();
+  } catch (error) {
+    console.error("Error refreshing chat:", error);
+  }
+}
 </script>
 
 <style scoped>
@@ -342,6 +441,44 @@ function exportCSV() {
   background-color: #0f172a; /* Deep Blue Background */
   border-left: 1px solid #1e293b;
   position: relative;
+}
+
+/* ✅ Pull-to-Refresh Indicator */
+.pull-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  transition: height 0.3s ease-out;
+  color: #64748b;
+  font-size: 0.9em;
+  gap: 8px;
+}
+
+.pull-indicator i {
+  font-size: 1.5em;
+  transition: transform 0.2s ease;
+}
+
+.pull-indicator.pulling i {
+  transform: rotate(180deg);
+  color: #3b82f6;
+}
+
+.pull-indicator.refreshing i {
+  animation: spin 1s linear infinite;
+  color: #10b981;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .tools-bar {

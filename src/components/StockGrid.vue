@@ -26,7 +26,24 @@
       <div></div>
     </div>
 
-    <div class="stock-grid" ref="gridContainer">
+    <!-- ✅ Pull-to-Refresh Indicator -->
+    <div
+      class="pull-indicator"
+      :class="{ pulling: isPulling, refreshing: isRefreshing }"
+      :style="{ height: pullDistance + 'px' }"
+    >
+      <i class="fa-solid fa-sync" :class="{ spinning: isRefreshing }"></i>
+      <span v-if="pullDistance > pullThreshold">ปล่อยเพื่อรีเฟรช</span>
+      <span v-else-if="isPulling">ดึงลงเพื่อรีเฟรช</span>
+    </div>
+
+    <div
+      class="stock-grid"
+      ref="gridContainer"
+      @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd"
+    >
       <TransitionGroup name="stock-list">
         <div
           v-for="i in stockStore.stockSize"
@@ -162,6 +179,14 @@ const { playSfx, queueSpeech } = useAudio();
 const gridContainer = ref(null);
 const highlightedId = ref(null);
 const newOrders = ref(new Set());
+
+// ✅ Pull-to-Refresh State
+const isPulling = ref(false);
+const isRefreshing = ref(false);
+const pullDistance = ref(0);
+const pullThreshold = 80;
+let touchStartY = 0;
+let canPull = false;
 
 // ✅ Local Stock Size for Input (Synced with Firebase)
 const localStockSize = ref(stockStore.stockSize || 100);
@@ -417,6 +442,74 @@ function confirmClear() {
     if (r.isConfirmed) stockStore.clearAllStock();
   });
 }
+
+// ✅ Pull-to-Refresh Touch Handlers
+function handleTouchStart(e) {
+  const el = gridContainer.value;
+  if (!el) return;
+
+  // Only allow pull when at the top of the scroll
+  canPull = el.scrollTop === 0;
+  if (canPull) {
+    touchStartY = e.touches[0].clientY;
+  }
+}
+
+function handleTouchMove(e) {
+  if (!canPull || isRefreshing.value) return;
+
+  const touchY = e.touches[0].clientY;
+  const delta = touchY - touchStartY;
+
+  // Only trigger pull when dragging down
+  if (delta > 0) {
+    isPulling.value = true;
+    pullDistance.value = Math.min(delta * 0.5, 120);
+
+    // Prevent native pull-to-refresh on iOS
+    if (pullDistance.value > 10) {
+      e.preventDefault();
+    }
+  }
+}
+
+async function handleTouchEnd() {
+  if (!isPulling.value || isRefreshing.value) return;
+
+  isPulling.value = false;
+
+  // Trigger refresh if pulled beyond threshold
+  if (pullDistance.value >= pullThreshold) {
+    isRefreshing.value = true;
+
+    // Perform refresh
+    await refreshStock();
+
+    // Reset after delay
+    setTimeout(() => {
+      isRefreshing.value = false;
+      pullDistance.value = 0;
+    }, 500);
+  } else {
+    // Spring back
+    pullDistance.value = 0;
+  }
+
+  canPull = false;
+}
+
+async function refreshStock() {
+  try {
+    // Stock data is already synced via Firebase in real-time
+    // Just play confirmation sound
+    playSfx();
+
+    // Show visual feedback
+    logger.log("✅ Stock refreshed");
+  } catch (error) {
+    console.error("Error refreshing stock:", error);
+  }
+}
 </script>
 
 <style scoped>
@@ -428,6 +521,44 @@ function confirmClear() {
   background: var(--bg-panel);
   border-right: 1px solid var(--border-color);
   overflow: hidden;
+}
+
+/* ✅ Pull-to-Refresh Indicator */
+.pull-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(180deg, #252525 0%, #1a1a1a 100%);
+  transition: height 0.3s ease-out;
+  color: #999;
+  font-size: 0.9em;
+  gap: 8px;
+}
+
+.pull-indicator i {
+  font-size: 1.5em;
+  transition: transform 0.2s ease;
+}
+
+.pull-indicator.pulling i {
+  transform: rotate(180deg);
+  color: #3b82f6;
+}
+
+.pull-indicator.refreshing i {
+  animation: spin 1s linear infinite;
+  color: #10b981;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .stock-header {

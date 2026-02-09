@@ -166,7 +166,6 @@ body {
 }
 
 @keyframes workingPulse {
-
   0%,
   100% {
     opacity: 1;
@@ -180,7 +179,6 @@ body {
 }
 
 @keyframes statusBlink {
-
   0%,
   50%,
   100% {
@@ -241,7 +239,6 @@ body {
 }
 
 @keyframes pulse {
-
   0%,
   100% {
     box-shadow: 0 0 8px var(--success);
@@ -340,7 +337,6 @@ body {
 }
 
 @keyframes pulseAi {
-
   0%,
   100% {
     box-shadow: 0 0 5px rgba(156, 39, 176, 0.5);
@@ -625,7 +621,6 @@ body {
 }
 
 @keyframes adminGlow {
-
   0%,
   100% {
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
@@ -1025,7 +1020,6 @@ body {
 }
 
 @keyframes moonSway {
-
   0%,
   100% {
     transform: rotate(-10deg);
@@ -1094,7 +1088,6 @@ body {
 }
 
 @keyframes pulseAway {
-
   0%,
   100% {
     box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
@@ -1214,7 +1207,6 @@ body {
    RESPONSIVE DESIGN (Forced Side-by-Side)
    ======================================== */
 @media (max-width: 1024px) {
-
   /* ✅ บังคับแนวนอนเสมอ ไม่ว่าจะจอเล็กแค่ไหน */
   .main-container {
     flex-direction: row;
@@ -1294,7 +1286,6 @@ body {
 }
 
 @media print {
-
   .header,
   .tools-bar,
   .btn,
@@ -1311,14 +1302,16 @@ body {
   }
 }
 
-/*  Shipping Color (Purple) */
+/*  Shipping Color (Purple - Consistent Theme) */
 .chat-row.shipping .chat-bubble {
   background-color: #581c87 !important;
-  /* สีม่วงเข้ม */
-  border: 1px solid #a855f7 !important;
-  /* ขอบสีม่วงสว่าง */
-  box-shadow: 0 0 5px rgba(168, 85, 247, 0.2) !important;
-  color: #fff !important;
+  /* Solid purple background */
+  border: 2px solid #a855f7 !important;
+  /* Brighter purple border */
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3) !important;
+  /* Subtle purple glow */
+  color: #f1f5f9 !important;
+  /* White text */
 }
 
 /* ===== TOOLS LIST COLORS ===== */

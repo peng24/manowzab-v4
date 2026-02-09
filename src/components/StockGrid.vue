@@ -21,22 +21,6 @@
         <span class="stats-label">ขายแล้ว:</span>
         <span class="stat-sold">{{ soldCount }}</span>
         <span style="opacity: 0.5">/{{ stockStore.stockSize }}</span>
-
-        <div class="progress-bar-container">
-          <div
-            class="progress-bar"
-            :style="{
-              width: soldPercentage + '%',
-              background: progressBarColor,
-            }"
-          >
-            <div class="progress-shimmer"></div>
-          </div>
-        </div>
-
-        <span class="percentage-text"
-          >{{ soldPercentage }}% {{ motivationalText }}</span
-        >
       </div>
 
       <div></div>

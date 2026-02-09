@@ -1,0 +1,261 @@
+{
+  "meta": {
+    "project": "Manowzab Command Center",
+    "date": "2026-02-06",
+    "prepared_by": "AI Assistant"
+  },
+  "product_overview": "Manowzab Command Center is a specialized, high-performance Progressive Web Application designed to manage Facebook and YouTube Live commerce. It facilitates real-time stock management, automated order processing directly from live chat messages, and delivers high-quality Text-to-Speech announcements to enhance livestream selling experiences.",
+  "core_goals": [
+    "Enable real-time stock management during live commerce sessions with automatic stock cutting.",
+    "Automate order processing from chat messages to minimize manual intervention and errors.",
+    "Provide instant and reliable audio feedback using hybrid TTS to enhance customer engagement.",
+    "Synchronize data across multiple admin and observer devices with minimal latency.",
+    "Maintain persistent sales and chat history for analytics and business insights.",
+    "Ensure seamless and reliable operation on iPad/iOS devices, considering audio unlock restrictions.",
+    "Comply with API quotas and manage cost-effective usage of Firebase and external APIs."
+  ],
+  "key_features": [
+    "Live Commerce Management with real-time stock cutting triggered by specific chat commands or message patterns, multi-buy support, queue system for popular items, and manual admin proxy commands.",
+    "Advanced Audio and Text-to-Speech system featuring hybrid Google Cloud TTS with fallback to native browser TTS, multiple API key rotation for quota management, iPad/iOS silent audio unlock technique, and sound effects for success and errors.",
+    "Intelligent Chat Processing integrating YouTube Live Chat API with real-time sync across devices, smart spam filtering, AI-powered chat analysis (optional), nickname management, and persistent chat storage with export capabilities.",
+    "System Features encompassing PWA with offline caching, pull-to-refresh, away mode with auto-responses, live overlay mode for OBS integration, detailed history modal with search and CSV export, and multi-device presence tracking.",
+    "Voice Detection and AI integration including Gemini AI for voice price detection and Ollama local AI for optional chat analysis and price voice announcements."
+  ],
+  "user_flow_summary": [
+    "Host Device connects to YouTube Live Chat API and fetches livestream messages in real-time, processes orders by detecting commands and numeric patterns, and writes processed data to Firebase.",
+    "All connected client devices listen to Firebase Realtime Database for chats, stock changes, and system status, updating their UI instantly and synchronizing data across multiple devices.",
+    "When a user submits a chat message containing order commands, the system detects buy or cancel instructions using regex and AI-based methods, modifies stock accordingly, updates queues, and announces changes via TTS.",
+    "Admin users can manually book items or cancel orders via proxy commands through the stock grid interface, impacting stock and queues in Firebase.",
+    "The audio system prioritizes Google Cloud TTS; if unavailable or slow, it falls back to native TTS; sound effects play success or error cues, managed sequentially to prevent overlap.",
+    "Users can toggle away mode to show auto-responses, access sales history with filtering and CSV export, and use live overlay mode for stream display integration."
+  ],
+  "validation_criteria": [
+    "Orders must be processed and stock updated within 1 second after chat message detection.",
+    "Multi-device synchronization latency shall remain under 100 milliseconds.",
+    "Text-to-Speech audio must start within 3 seconds online or immediately offline using native TTS.",
+    "The system must detect and process combined multi-buy chat messages correctly, including partial successes.",
+    "Queue promotions after cancellations must happen instantly and prevent duplicate entries.",
+    "The audio unlock mechanism on iPad/iOS must enable sound playback after first user interaction without errors.",
+    "System must handle YouTube API polling intervals of 60 seconds or more to prevent quota exhaustion.",
+    "Firebase data persistence must survive page reloads without data loss.",
+    "All stock, chat, and nickname data must synchronize accurately across all authorized devices.",
+    "Fallback from Google Cloud TTS to Native TTS must trigger automatically on API quota exceed or network timeout events.",
+    "Sound effects for success and error must play with low latency and appropriately reflect system states.",
+    "PWA features including offline caching, pull-to-refresh, and update prompt must function as intended.",
+    "Away mode messages and timer should display correctly and be toggled by users.",
+    "History modal must allow searching, filtering, and CSV export of past livestream sales data reliably."
+  ],
+  "code_summary": {
+    "project_name": "Manowzab Command Center",
+    "project_version": "4.9.9",
+    "project_description": "A specialized, high-performance dashboard for managing Facebook/YouTube Live commerce with real-time stock management, automated order processing from chat, and high-quality Text-to-Speech (TTS) announcements.",
+    "tech_stack": {
+      "framework": "Vue 3 (Composition API)",
+      "build_tool": "Vite 7.2.4",
+      "state_management": "Pinia 3.0.4",
+      "backend": "Firebase Realtime Database",
+      "authentication": "Firebase Authentication",
+      "styling": "Custom Vanilla CSS",
+      "pwa": "VitePWA 1.2.0",
+      "ui_library": "SweetAlert2 11.26.10"
+    },
+    "key_features": [
+      {
+        "category": "Live Commerce Management",
+        "features": [
+          "Real-time stock cutting when customers type CF or specific codes",
+          "Multi-buy support (e.g., '26 38 74' in a single message)",
+          "Admin proxy for manual booking via chat commands",
+          "Color-coded stock grid (Green=Available, Red=Reserved, Sold-out)",
+          "Queue system for popular items",
+          "Stock size sync across devices",
+          "History tracking with total sales and items"
+        ]
+      },
+      {
+        "category": "Advanced Audio & TTS System",
+        "features": [
+          "Hybrid TTS engine: Google Cloud TTS (Neural2) + Native Browser TTS",
+          "Smart fallback: Auto-switch to Native TTS if internet lags >3s or quota exceeded",
+          "iPad/iOS optimized with Silent Unlock technology",
+          "Sound effects (SFX): Success (Ka-Ching!), Error/Sold Out (Buzzer)",
+          "Multiple Google TTS API keys with rotation for quota management",
+          "Text-to-Speech queue system"
+        ]
+      },
+      {
+        "category": "Intelligent Chat Processing",
+        "features": [
+          "YouTube Live Integration: Real-time chat and viewer statistics",
+          "Smart filtering: Ignores spam and irrelevant messages",
+          "Cross-device sync via Firebase Realtime Database",
+          "Session-based history organized by Video ID",
+          "Custom nickname system with Firebase sync",
+          "AI-powered chat analysis using Ollama (optional)",
+          "Multiple detection methods: Regex (Pure Number, Explicit Buy, Dash Buy), AI",
+          "Admin commands: CF (confirm), cancel, shipping detection",
+          "Multi-buy detection and processing",
+          "Persistent chat storage with Firebase"
+        ]
+      },
+      {
+        "category": "System Features",
+        "features": [
+          "PWA support with offline caching",
+          "Pull-to-refresh functionality",
+          "Away mode with auto-response messages",
+          "Voice price mode for price announcements",
+          "Live overlay mode for OBS integration",
+          "History modal with search/filter and CSV export",
+          "Auto-cleanup of old data",
+          "Firebase presence tracking",
+          "Multi-device synchronization",
+          "Safe area support for iOS devices",
+          "GitHub Pages deployment support"
+        ]
+      },
+      {
+        "category": "Voice Detection & AI",
+        "features": [
+          "Gemini AI integration for voice analysis",
+          "Ollama local AI integration (optional)",
+          "Voice price detection and logging",
+          "Automated voice price announcements"
+        ]
+      }
+    ],
+    "project_structure": {
+      "components": [
+        "App.vue - Main application entry with Firebase presence and audio unlock",
+        "ChatPanel.vue - Chat display and Firebase sync",
+        "Dashboard.vue - Stock grid management interface",
+        "Header.vue - Navigation with TTS toggle, connection status, and settings",
+        "HistoryModal.vue - Historical sales data viewer with export",
+        "LiveOverlay.vue - OBS overlay for livestream",
+        "StockGrid.vue - Visual stock grid with color-coding",
+        "UpdatePrompt.vue - PWA update notification",
+        "VoicePricePage.vue - Price announcement interface"
+      ],
+      "composables": [
+        "useAudio.js - AudioContext for sound effects (SFX)",
+        "useAutoCleanup.js - Auto-cleanup of old Firebase data",
+        "useAwayMode.js - Away mode with auto-response",
+        "useChatProcessor.js - Core chat processing logic with order detection",
+        "useFirebase.js - Firebase initialization",
+        "useGemini.js - Gemini AI integration",
+        "useHistory.js - History data management",
+        "useOllama.js - Local Ollama AI integration (optional)",
+        "usePullToRefresh.js - Pull-to-refresh for PWA",
+        "useVoiceDetector.js - Voice price detection",
+        "useVoiceLogger.js - Voice price logging",
+        "useYouTube.js - YouTube Live Chat API integration"
+      ],
+      "stores": [
+        "chat.js - Chat messages state with Firebase sync and CSV export",
+        "nickname.js - Nickname management with Firebase persistence",
+        "stock.js - Stock inventory state with Firebase sync and transaction handling",
+        "system.js - Global system state (connection, video ID, settings, host mode)"
+      ],
+      "services": [
+        "TextToSpeech.js - TTS service with Google TTS and Native TTS fallback",
+        "YouTubeLiveChat.js - YouTube Live Chat API wrapper"
+      ]
+    },
+    "firebase_structure": {
+      "nodes": [
+        "chats/{videoId} - Chat messages organized by video session",
+        "stock/{videoId} - Stock inventory with owner, queue, price, time",
+        "settings/{videoId}/stockSize - Stock size configuration",
+        "nicknames/{uid} - User nickname mappings",
+        "history/{videoId} - Session history with total sales and items",
+        "overlay/{videoId} - OBS overlay data",
+        "presence/{uid} - User presence tracking",
+        "system/activeVideo - Current active video ID",
+        "system/isHost - Host device indicator"
+      ]
+    },
+    "key_algorithms": [
+      {
+        "name": "Order Detection",
+        "description": "Multi-strategy regex detection: Pure Number, Explicit Buy (CF/F/รับ/เอา), Dash Buy (name-number), Cancel detection"
+      },
+      {
+        "name": "Multi-Buy Processing",
+        "description": "Detects multiple numbers in a single message and processes each sequentially with queue handling"
+      },
+      {
+        "name": "Stock Transaction",
+        "description": "Firebase runTransaction for atomic stock updates, queue promotion on cancel"
+      },
+      {
+        "name": "TTS Fallback",
+        "description": "Google TTS with 3s timeout fallback to Native TTS, API key rotation for quota management"
+      },
+      {
+        "name": "Silent Audio Unlock",
+        "description": "iOS Safari audio unlock using silent WAV blob on first user interaction"
+      },
+      {
+        "name": "Real-time Sync",
+        "description": "Firebase onValue/onChildAdded listeners with automatic cleanup on video switch"
+      }
+    ],
+    "user_roles": [
+      {
+        "role": "Host",
+        "description": "Main admin device that fetches YouTube Live Chat and processes orders",
+        "permissions": "Read/Write to all Firebase nodes, YouTube API access"
+      },
+      {
+        "role": "Client/Observer",
+        "description": "Secondary devices that display synchronized data",
+        "permissions": "Read-only access, shares same stock and chat view"
+      }
+    ],
+    "external_apis": [
+      {
+        "api": "YouTube Data API v3",
+        "usage": "Fetch live chat messages and video statistics",
+        "quota": "Polling interval >= 60s to prevent quota exhaustion"
+      },
+      {
+        "api": "Google Cloud Text-to-Speech",
+        "usage": "High-quality Thai voice synthesis (Neural2)",
+        "features": "Multiple API keys with rotation, Base64 audio response"
+      },
+      {
+        "api": "Gemini AI",
+        "usage": "Voice price detection and analysis (optional)"
+      },
+      {
+        "api": "Ollama",
+        "usage": "Local AI for chat analysis (optional, if installed)"
+      }
+    ],
+    "deployment": {
+      "platform": "GitHub Pages",
+      "base_path": "/manowzab-v4/",
+      "build_command": "npm run build:gh",
+      "deploy_command": "npm run deploy"
+    },
+    "notable_patterns": [
+      "Singleton TTS service shared across application",
+      "Additive-only modification policy (never delete existing logic)",
+      "iPad/iOS compatibility as critical requirement",
+      "Firebase as single source of truth for all real-time data",
+      "Session isolation by videoId for daily livestream organization",
+      "Smart deduplication using seenMessageIds",
+      "Cost-efficient Firebase usage (~300 messages/session)",
+      "Away mode with random Thai message selection"
+    ],
+    "critical_constraints": [
+      "Must maintain iPad/iOS audio compatibility",
+      "Must preserve existing TTS and Audio logic",
+      "Must use additive changes only (no deletions without permission)",
+      "Must keep YouTube API polling >= 60s interval",
+      "Must handle Firebase quota safety",
+      "Must support offline fallback for TTS",
+      "Must maintain cross-device synchronization"
+    ]
+  }
+}

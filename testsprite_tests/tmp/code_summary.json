@@ -1,0 +1,119 @@
+{
+  "tech_stack": [
+    "JavaScript",
+    "Vue 3",
+    "Vite",
+    "Pinia",
+    "Firebase Realtime Database",
+    "YouTube Data API",
+    "Google Cloud TTS API",
+    "SweetAlert2"
+  ],
+  "features": [
+    {
+      "name": "Live Commerce Dashboard",
+      "description": "Main dashboard displaying stock grid with color-coded availability status, live chat panel, and real-time statistics for Facebook/YouTube Live commerce management",
+      "files": [
+        "src/components/Dashboard.vue",
+        "src/components/StockGrid.vue",
+        "src/App.vue"
+      ]
+    },
+    {
+      "name": "Real-Time Chat Integration",
+      "description": "YouTube Live chat fetching and display with intelligent filtering, cross-device sync via Firebase, and session-based history management",
+      "files": [
+        "src/components/ChatPanel.vue",
+        "src/services/YouTubeLiveChat.js",
+        "src/composables/useYouTube.js",
+        "src/stores/chat.js"
+      ]
+    },
+    {
+      "name": "Automated Stock Management",
+      "description": "Real-time stock cutting system that automatically deducts stock when customers type confirmation codes (CF, item numbers), with multi-buy support and admin proxy booking",
+      "files": [
+        "src/composables/useChatProcessor.js",
+        "src/stores/stock.js",
+        "src/components/StockGrid.vue"
+      ]
+    },
+    {
+      "name": "Hybrid TTS System",
+      "description": "Advanced text-to-speech engine with smart switching between Google Cloud TTS (Neural2) and Native Browser TTS, with automatic fallback and iPad/iOS optimization",
+      "files": [
+        "src/services/TextToSpeech.js",
+        "src/composables/useAudio.js",
+        "src/stores/system.js"
+      ]
+    },
+    {
+      "name": "Voice Price Detection",
+      "description": "AI-powered audio processing that detects price announcements from live stream audio and displays them in real-time with history tracking",
+      "files": [
+        "src/components/VoicePricePage.vue",
+        "src/composables/useVoiceDetector.js",
+        "src/composables/useOllama.js",
+        "src/composables/useGemini.js"
+      ]
+    },
+    {
+      "name": "Sound Effects System",
+      "description": "Audio feedback system with distinct sound effects for success (ka-ching) and error/sold-out (buzzer) events",
+      "files": ["src/composables/useAudio.js"]
+    },
+    {
+      "name": "Chat History Management",
+      "description": "Session-based chat history with pagination, load more functionality, and export to CSV capability",
+      "files": [
+        "src/components/HistoryModal.vue",
+        "src/composables/useHistory.js",
+        "src/stores/chat.js"
+      ]
+    },
+    {
+      "name": "Header Navigation",
+      "description": "Application header with navigation controls, TTS toggle, away mode, and system settings",
+      "files": ["src/components/Header.vue", "src/stores/system.js"]
+    },
+    {
+      "name": "Live Overlay Display",
+      "description": "Overlay component showing live stream information and statistics",
+      "files": ["src/components/LiveOverlay.vue"]
+    },
+    {
+      "name": "Nickname Management",
+      "description": "Customer nickname storage and custom override system integrated with Firebase",
+      "files": ["src/stores/nickname.js"]
+    },
+    {
+      "name": "Auto Cleanup System",
+      "description": "Automatic cleanup of old chat messages and stock data with configurable retention periods",
+      "files": ["src/composables/useAutoCleanup.js"]
+    },
+    {
+      "name": "Away Mode",
+      "description": "Auto-pause functionality when user is away or inactive to conserve resources",
+      "files": ["src/composables/useAwayMode.js"]
+    },
+    {
+      "name": "Pull to Refresh",
+      "description": "Touch-based pull-to-refresh functionality optimized for mobile and tablet devices",
+      "files": ["src/composables/usePullToRefresh.js"]
+    },
+    {
+      "name": "Firebase Integration",
+      "description": "Firebase Realtime Database connection and authentication for cross-device data synchronization",
+      "files": ["src/composables/useFirebase.js", "src/config/firebase.js"]
+    },
+    {
+      "name": "PWA Support",
+      "description": "Progressive Web App capabilities with service worker, offline caching, and update prompts",
+      "files": [
+        "src/components/UpdatePrompt.vue",
+        "src/registerServiceWorker.js",
+        "vite.config.js"
+      ]
+    }
+  ]
+}

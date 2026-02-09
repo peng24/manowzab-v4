@@ -8,31 +8,31 @@
 
     <!-- ✅ Normal Mode -->
     <template v-else>
-       <Header />
+      <Header />
 
-    <div v-if="systemStore.isAway" class="away-banner">
-      <div class="away-content">
-        <div class="away-icon">🌙</div>
-        <div class="away-text">
-          <div class="away-title">แอดมินพาลูกนอน</div>
-          <div class="away-subtitle">
-            กรุณารอสักครู่ หรือส่งข้อความทักทายไว้ค่ะ
+      <div v-if="systemStore.isAway" class="away-banner">
+        <div class="away-content">
+          <div class="away-icon">🌙</div>
+          <div class="away-text">
+            <div class="away-title">แอดมินพาลูกนอน</div>
+            <div class="away-subtitle">
+              กรุณารอสักครู่ หรือส่งข้อความทักทายไว้ค่ะ
+            </div>
           </div>
+          <span class="away-timer">{{ awayTimer }}</span>
+          <button class="away-btn" @click="closeAwayMode">
+            <i class="fa-solid fa-check"></i> ลูกหลับแล้ว
+          </button>
         </div>
-        <span class="away-timer">{{ awayTimer }}</span>
-        <button class="away-btn" @click="closeAwayMode">
-          <i class="fa-solid fa-check"></i> ลูกหลับแล้ว
-        </button>
       </div>
-    </div>
 
-    <div class="main-container">
-      <StockGrid />
-      <ChatPanel />
+      <div class="main-container">
+        <StockGrid />
+        <ChatPanel />
 
-      <Dashboard v-if="showDashboard" @close="showDashboard = false" />
-      <HistoryModal v-if="showHistory" @close="showHistory = false" />
-    </div>
+        <Dashboard v-if="showDashboard" @close="showDashboard = false" />
+        <HistoryModal v-if="showHistory" @close="showHistory = false" />
+      </div>
     </template>
   </div>
 </template>
@@ -44,7 +44,7 @@ import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
 import { useNicknameStore } from "./stores/nickname";
 import { ref as dbRef, onValue, onDisconnect, set } from "firebase/database";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { db, auth } from "./composables/useFirebase";
 import { logger } from "./utils/logger"; // ✅ Import Logger
 import { useAudio } from "./composables/useAudio";
@@ -67,15 +67,20 @@ const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
 
 // ✅ Global Watcher: Silence immediately when Sound is toggled OFF
-watch(() => systemStore.isSoundOn, (isOn) => {
-  if (!isOn) {
-    console.log("🔇 Sound turned OFF - Silencing immediately (App Singleton).");
-    ttsService.reset();
-  }
-});
+watch(
+  () => systemStore.isSoundOn,
+  (isOn) => {
+    if (!isOn) {
+      console.log(
+        "🔇 Sound turned OFF - Silencing immediately (App Singleton).",
+      );
+      ttsService.reset();
+    }
+  },
+);
 
 const urlParams = new URLSearchParams(window.location.search);
-const isVoiceMode = urlParams.get("mode") === "voice"; 
+const isVoiceMode = urlParams.get("mode") === "voice";
 const isOverlayMode = urlParams.get("mode") === "overlay"; // ✅ Check Overlay Mode
 
 // ✅ ดึง unlockAudio มาใช้แทน playDing
@@ -98,39 +103,53 @@ provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
 
 // ✅ Unlock Audio Function (All audio types: SFX, Native TTS, Google TTS)
-  async function handleFirstInteraction() {
-    const unlocked = await unlockAudio(); // Unlocks all audio systems
+async function handleFirstInteraction() {
+  const unlocked = await unlockAudio(); // Unlocks all audio systems
 
-    if (unlocked) {
-        // Remove listeners to prevent duplicate calls
-        document.removeEventListener("click", handleFirstInteraction);
-        document.removeEventListener("touchstart", handleFirstInteraction);
-        logger.log("✅ Audio unlocked on first interaction");
+  if (unlocked) {
+    // Remove listeners to prevent duplicate calls
+    document.removeEventListener("click", handleFirstInteraction);
+    document.removeEventListener("touchstart", handleFirstInteraction);
+    logger.log("✅ Audio unlocked on first interaction");
+  }
+}
+
+onMounted(async () => {
+  console.log("🚀 App mounted");
+
+  // 🤖 Test Mode: Auto-Login
+  const testEmail = import.meta.env.VITE_TEST_EMAIL;
+  const testPass = import.meta.env.VITE_TEST_PASSWORD;
+
+  if (testEmail && testPass && !auth.currentUser) {
+    console.log("🤖 Test Mode Detected: Attempting Auto-Login...");
+    try {
+      await signInWithEmailAndPassword(auth, testEmail, testPass);
+      console.log("✅ Auto-Login Success:", testEmail);
+    } catch (e) {
+      console.error("❌ Auto-Login Failed:", e.message);
     }
   }
 
-  onMounted(() => {
-    console.log("🚀 App mounted");
+  // ✅ Enable Pull to Refresh for PWA
+  usePullToRefresh();
 
-    // ✅ Enable Pull to Refresh for PWA
-    usePullToRefresh();
+  // ✅ Check Ollama connection on startup
+  checkConnection();
 
-    // ✅ Check Ollama connection on startup
-    checkConnection();
+  // Add global listeners for audio unlock
+  document.addEventListener("click", handleFirstInteraction);
+  document.addEventListener("touchstart", handleFirstInteraction);
+  document.addEventListener("keydown", handleFirstInteraction);
 
-    // Add global listeners for audio unlock
-    document.addEventListener("click", handleFirstInteraction);
-    document.addEventListener("touchstart", handleFirstInteraction);
-    document.addEventListener("keydown", handleFirstInteraction);
+  const cleanupFns = [];
 
-    const cleanupFns = [];
-    
-    // Clean up these specific listeners on unmount (if not yet removed)
-    cleanupFns.push(() => {
-        document.removeEventListener("click", handleFirstInteraction);
-        document.removeEventListener("touchstart", handleFirstInteraction);
-        document.removeEventListener("keydown", handleFirstInteraction);
-    });
+  // Clean up these specific listeners on unmount (if not yet removed)
+  cleanupFns.push(() => {
+    document.removeEventListener("click", handleFirstInteraction);
+    document.removeEventListener("touchstart", handleFirstInteraction);
+    document.removeEventListener("keydown", handleFirstInteraction);
+  });
 
   // ✅ Initialize Listeners (Capture cleanup functions)
   const unsubNick = nicknameStore.initNicknameListener();
@@ -178,7 +197,7 @@ provide("openHistory", () => (showHistory.value = true));
   const connectedRef = dbRef(db, ".info/connected");
   const unsubConnected = onValue(connectedRef, (snap) => {
     const isOnline = snap.val() === true;
-    
+
     if (isOnline) {
       hasConnectedOnce = true;
       systemStore.statusDb = "ok";
@@ -188,7 +207,7 @@ provide("openHistory", () => (showHistory.value = true));
     } else {
       systemStore.statusDb = "err";
       isDbConnected.value = false;
-      
+
       // Only log warning if we were previously connected
       if (hasConnectedOnce) {
         logger.warn("❌ Firebase Disconnected");
@@ -203,7 +222,9 @@ provide("openHistory", () => (showHistory.value = true));
   // ✅ Auth State Listener
   const unsubAuth = onAuthStateChanged(auth, (user) => {
     isUserAuthenticated.value = !!user;
-    console.log(`✅ Auth state changed: ${user ? 'authenticated' : 'not authenticated'}`);
+    console.log(
+      `✅ Auth state changed: ${user ? "authenticated" : "not authenticated"}`,
+    );
     setupPresence();
   });
   cleanupFns.push(unsubAuth);
@@ -223,7 +244,7 @@ provide("openHistory", () => (showHistory.value = true));
     (snap) => {
       const val = snap.val();
       if (val) stockStore.stockSize = val;
-    }
+    },
   );
   cleanupFns.push(unsubSettings);
 
@@ -257,7 +278,7 @@ provide("openHistory", () => (showHistory.value = true));
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
-  
+
   /* iOS Safe Area Support */
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);

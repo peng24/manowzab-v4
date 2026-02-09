@@ -1,0 +1,79 @@
+import asyncio
+from playwright import async_api
+
+async def run_test():
+    pw = None
+    browser = None
+    context = None
+
+    try:
+        # Start a Playwright session in asynchronous mode
+        pw = await async_api.async_playwright().start()
+
+        # Launch a Chromium browser in headless mode with custom arguments
+        browser = await pw.chromium.launch(
+            headless=True,
+            args=[
+                "--window-size=1280,720",         # Set the browser window size
+                "--disable-dev-shm-usage",        # Avoid using /dev/shm which can cause issues in containers
+                "--ipc=host",                     # Use host-level IPC for better stability
+                "--single-process"                # Run the browser in a single process mode
+            ],
+        )
+
+        # Create a new browser context (like an incognito window)
+        context = await browser.new_context()
+        context.set_default_timeout(5000)
+
+        # Open a new page in the browser context
+        page = await context.new_page()
+
+        # Navigate to your target URL and wait until the network request is committed
+        await page.goto("http://localhost:5173", wait_until="commit", timeout=10000)
+
+        # Wait for the main page to reach DOMContentLoaded state (optional for stability)
+        try:
+            await page.wait_for_load_state("domcontentloaded", timeout=3000)
+        except async_api.Error:
+            pass
+
+        # Iterate through all iframes and wait for them to load as well
+        for frame in page.frames:
+            try:
+                await frame.wait_for_load_state("domcontentloaded", timeout=3000)
+            except async_api.Error:
+                pass
+
+        # Interact with the page elements to simulate user flow
+        # -> Navigate to http://localhost:5173
+        await page.goto("http://localhost:5173", wait_until="commit", timeout=10000)
+        
+        # -> Try a longer wait, then scroll the page to reveal any lazy-loaded UI, and if still blank reload the app URL.
+        await page.goto("http://localhost:5173/manowzab-v4/", wait_until="commit", timeout=10000)
+        
+        # -> Try a direct reload/navigation to the root app URL (http://localhost:5173/) and wait to allow the SPA to initialize, then scroll to reveal any lazy-loaded UI. If still empty, plan to report website issue.
+        await page.goto("http://localhost:5173/", wait_until="commit", timeout=10000)
+        
+        # -> Navigate to an alternative host (http://127.0.0.1:5173/manowzab-v4/) and wait 3 seconds, then rescan the page for interactive elements. If still blank, prepare to report website issue.
+        await page.goto("http://127.0.0.1:5173/manowzab-v4/", wait_until="commit", timeout=10000)
+        
+        # --> Assertions to verify final state
+        frame = context.pages[-1]
+        ```
+        try:
+            await expect(frame.locator('text=Next order promoted and stock updated').first).to_be_visible(timeout=3000)
+        except AssertionError:
+            raise AssertionError("Test case failed: When cancelling the front order the test expected the queue to instantly promote the next waiting order and update stock without creating duplicate queue entries, but the page did not show 'Next order promoted and stock updated', indicating the promotion, stock reconciliation, or duplicate-handling did not occur as expected.")
+        ```
+        await asyncio.sleep(5)
+
+    finally:
+        if context:
+            await context.close()
+        if browser:
+            await browser.close()
+        if pw:
+            await pw.stop()
+
+asyncio.run(run_test())
+    

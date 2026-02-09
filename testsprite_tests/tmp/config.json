@@ -1,0 +1,17 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:5173",
+  "executionArgs": {
+    "projectName": "manowzab-v4",
+    "projectPath": "d:\\Manowzab-v4\\manowzab-v4",
+    "testIds": [],
+    "additionalInstruction": "",
+    "envs": {
+      "API_KEY": "sk-user-eJhyRgGCpbcpMp-QUBW2i-hHPWJJjz5R8h5zAfB2msDNhKi3FGxPcg06v72dZ9BU5Zgu_CXnMBD86cDKCDLhmyUgfSw33Im_MjsDBXZgiF2sranBlLlK0RM3bF2eKCXm_kk"
+    }
+  },
+  "serverPort": 63299,
+  "proxy": "http://5c74b874-9ae4-433e-bc05-64f84073b395:Ivu23jjop18mPd1aTFmzHDnLs8RHhSqj@tun.testsprite.com:8080"
+}

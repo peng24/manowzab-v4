@@ -1,388 +1,384 @@
 [
   {
     "id": "TC001",
-    "title": "Real-time stock cutting from chat order commands",
-    "description": "Verify that when chat messages containing valid order commands (e.g., CF, pure numbers) are received, the stock of corresponding items is updated atomically and within 1 second.",
+    "title": "Real-time stock update upon incoming order chat message",
+    "description": "Verify that when an order chat message is detected, the stock inventory updates in real-time across all connected devices.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Start live session and connect host device to YouTube Live Chat API"
+        "description": "Open two client devices logged into the same account with Manowzab Command Center dashboard."
       },
       {
         "type": "action",
-        "description": "Send chat message with a valid single item order command (e.g., 'CF 12')"
+        "description": "Send a valid order-formatted chat message containing an item purchase from YouTube Live Chat."
       },
       {
         "type": "assertion",
-        "description": "Check stock value for item 12 decreases by one within 1 second"
-      },
-      {
-        "type": "action",
-        "description": "Send chat message with a multi-buy order command (e.g., '26 38 74')"
+        "description": "Check that the stock quantity decreases correctly in the Stock Grid on both devices reflecting the order."
       },
       {
         "type": "assertion",
-        "description": "Verify stock values for items 26, 38, and 74 each decrease accordingly within 1 second"
-      },
-      {
-        "type": "action",
-        "description": "Send chat message with admin proxy manual booking command"
-      },
-      {
-        "type": "assertion",
-        "description": "Check stock updated as expected and queue system reflects the manual booking"
+        "description": "Verify no delay greater than 1 second from chat message reception to stock update."
       }
     ]
   },
   {
     "id": "TC002",
-    "title": "Multi-device synchronization latency",
-    "description": "Ensure data synchronization latency remains under 100 milliseconds across multiple connected admin and observer client devices for stock, chat messages, and system status updates.",
+    "title": "Automated TTS announcement playback on new order",
+    "description": "Confirm that the hybrid TTS system triggers playback of order summary announcements immediately when an order is processed online and falls back offline when unavailable.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Connect host and at least two observer client devices to the same videoId session"
-      },
-      {
-        "type": "action",
-        "description": "Trigger an order via chat message or admin proxy on host device"
+        "description": "Simulate an incoming order chat message triggering order processing with TTS enabled in online mode."
       },
       {
         "type": "assertion",
-        "description": "Verify all observer devices update stock and chat state with less than 100ms latency"
+        "description": "Verify Google Cloud TTS playback starts within 3 seconds."
       },
       {
         "type": "action",
-        "description": "Cancel an order on one client device"
+        "description": "Disable internet connectivity and simulate a new order chat message."
       },
       {
         "type": "assertion",
-        "description": "Check host and other clients reflect the cancellation instantly within 100ms"
+        "description": "Check that native browser TTS plays the order summary immediately after detection without error."
       }
     ]
   },
   {
     "id": "TC003",
-    "title": "Text-to-Speech functionality with Google Cloud TTS and fallback to Native TTS",
-    "description": "Validate that TTS audio starts playing within 3 seconds when online using Google Cloud TTS, and automatically falls back to Native TTS if Google TTS API exceeds timeout or quota.",
+    "title": "Stock Grid color-coded availability and queue display",
+    "description": "Validate that the Stock Grid correctly shows color codes for availability status and displays queue counts for items that are reserved but not yet finalized.",
     "category": "functional",
-    "priority": "High",
+    "priority": "Medium",
     "steps": [
       {
         "type": "action",
-        "description": "Trigger an order processing that requires TTS announcement with Google Cloud TTS available"
+        "description": "Manually book items using admin proxy commands or stock grid controls to generate queue reservations."
       },
       {
         "type": "assertion",
-        "description": "Audio playback starts within 3 seconds using Google Cloud TTS"
-      },
-      {
-        "type": "action",
-        "description": "Simulate Google Cloud TTS API quota exceeded or timeout error"
+        "description": "Confirm color codes on stock items accurately reflect 'in stock', 'reserved (queued)', and 'out of stock' statuses."
       },
       {
         "type": "assertion",
-        "description": "System automatically switches to Native TTS and audio plays immediately"
+        "description": "Check the queue count number is displayed clearly next to queued items."
       }
     ]
   },
   {
     "id": "TC004",
-    "title": "iPad/iOS audio unlock mechanism",
-    "description": "Confirm that the silent audio unlock technique on iPad/iOS devices enables sound playback after the first user interaction without errors or user disruption.",
+    "title": "Multi-device Firebase synchronization for stock, chat, and system state",
+    "description": "Ensure all stock changes, chat messages, system toggles (like TTS, sound, away mode) are synced with under 100ms latency without data loss or duplicated messages across multiple devices.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Open the application on an iPad or iOS device"
+        "description": "Open the app on three separate devices simultaneously logged into the same admin user."
       },
       {
         "type": "action",
-        "description": "Perform first user interaction (e.g., tap anywhere on the screen)"
-      },
-      {
-        "type": "action",
-        "description": "Trigger any audio playback (TTS or sound effect)"
+        "description": "Perform changes such as stock adjustments, toggle TTS mode, send chat messages, and enable away mode on one device."
       },
       {
         "type": "assertion",
-        "description": "Verify that audio plays without errors and with expected quality"
+        "description": "Verify that all other devices update their UI to reflect these changes under 100ms with no duplicated chat or stock entries."
       }
     ]
   },
   {
     "id": "TC005",
-    "title": "Queue system promotion on order cancellation",
-    "description": "Ensure that when an order is cancelled, the queue system instantly promotes next waiting orders without duplication or inconsistencies in stock reservation.",
+    "title": "Chat panel pagination and message formatting validation",
+    "description": "Verify chat panel displays up to 200 messages with correct formatting for buy/sell/shipping message types and supports loading older messages via pagination.",
     "category": "functional",
-    "priority": "High",
+    "priority": "Medium",
     "steps": [
       {
         "type": "action",
-        "description": "Place multiple orders leading to queue formation for a popular item"
+        "description": "Fill chat with more than 200 messages including various message types (order, cancellation, shipping, and normal chat)."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that the newest 200 messages are displayed with appropriate highlights and buyer nickname overrides."
       },
       {
         "type": "action",
-        "description": "Cancel an order at the front of the queue"
+        "description": "Use 'Load More' pagination control to fetch earlier messages."
       },
       {
         "type": "assertion",
-        "description": "Verify queue updates instantly with next order promoted and stock reflects these changes"
-      },
-      {
-        "type": "assertion",
-        "description": "Ensure no duplicate queue entries exist for the same order"
+        "description": "Confirm older messages are loaded and displayed correctly maintaining formatting."
       }
     ]
   },
   {
     "id": "TC006",
-    "title": "Persistent chat and sales history with search and CSV export",
-    "description": "Verify that chat messages and sales history persist across page reloads and sessions, support filtering and searching, and allow reliable CSV export.",
+    "title": "Sales and chat history filtering and CSV export",
+    "description": "Confirm that the History Modal correctly filters sessions by date and search terms and exports complete, accurate sales data as CSV.",
     "category": "functional",
     "priority": "Medium",
     "steps": [
       {
         "type": "action",
-        "description": "Generate multiple chat messages with order commands across sessions"
+        "description": "Open the History Modal and set date range filters to a specific session period."
       },
       {
         "type": "action",
-        "description": "Reload application page"
+        "description": "Apply text search filters to narrow down transactions."
       },
       {
         "type": "assertion",
-        "description": "Verify chat and sales history is fully restored from Firebase"
+        "description": "Verify that only transactions matching criteria are displayed and sales statistics update accordingly."
       },
       {
         "type": "action",
-        "description": "Use history modal's search and filter functionality with different criteria"
+        "description": "Click CSV export button."
       },
       {
         "type": "assertion",
-        "description": "Confirm results accurately reflect filters"
-      },
-      {
-        "type": "action",
-        "description": "Perform CSV export of filtered and unfiltered data"
-      },
-      {
-        "type": "assertion",
-        "description": "Check exported file integrity and correct content"
+        "description": "Validate the downloaded CSV contains all filtered transactions with correct fields and no data omissions."
       }
     ]
   },
   {
     "id": "TC007",
-    "title": "Smart spam filtering and invalid message handling",
-    "description": "Confirm that spam and irrelevant messages are filtered out and do not trigger stock changes or TTS announcements.",
-    "category": "error handling",
-    "priority": "Medium",
+    "title": "iPad Safari audio unlock enabling autoplay on first interaction",
+    "description": "Test that audio playback (TTS and sound effects) on iPad Safari is successfully unlocked after the user's first interaction, allowing autoplay throughout the session.",
+    "category": "functional",
+    "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Send chat messages identified as spam or irrelevant by filtering logic"
+        "description": "Open the app on iPad Safari with audio playback initially locked."
       },
       {
         "type": "assertion",
-        "description": "Check that no stock transaction or queue update occurs"
+        "description": "Verify initially audio autoplay is blocked."
+      },
+      {
+        "type": "action",
+        "description": "Perform any user interaction such as tapping a button to unlock audio."
       },
       {
         "type": "assertion",
-        "description": "Verify no TTS or error sound effects are played"
+        "description": "Confirm subsequent TTS and sound effect playback occur without additional user interaction."
       }
     ]
   },
   {
     "id": "TC008",
-    "title": "System behavior during YouTube API polling interval delays",
-    "description": "Ensure the application properly handles YouTube Data API polling intervals of 60 seconds or more without causing quota exhaustion or missed data loss.",
+    "title": "Sound effect playback for success and error events",
+    "description": "Ensure that distinct sound effects play appropriately on successful order processing and error occurrences.",
     "category": "functional",
-    "priority": "High",
+    "priority": "Medium",
     "steps": [
       {
         "type": "action",
-        "description": "Set YouTube API polling interval to 60 seconds"
-      },
-      {
-        "type": "action",
-        "description": "Monitor chat message reception and synchronization during polling intervals"
+        "description": "Trigger a successful order processing event by simulating a valid chat order."
       },
       {
         "type": "assertion",
-        "description": "Verify no API quota errors occur and chat messages are accurately processed after each poll"
+        "description": "Verify that the success sound effect is played exactly once."
+      },
+      {
+        "type": "action",
+        "description": "Trigger an error state such as stock overbooking or invalid command."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the error sound effect is played exactly once."
       }
     ]
   },
   {
     "id": "TC009",
-    "title": "Offline caching and pull-to-refresh functionality in PWA mode",
-    "description": "Validate that the application supports offline caching enabling usage without network connectivity and that pull-to-refresh triggers a correct data synchronization.",
-    "category": "functional",
-    "priority": "Medium",
+    "title": "YouTube Live Chat API polling respects quota and handles errors gracefully",
+    "description": "Validate that the YouTube Live Chat API polling mechanism limits request frequency to avoid quota breaches and recovers smoothly from API errors.",
+    "category": "error handling",
+    "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Launch the PWA and cache necessary data"
-      },
-      {
-        "type": "action",
-        "description": "Go offline and restart the app"
+        "description": "Simulate continuous message polling at high frequency with YouTube API quota restrictions."
       },
       {
         "type": "assertion",
-        "description": "Confirm the app is functional with cached data and no crashes"
+        "description": "Verify polling adjusts interval dynamically to prevent exceeding quota."
       },
       {
         "type": "action",
-        "description": "Go back online and perform pull-to-refresh gesture"
+        "description": "Introduce artificial API error responses such as HTTP 403 or 500."
       },
       {
         "type": "assertion",
-        "description": "Verify latest data is fetched and UI updates accordingly"
+        "description": "Check that errors are logged, users notified if needed, and polling resumes normally after cooldown."
       }
     ]
   },
   {
     "id": "TC010",
-    "title": "Away mode toggle and auto-response messages functionality",
-    "description": "Check that toggling away mode activates auto-response messages with correct timer and random Thai message selection.",
+    "title": "Away mode toggle and custom away message display with visual banner",
+    "description": "Confirm that toggling away mode updates system state, broadcasts custom away messages, and displays a visible banner as expected.",
     "category": "functional",
     "priority": "Medium",
     "steps": [
       {
         "type": "action",
-        "description": "Enable away mode via UI toggle"
+        "description": "Toggle away mode on via the header controls."
       },
       {
         "type": "assertion",
-        "description": "Verify auto-responses are sent periodically with varied Thai messages"
+        "description": "Validate that the custom away message is sent as a chat notification."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm a banner indicating away mode is visible on all devices connected to the account."
       },
       {
         "type": "action",
-        "description": "Disable away mode"
+        "description": "Toggle away mode off."
       },
       {
         "type": "assertion",
-        "description": "Confirm auto-responses stop immediately"
+        "description": "Verify that the away banner is removed and normal chat operations continue."
       }
     ]
   },
   {
     "id": "TC011",
-    "title": "Stock grid interface color-coding and manual admin proxy commands",
-    "description": "Verify that the stock grid visually reflects correct color codes (green, red) for available, reserved and sold-out stock and that manual bookings or cancellations via admin commands update the stock grid accordingly.",
-    "category": "ui",
+    "title": "Offline caching and update prompt functionality of PWA",
+    "description": "Verify that the Progressive Web App caches critical assets for offline use and displays an update prompt when a new version is available.",
+    "category": "functional",
     "priority": "Medium",
     "steps": [
       {
         "type": "action",
-        "description": "Set stock for items to various levels: available, reserved, sold-out"
-      },
-      {
-        "type": "assertion",
-        "description": "Confirm corresponding color codes appear correctly on stock grid"
+        "description": "Load the app and verify all static resources are cached by the service worker."
       },
       {
         "type": "action",
-        "description": "Use admin proxy commands to manually book and cancel stock"
+        "description": "Disconnect network and reload the app."
       },
       {
         "type": "assertion",
-        "description": "Verify stock grid updates colors and values to reflect actions"
+        "description": "Confirm app loads successfully with cached resources and all main UI components function offline."
+      },
+      {
+        "type": "action",
+        "description": "Deploy a new app version and reload the page."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that an update prompt is displayed, allowing the user to refresh to the new version."
       }
     ]
   },
   {
     "id": "TC012",
-    "title": "Sound effects playback on order success and error states",
-    "description": "Ensure that appropriate success (Ka-Ching!) and error (Buzzer) sound effects play with low latency and reflect the correct system states during order processing.",
+    "title": "Manual booking and queue management via stock grid inputs",
+    "description": "Test that admins can manually book stock items and manage queues through Stock Grid controls and that these updates reflect in real-time.",
     "category": "functional",
     "priority": "Medium",
     "steps": [
       {
         "type": "action",
-        "description": "Trigger successful order processing"
+        "description": "Select a stock item in the Stock Grid and manually input a booking quantity."
       },
       {
         "type": "assertion",
-        "description": "Success sound effect plays immediately after order is confirmed"
+        "description": "Verify that the booking updates the queue count and stock availability accordingly."
       },
       {
         "type": "action",
-        "description": "Attempt an order when stock is sold out"
+        "description": "Cancel part or all of the queue using stock grid controls."
       },
       {
         "type": "assertion",
-        "description": "Error sound effect plays to indicate sold out or failure"
+        "description": "Confirm the queue count and available stock adjust correctly and synchronize across devices."
       }
     ]
   },
   {
     "id": "TC013",
-    "title": "Firebase data persistence across page reloads",
-    "description": "Validate that all stock, chat, nickname, and system state data stored in Firebase persists and synchronizes correctly after page reloads for both host and client devices.",
-    "category": "functional",
-    "priority": "High",
-    "steps": [
-      {
-        "type": "action",
-        "description": "Populate system with chat messages, nicknames, stock reservations"
-      },
-      {
-        "type": "action",
-        "description": "Reload page on host and client devices"
-      },
-      {
-        "type": "assertion",
-        "description": "Verify that all data is synchronized and consistent post reload"
-      }
-    ]
-  },
-  {
-    "id": "TC014",
-    "title": "TTS queue system to prevent audio overlap",
-    "description": "Confirm that multiple TTS announcements triggered in rapid succession are queued and played sequentially without overlapping or cutting off each other.",
-    "category": "functional",
-    "priority": "Medium",
-    "steps": [
-      {
-        "type": "action",
-        "description": "Trigger multiple order notifications in less than 1 second"
-      },
-      {
-        "type": "assertion",
-        "description": "Verify TTS audio announcements queue and play one after another"
-      },
-      {
-        "type": "assertion",
-        "description": "Ensure no audio overlap or loss occurs"
-      }
-    ]
-  },
-  {
-    "id": "TC015",
-    "title": "Custom nickname system synchronization",
-    "description": "Verify that nickname changes are persisted in Firebase per user and synchronized across all connected devices accurately.",
+    "title": "Pull-to-refresh gesture on mobile reloads chat and stock data",
+    "description": "Validate the pull-to-refresh gesture on mobile devices triggers reload of latest chat messages and stock data without errors.",
     "category": "functional",
     "priority": "Low",
     "steps": [
       {
         "type": "action",
-        "description": "Change nickname on one client device"
+        "description": "Open the app on a mobile/tablet device."
+      },
+      {
+        "type": "action",
+        "description": "Perform pull-to-refresh gesture on the chat panel."
       },
       {
         "type": "assertion",
-        "description": "Verify the updated nickname is saved in Firebase"
+        "description": "Verify that the chat panel reloads new chat messages and stock grid refreshes current stock status."
       },
       {
         "type": "assertion",
-        "description": "Check all other client devices display the updated nickname correctly"
+        "description": "Confirm no duplicates or missing data occur after refresh."
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Voice-price detection processes spoken price queries with TTS response",
+    "description": "Ensure that spoken price queries on the Voice Price Page are detected accurately by speech recognition and the corresponding price information is announced using TTS.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the Voice Price Page and speak a valid price query for an available stock item."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that speech recognition converts the spoken query into text accurately."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm TTS playback announces the correct price information within 3 seconds."
+      },
+      {
+        "type": "action",
+        "description": "Speak an invalid or unknown item query."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that an appropriate error or 'item not found' message is announced with TTS."
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "System reliability under high load with 500+ chat messages and 70 stock items",
+    "description": "Test the application stability and UI responsiveness when handling large volumes of chat messages and extensive stock inventory without memory leaks or lag.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Populate chat history with over 500 messages including multiple order, cancellation, and normal chat types."
+      },
+      {
+        "type": "action",
+        "description": "Load a stock inventory of at least 70 items and perform frequent real-time stock updates."
+      },
+      {
+        "type": "assertion",
+        "description": "Monitor UI responsiveness and memory usage over a 30-minute period."
+      },
+      {
+        "type": "assertion",
+        "description": "Validate no UI freezing, data loss, or memory leaks occur."
       }
     ]
   }

@@ -18,10 +18,10 @@ import { useSystemStore } from "./system";
 export const useStockStore = defineStore("stock", () => {
   /** @type {import('vue').Ref<Object>} Dictionary of stock items */
   const stockData = ref({});
-  
+
   /** @type {import('vue').Ref<number>} Total number of stock items */
   const stockSize = ref(70);
-  
+
   const systemStore = useSystemStore();
 
   /**
@@ -38,22 +38,22 @@ export const useStockStore = defineStore("stock", () => {
 
       // ✅ Real-time History Sync: Update Total Sales & Item Count
       if (videoId && videoId !== "demo") {
-         let totalSales = 0;
-         let totalItems = 0;
-         
-         Object.values(val).forEach(item => {
-             if (item.owner && item.price) {
-                 totalSales += parseInt(item.price);
-                 totalItems++;
-             }
-         });
+        let totalSales = 0;
+        let totalItems = 0;
 
-         const historyRef = dbRef(db, `history/${videoId}`);
-         update(historyRef, {
-             totalSales: totalSales,
-             totalItems: totalItems,
-             lastUpdated: Date.now()
-         }).catch(err => console.error("History Sync Error:", err));
+        Object.values(val).forEach((item) => {
+          if (item.owner && item.price) {
+            totalSales += parseInt(item.price);
+            totalItems++;
+          }
+        });
+
+        const historyRef = dbRef(db, `history/${videoId}`);
+        update(historyRef, {
+          totalSales: totalSales,
+          totalItems: totalItems,
+          lastUpdated: Date.now(),
+        }).catch((err) => console.error("History Sync Error:", err));
       }
     });
 
@@ -74,7 +74,7 @@ export const useStockStore = defineStore("stock", () => {
   /**
    * Processes a new order (booking/buying).
    * Used by both Manual input and Chat/AI processing.
-   * 
+   *
    * @param {number} num - The item number to book.
    * @param {string} owner - Display name of the buyer.
    * @param {string} uid - Unique ID of the buyer (channelId).
@@ -88,14 +88,17 @@ export const useStockStore = defineStore("stock", () => {
     uid,
     source = "manual",
     price = null,
-    method = "manual"
+    method = "manual",
   ) {
     const itemRef = dbRef(db, `stock/${systemStore.currentVideoId}/${num}`);
 
     try {
+      let action = "unknown";
+
       await runTransaction(itemRef, (currentData) => {
         if (currentData === null) {
           // Create new item if not exists
+          action = "claimed";
           return {
             owner,
             uid,
@@ -106,6 +109,7 @@ export const useStockStore = defineStore("stock", () => {
           };
         } else if (!currentData.owner) {
           // Claim empty item
+          action = "claimed";
           currentData.owner = owner;
           currentData.uid = uid;
           currentData.time = Date.now();
@@ -115,22 +119,32 @@ export const useStockStore = defineStore("stock", () => {
           return currentData;
         } else {
           // Add to queue if occupied
-          if (currentData.owner === owner) return; // Already owns it
+          if (currentData.owner === owner) {
+            action = "already_owned";
+            return; // Already owns it
+          }
           const queue = currentData.queue || [];
-          if (queue.find((q) => q.owner === owner)) return; // Already in queue
+          if (queue.find((q) => q.owner === owner)) {
+            action = "already_queued";
+            return; // Already in queue
+          }
+          action = "queued";
           queue.push({ owner, uid, time: Date.now() });
           currentData.queue = queue;
           return currentData;
         }
       });
+
+      return { success: true, action, error: null };
     } catch (e) {
       console.error("Transaction failed: ", e);
+      return { success: false, action: "error", error: e.message };
     }
   }
 
   /**
    * Cancels an order and promotes the next person in queue.
-   * 
+   *
    * @param {number} num - The item number to cancel.
    * @returns {Promise<{previousOwner: string, nextOwner: string|null}|null>} Info about the cancellation for TTS.
    */
@@ -141,30 +155,40 @@ export const useStockStore = defineStore("stock", () => {
     const previousOwner = current.owner;
     let nextOwner = null;
 
-    if (current.queue && current.queue.length > 0) {
-      // Promote next in queue
-      const next = current.queue[0];
-      const nextQ = current.queue.slice(1);
-      const newData = {
-        owner: next.owner,
-        uid: next.uid,
-        time: Date.now(),
-        queue: nextQ,
-        source: "queue",
+    try {
+      if (current.queue && current.queue.length > 0) {
+        // Promote next in queue
+        const next = current.queue[0];
+        const nextQ = current.queue.slice(1);
+        const newData = {
+          owner: next.owner,
+          uid: next.uid,
+          time: Date.now(),
+          queue: nextQ,
+          source: "queue",
+        };
+        if (current.price) newData.price = current.price;
+
+        await set(
+          dbRef(db, `stock/${systemStore.currentVideoId}/${num}`),
+          newData,
+        );
+        nextOwner = next.owner;
+      } else {
+        // Delete item if no queue
+        await remove(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`));
+      }
+
+      return { success: true, previousOwner, nextOwner, error: null };
+    } catch (e) {
+      console.error("Cancel failed: ", e);
+      return {
+        success: false,
+        previousOwner,
+        nextOwner: null,
+        error: e.message,
       };
-      if (current.price) newData.price = current.price;
-
-      await set(
-        dbRef(db, `stock/${systemStore.currentVideoId}/${num}`),
-        newData
-      );
-      nextOwner = next.owner;
-    } else {
-      // Delete item if no queue
-      await remove(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`));
     }
-
-    return { previousOwner, nextOwner };
   }
 
   /**
@@ -176,8 +200,8 @@ export const useStockStore = defineStore("stock", () => {
 
   /**
    * Updates only the price of a stock item.
-   * @param {number} num 
-   * @param {number} price 
+   * @param {number} num
+   * @param {number} price
    */
   function updateStockPrice(num, price) {
     const path = `stock/${systemStore.currentVideoId}/${num}/price`;
@@ -186,13 +210,13 @@ export const useStockStore = defineStore("stock", () => {
 
   /**
    * Sets the total stock size (max items).
-   * @param {number} newSize 
+   * @param {number} newSize
    */
   function updateStockSize(newSize) {
     if (!systemStore.currentVideoId) return;
     const sizeRef = dbRef(
       db,
-      `settings/${systemStore.currentVideoId}/stockSize`
+      `settings/${systemStore.currentVideoId}/stockSize`,
     );
     set(sizeRef, newSize);
   }
@@ -206,16 +230,22 @@ export const useStockStore = defineStore("stock", () => {
     if (!systemStore.currentVideoId) return;
 
     // 1. Update Stock Item
-    await update(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`), newData);
+    await update(
+      dbRef(db, `stock/${systemStore.currentVideoId}/${num}`),
+      newData,
+    );
 
     // 2. Update Overlay "Current Item" (Only if we have price/size)
     if (newData.price || newData.size) {
-      await update(dbRef(db, `overlay/${systemStore.currentVideoId}/current_item`), {
-        id: num,
-        price: newData.price || null,
-        size: newData.size || null,
-        updatedAt: Date.now()
-      });
+      await update(
+        dbRef(db, `overlay/${systemStore.currentVideoId}/current_item`),
+        {
+          id: num,
+          price: newData.price || null,
+          size: newData.size || null,
+          updatedAt: Date.now(),
+        },
+      );
     }
   }
 

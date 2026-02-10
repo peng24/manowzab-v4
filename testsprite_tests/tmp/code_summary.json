@@ -4,116 +4,154 @@
     "Vue 3",
     "Vite",
     "Pinia",
-    "Firebase Realtime Database",
-    "YouTube Data API",
-    "Google Cloud TTS API",
-    "SweetAlert2"
+    "Firebase",
+    "SweetAlert2",
+    "PWA (vite-plugin-pwa)"
   ],
   "features": [
     {
-      "name": "Live Commerce Dashboard",
-      "description": "Main dashboard displaying stock grid with color-coded availability status, live chat panel, and real-time statistics for Facebook/YouTube Live commerce management",
-      "files": [
-        "src/components/Dashboard.vue",
-        "src/components/StockGrid.vue",
-        "src/App.vue"
-      ]
+      "name": "MainApp",
+      "description": "Root application component handling Firebase auth, presence tracking, route/view management (Login, Dashboard, VoicePrice), and global lifecycle",
+      "files": ["src/App.vue", "src/main.js"]
     },
     {
-      "name": "Real-Time Chat Integration",
-      "description": "YouTube Live chat fetching and display with intelligent filtering, cross-device sync via Firebase, and session-based history management",
-      "files": [
-        "src/components/ChatPanel.vue",
-        "src/services/YouTubeLiveChat.js",
-        "src/composables/useYouTube.js",
-        "src/stores/chat.js"
-      ]
+      "name": "ChatPanel",
+      "description": "Real-time chat panel displaying messages with special formatting for buy/sell/shipping events, pagination with Load More, and auto-scroll",
+      "files": ["src/components/ChatPanel.vue"]
     },
     {
-      "name": "Automated Stock Management",
-      "description": "Real-time stock cutting system that automatically deducts stock when customers type confirmation codes (CF, item numbers), with multi-buy support and admin proxy booking",
-      "files": [
-        "src/composables/useChatProcessor.js",
-        "src/stores/stock.js",
-        "src/components/StockGrid.vue"
-      ]
+      "name": "StockGrid",
+      "description": "Interactive stock inventory grid with search, filtering, sorting, quantity adjustment, and real-time Firebase sync",
+      "files": ["src/components/StockGrid.vue"]
     },
     {
-      "name": "Hybrid TTS System",
-      "description": "Advanced text-to-speech engine with smart switching between Google Cloud TTS (Neural2) and Native Browser TTS, with automatic fallback and iPad/iOS optimization",
-      "files": [
-        "src/services/TextToSpeech.js",
-        "src/composables/useAudio.js",
-        "src/stores/system.js"
-      ]
+      "name": "Dashboard",
+      "description": "Main dashboard view composing StockGrid and ChatPanel side by side with responsive layout",
+      "files": ["src/components/Dashboard.vue"]
     },
     {
-      "name": "Voice Price Detection",
-      "description": "AI-powered audio processing that detects price announcements from live stream audio and displays them in real-time with history tracking",
-      "files": [
-        "src/components/VoicePricePage.vue",
-        "src/composables/useVoiceDetector.js",
-        "src/composables/useOllama.js",
-        "src/composables/useGemini.js"
-      ]
+      "name": "Header",
+      "description": "App header with navigation, TTS toggle (online/offline), away mode toggle, sound toggle, and user info display",
+      "files": ["src/components/Header.vue"]
     },
     {
-      "name": "Sound Effects System",
-      "description": "Audio feedback system with distinct sound effects for success (ka-ching) and error/sold-out (buzzer) events",
-      "files": ["src/composables/useAudio.js"]
+      "name": "HistoryModal",
+      "description": "Modal for viewing transaction history with date filtering, search, CSV export, and summary statistics",
+      "files": ["src/components/HistoryModal.vue"]
     },
     {
-      "name": "Chat History Management",
-      "description": "Session-based chat history with pagination, load more functionality, and export to CSV capability",
-      "files": [
-        "src/components/HistoryModal.vue",
-        "src/composables/useHistory.js",
-        "src/stores/chat.js"
-      ]
-    },
-    {
-      "name": "Header Navigation",
-      "description": "Application header with navigation controls, TTS toggle, away mode, and system settings",
-      "files": ["src/components/Header.vue", "src/stores/system.js"]
-    },
-    {
-      "name": "Live Overlay Display",
-      "description": "Overlay component showing live stream information and statistics",
+      "name": "LiveOverlay",
+      "description": "Overlay component for live streaming display with latest transaction info",
       "files": ["src/components/LiveOverlay.vue"]
     },
     {
-      "name": "Nickname Management",
-      "description": "Customer nickname storage and custom override system integrated with Firebase",
-      "files": ["src/stores/nickname.js"]
+      "name": "VoicePricePage",
+      "description": "Voice-activated price checking page with speech recognition and TTS feedback",
+      "files": ["src/components/VoicePricePage.vue"]
     },
     {
-      "name": "Auto Cleanup System",
-      "description": "Automatic cleanup of old chat messages and stock data with configurable retention periods",
+      "name": "UpdatePrompt",
+      "description": "PWA update prompt notifying users when a new version is available",
+      "files": ["src/components/UpdatePrompt.vue"]
+    },
+    {
+      "name": "ChatProcessor",
+      "description": "Composable processing incoming chat messages, detecting buy/sell/shipping commands, updating stock, and triggering TTS",
+      "files": ["src/composables/useChatProcessor.js"]
+    },
+    {
+      "name": "AudioManagement",
+      "description": "Composable managing audio playback, sound effects, and TTS audio unlocking for iOS",
+      "files": ["src/composables/useAudio.js"]
+    },
+    {
+      "name": "VoiceDetector",
+      "description": "Composable for speech recognition to detect voice commands for price queries",
+      "files": ["src/composables/useVoiceDetector.js"]
+    },
+    {
+      "name": "YouTubeIntegration",
+      "description": "Composable for connecting to YouTube Live Chat API and streaming messages",
+      "files": ["src/composables/useYouTube.js"]
+    },
+    {
+      "name": "OllamaAI",
+      "description": "Composable for optional Ollama AI integration providing intelligent responses",
+      "files": ["src/composables/useOllama.js"]
+    },
+    {
+      "name": "GeminiAI",
+      "description": "Composable for Google Gemini AI integration",
+      "files": ["src/composables/useGemini.js"]
+    },
+    {
+      "name": "HistoryManagement",
+      "description": "Composable for fetching and managing transaction history from Firebase",
+      "files": ["src/composables/useHistory.js"]
+    },
+    {
+      "name": "AutoCleanup",
+      "description": "Composable for automatic cleanup of old data from Firebase",
       "files": ["src/composables/useAutoCleanup.js"]
     },
     {
-      "name": "Away Mode",
-      "description": "Auto-pause functionality when user is away or inactive to conserve resources",
+      "name": "AwayMode",
+      "description": "Composable for away mode functionality that auto-responds when user is away",
       "files": ["src/composables/useAwayMode.js"]
     },
     {
-      "name": "Pull to Refresh",
-      "description": "Touch-based pull-to-refresh functionality optimized for mobile and tablet devices",
+      "name": "PullToRefresh",
+      "description": "Composable implementing pull-to-refresh gesture for mobile/tablet devices",
       "files": ["src/composables/usePullToRefresh.js"]
     },
     {
-      "name": "Firebase Integration",
-      "description": "Firebase Realtime Database connection and authentication for cross-device data synchronization",
-      "files": ["src/composables/useFirebase.js", "src/config/firebase.js"]
+      "name": "TextToSpeech",
+      "description": "Service providing TTS capabilities with Google Cloud TTS (online) and native browser TTS (offline) modes",
+      "files": ["src/services/TextToSpeech.js"]
     },
     {
-      "name": "PWA Support",
-      "description": "Progressive Web App capabilities with service worker, offline caching, and update prompts",
+      "name": "YouTubeLiveChat",
+      "description": "Service for polling YouTube Live Chat API and fetching messages",
+      "files": ["src/services/YouTubeLiveChat.js"]
+    },
+    {
+      "name": "StockStore",
+      "description": "Pinia store managing stock inventory state with Firebase real-time sync",
+      "files": ["src/stores/stock.js"]
+    },
+    {
+      "name": "ChatStore",
+      "description": "Pinia store managing chat messages with pagination and memory management",
+      "files": ["src/stores/chat.js"]
+    },
+    {
+      "name": "SystemStore",
+      "description": "Pinia store for system-wide settings (sound, TTS mode, away mode, login state)",
+      "files": ["src/stores/system.js"]
+    },
+    {
+      "name": "NicknameStore",
+      "description": "Pinia store managing user nickname mappings from Firebase",
+      "files": ["src/stores/nickname.js"]
+    },
+    {
+      "name": "Utilities",
+      "description": "Utility modules for error handling, logging, and performance monitoring",
       "files": [
-        "src/components/UpdatePrompt.vue",
-        "src/registerServiceWorker.js",
-        "vite.config.js"
+        "src/utils/errorHandler.js",
+        "src/utils/logger.js",
+        "src/utils/performance.js"
       ]
+    },
+    {
+      "name": "Configuration",
+      "description": "App constants and Firebase configuration",
+      "files": ["src/constants.js", "src/config/constants.js"]
+    },
+    {
+      "name": "Styling",
+      "description": "Global CSS styles and assets for the application",
+      "files": ["src/style.css", "src/assets/style.css"]
     }
   ]
 }

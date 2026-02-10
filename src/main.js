@@ -10,6 +10,16 @@ app.use(createPinia());
 // Register Global Error Handler
 app.config.errorHandler = globalErrorHandler;
 
-console.log("%c🚀 Booting Manowzab v4...", "color: #00e676; font-weight: bold; font-size: 14px;");
+// ✅ Catch unhandled promise rejections (Firebase, fetch, etc.)
+window.addEventListener("unhandledrejection", (event) => {
+  console.warn("⚠️ Unhandled Promise Rejection:", event.reason);
+  // Prevent the default browser error logging (optional — remove to keep both)
+  // event.preventDefault();
+});
+
+console.log(
+  "%c🚀 Booting Manowzab v4...",
+  "color: #00e676; font-weight: bold; font-size: 14px;",
+);
 app.mount("#app");
 console.log("%c✅ App initialized", "color: #00e676; font-weight: bold;");

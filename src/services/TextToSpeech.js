@@ -12,6 +12,8 @@ export class TextToSpeech {
     this.audioPlayer = new Audio(); // Single reusable audio player
     this.isNativeUnlocked = false; // Track Native TTS unlock status
     this.isGoogleUnlocked = false; // Track Google TTS Audio Element unlock status
+    this.stuckTimer = null; // ✅ Safety timer to detect stuck state
+    this.STUCK_TIMEOUT = 15000; // ✅ 15 seconds max per utterance
 
     // Bind methods
     this.processQueue = this.processQueue.bind(this);
@@ -248,20 +250,24 @@ export class TextToSpeech {
         const blob = this.base64ToBlob(data.audioContent);
         const blobUrl = URL.createObjectURL(blob);
 
-        // Set up single audio player
-        this.audioPlayer.src = blobUrl;
-
-        this.audioPlayer.onended = () => {
-          URL.revokeObjectURL(blobUrl); // Free memory immediately
+        // ✅ Guard against double processQueue calls
+        let hasEnded = false;
+        const advanceQueue = () => {
+          if (hasEnded) return;
+          hasEnded = true;
+          URL.revokeObjectURL(blobUrl);
+          this.clearStuckTimer();
           this.isSpeaking = false;
           this.processQueue();
         };
 
+        // Set up single audio player
+        this.audioPlayer.src = blobUrl;
+        this.audioPlayer.onended = advanceQueue;
+
         this.audioPlayer.onerror = (e) => {
           console.error("❌ Audio playback error:", e);
-          URL.revokeObjectURL(blobUrl); // Free memory on error
-          this.isSpeaking = false;
-          this.processQueue();
+          advanceQueue();
         };
 
         await this.audioPlayer.play();
@@ -301,51 +307,86 @@ export class TextToSpeech {
    * Speak using native browser TTS
    */
   speakNative(text) {
-    const voice = this.getBestVoice();
+    try {
+      const voice = this.getBestVoice();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "th-TH";
-    utterance.volume = 1.0;
-    utterance.rate = 1.0;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "th-TH";
+      utterance.volume = 1.0;
+      utterance.rate = 1.0;
 
-    if (voice) {
-      utterance.voice = voice;
+      if (voice) {
+        utterance.voice = voice;
+      }
+
+      console.log(
+        "🎙️ Native TTS:",
+        text.substring(0, 50) + (text.length > 50 ? "..." : ""),
+      );
+
+      // Push to global array to prevent garbage collection
+      window.ttsActiveUtterances.push(utterance);
+
+      // ✅ Guard against double-fire
+      let hasEnded = false;
+      const cleanupAndAdvance = () => {
+        if (hasEnded) return;
+        hasEnded = true;
+        const index = window.ttsActiveUtterances.indexOf(utterance);
+        if (index > -1) {
+          window.ttsActiveUtterances.splice(index, 1);
+        }
+        this.clearStuckTimer();
+        this.isSpeaking = false;
+        this.processQueue();
+      };
+
+      // Handle end
+      utterance.onend = cleanupAndAdvance;
+
+      // Handle error
+      utterance.onerror = (e) => {
+        // Ignore "interrupted" error to reduce console noise during mode switching
+        if (e.error === "interrupted") return;
+        console.error("❌ Native TTS Error:", e);
+        cleanupAndAdvance();
+      };
+
+      // Speak
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      // ✅ Catch-all: ensure queue never stalls on unexpected errors
+      console.error("❌ Native TTS setup failed:", e);
+      this.clearStuckTimer();
+      this.isSpeaking = false;
+      this.processQueue();
     }
+  }
 
-    console.log(
-      "🎙️ Native TTS:",
-      text.substring(0, 50) + (text.length > 50 ? "..." : ""),
-    );
+  /**
+   * ✅ Clear stuck detection timer
+   */
+  clearStuckTimer() {
+    if (this.stuckTimer) {
+      clearTimeout(this.stuckTimer);
+      this.stuckTimer = null;
+    }
+  }
 
-    // Push to global array to prevent garbage collection
-    window.ttsActiveUtterances.push(utterance);
-
-    // Handle end
-    utterance.onend = () => {
-      const index = window.ttsActiveUtterances.indexOf(utterance);
-      if (index > -1) {
-        window.ttsActiveUtterances.splice(index, 1);
+  /**
+   * ✅ Start stuck detection timer — auto-resets if isSpeaking for too long
+   */
+  startStuckTimer() {
+    this.clearStuckTimer();
+    this.stuckTimer = setTimeout(() => {
+      if (this.isSpeaking) {
+        console.warn(
+          `⚠️ TTS stuck for ${this.STUCK_TIMEOUT / 1000}s — auto-resetting queue`,
+        );
+        this.isSpeaking = false;
+        this.processQueue();
       }
-      this.isSpeaking = false;
-      this.processQueue();
-    };
-
-    // Handle error
-    utterance.onerror = (e) => {
-      // Ignore "interrupted" error to reduce console noise during mode switching
-      if (e.error === "interrupted") return;
-
-      console.error("❌ Native TTS Error:", e);
-      const index = window.ttsActiveUtterances.indexOf(utterance);
-      if (index > -1) {
-        window.ttsActiveUtterances.splice(index, 1);
-      }
-      this.isSpeaking = false;
-      this.processQueue();
-    };
-
-    // Speak
-    window.speechSynthesis.speak(utterance);
+    }, this.STUCK_TIMEOUT);
   }
 
   /**
@@ -359,6 +400,9 @@ export class TextToSpeech {
 
     this.isSpeaking = true;
     const text = this.queue.shift();
+
+    // ✅ Start stuck detection timer
+    this.startStuckTimer();
 
     // Check system store setting
     const systemStore = useSystemStore();
@@ -391,6 +435,9 @@ export class TextToSpeech {
    * Reset TTS
    */
   reset() {
+    // ✅ Clear stuck timer first
+    this.clearStuckTimer();
+
     if (this.audioPlayer) {
       // 1. Remove listeners FIRST to prevent error logging during cleanup
       this.audioPlayer.onended = null;

@@ -7,7 +7,14 @@ import { logger } from "../utils/logger";
 export const useNicknameStore = defineStore("nickname", () => {
   const nicknames = ref({});
 
-  // Listen to nicknames changes
+  // ✅ รายชื่อพิเศษสำหรับ "เสียงอ่าน" เท่านั้น (บนจอจะยังโชว์ชื่อเดิม)
+  const SPECIAL_NAMES_TTS = {
+    "รุ่งนภา ชม.": "คุณรุ่งนภา เชียงใหม่",
+    "รุ่งนภา ชม": "คุณรุ่งนภา เชียงใหม่",
+    "อัจฉรา จิน": "คุณอัจฉรา จินดาธรรม",
+    "จิราพร เต": "คุณจิราพร เตชาทวีวรรณ"
+  };
+
   function initNicknameListener() {
     return onValue(dbRef(db, "nicknames"), (snapshot) => {
       const data = snapshot.val() || {};
@@ -16,23 +23,9 @@ export const useNicknameStore = defineStore("nickname", () => {
     });
   }
 
+  // 👁️ สำหรับแสดงผลบนจอ (เอาชื่อสั้นๆ เดิมๆ)
   function getNickname(uid, realName) {
-    // ✅ Hardcoded Nickname Override (for TTS pronunciation)
-    // Now covers both full name and short name
-    if (realName === "รุ่งนภา ชม." || realName === "รุ่งนภา ชม") {
-      return "รุ่งนภา เชียงใหม่";
-    }
-
-    // Atchara pronunciation override
-    if (realName === "อัจฉรา จิน") {
-      return "อัจฉรา จินดาธรรม";
-    }
-
-    // Jiraporn pronunciation override
-    if (realName === "จิราพร เต") {
-      return "จิราพร เตชาทวีวรรณ";
-    }
-
+    // ไม่ต้องมี Hardcode ตรงนี้แล้ว
     if (nicknames.value[uid]) {
       return typeof nicknames.value[uid] === "object"
         ? nicknames.value[uid].nick
@@ -41,26 +34,25 @@ export const useNicknameStore = defineStore("nickname", () => {
     return realName;
   }
 
-  /**
-   * Get phonetic name for TTS pronunciation
-   * @param {string} uid - User ID
-   * @param {string} displayName - Display name (fallback)
-   * @returns {string} Phonetic name for TTS
-   */
+  // 🔊 สำหรับเสียงอ่าน (เอาชื่อเต็มยศ)
   function getPhoneticName(uid, displayName) {
-    // Check if phonetic field exists in nickname data
+    // 1. เช็คชื่อพิเศษ (ถ้าเจอ ให้เปลี่ยนเป็นชื่อยาวทันที)
+    if (SPECIAL_NAMES_TTS[displayName]) {
+      return SPECIAL_NAMES_TTS[displayName];
+    }
+
+    // 2. ถ้าไม่มีในรายการพิเศษ ค่อยไปดูใน Firebase
     if (nicknames.value[uid]?.phonetic) {
       return nicknames.value[uid].phonetic;
     }
     
-    // Fallback to display name
     return displayName;
   }
 
   return {
     nicknames,
     initNicknameListener,
-    getNickname,      // For display
-    getPhoneticName,  // For TTS pronunciation
+    getNickname,
+    getPhoneticName,
   };
 });

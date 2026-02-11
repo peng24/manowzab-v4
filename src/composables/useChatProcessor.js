@@ -7,6 +7,7 @@ import { useAudio } from "./useAudio";
 import { ref as dbRef, onValue, set, update, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
+import { extractMessageRuns } from "../services/YouTubeLiveChat";
 import Swal from "sweetalert2";
 
 // Logger Config
@@ -115,52 +116,7 @@ export function useChatProcessor() {
     );
   });
 
-  /**
-   * Extract emoji data from YouTube API message
-   * @param {Object} item - YouTube API message item
-   * @returns {Array} Array of text/emoji runs
-   */
-  function extractMessageRuns(item) {
-    // ✅ DEBUG: Log the entire snippet to see structure
-    console.log('🔍 DEBUG: YouTube API item.snippet:', item.snippet);
-    
-    // Check if textMessageDetails exists with message runs
-    if (item.snippet?.textMessageDetails?.messageText) {
-      const runs = [];
-      const messageText = item.snippet.textMessageDetails.messageText;
-      
-      console.log('🔍 DEBUG: messageText type:', typeof messageText);
-      console.log('🔍 DEBUG: messageText value:', messageText);
-      
-      // If it's a string, wrap it in a text run
-      if (typeof messageText === 'string') {
-        return [{ text: messageText }];
-      }
-      
-      // If it's an array of runs (text + emojis)
-      if (Array.isArray(messageText)) {
-        console.log('🔍 DEBUG: messageText is array with length:', messageText.length);
-        return messageText.map(run => {
-          console.log('🔍 DEBUG: run:', run);
-          if (run.text) {
-            return { text: run.text };
-          } else if (run.emoji) {
-            return {
-              emoji: {
-                emojiId: run.emoji.emojiId,
-                image: run.emoji.image
-              }
-            };
-          }
-          return { text: '' };
-        });
-      }
-    }
-    
-    // Fallback to displayMessage
-    console.log('🔍 DEBUG: Using fallback displayMessage:', item.snippet.displayMessage);
-    return [{ text: item.snippet.displayMessage || '' }];
-  }
+  // extractMessageRuns is now imported from ../services/YouTubeLiveChat
 
   function stringToColor(str) {
     let hash = 0;

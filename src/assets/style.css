@@ -1530,3 +1530,11 @@ body {
 .btn-sync-chat:active {
   transform: scale(0.98);
 }
+
+/* ✅ Global YouTube Emoji Styling */
+.yt-emoji {
+  height: 1.4em;
+  width: auto;
+  vertical-align: sub;
+  margin: 0 2px;
+}

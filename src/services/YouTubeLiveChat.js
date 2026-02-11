@@ -257,3 +257,42 @@ export class YouTubeLiveChat {
     }
   }
 }
+
+/**
+ * Extract and normalize message content into a runs array for emoji support.
+ * Exported as standalone helper so any consumer (ChatProcessor, etc.) can use it.
+ *
+ * @param {Object} item - YouTube API liveChatMessage item
+ * @returns {Array<{text?: string, emoji?: {emojiId: string, image: Object}}>}
+ */
+export function extractMessageRuns(item) {
+  // Check if textMessageDetails exists with message runs
+  if (item.snippet?.textMessageDetails?.messageText) {
+    const messageText = item.snippet.textMessageDetails.messageText;
+
+    // Case A: Simple string → wrap in a single text run
+    if (typeof messageText === 'string') {
+      return [{ text: messageText }];
+    }
+
+    // Case B: Array of runs (text + emojis)
+    if (Array.isArray(messageText)) {
+      return messageText.map(run => {
+        if (run.text) {
+          return { text: run.text };
+        } else if (run.emoji) {
+          return {
+            emoji: {
+              emojiId: run.emoji.emojiId,
+              image: run.emoji.image
+            }
+          };
+        }
+        return { text: '' };
+      });
+    }
+  }
+
+  // Fallback to displayMessage
+  return [{ text: item.snippet?.displayMessage || '' }];
+}

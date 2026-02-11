@@ -143,22 +143,30 @@ export class TextToSpeech {
   }
 
   /**
-   * Sanitize text for TTS
+   * Sanitize text for TTS: Remove Emojis and Symbols
    */
   sanitize(text) {
     if (!text) return "";
 
-    // Remove emojis
-    const emojiRegex =
-      /[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]/g;
-    let cleanText = text.replace(emojiRegex, " ");
+    // ✅ Regex to remove ALL Emojis (Surrogates, Dingbats, Transport, etc.)
+    // This covers: 🎄, 🥳, 🙏, etc.
+    const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]|\uD83F[\uDC00-\uDFFF]|[\u2000-\u26FF])/g;
 
-    // Limit length
+    // Replace emoji with empty string
+    let cleanText = text.replace(emojiRegex, "");
+
+    // Remove specific special chars that might annoy TTS (optional)
+    cleanText = cleanText.replace(/[#*~_]/g, "");
+
+    // Clean up double spaces
+    cleanText = cleanText.replace(/\s+/g, " ").trim();
+
+    // Limit length (prevent too long speech)
     if (cleanText.length > 500) {
-      cleanText = cleanText.substring(0, 500) + "... ตัดจบ";
+      cleanText = cleanText.substring(0, 500);
     }
 
-    return cleanText.trim();
+    return cleanText;
   }
 
   /**

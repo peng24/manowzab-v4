@@ -116,6 +116,8 @@ export function useYouTube() {
         // Start Chat Service
         chatService.liveChatId = activeChatId.value;
         chatService.startPolling(videoId, async (msg) => {
+          // ✅ DEBUG: Log complete message structure from YouTube API
+          console.log('🔍🔍🔍 RAW YouTube API Message:', JSON.stringify(msg, null, 2));
           if (processMessageFunc) await processMessageFunc(msg);
         });
 

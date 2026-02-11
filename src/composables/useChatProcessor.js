@@ -1,6 +1,7 @@
 import { useStockStore } from "../stores/stock";
 import { useChatStore } from "../stores/chat";
 import { useSystemStore } from "../stores/system";
+import { useNicknameStore } from "../stores/nickname";
 import { useOllama } from "./useOllama";
 import { useAudio } from "./useAudio";
 import { ref as dbRef, onValue, set, update, push } from "firebase/database";
@@ -76,6 +77,7 @@ export function useChatProcessor() {
   const stockStore = useStockStore();
   const chatStore = useChatStore();
   const systemStore = useSystemStore();
+  const nicknameStore = useNicknameStore();
   const { analyzeChat } = useOllama();
   const { queueSpeech, playSfx, speak } = useAudio();
 
@@ -113,6 +115,53 @@ export function useChatProcessor() {
     );
   });
 
+  /**
+   * Extract emoji data from YouTube API message
+   * @param {Object} item - YouTube API message item
+   * @returns {Array} Array of text/emoji runs
+   */
+  function extractMessageRuns(item) {
+    // ✅ DEBUG: Log the entire snippet to see structure
+    console.log('🔍 DEBUG: YouTube API item.snippet:', item.snippet);
+    
+    // Check if textMessageDetails exists with message runs
+    if (item.snippet?.textMessageDetails?.messageText) {
+      const runs = [];
+      const messageText = item.snippet.textMessageDetails.messageText;
+      
+      console.log('🔍 DEBUG: messageText type:', typeof messageText);
+      console.log('🔍 DEBUG: messageText value:', messageText);
+      
+      // If it's a string, wrap it in a text run
+      if (typeof messageText === 'string') {
+        return [{ text: messageText }];
+      }
+      
+      // If it's an array of runs (text + emojis)
+      if (Array.isArray(messageText)) {
+        console.log('🔍 DEBUG: messageText is array with length:', messageText.length);
+        return messageText.map(run => {
+          console.log('🔍 DEBUG: run:', run);
+          if (run.text) {
+            return { text: run.text };
+          } else if (run.emoji) {
+            return {
+              emoji: {
+                emojiId: run.emoji.emojiId,
+                image: run.emoji.image
+              }
+            };
+          }
+          return { text: '' };
+        });
+      }
+    }
+    
+    // Fallback to displayMessage
+    console.log('🔍 DEBUG: Using fallback displayMessage:', item.snippet.displayMessage);
+    return [{ text: item.snippet.displayMessage || '' }];
+  }
+
   function stringToColor(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -142,6 +191,9 @@ export function useChatProcessor() {
           ? savedNamesCache.value[uid].nick
           : savedNamesCache.value[uid];
     }
+
+    // ✅ Get phonetic name for TTS (separate from display name)
+    const phoneticName = nicknameStore.getPhoneticName(uid, displayName);
 
     const isAdmin =
       /admin|แอดมิน/i.test(displayName) || /admin|แอดมิน/i.test(realName);
@@ -234,8 +286,10 @@ export function useChatProcessor() {
         push(chatRef, {
           id: item.id,
           text: msg,
+          messageRuns: extractMessageRuns(item),
           authorName: realName,
           displayName,
+          phoneticName,
           realName: realName,
           uid: uid,
           avatar,
@@ -248,7 +302,7 @@ export function useChatProcessor() {
 
         // ✅ Play SFX BEFORE TTS
         await playSfx("success");
-        speak(displayName, `${msg} ... ทั้งหมด ${itemIds.length} รายการ`);
+        speak(phoneticName, `${msg} ... ทั้งหมด ${itemIds.length} รายการ`);
 
         // Exit early - don't process further
         return;
@@ -355,8 +409,10 @@ export function useChatProcessor() {
     push(chatRef, {
       id: item.id,
       text: msg,
+      messageRuns: extractMessageRuns(item),
       authorName: realName,
       displayName,
+      phoneticName,
       realName: realName,
       uid: uid,
       avatar,
@@ -425,7 +481,7 @@ export function useChatProcessor() {
 
         // ✅ Play SUCCESS sound BEFORE TTS
         await playSfx("success");
-        speak(displayName, msg);
+        speak(phoneticName, msg);
       } catch (error) {
         // ✅ Error - Item might be sold out or other issue
         logger.error("❌ Order failed:", error);
@@ -437,7 +493,7 @@ export function useChatProcessor() {
 
         // ✅ Play ERROR sound BEFORE TTS
         await playSfx("error");
-        speak(displayName, msg); // Still announce to admin
+        speak(phoneticName, msg); // Still announce to admin
       }
     } else if (intent === "cancel" && targetId > 0) {
       // --- Cancel Logic ---
@@ -447,7 +503,7 @@ export function useChatProcessor() {
 
         // ✅ Play CANCEL sound BEFORE TTS
         await playSfx("cancel");
-        speak(displayName, msg);
+        speak(phoneticName, msg);
       }
     } else {
       // --- Other Intents / General Chat ---
@@ -472,10 +528,10 @@ export function useChatProcessor() {
           type: "user",
         });
 
-        speak(displayName, msg);
+        speak(phoneticName, msg);
       } else {
         // Read EVERYTHING else
-        speak(displayName, msg);
+        speak(phoneticName, msg);
       }
     }
   }

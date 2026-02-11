@@ -67,7 +67,18 @@
         >
           <!-- Avatar Left -->
           <div class="avatar-container">
-            <img :src="chat.avatar" class="avatar" loading="lazy" />
+            <img 
+              :src="chat.avatar" 
+              class="avatar" 
+              loading="lazy"
+              @error="(e) => e.target.style.display = 'none'"
+            />
+            <div 
+              class="avatar-fallback" 
+              :style="{ backgroundColor: chat.color }"
+            >
+              {{ chat.displayName?.[0] || '?' }}
+            </div>
           </div>
 
           <!-- Message Bubble Right -->
@@ -89,7 +100,25 @@
             </div>
 
             <div class="chat-bubble">
-              <div class="chat-text">{{ chat.text }}</div>
+              <div class="chat-text">
+                <!-- ✅ Render message with emoji support -->
+                <template v-if="chat.messageRuns && chat.messageRuns.length > 0">
+                  <template v-for="(run, idx) in chat.messageRuns" :key="idx">
+                    <span v-if="run.text">{{ run.text }}</span>
+                    <img
+                      v-else-if="run.emoji && run.emoji.image"
+                      :src="run.emoji.image.thumbnails?.[0]?.url || run.emoji.image.url"
+                      :alt="run.emoji.emojiId || 'emoji'"
+                      class="emoji-image"
+                      loading="lazy"
+                    />
+                  </template>
+                </template>
+                <!-- ✅ Fallback to plain text -->
+                <template v-else>
+                  {{ chat.text }}
+                </template>
+              </div>
 
               <!-- Force Process Button -->
               <div
@@ -580,6 +609,9 @@ async function refreshChat() {
 
 .avatar-container {
   flex-shrink: 0;
+  position: relative;
+  width: 40px;
+  height: 40px;
 }
 
 .avatar {
@@ -589,6 +621,35 @@ async function refreshChat() {
   border: 2px solid #334155;
   object-fit: cover;
 }
+
+/* ✅ Avatar Fallback (Letter Avatar) */
+.avatar-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font-weight: bold;
+  font-size: 1.2em;
+  text-transform: uppercase;
+  pointer-events: none; /* Allow clicks to pass through */
+}
+
+/* Hide fallback when image is visible */
+.avatar-container img[style*="display: none"] ~ .avatar-fallback {
+  display: flex;
+}
+
+.avatar-container img:not([style*="display: none"]) ~ .avatar-fallback {
+  display: none;
+}
+
 
 .chat-bubble-container {
   display: flex;
@@ -651,6 +712,17 @@ async function refreshChat() {
   position: relative;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
+
+/* ✅ YouTube Emoji Styling */
+.emoji-image {
+  height: 1.5em;
+  width: auto;
+  vertical-align: middle;
+  display: inline-block;
+  margin: 0 2px;
+  object-fit: contain;
+}
+
 
 /* Special Types */
 .chat-row.buy .chat-bubble {

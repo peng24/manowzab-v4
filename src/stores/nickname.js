@@ -41,9 +41,26 @@ export const useNicknameStore = defineStore("nickname", () => {
     return realName;
   }
 
+  /**
+   * Get phonetic name for TTS pronunciation
+   * @param {string} uid - User ID
+   * @param {string} displayName - Display name (fallback)
+   * @returns {string} Phonetic name for TTS
+   */
+  function getPhoneticName(uid, displayName) {
+    // Check if phonetic field exists in nickname data
+    if (nicknames.value[uid]?.phonetic) {
+      return nicknames.value[uid].phonetic;
+    }
+    
+    // Fallback to display name
+    return displayName;
+  }
+
   return {
     nicknames,
     initNicknameListener,
-    getNickname,
+    getNickname,      // For display
+    getPhoneticName,  // For TTS pronunciation
   };
 });

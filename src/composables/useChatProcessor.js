@@ -61,6 +61,11 @@ const cancelRegex =
   /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i; // Flexible: "cancel 46" or "46 cancel"
 const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
 
+// ✅ Thai Numeral → Arabic Digit Converter
+function thaiToArabic(text) {
+  return text.replace(/[๐-๙]/g, (ch) => ch.charCodeAt(0) - 0x0E50);
+}
+
 // ✅ Toast Notification Mixin
 const Toast = Swal.mixin({
   toast: true,
@@ -133,6 +138,9 @@ export function useChatProcessor() {
     const msg = item.snippet.displayMessage || "";
     if (!msg) return;
 
+    // ✅ Normalize Thai numerals → Arabic digits for regex matching
+    const normalizedMsg = thaiToArabic(msg);
+
     const uid = item.authorDetails.channelId;
     const realName = item.authorDetails.displayName;
     const avatar =
@@ -186,7 +194,7 @@ export function useChatProcessor() {
 
     // 🔥 HIGHEST PRIORITY: Multi-Buy Logic (before all other checks)
     // Handles "26 38 74" or "26 38 74 ClientName"
-    const matchMultiBuy = msg.match(multiBuyRegex);
+    const matchMultiBuy = normalizedMsg.match(multiBuyRegex);
     if (matchMultiBuy) {
       const numbersStr = matchMultiBuy[1]; // "26 38 74"
       const proxyName = matchMultiBuy[2] ? matchMultiBuy[2].trim() : null; // Optional client name
@@ -266,16 +274,16 @@ export function useChatProcessor() {
     }
 
     // Special Check for Admin Proxy (Single Item)
-    if (isAdmin && adminProxyRegex.test(msg)) {
-      const matchProxy = msg.match(adminProxyRegex);
+    if (isAdmin && adminProxyRegex.test(normalizedMsg)) {
+      const matchProxy = normalizedMsg.match(adminProxyRegex);
       intent = "buy";
       targetId = parseInt(matchProxy[1]);
       forcedOwnerName = matchProxy[2].trim();
       method = "admin-proxy";
-    } else if (shippingRegex.test(msg)) {
+    } else if (shippingRegex.test(normalizedMsg)) {
       intent = "shipping";
       method = "regex-ship";
-    } else if (questionRegex.test(msg)) {
+    } else if (questionRegex.test(normalizedMsg)) {
       // It's a question. Check if it accidentally contains a pure number?
       // Rule 6 says preserve question detection.
       // But Rule 5 says ignore embedded numbers.
@@ -284,11 +292,11 @@ export function useChatProcessor() {
       method = "question-skip";
     } else {
       // Regex Matching
-      const matchPure = msg.match(pureNumberRegex);
-      const matchExplicit = msg.match(explicitBuyRegex);
-      const matchDash = msg.match(dashBuyRegex);
-      const matchCancel = msg.match(cancelRegex);
-      const matchImplicit = msg.match(implicitBuyRegex);
+      const matchPure = normalizedMsg.match(pureNumberRegex);
+      const matchExplicit = normalizedMsg.match(explicitBuyRegex);
+      const matchDash = normalizedMsg.match(dashBuyRegex);
+      const matchCancel = normalizedMsg.match(cancelRegex);
+      const matchImplicit = normalizedMsg.match(implicitBuyRegex);
 
       if (matchCancel) {
         // Priority: Cancel (Flexible - supports both "cancel 46" and "46 cancel")

@@ -378,7 +378,7 @@ export function useVoiceDetector() {
           }
         } catch (error) {
           console.error("AI Fallback Error:", error);
-          // Continue without AI result - no action needed
+          lastAction.value = "⚠️ AI ไม่ตอบสนอง";
         }
       }, 800);
 

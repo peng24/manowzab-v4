@@ -9,6 +9,7 @@ import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 import { extractMessageRuns } from "../services/YouTubeLiveChat";
 import Swal from "sweetalert2";
+import { watch } from "vue";
 
 // Logger Config
 const DEBUG_MODE = true;
@@ -110,16 +111,12 @@ export function useChatProcessor() {
 
   // Initial Setup & Watch for Video ID change
   setupOverlayListener();
-  // Note: If videoID changes dynamically without page reload, we might need a watcher here.
-  // Assuming systemStore.currentVideoId is reactive:
-  import("vue").then(({ watch }) => {
-    watch(
-      () => systemStore.currentVideoId,
-      (newId) => {
-        if (newId) setupOverlayListener();
-      },
-    );
-  });
+  watch(
+    () => systemStore.currentVideoId,
+    (newId) => {
+      if (newId) setupOverlayListener();
+    }
+  );
 
   // extractMessageRuns is now imported from ../services/YouTubeLiveChat
 
@@ -428,7 +425,7 @@ export function useChatProcessor() {
 
       try {
         // ✅ Try to process order
-        await stockStore.processOrder(
+        const result = await stockStore.processOrder(
           targetId,
           ownerName,
           ownerUid,
@@ -436,6 +433,10 @@ export function useChatProcessor() {
           targetPrice,
           method,
         );
+
+        if (!result.success || (result.action !== 'claimed' && result.action !== 'queued')) {
+           throw new Error(result.error || (result.action === 'already_owned' ? "ซ้ำแล้ว" : "เต็มแล้ว/อื่นๆ"));
+        }
 
         // ✅ Success - Show Toast
         Toast.fire({

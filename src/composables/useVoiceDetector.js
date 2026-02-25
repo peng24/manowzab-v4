@@ -69,6 +69,9 @@ export function useVoiceDetector() {
   const recognition = ref(null);
   const manualStop = ref(false);
 
+  // Context Tracking
+  const lastDetectedId = ref(null);
+
   // Debounce Timer for AI Fallback
   let aiDebounceTimer = null;
 
@@ -251,7 +254,8 @@ export function useVoiceDetector() {
             const p2Val = parseInt(str.slice(-2)); // Last 2 digits
             const p1Val = parseInt(str.slice(0, -2)); // The rest
 
-            if (isValidPrice(p2Val) && isValidId(p1Val)) {
+            // Fix "100" splitting into ID 1, Price 0
+            if (p2Val > 0 && isValidPrice(p2Val) && isValidId(p1Val)) {
               detected.id = p1Val;
               detected.price = p2Val;
               detected.logic = "Implicit-Glued-Split";
@@ -321,16 +325,17 @@ export function useVoiceDetector() {
         lastAction.value = "🤔 กำลังคิด...";
 
         try {
-          const aiResult = await extractPriceFromVoice(rawText);
+          const aiResult = await extractPriceFromVoice(rawText, lastDetectedId.value);
 
           if (aiResult) {
             // Update detection with AI results
             if (aiResult.id !== null && aiResult.id !== undefined) {
               // Handle special case: "current" means user wants current item
-              if (aiResult.id === "current") {
-                // Could integrate with overlay/current selection logic here
-                // For now, just log it
-                console.log("AI detected 'current item' reference");
+              if (aiResult.id === "current" && lastDetectedId.value) {
+                detected.id = lastDetectedId.value;
+                detected.logic = "AI-Ollama-Context";
+              } else if (aiResult.id === "current") {
+                console.log("AI detected 'current' but no lastDetectedId exists");
               } else {
                 detected.id =
                   typeof aiResult.id === "string"
@@ -486,6 +491,9 @@ export function useVoiceDetector() {
       // Commit to Store
       if (Object.keys(updateData).length > 0) {
         stockStore.updateItemData(detected.id, updateData);
+
+        // Update context tracking
+        lastDetectedId.value = detected.id;
 
         // Feedback
         let feedback = `✅ #${detected.id}`;

@@ -17,6 +17,18 @@
             }}</span>
           </div>
 
+          <!-- Auto Agent Mode Toggle -->
+          <div class="ai-toggle-wrapper auto-agent" :class="{ processing: isAutoAgentProcessing }">
+            <span class="toggle-label">Auto Agent Mode</span>
+            <label class="toggle-switch">
+              <input
+                type="checkbox"
+                v-model="isAutoAgentEnabled"
+              />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
           <!-- AI Assist Toggle -->
           <div class="ai-toggle-wrapper">
             <span class="toggle-label">AI Assist</span>
@@ -72,12 +84,19 @@
         <canvas ref="canvasRef" class="wave-canvas"></canvas>
 
         <div class="mic-controls">
+          <!-- Auto Agent Status -->
+          <transition name="fade">
+            <div class="auto-agent-bar" v-if="isAutoAgentEnabled">
+              <span class="agent-text" :class="{ 'pulsing': isAutoAgentProcessing }">{{ autoAgentStatus }}</span>
+            </div>
+          </transition>
+
           <!-- Log / Hearing -->
-          <div class="hearing-status">
+          <div class="hearing-status" :class="{ 'dimmed': isAutoAgentEnabled }">
             <div class="log-transcript">"{{ transcript || "..." }}"</div>
             <div
               class="log-status"
-              :class="{ error: lastAction.startsWith('⚠️' || '🗑️') }"
+              :class="{ error: lastAction && (lastAction.startsWith('⚠️') || lastAction.startsWith('🗑️')) }"
             >
               {{ lastAction || "รอคำสั่ง..." }}
             </div>
@@ -194,12 +213,21 @@ import { useVoiceLogger } from "../composables/useVoiceLogger";
 import { useFirebase } from "../composables/useFirebase";
 import { aiLogs } from "../composables/useOllama";
 import { ref as dbRef, onValue } from "firebase/database";
+import { useAutoPriceAgent } from "../composables/useAutoPriceAgent";
 
 const systemStore = useSystemStore();
 const { isListening, transcript, lastAction, toggleMic } = useVoiceDetector();
 const { downloadLogs } = useVoiceLogger();
 const isDbConnected = ref(false);
 const isMonitorOpen = ref(false); // Closed by default on mobile
+
+// Auto Agent Init
+const {
+  isAutoAgentEnabled,
+  isListeningAuto,
+  statusText: autoAgentStatus,
+  isProcessing: isAutoAgentProcessing
+} = useAutoPriceAgent();
 
 // Ollama Status Display
 const ollamaStatusDisplay = computed(() => {
@@ -796,6 +824,35 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.7);
   min-height: 1.5em;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+.auto-agent-bar {
+  text-align: center;
+  padding: 8px 16px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+.agent-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #10b981;
+}
+.pulsing {
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; text-shadow: 0 0 10px rgba(16,185,129,0.5); }
+  100% { opacity: 0.6; }
+}
+.dimmed {
+  opacity: 0.4;
+  transition: opacity 0.3s;
+}
+.auto-agent.processing .toggle-label {
+  color: #10b981;
+  animation: pulse 1.5s infinite;
 }
 .log-status {
   font-size: 1rem;

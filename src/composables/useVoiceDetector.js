@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from "vue";
+import { ref, watch, onUnmounted } from "vue";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "./useAudio";
@@ -14,26 +14,18 @@ const CONFIG = {
     bust: { min: 30, max: 70 },
     length: { min: 15, max: 60 },
     id: { min: 1, max: 1000 },
-    // "Split-Price must be in [20, 30...100, 120, 150] OR end in 0"
-    // We will implement this logic in a helper function, but define the base set here if needed.
   },
   // Regex Patterns
   patterns: {
     corrections: [
-      // Fix "Chest" Misinterpretation: "6 52" -> "อก 52"
       { from: /(?:^|\s)(?:6|หก)(?=\s*[3-6]\d\b)/g, to: " อก " },
-      // Fix "Polyester" Noise
       { from: /(?:โพลิ|โพรี|Poly)\S*/gi, to: "" },
-      // Fix "Price" Keywords
       { from: /(?:เอาไป|ขาย|เหลือ|ราคา)/g, to: " ราคา " },
-      // Fix "Item" Keywords
       { from: /(?:เบอร์|รหัส|ตัวที่|ที่|No\.?)/gi, to: " รายการที่ " },
-      // Standardize synonyms
-      { from: /อก/g, to: " อก " }, // Ensure spaces around keywords
+      { from: /อก/g, to: " อก " },
       { from: /ยาว/g, to: " ยาว " },
     ],
     noise: [
-      // Context Noise
       /(?:ค่าส่ง|โอน|ปลายทาง|ทั้งหมด|เหลืออีก|มี)\s*\d+/g,
       /(?:กระดุม|ตำหนิ|สำรอง)\s*\d+/g,
       /(?:ลูกค้า|พี่|น้อง|แม่ค้า|ครับ|ค่ะ|จ้า)/gi,
@@ -46,9 +38,8 @@ const CONFIG = {
       sizeLetter: /\b(XXL|XL|L|M|S|XS)\b/i,
     },
     anchors: {
-      // Explicit Anchors
       id: /รายการที่\s*(\d+)/i,
-      price: /(?:ราคา\s*(\d+)|(\d+)\s*บาท)/i, // Matches "ราคา 80" or "80 บาท"
+      price: /(?:ราคา\s*(\d+)|(\d+)\s*บาท)/i,
       freebie: /(?:ฟรี|แถม)/i,
     },
   },
@@ -66,8 +57,16 @@ export function useVoiceDetector() {
   const isListening = ref(false);
   const transcript = ref("");
   const lastAction = ref("");
-  const recognition = ref(null);
   const manualStop = ref(false);
+
+  // ============================================
+  // AUTO AGENT STATE (merged from useAutoPriceAgent)
+  // ============================================
+  const isAutoAgentEnabled = ref(false);
+  const autoAgentStatus = ref("🤖 Auto Agent: Standby...");
+  const isAutoAgentProcessing = ref(false);
+  let agentProcessingTimer = null;
+  let agentLastProcessedIndex = 0;
 
   // Context Tracking
   const lastDetectedId = ref(null);
@@ -75,27 +74,51 @@ export function useVoiceDetector() {
   // Debounce Timer for AI Fallback
   let aiDebounceTimer = null;
 
-  // ============================================
-  // INITIALIZATION
-  // ============================================
-  if ("webkitSpeechRecognition" in window) {
-    const SpeechRecognition = window.webkitSpeechRecognition;
-    recognition.value = new SpeechRecognition();
-    recognition.value.continuous = true;
-    recognition.value.interimResults = false;
-    recognition.value.lang = "th-TH";
+  // Single shared SpeechRecognition instance
+  let recognition = null;
 
-    recognition.value.onstart = () => {
+  // ============================================
+  // INITIALIZATION — Single SpeechRecognition
+  // ============================================
+  if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+    const SpeechRecognitionAPI =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.lang = "th-TH";
+
+    recognition.onstart = () => {
       isListening.value = true;
       manualStop.value = false;
+
+      if (isAutoAgentEnabled.value) {
+        agentLastProcessedIndex = 0;
+        // Use interim results for Auto Agent (keyword detection)
+        recognition.interimResults = true;
+        if (!isAutoAgentProcessing.value) {
+          autoAgentStatus.value = "🤖 Auto Agent: Listening...";
+        }
+      } else {
+        // Manual mode: final results only
+        recognition.interimResults = false;
+      }
     };
-    recognition.value.onend = () => {
+
+    recognition.onend = () => {
       isListening.value = false;
-      if (!manualStop.value) {
-        // Auto-restart for continuous listening
+
+      if (isAutoAgentEnabled.value) {
+        // Auto Agent: always restart
+        try {
+          recognition.start();
+        } catch (e) {
+          /* ignore */
+        }
+      } else if (!manualStop.value) {
+        // Manual mode: auto-restart unless user stopped
         setTimeout(() => {
           try {
-            recognition.value.start();
+            recognition.start();
           } catch (e) {
             /* ignore */
           }
@@ -103,52 +126,156 @@ export function useVoiceDetector() {
       }
     };
 
-    recognition.value.onresult = async (event) => {
-      const text = event.results[event.results.length - 1][0].transcript.trim();
-      await processVoiceCommand(text);
+    recognition.onresult = async (event) => {
+      if (isAutoAgentEnabled.value) {
+        // ===== AUTO AGENT PIPELINE =====
+        handleAutoAgentResult(event);
+      } else {
+        // ===== MANUAL / REGEX+AI PIPELINE =====
+        const text =
+          event.results[event.results.length - 1][0].transcript.trim();
+        await processVoiceCommand(text);
+      }
     };
 
-    recognition.value.onerror = (event) => {
-      console.error("Speech Recognition Error:", event.error);
+    recognition.onerror = (event) => {
+      // Suppress "aborted" errors silently — these are expected during mode switches
+      if (event.error === "aborted") {
+        console.debug("[SpeechRecognition] Session recycled (aborted)");
+        return;
+      }
+
+      console.warn("Speech Recognition Error:", event.error);
+
       if (
         event.error === "not-allowed" ||
         event.error === "service-not-allowed"
       ) {
         isListening.value = false;
         manualStop.value = true;
+        if (isAutoAgentEnabled.value) {
+          isAutoAgentEnabled.value = false;
+          autoAgentStatus.value = "🤖 Error: Mic not allowed";
+        }
       }
     };
   } else {
     lastAction.value = "⚠️ Browser not supported";
+    autoAgentStatus.value = "🤖 Auto Agent: Not supported in this browser.";
   }
 
   // ============================================
-  // CORE LOGIC: SMART HUNTER
+  // AUTO AGENT PIPELINE (from useAutoPriceAgent)
+  // ============================================
+  function handleAutoAgentResult(event) {
+    if (!isAutoAgentEnabled.value || isAutoAgentProcessing.value) return;
+
+    let currentTranscript = "";
+    for (let i = agentLastProcessedIndex; i < event.results.length; ++i) {
+      currentTranscript += event.results[i][0].transcript + " ";
+    }
+
+    // Keyword Trigger
+    const keywordRegex = /รายการที่|รหัส|ราคา|ไซส์/;
+    if (keywordRegex.test(currentTranscript)) {
+      if (agentProcessingTimer) {
+        clearTimeout(agentProcessingTimer);
+      }
+
+      autoAgentStatus.value = "🤖 Auto Agent: กำลังรอจบประโยค...";
+
+      agentProcessingTimer = setTimeout(async () => {
+        isAutoAgentProcessing.value = true;
+        autoAgentStatus.value = "🤖 Auto Agent: 🧠 กำลังคิด...";
+
+        let textToProcess = "";
+        for (let i = agentLastProcessedIndex; i < event.results.length; ++i) {
+          textToProcess += event.results[i][0].transcript + " ";
+        }
+        agentLastProcessedIndex = event.results.length;
+
+        if (textToProcess.length > 400) {
+          textToProcess = "..." + textToProcess.slice(-400);
+        }
+
+        try {
+          const aiResult = await extractPriceFromVoice(textToProcess.trim());
+          if (aiResult && aiResult.id && aiResult.price) {
+            await stockStore.updateItemData(aiResult.id, {
+              price: aiResult.price,
+              size: aiResult.size || null,
+            });
+            autoAgentStatus.value = `🤖 Auto Agent: ✅ อัปเดต ${aiResult.id} ฿${aiResult.price}`;
+          } else {
+            autoAgentStatus.value = "🤖 Auto Agent: ❌ ไม่พบข้อมูลที่ชัดเจน";
+          }
+        } catch (e) {
+          console.error("Auto Agent Error:", e);
+          autoAgentStatus.value = "🤖 Auto Agent: ⚠️ เกิดข้อผิดพลาด";
+        } finally {
+          isAutoAgentProcessing.value = false;
+          setTimeout(() => {
+            if (isAutoAgentEnabled.value && !isAutoAgentProcessing.value) {
+              autoAgentStatus.value = "🤖 Auto Agent: Listening...";
+            }
+          }, 3000);
+        }
+      }, 1500);
+    }
+  }
+
+  // ============================================
+  // WATCH: Auto Agent Enable/Disable
+  // ============================================
+  watch(isAutoAgentEnabled, (enabled) => {
+    if (enabled) {
+      // Stop current session, restart with Agent config
+      if (recognition && isListening.value) {
+        manualStop.value = true;
+        recognition.stop();
+      }
+      // Start fresh for Agent mode
+      setTimeout(() => {
+        manualStop.value = false;
+        agentLastProcessedIndex = 0;
+        try {
+          recognition?.start();
+        } catch (e) {
+          /* ignore */
+        }
+      }, 300);
+    } else {
+      // Turning off Agent — stop recognition
+      if (recognition) {
+        manualStop.value = true;
+        recognition.stop();
+      }
+      isAutoAgentProcessing.value = false;
+      if (agentProcessingTimer) clearTimeout(agentProcessingTimer);
+      autoAgentStatus.value = "🤖 Auto Agent: Standby...";
+    }
+  });
+
+  // ============================================
+  // CORE LOGIC: SMART HUNTER (Manual Pipeline)
   // ============================================
   async function processVoiceCommand(rawText) {
-    // Clear any pending AI debounce timer
     if (aiDebounceTimer) {
       clearTimeout(aiDebounceTimer);
       aiDebounceTimer = null;
     }
 
-    // --- STEP 1: PRE-PROCESSING (The Cleaner) ---
+    // --- STEP 1: PRE-PROCESSING ---
     let cleanText = rawText;
-
-    // 1.1 Apply Corrections
     CONFIG.patterns.corrections.forEach((rule) => {
       cleanText = cleanText.replace(rule.from, rule.to);
     });
-
-    // 1.2 Remove Noise
     CONFIG.patterns.noise.forEach((pattern) => {
       cleanText = cleanText.replace(pattern, "");
     });
-
-    // 1.3 Normalize Whitespace
     cleanText = cleanText.replace(/\s+/g, " ").trim();
 
-    // --- STEP 2: EXTRACTION PIPELINE (Priority Order) ---
+    // --- STEP 2: EXTRACTION PIPELINE ---
     let workingText = cleanText;
     let detected = {
       id: null,
@@ -160,49 +287,43 @@ export function useVoiceDetector() {
       logic: "Unknown",
     };
 
-    // 2.1 Attributes (Get these out first)
-    // Fabric
+    // 2.1 Attributes
     const fabricMatch = workingText.match(CONFIG.patterns.attributes.fabric);
     if (fabricMatch) {
       detected.fabric = fabricMatch[1];
       workingText = workingText.replace(fabricMatch[0], "").trim();
     }
-    // Size Letter
     const sizeMatch = workingText.match(CONFIG.patterns.attributes.sizeLetter);
     if (sizeMatch) {
       detected.sizeLetter = sizeMatch[1].toUpperCase();
       workingText = workingText.replace(sizeMatch[0], "").trim();
     }
-    // Bust
     const bustMatch = workingText.match(CONFIG.patterns.attributes.bust);
     if (bustMatch) {
       const rangeStr = bustMatch[1];
-      // Check if it's a range or single number
       const firstNum = parseInt(rangeStr.split(/[- ]/)[0]);
       if (
         firstNum >= CONFIG.ranges.bust.min &&
         firstNum <= CONFIG.ranges.bust.max
       ) {
-        detected.bust = rangeStr; // Store full range string
+        detected.bust = rangeStr;
         workingText = workingText.replace(bustMatch[0], "").trim();
       }
     }
-    // Length
     const lengthMatch = workingText.match(CONFIG.patterns.attributes.length);
     if (lengthMatch) {
       const rangeStr = lengthMatch[1];
-      // Check if it's a range or single number
       const firstNum = parseInt(rangeStr.split(/[- ]/)[0]);
       if (
         firstNum >= CONFIG.ranges.length.min &&
         firstNum <= CONFIG.ranges.length.max
       ) {
-        detected.length = rangeStr; // Store full range string
+        detected.length = rangeStr;
         workingText = workingText.replace(lengthMatch[0], "").trim();
       }
     }
 
-    // 2.2 Explicit Price (The Anchor)
+    // 2.2 Explicit Price
     if (CONFIG.patterns.anchors.freebie.test(workingText)) {
       detected.price = 0;
       workingText = workingText
@@ -211,7 +332,6 @@ export function useVoiceDetector() {
     } else {
       const priceMatch = workingText.match(CONFIG.patterns.anchors.price);
       if (priceMatch) {
-        // Match could be group 1 (ราคา X) or group 2 (X บาท)
         const val = parseInt(priceMatch[1] || priceMatch[2]);
         if (isValidPrice(val)) {
           detected.price = val;
@@ -220,7 +340,7 @@ export function useVoiceDetector() {
       }
     }
 
-    // 2.3 Explicit ID (The Anchor)
+    // 2.3 Explicit ID
     const idMatch = workingText.match(CONFIG.patterns.anchors.id);
     if (idMatch) {
       const val = parseInt(idMatch[1]);
@@ -231,16 +351,13 @@ export function useVoiceDetector() {
       }
     }
 
-    // --- STEP 3: IMPLICIT LOGIC (The Smart Splitter) ---
-    // Only run if we are missing ID or Price
+    // --- STEP 3: IMPLICIT LOGIC ---
     if (detected.id === null || detected.price === null) {
-      // Find all remaining independent numbers
       const numbers = [...workingText.matchAll(/\b(\d+)\b/g)].map((m) =>
         parseInt(m[1]),
       );
 
       if (numbers.length > 0) {
-        // Case A: Glued Numbers (e.g., "680", "4350")
         if (
           numbers.length === 1 &&
           detected.id === null &&
@@ -248,31 +365,22 @@ export function useVoiceDetector() {
         ) {
           const num = numbers[0];
           const str = num.toString();
-
-          // Logic: If 3-4 digits, try splitting last 2 digits as Price
           if (str.length >= 3 && str.length <= 4) {
-            const p2Val = parseInt(str.slice(-2)); // Last 2 digits
-            const p1Val = parseInt(str.slice(0, -2)); // The rest
-
-            // Fix "100" splitting into ID 1, Price 0
+            const p2Val = parseInt(str.slice(-2));
+            const p1Val = parseInt(str.slice(0, -2));
             if (p2Val > 0 && isValidPrice(p2Val) && isValidId(p1Val)) {
               detected.id = p1Val;
               detected.price = p2Val;
               detected.logic = "Implicit-Glued-Split";
             } else if (isValidId(num)) {
-              // Single Number Fallback
-              // Case C: Single Number -> ID
               detected.id = num;
               detected.logic = "Implicit-Single-ID";
             }
           } else if (isValidId(num)) {
-            // Case C: Single Number -> ID
             detected.id = num;
             detected.logic = "Implicit-Single-ID";
           }
-        }
-        // Case B: Two Separate Numbers (e.g., "53 80")
-        else if (
+        } else if (
           numbers.length >= 2 &&
           detected.id === null &&
           detected.price === null
@@ -283,12 +391,9 @@ export function useVoiceDetector() {
             detected.price = n2;
             detected.logic = "Implicit-Pair";
           } else if (isValidId(n1)) {
-            // Fallback?
             detected.id = n1;
           }
-        }
-        // Case C (Variant): We have Price, missing ID, and have a number
-        else if (
+        } else if (
           detected.id === null &&
           detected.price !== null &&
           numbers.length > 0
@@ -297,9 +402,7 @@ export function useVoiceDetector() {
             detected.id = numbers[0];
             detected.logic = "Implicit-ID-Only";
           }
-        }
-        // Case C (Variant): We have ID, missing Price, and have a number
-        else if (
+        } else if (
           detected.id !== null &&
           detected.price === null &&
           numbers.length > 0
@@ -312,30 +415,27 @@ export function useVoiceDetector() {
       }
     }
 
-    // --- STEP 4: AI FALLBACK (Smart Hybrid Approach) ---
-    // Only activate AI if regex failed to detect ID AND text is substantial AND AI is enabled
+    // --- STEP 4: AI FALLBACK ---
     if (detected.id === null && rawText.length > 5 && systemStore.isAiEnabled) {
-      // Debounce: Wait 800ms before calling Ollama
-      // This prevents spamming the AI when user is still speaking
       aiDebounceTimer = setTimeout(async () => {
-        // Check if still listening (optional safety check)
         if (!isListening.value) return;
-
-        // Show "Thinking..." UI feedback
         lastAction.value = "🤔 กำลังคิด...";
 
         try {
-          const aiResult = await extractPriceFromVoice(rawText, lastDetectedId.value);
+          const aiResult = await extractPriceFromVoice(
+            rawText,
+            lastDetectedId.value,
+          );
 
           if (aiResult) {
-            // Update detection with AI results
             if (aiResult.id !== null && aiResult.id !== undefined) {
-              // Handle special case: "current" means user wants current item
               if (aiResult.id === "current" && lastDetectedId.value) {
                 detected.id = lastDetectedId.value;
                 detected.logic = "AI-Ollama-Context";
               } else if (aiResult.id === "current") {
-                console.log("AI detected 'current' but no lastDetectedId exists");
+                console.log(
+                  "AI detected 'current' but no lastDetectedId exists",
+                );
               } else {
                 detected.id =
                   typeof aiResult.id === "string"
@@ -348,37 +448,29 @@ export function useVoiceDetector() {
               detected.price = aiResult.price;
             }
 
-            // Merge AI's size data if present
             if (
               aiResult.size !== null &&
               aiResult.size !== undefined &&
               aiResult.size !== ""
             ) {
-              // Parse AI size and merge with detected attributes
               const sizeParts = [];
               if (detected.bust) sizeParts.push(`อก ${detected.bust}`);
               if (detected.length) sizeParts.push(`ยาว ${detected.length}`);
               if (detected.sizeLetter) sizeParts.push(detected.sizeLetter);
               if (detected.fabric) sizeParts.push(detected.fabric);
-
-              // Add AI size if not already captured by regex
               if (
                 sizeParts.length === 0 ||
                 !sizeParts.join(" ").includes(aiResult.size)
               ) {
                 sizeParts.push(aiResult.size);
               }
-
-              // Override the detected size attributes with merged data
               detected.aiSize = sizeParts.join(" ");
             }
 
-            // Mark this as AI-detected
             if (detected.id !== null) {
               detected.logic = "AI-Ollama";
             }
 
-            // Execute action with AI results
             executeAction(rawText, cleanText, detected);
           }
         } catch (error) {
@@ -387,14 +479,12 @@ export function useVoiceDetector() {
         }
       }, 800);
 
-      // Return early - AI will execute action when ready
       return;
     } else if (
       detected.id === null &&
       rawText.length > 5 &&
       !systemStore.isAiEnabled
     ) {
-      // AI is disabled - log and skip
       console.log("⚠️ AI Disabled - No ID detected by regex");
       logEvent({
         raw: rawText,
@@ -418,15 +508,11 @@ export function useVoiceDetector() {
   }
 
   function isValidPrice(num) {
-    // "Split-Price must be in [20, 30...100, 120, 150] OR end in 0"
-    // And generally reasonable prices
-    if (num === 0) return true; // Free
-    if (num < 10) return false; // Too cheap (unless single digit bugs?)
-    if (num % 10 === 0) return true; // Ends in 0 (20, 30, 80, 120)
-    // Specific whitelist for common prices if needed:
+    if (num === 0) return true;
+    if (num < 10) return false;
+    if (num % 10 === 0) return true;
     const commonPrices = [120, 150, 199, 250, 290];
     if (commonPrices.includes(num)) return true;
-
     return false;
   }
 
@@ -434,7 +520,6 @@ export function useVoiceDetector() {
   // ACTION HANDLER
   // ============================================
   function executeAction(rawText, cleanText, detected) {
-    // Admin Commands Check (Cancel/Book)
     const cancelMatch = cleanText.match(
       /(?:ยกเลิก|ลบ|เคลียร์|ไม่เอา)\s*(?:รายการที่)?\s*(\d+)/i,
     );
@@ -443,7 +528,7 @@ export function useVoiceDetector() {
       if (stockStore.stockData[id]) {
         stockStore.processCancel(id);
         lastAction.value = `🗑️ ยกเลิก #${id}`;
-        playDing();
+        playSfx("ding");
         logEvent({
           raw: rawText,
           cleaned: cleanText,
@@ -455,9 +540,7 @@ export function useVoiceDetector() {
       }
     }
 
-    // Logic: We MUST have an ID to do anything meaningful update-wise
     if (detected.id) {
-      // Check existence
       if (detected.id > stockStore.stockSize || detected.id < 1) {
         lastAction.value = `⚠️ ไม่พบรายการ #${detected.id}`;
         logEvent({
@@ -470,11 +553,9 @@ export function useVoiceDetector() {
         return;
       }
 
-      // Construct Update Payload
       const updateData = {};
       let sizeParts = [];
 
-      // Use AI size if available, otherwise build from detected attributes
       if (detected.aiSize) {
         updateData.size = detected.aiSize;
       } else {
@@ -482,29 +563,23 @@ export function useVoiceDetector() {
         if (detected.length) sizeParts.push(`ยาว ${detected.length}`);
         if (detected.sizeLetter) sizeParts.push(detected.sizeLetter);
         if (detected.fabric) sizeParts.push(detected.fabric);
-
         if (sizeParts.length > 0) updateData.size = sizeParts.join(" ");
       }
 
       if (detected.price !== null) updateData.price = detected.price;
 
-      // Commit to Store
       if (Object.keys(updateData).length > 0) {
         stockStore.updateItemData(detected.id, updateData);
-
-        // Update context tracking
         lastDetectedId.value = detected.id;
 
-        // Feedback
         let feedback = `✅ #${detected.id}`;
         if (updateData.size) feedback += ` | ${updateData.size}`;
-        // Explicit check for undefined because Price can be 0
         if (updateData.price !== undefined)
           feedback += ` | ${updateData.price}.-`;
 
         lastAction.value = feedback;
-        transcript.value = cleanText; // Show the clean version
-        playDing();
+        transcript.value = cleanText;
+        playSfx("ding");
 
         logEvent({
           raw: rawText,
@@ -514,7 +589,6 @@ export function useVoiceDetector() {
           status: "MATCHED",
         });
       } else {
-        // Just selecting? Or partial parse?
         lastAction.value = `ℹ️ เลือก #${detected.id}`;
         logEvent({
           raw: rawText,
@@ -525,8 +599,6 @@ export function useVoiceDetector() {
         });
       }
     } else {
-      // No ID found - Ignore
-      // Only log substantial speech
       if (rawText.length > 5 && !rawText.includes("แก้ไข")) {
         logEvent({
           raw: rawText,
@@ -540,24 +612,47 @@ export function useVoiceDetector() {
   }
 
   function toggleMic() {
-    if (!recognition.value) return;
+    if (!recognition) return;
+
+    // If Auto Agent is active, don't allow manual toggle conflict
+    if (isAutoAgentEnabled.value) {
+      // Toggle agent off when user taps mic during agent mode
+      isAutoAgentEnabled.value = false;
+      return;
+    }
+
     if (isListening.value) {
       manualStop.value = true;
-      recognition.value.stop();
+      recognition.stop();
     } else {
       manualStop.value = false;
       try {
-        recognition.value.start();
+        recognition.start();
       } catch (e) {
         console.error(e);
       }
     }
   }
 
+  // Cleanup
+  onUnmounted(() => {
+    if (recognition) {
+      manualStop.value = true;
+      isAutoAgentEnabled.value = false;
+      recognition.stop();
+    }
+    if (agentProcessingTimer) clearTimeout(agentProcessingTimer);
+    if (aiDebounceTimer) clearTimeout(aiDebounceTimer);
+  });
+
   return {
     isListening,
     transcript,
     lastAction,
     toggleMic,
+    // Auto Agent exports
+    isAutoAgentEnabled,
+    autoAgentStatus,
+    isAutoAgentProcessing,
   };
 }

@@ -4,7 +4,7 @@ import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
 import { useOllama } from "./useOllama";
 import { useAudio } from "./useAudio";
-import { ref as dbRef, onValue, set, update, push } from "firebase/database";
+import { ref as dbRef, onValue, set, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 import { extractMessageRuns } from "../services/YouTubeLiveChat";
@@ -54,17 +54,17 @@ const multiBuyRegex = /^(\d+(?:\s+\d+)+)(?:\s+(.*))?$/; // Multi-Buy: "26 38 74"
 const adminProxyRegex = /^(\d+)\s+(.+)$/;
 const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
 const questionRegex =
-  /อก|เอว|ยาว|ราคา|เท่าไหร่|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
+  /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
 const pureNumberRegex = /^\s*(\d+)\s*$/;
 const explicitBuyRegex = /(?:F|f|cf|CF|รับ|เอา)\s*(\d+)/;
-const dashBuyRegex = /^(?:.+?)\s*[-]\s*(\d+)$/;
+const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 const cancelRegex =
   /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i; // Flexible: "cancel 46" or "46 cancel"
 const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
 
 // ✅ Thai Numeral → Arabic Digit Converter
 function thaiToArabic(text) {
-  return text.replace(/[๐-๙]/g, (ch) => ch.charCodeAt(0) - 0x0E50);
+  return text.replace(/[๐-๙]/g, (ch) => ch.charCodeAt(0) - 0x0e50);
 }
 
 // ✅ Toast Notification Mixin
@@ -79,6 +79,9 @@ const Toast = Swal.mixin({
     toast.addEventListener("mouseleave", Swal.resumeTimer);
   },
 });
+
+// ✅ Concurrency Lock for Chat Processing
+const processingLocks = new Set();
 
 export function useChatProcessor() {
   const stockStore = useStockStore();
@@ -115,7 +118,7 @@ export function useChatProcessor() {
     () => systemStore.currentVideoId,
     (newId) => {
       if (newId) setupOverlayListener();
-    }
+    },
   );
 
   // extractMessageRuns is now imported from ../services/YouTubeLiveChat
@@ -226,14 +229,26 @@ export function useChatProcessor() {
 
         // Process all orders
         for (const itemId of itemIds) {
-          await stockStore.processOrder(
-            itemId,
-            ownerName,
-            ownerUid,
-            "chat",
-            null, // No price for multi-buy
-            "multi-buy",
-          );
+          if (processingLocks.has(itemId)) {
+            logger.warn(
+              `Item ${itemId} is being processed. Skipping in multi-buy.`,
+            );
+            continue;
+          }
+
+          processingLocks.add(itemId);
+          try {
+            await stockStore.processOrder(
+              itemId,
+              ownerName,
+              ownerUid,
+              "chat",
+              null, // No price for multi-buy
+              "multi-buy",
+            );
+          } finally {
+            processingLocks.delete(itemId);
+          }
         }
 
         // ✅ Show Success Toast
@@ -243,8 +258,7 @@ export function useChatProcessor() {
         });
 
         // ✅ Push message to Firebase (Listener will update UI)
-        const chatRef = dbRef(db, `chats/${systemStore.currentVideoId}`);
-        push(chatRef, {
+        chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
           id: item.id,
           text: msg,
           messageRuns: extractMessageRuns(item),
@@ -366,8 +380,7 @@ export function useChatProcessor() {
     }
 
     // 4. ✅ Push message to Firebase (Listener will update UI)
-    const chatRef = dbRef(db, `chats/${systemStore.currentVideoId}`);
-    push(chatRef, {
+    chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
       id: item.id,
       text: msg,
       messageRuns: extractMessageRuns(item),
@@ -424,6 +437,11 @@ export function useChatProcessor() {
       }
 
       try {
+        if (processingLocks.has(targetId)) {
+          throw new Error("คิวเต็ม/ซ้ำแล้ว");
+        }
+        processingLocks.add(targetId);
+
         // ✅ Try to process order
         const result = await stockStore.processOrder(
           targetId,
@@ -434,8 +452,16 @@ export function useChatProcessor() {
           method,
         );
 
-        if (!result.success || (result.action !== 'claimed' && result.action !== 'queued')) {
-           throw new Error(result.error || (result.action === 'already_owned' ? "ซ้ำแล้ว" : "เต็มแล้ว/อื่นๆ"));
+        if (
+          !result.success ||
+          (result.action !== "claimed" && result.action !== "queued")
+        ) {
+          throw new Error(
+            result.error ||
+              (result.action === "already_owned"
+                ? "ซ้ำแล้ว"
+                : "เต็มแล้ว/อื่นๆ"),
+          );
         }
 
         // ✅ Success - Show Toast
@@ -459,6 +485,8 @@ export function useChatProcessor() {
         // ✅ Play ERROR sound BEFORE TTS
         await playSfx("error");
         speak(phoneticName, msg); // Still announce to admin
+      } finally {
+        processingLocks.delete(targetId);
       }
     } else if (intent === "cancel" && targetId > 0) {
       // --- Cancel Logic ---

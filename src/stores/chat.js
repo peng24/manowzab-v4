@@ -103,7 +103,9 @@ export const useChatStore = defineStore("chat", () => {
 
     // ✅ Auto-Clear if switching to a new video
     if (currentVideoId && currentVideoId !== videoId) {
-      console.log(`🔄 Switching video from ${currentVideoId} to ${videoId}. Clearing chat...`);
+      console.log(
+        `🔄 Switching video from ${currentVideoId} to ${videoId}. Clearing chat...`,
+      );
       clearChat();
     }
 
@@ -141,6 +143,27 @@ export const useChatStore = defineStore("chat", () => {
     };
   }
 
+  /**
+   * ✅ Send a new message to Firebase
+   * @param {string} videoId - The video ID to save the chat under
+   * @param {Object} messageData - The full message object
+   * @returns {Promise} Resolves when the message is successfully pushed
+   */
+  async function sendMessageToFirebase(videoId, messageData) {
+    if (!videoId) {
+      console.warn("⚠️ Cannot send message: No videoId provided");
+      return;
+    }
+
+    try {
+      const chatRef = dbRef(db, `chats/${videoId}`);
+      await push(chatRef, messageData);
+    } catch (error) {
+      console.error("❌ Error sending message to Firebase:", error);
+      throw error;
+    }
+  }
+
   return {
     messages,
     fullChatLog,
@@ -149,5 +172,6 @@ export const useChatStore = defineStore("chat", () => {
     clearChat,
     downloadChatCSV,
     syncFromFirebase,
+    sendMessageToFirebase, // ✅ Export new action
   };
 });

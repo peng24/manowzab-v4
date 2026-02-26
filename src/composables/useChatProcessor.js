@@ -284,8 +284,15 @@ export function useChatProcessor() {
       }
     }
 
+    // 🔴 CANCEL CHECK — must be before Admin Proxy to prevent "35 ยกเลิก" from being treated as a buy
+    const earlyMatchCancel = normalizedMsg.match(cancelRegex);
+    if (earlyMatchCancel) {
+      intent = "cancel";
+      targetId = parseInt(earlyMatchCancel[1] || earlyMatchCancel[2]);
+      method = "regex-cancel";
+    }
     // Special Check for Admin Proxy (Single Item)
-    if (isAdmin && adminProxyRegex.test(normalizedMsg)) {
+    else if (isAdmin && adminProxyRegex.test(normalizedMsg)) {
       const matchProxy = normalizedMsg.match(adminProxyRegex);
       intent = "buy";
       targetId = parseInt(matchProxy[1]);

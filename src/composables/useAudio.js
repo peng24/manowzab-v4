@@ -75,13 +75,15 @@ export function useAudio() {
     ttsService.speak(author, message);
   }
 
+  let activeOscillators = [];
+
   /**
-   * Play sound effect with proper async/await support
+   * Play sound effect without blocking TTS
    * @param {string} type - 'success', 'error', or 'cancel'
-   * @returns {Promise} Resolves when sound finishes playing
+   * @returns {Promise} Resolves immediately after starting the sound
    */
-  function playSfx(type = 'success') {
-    return new Promise((resolve) => {
+  function playSfx(type = "success") {
+    return new Promise(async (resolve) => {
       if (!systemStore.isSoundOn) {
         resolve();
         return;
@@ -90,7 +92,7 @@ export function useAudio() {
       initAudio();
 
       if (audioCtx.value && audioCtx.value.state === "suspended") {
-        audioCtx.value.resume();
+        await audioCtx.value.resume();
       }
       if (!audioCtx.value) {
         resolve();
@@ -100,76 +102,75 @@ export function useAudio() {
       const ctx = audioCtx.value;
       const now = ctx.currentTime;
 
-      if (type === 'success') {
-        // 🎵 Ka-Ching! (Coin sound - Two ascending tones)
-        const duration = 0.5;
+      // Stop any active sounds to prevent overlapping
+      activeOscillators.forEach((osc) => {
+        try {
+          osc.stop();
+          osc.disconnect();
+        } catch (e) {
+          // ignore
+        }
+      });
+      activeOscillators = [];
 
-        // First tone (lower)
+      if (type === "success") {
+        // 🔔 Bright Bell
         const osc1 = ctx.createOscillator();
         const gain1 = ctx.createGain();
         osc1.type = "sine";
-        osc1.frequency.setValueAtTime(800, now);
-        gain1.gain.setValueAtTime(0.3, now);
-        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc1.frequency.setValueAtTime(1200, now);
+        gain1.gain.setValueAtTime(0.1, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
         osc1.connect(gain1);
         gain1.connect(ctx.destination);
         osc1.start(now);
-        osc1.stop(now + 0.2);
+        osc1.stop(now + 0.5);
 
-        // Second tone (higher)
         const osc2 = ctx.createOscillator();
         const gain2 = ctx.createGain();
         osc2.type = "sine";
-        osc2.frequency.setValueAtTime(1200, now + 0.1);
-        gain2.gain.setValueAtTime(0.4, now + 0.1);
-        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        osc2.frequency.setValueAtTime(1600, now);
+        gain2.gain.setValueAtTime(0.05, now);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
         osc2.connect(gain2);
         gain2.connect(ctx.destination);
-        osc2.start(now + 0.1);
+        osc2.start(now);
         osc2.stop(now + 0.4);
 
-        setTimeout(resolve, duration * 1000);
-
-      } else if (type === 'error') {
-        // 🔴 Buzzer (Low harsh sound)
-        const duration = 0.6;
-
+        activeOscillators.push(osc1, osc2);
+      } else if (type === "error") {
+        // 🔴 Error (Low harsh sound)
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = "sawtooth"; // Harsh sound
+        osc.type = "sawtooth";
         osc.frequency.setValueAtTime(200, now);
         osc.frequency.linearRampToValueAtTime(150, now + 0.3);
-        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.setValueAtTime(0.15, now);
         gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
         osc.stop(now + 0.6);
 
-        setTimeout(resolve, duration * 1000);
-
-      } else if (type === 'cancel') {
-        // 🔵 Pop (Neutral quick sound)
-        const duration = 0.3;
-
+        activeOscillators.push(osc);
+      } else if (type === "cancel") {
+        // 🚨 Buzzer (อ๊อด)
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(300, now + 0.2);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(150, now);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.3);
+        osc.stop(now + 0.4);
 
-        setTimeout(resolve, duration * 1000);
-
-      } else {
-        // Unknown type - resolve immediately
-        resolve();
+        activeOscillators.push(osc);
       }
+
+      // Resolve immediately to not block TTS
+      resolve();
     });
   }
 
@@ -179,10 +180,9 @@ export function useAudio() {
 
   return {
     queueSpeech, // Kept for backward compatibility
-    speak,       // New preferred method
-    playSfx,     // ✅ New sound effects system
+    speak, // New preferred method
+    playSfx, // ✅ New sound effects system
     resetVoice,
     unlockAudio,
   };
 }
-

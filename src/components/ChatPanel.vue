@@ -67,17 +67,17 @@
         >
           <!-- Avatar Left -->
           <div class="avatar-container">
-            <img 
-              :src="chat.avatar" 
-              class="avatar" 
+            <img
+              :src="chat.avatar"
+              class="avatar"
               loading="lazy"
-              @error="(e) => e.target.style.display = 'none'"
+              @error="(e) => (e.target.style.display = 'none')"
             />
-            <div 
-              class="avatar-fallback" 
+            <div
+              class="avatar-fallback"
               :style="{ backgroundColor: chat.color }"
             >
-              {{ chat.displayName?.[0] || '?' }}
+              {{ chat.displayName?.[0] || "?" }}
             </div>
           </div>
 
@@ -93,6 +93,20 @@
               >
                 {{ chat.displayName }}
               </span>
+
+              <!-- ✅ Intent Badge Separated -->
+              <span
+                v-if="getIntentBadge(chat.type)"
+                class="status-badge"
+                :class="getIntentBadge(chat.type).class"
+              >
+                {{ getIntentBadge(chat.type).icon }}
+                {{ getIntentBadge(chat.type).label }}
+              </span>
+              <span v-else-if="chat.type === 'spam'" class="status-emoji-only"
+                >🍋</span
+              >
+
               <span v-if="chat.isAdmin" class="admin-badge">ADMIN</span>
               <span v-if="chat.realName !== chat.displayName" class="real-name">
                 ({{ chat.realName }})
@@ -102,12 +116,17 @@
             <div class="chat-bubble">
               <div class="chat-text">
                 <!-- ✅ Render message with emoji support -->
-                <template v-if="chat.messageRuns && chat.messageRuns.length > 0">
+                <template
+                  v-if="chat.messageRuns && chat.messageRuns.length > 0"
+                >
                   <template v-for="(run, idx) in chat.messageRuns" :key="idx">
                     <span v-if="run.text">{{ run.text }}</span>
                     <img
                       v-else-if="run.emoji && run.emoji.image"
-                      :src="run.emoji.image.thumbnails?.[0]?.url || run.emoji.image.url"
+                      :src="
+                        run.emoji.image.thumbnails?.[0]?.url ||
+                        run.emoji.image.url
+                      "
                       :alt="run.emoji.emojiId || 'emoji'"
                       class="emoji-image"
                       loading="lazy"
@@ -180,6 +199,22 @@ const visibleMessages = computed(() => {
 const hasMoreMessages = computed(() => {
   return chatStore.messages.length > displayLimit.value;
 });
+
+// ✅ Helper: Get Badge Info for Message Intent
+function getIntentBadge(type) {
+  switch (type) {
+    case "buy":
+      return { icon: "🛍️", label: "เอฟ", class: "badge-buy" };
+    case "cancel":
+      return { icon: "🥺", label: "ยกเลิก", class: "badge-cancel" };
+    case "shipping":
+      return { icon: "📦", label: "ส่ง", class: "badge-shipping" };
+    case "question":
+      return { icon: "💬", label: "ถาม", class: "badge-question" };
+    default:
+      return null; // Return null so we can fallback to just 🍋 for spam
+  }
+}
 
 function formatTime(timestamp) {
   if (!timestamp) return "";
@@ -650,7 +685,6 @@ async function refreshChat() {
   display: none;
 }
 
-
 .chat-bubble-container {
   display: flex;
   flex-direction: column;
@@ -662,7 +696,8 @@ async function refreshChat() {
 .chat-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap; /* ✅ Allow wrapping nicely */
+  gap: 6px; /* ✅ Unified gap */
   margin-bottom: 4px;
   font-size: 0.85em;
 }
@@ -713,6 +748,43 @@ async function refreshChat() {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
+/* ✅ Status Badges (Independent) */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+
+.badge-buy {
+  background-color: #c6f6d5; /* สีเขียวมินต์ */
+  color: #1c4532; /* สีเขียวเข้มจัด */
+}
+
+.badge-cancel {
+  background-color: #fed7d7; /* สีแดงพาสเทล */
+  color: #742a2a; /* สีแดงเข้ม */
+}
+
+.badge-shipping {
+  background-color: #bee3f8; /* สีฟ้าสว่าง */
+  color: #234e52; /* สีกรมท่า/ฟ้าเข้ม */
+}
+
+.badge-question {
+  background-color: #feebc8; /* สีส้มพีช */
+  color: #7b341e; /* สีส้มอิฐเข้ม */
+}
+
+.status-emoji-only {
+  font-size: 0.9em;
+}
+
 /* ✅ YouTube Emoji Styling */
 .emoji-image {
   height: 1.5em;
@@ -722,7 +794,6 @@ async function refreshChat() {
   margin: 0 2px;
   object-fit: contain;
 }
-
 
 /* Special Types */
 .chat-row.buy .chat-bubble {

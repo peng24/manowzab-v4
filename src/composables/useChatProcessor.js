@@ -4,7 +4,7 @@ import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
 import { useOllama } from "./useOllama";
 import { useAudio } from "./useAudio";
-import { ref as dbRef, onValue, set, update } from "firebase/database";
+import { ref as dbRef, onValue, set, update, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 import { extractMessageRuns } from "../services/YouTubeLiveChat";

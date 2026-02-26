@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, reactive } from "vue";
-import { ref as dbRef, onChildAdded, off } from "firebase/database";
+import { ref as dbRef, onChildAdded, off, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
 
 export const useChatStore = defineStore("chat", () => {

@@ -71,11 +71,10 @@
           systemStore.isConnected
             ? "DISCONNECT"
             : isConnecting
-            ? "..."
-            : "CONNECT"
+              ? "..."
+              : "CONNECT"
         }}
       </button>
-
 
       <!-- TTS Toggle - Vibrant Blue Gradient (Fixed) -->
       <button
@@ -86,7 +85,7 @@
             : 'linear-gradient(135deg, #4B5563 0%, #374151 100%)', // Dark Gray
           boxShadow: systemStore.useOnlineTts
             ? '0 4px 15px rgba(0, 114, 255, 0.4)'
-            : 'none'
+            : 'none',
         }"
         @click="toggleTtsMode"
         :title="
@@ -101,19 +100,18 @@
             'text-lg drop-shadow-sm',
             systemStore.useOnlineTts
               ? 'fa-solid fa-cloud'
-              : 'fa-solid fa-robot'
+              : 'fa-solid fa-robot',
           ]"
         ></i>
 
         <!-- Key Index Number -->
-        <span 
-          v-if="systemStore.useOnlineTts" 
+        <span
+          v-if="systemStore.useOnlineTts"
           class="ml-2 text-lg font-bold font-mono drop-shadow-sm"
         >
           {{ systemStore.activeKeyIndex }}
         </span>
       </button>
-
 
       <div class="dropdown" ref="dropdownRef">
         <button class="btn btn-sim" @click.stop="toggleDropdown">
@@ -238,7 +236,7 @@ watch(
       videoId.value = newVal;
       logger.log("🔄 Synced Video ID:", newVal);
     }
-  }
+  },
 );
 
 // คำนวณ Shipping Count (คงเดิม)
@@ -251,7 +249,7 @@ const shippingCount = computed(() => {
     }
   });
   return Object.keys(currentShipping).filter(
-    (uid) => currentShipping[uid]?.ready && activeBuyerUids.has(uid)
+    (uid) => currentShipping[uid]?.ready && activeBuyerUids.has(uid),
   ).length;
 });
 
@@ -296,12 +294,12 @@ function getStatusTitle(type) {
     type === "db"
       ? systemStore.statusDb
       : type === "api"
-      ? systemStore.statusApi
-      : type === "chat"
-      ? systemStore.statusChat
-      : type === "ollama"
-      ? systemStore.statusOllama
-      : "idle";
+        ? systemStore.statusApi
+        : type === "chat"
+          ? systemStore.statusChat
+          : type === "ollama"
+            ? systemStore.statusOllama
+            : "idle";
   return titles[type]?.[status] || titles[type]?.idle || "ไม่ทราบสถานะ";
 }
 
@@ -346,17 +344,18 @@ function toggleAI() {
 // ✅ Extract YouTube Video ID from various URL formats
 function extractVideoId(input) {
   if (!input) return "";
-  
+
   // Handle common YouTube URL formats:
   // - youtube.com/watch?v=ID
   // - youtu.be/ID
   // - youtube.com/live/ID
   // - youtube.com/shorts/ID
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
+  const regExp =
+    /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
   const match = input.match(regExp);
-  
+
   // Return the extracted ID if it's 11 characters, otherwise return original input
-  return (match && match[2].length === 11) ? match[2] : input;
+  return match && match[2].length === 11 ? match[2] : input;
 }
 
 async function toggleConnection() {
@@ -364,7 +363,7 @@ async function toggleConnection() {
     disconnect();
     systemStore.isConnected = false;
     systemStore.statusChat = "idle"; // ✅ Changed from 'err' to 'idle'
-    systemStore.statusApi = "idle";   // ✅ Reset API status too
+    systemStore.statusApi = "idle"; // ✅ Reset API status too
     queueSpeech("หยุดการเชื่อมต่อ");
     return;
   }
@@ -393,9 +392,31 @@ async function toggleConnection() {
   // ✅ เพิ่ม: Unlock Audio เพื่อให้เสียงพูดทำงาน
   unlockAudio();
 
+  // ✅ Wake up Hugging Face Space backend (non-blocking)
+  fetch("https://peng24-manowzab-price-detector.hf.space/docs", {
+    method: "GET",
+  })
+    .then((res) => {
+      if (res.ok || res.status === 404) {
+        console.log(
+          "%c✅ Hugging Face Server is Awake and Ready!",
+          "color: #22c55e; font-size: 14px; font-weight: bold; text-shadow: 0 0 8px rgba(34,197,94,0.4);",
+        );
+      } else {
+        throw new Error(`Status: ${res.status}`);
+      }
+    })
+    .catch((err) => {
+      console.log(
+        "%c❌ Failed to wake up Hugging Face Server",
+        "color: #ef4444; font-size: 14px; font-weight: bold;",
+        err.message,
+      );
+    });
+
   // ✅ เพิ่ม: ส่งรหัสไลฟ์ขึ้น Firebase เพื่อให้เครื่องอื่นรู้
   set(dbRef(db, "system/activeVideo"), videoId.value).catch((err) =>
-    console.error("Sync Error:", err)
+    console.error("Sync Error:", err),
   );
 
   try {
@@ -515,9 +536,8 @@ async function toggleSimulation() {
   // (Logic เดิม)
   isSimulating.value = !isSimulating.value;
   if (isSimulating.value) {
-    const { useChatProcessor } = await import(
-      "../composables/useChatProcessor"
-    );
+    const { useChatProcessor } =
+      await import("../composables/useChatProcessor");
     const { processMessage } = useChatProcessor();
     Swal.fire({
       icon: "info",
@@ -564,8 +584,6 @@ async function toggleSimulation() {
   showDropdown.value = false;
 }
 
-
-
 function askAiKey() {
   // (Logic เดิม)
   const currentKey = localStorage.getItem("geminiApiKey") || "";
@@ -594,12 +612,18 @@ function askAiKey() {
 }
 
 function openVoicePricePage() {
-  window.open(window.location.origin + window.location.pathname + "?mode=voice", "_blank");
+  window.open(
+    window.location.origin + window.location.pathname + "?mode=voice",
+    "_blank",
+  );
   showDropdown.value = false;
 }
 
 function openOverlayPage() {
-  window.open(window.location.origin + window.location.pathname + "?mode=overlay", "_blank");
+  window.open(
+    window.location.origin + window.location.pathname + "?mode=overlay",
+    "_blank",
+  );
   showDropdown.value = false;
 }
 
@@ -630,7 +654,7 @@ function toggleTtsMode() {
   systemStore.useOnlineTts = !systemStore.useOnlineTts;
   const mode = systemStore.useOnlineTts ? "Google Cloud TTS" : "Native TTS";
   logger.log("🔊 Switched to:", mode);
-  
+
   queueSpeech(`เปลี่ยนเป็น ${mode}`);
 }
 

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "case_a_isan_dialect",
+    "description": "High-velocity Isan dialect with noise words",
+    "input": "รหัส 5 บ่มีตำหนิ เอาไป 50 บาทพอ",
+    "expected_item_code": 5,
+    "expected_price": 50
+  },
+  {
+    "id": "case_b_code_switching",
+    "description": "Code-switching with fabric name and explicit anchors",
+    "input": "คอตตอนเบอร์ 10 ราคา 80 บาท",
+    "expected_item_code": 10,
+    "expected_price": 80
+  },
+  {
+    "id": "case_c_dimension_interference",
+    "description": "Ambiguous dimensions (bust/length) vs actual price",
+    "input": "อก 40 ยาว 30 ตัวนี้ 60 บาท",
+    "expected_item_code": null,
+    "expected_price": 60
+  },
+  {
+    "id": "case_d_explicit_both",
+    "description": "Explicit item code and price with anchors",
+    "input": "รายการที่ 15 ราคา 120 บาท",
+    "expected_item_code": 15,
+    "expected_price": 120
+  },
+  {
+    "id": "case_e_freebie",
+    "description": "Free item (ฟรี/แถม)",
+    "input": "ตัวที่ 3 ฟรีเลยค่ะ",
+    "expected_item_code": 3,
+    "expected_price": 0
+  },
+  {
+    "id": "case_f_spoken_number",
+    "description": "Spoken Thai number conversion",
+    "input": "รหัส 7 ขาย ห้าสิบ บาท",
+    "expected_item_code": 7,
+    "expected_price": 50
+  },
+  {
+    "id": "case_g_implicit_pair",
+    "description": "Implicit pair — two numbers, first=ID second=price",
+    "input": "เสื้อ 12 ตัวละ 90 น่ะค่ะ",
+    "expected_item_code": 12,
+    "expected_price": 90
+  },
+  {
+    "id": "case_h_price_only_with_baht",
+    "description": "Price only — no code mentioned, just price anchor",
+    "input": "อก 40 ยาว 30 ตัวนี้ 60 บาท",
+    "expected_item_code": null,
+    "expected_price": 60
+  },
+  {
+    "id": "case_i_complex_stream",
+    "description": "Complex stream with multiple numbers and noise",
+    "input": "ตัวที่ 25 ผ้าเด้ง อก 42 ยาว 28 เอาไป 199 บาท",
+    "expected_item_code": 25,
+    "expected_price": 199
+  },
+  {
+    "id": "case_j_name_first_format",
+    "description": "Item with 'เบอร์' anchor keyword",
+    "input": "เบอร์ 8 จัดไป 80",
+    "expected_item_code": 8,
+    "expected_price": 80
+  },
+  {
+    "id": "case_k_noise_heavy",
+    "description": "Heavy noise injection — should extract correctly",
+    "input": "ลูกค้า ครับ ตัวที่ 6 เอาไป 100 บาท จ้า",
+    "expected_item_code": 6,
+    "expected_price": 100
+  },
+  {
+    "id": "case_l_spoken_150",
+    "description": "Spoken ร้อยห้าสิบ = 150",
+    "input": "รหัส 20 ราคา ร้อยห้าสิบ บาท",
+    "expected_item_code": 20,
+    "expected_price": 150
+  }
+]

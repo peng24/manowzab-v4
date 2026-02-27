@@ -77,6 +77,9 @@
 
           <!-- Transcript / Status -->
           <div class="hearing-status" v-if="!isAutoAgentEnabled">
+            <div class="v3-badge">
+              <i class="fa-solid fa-bolt"></i> Smart Hunter V3
+            </div>
             <div class="log-transcript">"{{ transcript || "..." }}"</div>
             <div
               class="log-status"
@@ -634,12 +637,51 @@ onUnmounted(() => {
   margin-bottom: 8px;
 }
 
+/* ===== V3 Badge & Enhanced Status ===== */
+.v3-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  padding: 6px 14px;
+  border-radius: 50px;
+  margin-bottom: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  box-shadow: 0 0 15px rgba(251, 191, 36, 0.15);
+  animation: floatBadge 3s ease-in-out infinite;
+}
+
+.v3-badge i {
+  font-size: 0.8rem;
+  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.8));
+}
+
+@keyframes floatBadge {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
 .log-transcript {
-  font-size: 1.1rem;
-  font-weight: 300;
+  font-size: 1.2rem;
+  font-weight: 400;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.5);
+  background: linear-gradient(to right, #ffffff, #a5b4fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   min-height: 1.5em;
+  margin-bottom: 6px;
+  text-shadow: 0 0 20px rgba(165, 180, 252, 0.2);
 }
 
 .log-status {

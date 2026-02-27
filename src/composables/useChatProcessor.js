@@ -440,7 +440,7 @@ export function useChatProcessor() {
           ownerName = cleanName;
           ownerUid = "admin-proxy-" + Date.now();
         } else {
-          ownerName = "ลูกค้า (Admin)";
+          ownerName = displayName;
           ownerUid = "admin-proxy-" + Date.now();
         }
       }

@@ -107,7 +107,6 @@
                 >🍋</span
               >
 
-              <span v-if="chat.isAdmin" class="admin-badge">ADMIN</span>
               <span v-if="chat.realName !== chat.displayName" class="real-name">
                 ({{ chat.realName }})
               </span>

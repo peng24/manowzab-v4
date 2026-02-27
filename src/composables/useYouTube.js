@@ -7,7 +7,10 @@ import { useAudio } from "./useAudio";
 import { CONSTANTS } from "../config/constants";
 
 const rawKeys = import.meta.env.VITE_YOUTUBE_API_KEYS || "";
-const API_KEYS = rawKeys.split(",").map((k) => k.trim()).filter((k) => k);
+const API_KEYS = rawKeys
+  .split(",")
+  .map((k) => k.trim())
+  .filter((k) => k);
 
 if (API_KEYS.length === 0) {
   throw new Error("Missing VITE_YOUTUBE_API_KEYS in environment variables");
@@ -19,14 +22,16 @@ if (API_KEYS.length === 0) {
  */
 export function useYouTube() {
   const systemStore = useSystemStore();
-  const { speak } = useAudio();
+  const { queueAudio } = useAudio();
 
   const activeChatId = ref("");
   const viewerIntervalId = ref(null);
   const chatService = new YouTubeLiveChat(API_KEYS);
-  
+
   // Link Service Status to Store
-  chatService.onStatusChange = (status) => { systemStore.statusChat = status; };
+  chatService.onStatusChange = (status) => {
+    systemStore.statusChat = status;
+  };
 
   let processMessageFunc = null;
 
@@ -40,7 +45,7 @@ export function useYouTube() {
     try {
       systemStore.statusApi = "ok";
       let res = await fetch(
-        url + "&key=" + API_KEYS[systemStore.currentKeyIndex]
+        url + "&key=" + API_KEYS[systemStore.currentKeyIndex],
       );
       let data = await res.json();
 
@@ -67,7 +72,7 @@ export function useYouTube() {
   /**
    * Connects to a YouTube Video.
    * Fetches metadata, initializes chat polling, and starts viewer tracking.
-   * 
+   *
    * @param {string} videoId - The YouTube Video ID.
    * @returns {Promise<boolean>} True if connection successful, false otherwise.
    */
@@ -96,9 +101,13 @@ export function useYouTube() {
       }
 
       // Initialize Chat Store
-      const chatStore = await import("../stores/chat").then((m) => m.useChatStore());
+      const chatStore = await import("../stores/chat").then((m) =>
+        m.useChatStore(),
+      );
       if (item.liveStreamingDetails?.actualStartTime) {
-        chatStore.streamStartTime = new Date(item.liveStreamingDetails.actualStartTime).getTime();
+        chatStore.streamStartTime = new Date(
+          item.liveStreamingDetails.actualStartTime,
+        ).getTime();
       } else {
         chatStore.streamStartTime = Date.now();
       }
@@ -117,16 +126,26 @@ export function useYouTube() {
         chatService.liveChatId = activeChatId.value;
         chatService.startPolling(videoId, async (msg) => {
           // ✅ DEBUG: Log complete message structure from YouTube API
-          console.log('🔍🔍🔍 RAW YouTube API Message:', JSON.stringify(msg, null, 2));
+          console.log(
+            "🔍🔍🔍 RAW YouTube API Message:",
+            JSON.stringify(msg, null, 2),
+          );
           if (processMessageFunc) await processMessageFunc(msg);
         });
 
         // Start Viewer Count Loop
         updateViewerCount(videoId);
-        viewerIntervalId.value = setInterval(() => updateViewerCount(videoId), CONSTANTS.YOUTUBE.VIEWER_POLL_INTERVAL_MS);
+        viewerIntervalId.value = setInterval(
+          () => updateViewerCount(videoId),
+          CONSTANTS.YOUTUBE.VIEWER_POLL_INTERVAL_MS,
+        );
 
         // Voice Announcement
-        speak("", `การเชื่อมต่อสำเร็จ กำลังอ่านแชดสดจาก ${item.snippet.title}`);
+        queueAudio(
+          null,
+          "",
+          `การเชื่อมต่อสำเร็จ กำลังอ่านแชดสดจาก ${item.snippet.title}`,
+        );
 
         return true;
       } else {
@@ -142,7 +161,7 @@ export function useYouTube() {
 
   /**
    * Updates Concurrent Viewers and Detects Stream End.
-   * @param {string} videoId 
+   * @param {string} videoId
    */
   async function updateViewerCount(videoId) {
     try {
@@ -163,13 +182,13 @@ export function useYouTube() {
             clearInterval(viewerIntervalId.value);
             viewerIntervalId.value = null;
 
-            speak("", "ไลฟ์จบแล้ว");
+            queueAudio(null, "", "ไลฟ์จบแล้ว");
 
             const delaySec = CONSTANTS.YOUTUBE.DISCONNECT_DELAY_MS / 1000;
             console.log(`⏳ Disconnecting in ${delaySec} seconds...`);
             setTimeout(() => {
               if (systemStore.isConnected) {
-                speak("", "กำลังตัดการเชื่อมต่อครับ");
+                queueAudio(null, "", "กำลังตัดการเชื่อมต่อครับ");
                 disconnect();
               }
             }, CONSTANTS.YOUTUBE.DISCONNECT_DELAY_MS);

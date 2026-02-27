@@ -2,6 +2,10 @@ import { ref } from "vue";
 import { useSystemStore } from "../stores/system";
 import { ttsService } from "../services/TextToSpeech";
 
+// ✅ Global Unified Audio Queue (persists across re-renders)
+const audioQueue = [];
+let isAudioProcessing = false;
+
 export function useAudio() {
   const systemStore = useSystemStore();
   const audioCtx = ref(null);
@@ -56,23 +60,8 @@ export function useAudio() {
   }
 
   function queueSpeech(text) {
-    // NOTE: Overloading legacy function to support simple text calls
-    // But ideally should use full (name, msg)
-    // For compatibility, if we receive one string, we treat it as message with no name (or parse it?)
-    // However, ChatProcessor will be updated to call speak(name, msg) if possible.
-    // Let's keep this compatible:
-
     if (!systemStore.isSoundOn) return;
-
-    // Legacy support: if text is the only arg, pass it as message
-    // If it contains " ... ", try to split? No, let's just pass it through.
     ttsService.speak("", text);
-  }
-
-  // New API
-  function speak(author, message) {
-    if (!systemStore.isSoundOn) return;
-    ttsService.speak(author, message);
   }
 
   let activeOscillators = [];
@@ -178,10 +167,46 @@ export function useAudio() {
     ttsService.reset();
   }
 
+  // ✅ Unified Audio Queue Processor (SFX → TTS, sequential)
+  async function processAudioQueue() {
+    if (isAudioProcessing || audioQueue.length === 0) return;
+    isAudioProcessing = true;
+
+    const task = audioQueue.shift();
+
+    try {
+      // 1. Play SFX and wait for it to finish
+      if (task.sfxType) {
+        await playSfx(task.sfxType);
+      }
+
+      // 2. Play TTS and wait for it to finish
+      if (task.message) {
+        const ttsPromise = ttsService.speak(task.author, task.message);
+        if (ttsPromise instanceof Promise) {
+          await ttsPromise.catch((e) => console.warn("TTS Error:", e));
+        }
+      }
+    } catch (err) {
+      console.error("Audio Queue Error:", err);
+    }
+
+    isAudioProcessing = false;
+    // Process next item in the queue
+    processAudioQueue();
+  }
+
+  // ✅ Unified Entry Point: queues SFX + TTS as a single sequential task
+  function queueAudio(sfxType, author, message) {
+    if (!systemStore.isSoundOn) return;
+    audioQueue.push({ sfxType, author, message });
+    processAudioQueue();
+  }
+
   return {
-    queueSpeech, // Kept for backward compatibility
-    speak, // New preferred method
-    playSfx, // ✅ New sound effects system
+    queueSpeech, // Legacy
+    queueAudio, // ✅ Unified Queue API
+    playSfx,
     resetVoice,
     unlockAudio,
   };

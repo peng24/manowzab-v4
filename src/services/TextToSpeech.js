@@ -150,7 +150,8 @@ export class TextToSpeech {
 
     // ✅ Regex to remove ALL Emojis (Surrogates, Dingbats, Transport, etc.)
     // This covers: 🎄, 🥳, 🙏, etc.
-    const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]|\uD83F[\uDC00-\uDFFF]|[\u2000-\u26FF])/g;
+    const emojiRegex =
+      /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]|\uD83F[\uDC00-\uDFFF]|[\u2000-\u26FF])/g;
 
     // Replace emoji with empty string
     let cleanText = text.replace(emojiRegex, "");
@@ -265,6 +266,10 @@ export class TextToSpeech {
           hasEnded = true;
           URL.revokeObjectURL(blobUrl);
           this.clearStuckTimer();
+          if (this._currentOnComplete) {
+            this._currentOnComplete();
+            this._currentOnComplete = null;
+          }
           this.isSpeaking = false;
           this.processQueue();
         };
@@ -345,6 +350,10 @@ export class TextToSpeech {
           window.ttsActiveUtterances.splice(index, 1);
         }
         this.clearStuckTimer();
+        if (this._currentOnComplete) {
+          this._currentOnComplete();
+          this._currentOnComplete = null;
+        }
         this.isSpeaking = false;
         this.processQueue();
       };
@@ -366,6 +375,10 @@ export class TextToSpeech {
       // ✅ Catch-all: ensure queue never stalls on unexpected errors
       console.error("❌ Native TTS setup failed:", e);
       this.clearStuckTimer();
+      if (this._currentOnComplete) {
+        this._currentOnComplete();
+        this._currentOnComplete = null;
+      }
       this.isSpeaking = false;
       this.processQueue();
     }
@@ -407,7 +420,9 @@ export class TextToSpeech {
     }
 
     this.isSpeaking = true;
-    const text = this.queue.shift();
+    const item = this.queue.shift();
+    const text = typeof item === "string" ? item : item.text;
+    this._currentOnComplete = typeof item === "object" ? item.onComplete : null;
 
     // ✅ Start stuck detection timer
     this.startStuckTimer();
@@ -423,20 +438,26 @@ export class TextToSpeech {
   }
 
   /**
-   * Add message to queue
+   * Add message to queue and return a Promise that resolves when speech finishes.
+   * @returns {Promise<void>}
    */
   speak(author, message) {
     const sanitized = this.sanitize(message);
-    if (!sanitized) return;
+    if (!sanitized) return Promise.resolve();
 
     // Combine author and message
     const textToSpeak = author ? `${author} ... ${sanitized}` : sanitized;
 
-    // Add to queue
-    this.queue.push(textToSpeak);
+    return new Promise((resolve) => {
+      // Add to queue with a completion callback
+      this.queue.push({ text: textToSpeak, onComplete: resolve });
 
-    // Process queue
-    this.processQueue();
+      // Process queue
+      this.processQueue();
+
+      // Fallback timeout: ensure the Promise always resolves (max 20s)
+      setTimeout(() => resolve(), 20000);
+    });
   }
 
   /**
@@ -462,8 +483,15 @@ export class TextToSpeech {
     // Stop native speech synthesis
     window.speechSynthesis.cancel();
 
-    // Clear queue and state
+    // Clear queue and state — resolve any pending onComplete callbacks
+    this.queue.forEach((item) => {
+      if (typeof item === "object" && item.onComplete) item.onComplete();
+    });
     this.queue = [];
+    if (this._currentOnComplete) {
+      this._currentOnComplete();
+      this._currentOnComplete = null;
+    }
     this.isSpeaking = false;
     window.ttsActiveUtterances = []; // Clear native utterances ref
 

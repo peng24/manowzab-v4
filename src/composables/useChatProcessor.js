@@ -49,17 +49,21 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
   }
 });
 
-// 🚀 Performance: Regex patterns at module level to prevent recreation on every message
-const multiBuyRegex = /^(\d+(?:\s+\d+)+)(?:\s+(.*))?$/; // Multi-Buy: "26 38 74" or "26 38 74 ClientName"
-const adminProxyRegex = /^(\d+)\s+(.+)$/;
+// 🚀 Performance: Regex patterns at module level
+const multiBuyRegex = /^(\d+(?:[\s,]+\d+)+)(?:\s+(.*))?$/;
+const adminProxyNumFirstRegex = /^(\d+)\s+(.+)$/;
+const adminProxyNameFirstRegex = /^([^\d]+)\s+(\d+)$/;
 const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
 const questionRegex =
   /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
 const pureNumberRegex = /^\s*(\d+)\s*$/;
-const explicitBuyRegex = /(?:F|f|cf|CF|รับ|เอา)\s*(\d+)/;
+const explicitBuyRegex =
+  /(?:(?:F|f|cf|CF|รับ|เอา)\s*(\d+))|(?:(\d+)\s*(?:F|f|cf|CF|รับ|เอา))/i;
+const numberWithPoliteRegex =
+  /^(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
 const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 const cancelRegex =
-  /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i; // Flexible: "cancel 46" or "46 cancel"
+  /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i;
 const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
 
 // ✅ Thai Numeral → Arabic Digit Converter
@@ -89,7 +93,8 @@ export function useChatProcessor() {
   const systemStore = useSystemStore();
   const nicknameStore = useNicknameStore();
   const { analyzeChat } = useOllama();
-  const { queueSpeech, playSfx, speak } = useAudio();
+  const { queueSpeech, queueAudio, playSfx, resetVoice, unlockAudio } =
+    useAudio();
 
   // ✅ Local State for Implicit Buy Logic
   const currentOverlayItem = ref(null);
@@ -275,75 +280,72 @@ export function useChatProcessor() {
           timestamp: new Date(item.snippet.publishedAt).getTime(),
         });
 
-        // ✅ Play SFX BEFORE TTS
-        await playSfx("success");
-        speak(phoneticName, `${msg} ... ทั้งหมด ${itemIds.length} รายการ`);
+        // ✅ Queue SFX + TTS (non-blocking)
+        queueAudio(
+          "success",
+          phoneticName,
+          `${msg} ... ทั้งหมด ${itemIds.length} รายการ`,
+        );
 
         // Exit early - don't process further
         return;
       }
     }
 
-    // 🔴 CANCEL CHECK — must be before Admin Proxy to prevent "35 ยกเลิก" from being treated as a buy
+    // 🔴 CANCEL CHECK
     const earlyMatchCancel = normalizedMsg.match(cancelRegex);
     if (earlyMatchCancel) {
       intent = "cancel";
       targetId = parseInt(earlyMatchCancel[1] || earlyMatchCancel[2]);
       method = "regex-cancel";
-    }
-    // Special Check for Admin Proxy (Single Item)
-    else if (isAdmin && adminProxyRegex.test(normalizedMsg)) {
-      const matchProxy = normalizedMsg.match(adminProxyRegex);
-      intent = "buy";
-      targetId = parseInt(matchProxy[1]);
-      forcedOwnerName = matchProxy[2].trim();
-      method = "admin-proxy";
     } else if (shippingRegex.test(normalizedMsg)) {
       intent = "shipping";
       method = "regex-ship";
     } else if (questionRegex.test(normalizedMsg)) {
-      // It's a question. Check if it accidentally contains a pure number?
-      // Rule 6 says preserve question detection.
-      // But Rule 5 says ignore embedded numbers.
-      // If it matches Pure Number, it is NOT a question usually (e.g. "34").
-      // If it says "อก 34" -> Question regex matches "อก".
       method = "question-skip";
     } else {
-      // Regex Matching
+      // 🟢 Regex Matching
       const matchPure = normalizedMsg.match(pureNumberRegex);
       const matchExplicit = normalizedMsg.match(explicitBuyRegex);
+      const matchPolite = normalizedMsg.match(numberWithPoliteRegex);
       const matchDash = normalizedMsg.match(dashBuyRegex);
-      const matchCancel = normalizedMsg.match(cancelRegex);
       const matchImplicit = normalizedMsg.match(implicitBuyRegex);
 
-      if (matchCancel) {
-        // Priority: Cancel (Flexible - supports both "cancel 46" and "46 cancel")
-        intent = "cancel";
-        // Check both groups: Group 1 for prefix pattern, Group 2 for suffix pattern
-        targetId = parseInt(matchCancel[1] || matchCancel[2]);
-        method = "regex-cancel";
-      } else if (matchPure) {
-        // Priority: Pure Number
-        const num = parseInt(matchPure[1]);
-        // Rule: Validate if in range (1 to stockSize or reasonable limit)
-        // If number is huge (e.g. 555 for laugh), we might ignore?
-        // For now, assume strict mapping.
+      // ✅ Check Admin Proxy (Both Name-First and Number-First)
+      let matchAdminNumFirst = isAdmin
+        ? normalizedMsg.match(adminProxyNumFirstRegex)
+        : null;
+      let matchAdminNameFirst = isAdmin
+        ? normalizedMsg.match(adminProxyNameFirstRegex)
+        : null;
+
+      if (matchAdminNameFirst) {
         intent = "buy";
-        targetId = num;
+        targetId = parseInt(matchAdminNameFirst[2]);
+        forcedOwnerName = matchAdminNameFirst[1].trim();
+        method = "admin-proxy-name-first";
+      } else if (matchAdminNumFirst) {
+        intent = "buy";
+        targetId = parseInt(matchAdminNumFirst[1]);
+        forcedOwnerName = matchAdminNumFirst[2].trim();
+        method = "admin-proxy-num-first";
+      } else if (matchPure) {
+        intent = "buy";
+        targetId = parseInt(matchPure[1]);
         method = "regex-pure";
       } else if (matchExplicit) {
-        // Priority: Explicit Buy
         intent = "buy";
-        targetId = parseInt(matchExplicit[1]);
+        targetId = parseInt(matchExplicit[1] || matchExplicit[2]);
         method = "regex-explicit";
-      } else if (matchDash) {
-        // Priority: Dash Buy (Name-Number pattern)
+      } else if (matchPolite) {
         intent = "buy";
-        targetId = parseInt(matchDash[1]);
+        targetId = parseInt(matchPolite[1]);
+        method = "regex-polite";
+      } else if (matchDash) {
+        intent = "buy";
+        targetId = parseInt(matchDash[2]);
         method = "regex-dash";
       } else if (matchImplicit) {
-        // Priority: Implicit Buy (Context Aware)
-        // Only if we know what the current item is
         if (currentOverlayItem.value) {
           intent = "buy";
           targetId = parseInt(currentOverlayItem.value);
@@ -477,9 +479,8 @@ export function useChatProcessor() {
           title: `✅ ตัดรหัส ${targetId} ให้ ${ownerName} แล้ว`,
         });
 
-        // ✅ Play SUCCESS sound BEFORE TTS
-        await playSfx("success");
-        speak(phoneticName, msg);
+        // ✅ Queue SUCCESS SFX + TTS (non-blocking)
+        queueAudio("success", phoneticName, msg);
       } catch (error) {
         // ✅ Error - Item might be sold out or other issue
         logger.error("❌ Order failed:", error);
@@ -489,9 +490,8 @@ export function useChatProcessor() {
           title: `❌ ตัดไม่ได้: ${error.message || "เต็มแล้ว"}`,
         });
 
-        // ✅ Play ERROR sound BEFORE TTS
-        await playSfx("error");
-        speak(phoneticName, msg); // Still announce to admin
+        // ✅ Queue ERROR SFX + TTS (non-blocking)
+        queueAudio("error", phoneticName, msg);
       } finally {
         processingLocks.delete(targetId);
       }
@@ -501,9 +501,8 @@ export function useChatProcessor() {
       if (isAdmin || (currentItem && currentItem.uid === uid)) {
         await stockStore.processCancel(targetId);
 
-        // ✅ Play CANCEL sound BEFORE TTS
-        await playSfx("cancel");
-        speak(phoneticName, msg);
+        // ✅ Queue CANCEL SFX + TTS (non-blocking)
+        queueAudio("cancel", phoneticName, msg);
       }
     } else {
       // --- Other Intents / General Chat ---
@@ -528,10 +527,10 @@ export function useChatProcessor() {
           type: "user",
         });
 
-        speak(phoneticName, msg);
+        queueAudio(null, phoneticName, msg);
       } else {
         // Read EVERYTHING else
-        speak(phoneticName, msg);
+        queueAudio(null, phoneticName, msg);
       }
     }
   }

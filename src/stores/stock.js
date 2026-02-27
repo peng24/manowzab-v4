@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { triggerCelebration } from "../utils/celebration";
 import { ref } from "vue";
 import {
   ref as dbRef,
@@ -22,6 +23,9 @@ export const useStockStore = defineStore("stock", () => {
   /** @type {import('vue').Ref<number>} Total number of stock items */
   const stockSize = ref(70);
 
+  /** @type {import('vue').Ref<Set<number>>} Tracks which percentage milestones have been celebrated */
+  const achievedMilestones = ref(new Set());
+
   const systemStore = useSystemStore();
 
   /**
@@ -36,7 +40,6 @@ export const useStockStore = defineStore("stock", () => {
       const val = snapshot.val() || {};
       stockData.value = val;
 
-      // ✅ Real-time History Sync: Update Total Sales & Item Count
       if (videoId && videoId !== "demo") {
         let totalSales = 0;
         let totalItems = 0;
@@ -45,8 +48,23 @@ export const useStockStore = defineStore("stock", () => {
           if (item.owner && item.price) {
             totalSales += parseInt(item.price);
             totalItems++;
+          } else if (item.owner) {
+            // Count items that have an owner even if price is missing
+            totalItems++;
           }
         });
+
+        // ✅ Check Milestones for Celebration (50%, 80%, 100%)
+        const currentSize = stockSize.value > 0 ? stockSize.value : 70;
+        const percentage = (totalItems / currentSize) * 100;
+        const milestones = [50, 80, 100];
+
+        for (const m of milestones) {
+          if (percentage >= m && !achievedMilestones.value.has(m)) {
+            achievedMilestones.value.add(m);
+            triggerCelebration(m);
+          }
+        }
 
         const historyRef = dbRef(db, `history/${videoId}`);
         update(historyRef, {
@@ -196,6 +214,7 @@ export const useStockStore = defineStore("stock", () => {
    */
   function clearAllStock() {
     remove(dbRef(db, `stock/${systemStore.currentVideoId}`));
+    achievedMilestones.value.clear(); // ✅ Reset milestones for the next round
   }
 
   /**

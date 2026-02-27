@@ -1,7 +1,7 @@
 {
   "name": "manowzab-command-center",
   "private": true,
-  "version": "4.10.7",
+  "version": "4.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
     "deploy": "npm run build:gh && gh-pages -d dist"
   },
   "dependencies": {
+    "canvas-confetti": "^1.9.4",
     "firebase": "^12.7.0",
     "pinia": "^3.0.4",
     "sweetalert2": "^11.26.10",

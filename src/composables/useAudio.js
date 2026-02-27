@@ -103,57 +103,57 @@ export function useAudio() {
       activeOscillators = [];
 
       if (type === "success") {
-        // 🔔 Bright Bell
+        // Soft Bright Chime
         const osc1 = ctx.createOscillator();
         const gain1 = ctx.createGain();
         osc1.type = "sine";
         osc1.frequency.setValueAtTime(1200, now);
-        gain1.gain.setValueAtTime(0.1, now);
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        gain1.gain.setValueAtTime(0.03, now); // Very soft
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
         osc1.connect(gain1);
         gain1.connect(ctx.destination);
         osc1.start(now);
-        osc1.stop(now + 0.5);
+        osc1.stop(now + 0.4);
 
         const osc2 = ctx.createOscillator();
         const gain2 = ctx.createGain();
         osc2.type = "sine";
         osc2.frequency.setValueAtTime(1600, now);
-        gain2.gain.setValueAtTime(0.05, now);
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        gain2.gain.setValueAtTime(0.02, now); // Very soft
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
         osc2.connect(gain2);
         gain2.connect(ctx.destination);
         osc2.start(now);
-        osc2.stop(now + 0.4);
+        osc2.stop(now + 0.3);
 
         activeOscillators.push(osc1, osc2);
       } else if (type === "error") {
-        // 🔴 Error (Low harsh sound)
+        // Soft Low Boop
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(200, now);
-        osc.frequency.linearRampToValueAtTime(150, now + 0.3);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
+        osc.type = "sine"; // Changed from sawtooth
+        osc.frequency.setValueAtTime(250, now);
+        gain.gain.setValueAtTime(0.04, now); // Very soft
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.6);
+        osc.stop(now + 0.3);
 
         activeOscillators.push(osc);
       } else if (type === "cancel") {
-        // 🚨 Buzzer (อ๊อด)
+        // Soft Pop
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(150, now);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.type = "sine"; // Changed from sawtooth
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.15); // Drop frequency for pop effect
+        gain.gain.setValueAtTime(0.04, now); // Very soft
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15); // Short duration
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.4);
+        osc.stop(now + 0.15);
 
         activeOscillators.push(osc);
       }

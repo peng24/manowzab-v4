@@ -1,0 +1,79 @@
+name: Deploy Frontend & Backend
+
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  # ============================================
+  # Job 1: Deploy Vue.js Frontend to GitHub Pages
+  # ============================================
+  deploy-frontend:
+    name: 🌐 Deploy Frontend (GitHub Pages)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_DATABASE_URL: ${{ secrets.VITE_FIREBASE_DATABASE_URL }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_YOUTUBE_API_KEYS: ${{ secrets.VITE_YOUTUBE_API_KEYS }}
+          VITE_GOOGLE_API_KEYS: ${{ secrets.VITE_GOOGLE_API_KEYS }}
+          VITE_PRICE_API_URL: ${{ secrets.VITE_PRICE_API_URL }}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          force_orphan: true
+
+  # ============================================
+  # Job 2: Deploy Python Backend to Hugging Face Spaces
+  # ============================================
+  deploy-backend:
+    name: 🤖 Deploy Backend (Hugging Face Spaces)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Push to Hugging Face Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # Configure git
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+
+          # Clone the HF Space repo
+          git clone https://peng24:${HF_TOKEN}@huggingface.co/spaces/peng24/manowzab-price-detector hf_space
+
+          # Sync: clear old files and copy fresh ones
+          cd hf_space
+          find . -not -path './.git/*' -not -name '.git' -not -name '.' -delete 2>/dev/null || true
+          cp -r ../price_detection_service/* .
+
+          # Commit and push
+          git add -A
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Deploy from GitHub Actions — $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push

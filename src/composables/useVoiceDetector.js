@@ -6,44 +6,65 @@ import { useVoiceLogger } from "./useVoiceLogger";
 import { useOllama } from "./useOllama";
 
 // ============================================
-// CONFIG: SMART HUNTER V2
+// CONFIG: SMART HUNTER V3 (Livestream Optimized)
 // ============================================
 const CONFIG = {
-  // Standard Validations
   ranges: {
     bust: { min: 30, max: 70 },
     length: { min: 15, max: 60 },
     id: { min: 1, max: 1000 },
   },
-  // Regex Patterns
   patterns: {
-    corrections: [
-      { from: /(?:^|\s)(?:6|หก)(?=\s*[3-6]\d\b)/g, to: " อก " },
-      { from: /(?:โพลิ|โพรี|Poly)\S*/gi, to: "" },
-      { from: /(?:เอาไป|ขาย|เหลือ|ราคา)/g, to: " ราคา " },
-      { from: /(?:เบอร์|รหัส|ตัวที่|ที่|No\.?)/gi, to: " รายการที่ " },
-      { from: /อก/g, to: " อก " },
-      { from: /ยาว/g, to: " ยาว " },
+    wordToDigit: [
+      { from: /ร้อยนึง|ร้อยบาท|หนึ่งร้อย/g, to: "100" },
+      { from: /ร้อยยี่/g, to: "120" },
+      { from: /ร้อยห้าสิบ/g, to: "150" },
+      { from: /แปดสิบ/g, to: "80" },
+      { from: /หกสิบ/g, to: "60" },
+      { from: /ห้าสิบ/g, to: "50" },
+      { from: /สี่สิบ/g, to: "40" },
+      { from: /สามสิบ/g, to: "30" },
+      { from: /ยี่สิบ/g, to: "20" },
     ],
-    noise: [
-      /(?:ค่าส่ง|โอน|ปลายทาง|ทั้งหมด|เหลืออีก|มี)\s*\d+/g,
-      /(?:กระดุม|ตำหนิ|สำรอง)\s*\d+/g,
-      /(?:ลูกค้า|พี่|น้อง|แม่ค้า|ครับ|ค่ะ|จ้า)/gi,
-    ],
-    attributes: {
-      fabric:
-        /\b(ผ้าเด้ง|ชีฟอง|โพลิเอสเตอร์|ไนลอน|เรยอน|คอตตอน|ลินิน|ยืด|ไหมพรม|ซาติน|กำมะหยี่)\b/i,
-      bust: /(?:อก|รอบอก|ตึงหน้าผ้า)(?:\s*(?:ได้|ถึง|[-]|และ))?\s*((?:\d+[- ]\d+)|\d+)/i,
-      length: /(?:ยาว|ความยาว)\s*((?:\d+[- ]\d+)|\d+)/i,
-      sizeLetter: /\b(XXL|XL|L|M|S|XS)\b/i,
-    },
     anchors: {
-      id: /รายการที่\s*(\d+)/i,
-      price: /(?:ราคา\s*(\d+)|(\d+)\s*บาท)/i,
+      id: /(?:รายการที่|รหัส|เบอร์|ตัวที่|ที่)\s*(\d+)/i,
+      price: /(?:ราคา|เอาไป|จัดไป|ขาย|ตัวละ|เหลือ)\s*(\d+)|(\d+)\s*(?:บาท|.-)/i,
       freebie: /(?:ฟรี|แถม)/i,
     },
   },
 };
+
+// Cloud Price Detection API (Hugging Face Spaces)
+const PRICE_API_URL = import.meta.env.VITE_PRICE_API_URL || "";
+
+async function callCloudPriceAPI(rawText) {
+  if (!PRICE_API_URL) return null;
+  try {
+    const res = await fetch(`${PRICE_API_URL}/detect_price`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: rawText, enable_llm_fallback: false }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.item_code !== null && data.item_code !== undefined) {
+      return {
+        id: data.item_code,
+        price: data.price,
+        size: null,
+        method: data.extraction_method || "cloud-api",
+      };
+    }
+    return null;
+  } catch (e) {
+    console.warn(
+      "☁️ Cloud API unavailable, falling back to Ollama:",
+      e.message,
+    );
+    return null;
+  }
+}
 
 export function useVoiceDetector() {
   // Dependencies
@@ -257,7 +278,7 @@ export function useVoiceDetector() {
   });
 
   // ============================================
-  // CORE LOGIC: SMART HUNTER (Manual Pipeline)
+  // CORE LOGIC: SMART HUNTER V3
   // ============================================
   async function processVoiceCommand(rawText) {
     if (aiDebounceTimer) {
@@ -265,227 +286,179 @@ export function useVoiceDetector() {
       aiDebounceTimer = null;
     }
 
-    // --- STEP 1: PRE-PROCESSING ---
+    // --- STEP 1: NORMALIZE & CLEAN ---
     let cleanText = rawText;
-    CONFIG.patterns.corrections.forEach((rule) => {
+    CONFIG.patterns.wordToDigit.forEach((rule) => {
       cleanText = cleanText.replace(rule.from, rule.to);
     });
-    CONFIG.patterns.noise.forEach((pattern) => {
-      cleanText = cleanText.replace(pattern, "");
-    });
     cleanText = cleanText.replace(/\s+/g, " ").trim();
-
-    // --- STEP 2: EXTRACTION PIPELINE ---
     let workingText = cleanText;
+
     let detected = {
       id: null,
       price: null,
-      fabric: null,
-      bust: null,
-      length: null,
-      sizeLetter: null,
+      sizeParts: [],
       logic: "Unknown",
     };
 
-    // 2.1 Attributes
-    const fabricMatch = workingText.match(CONFIG.patterns.attributes.fabric);
-    if (fabricMatch) {
-      detected.fabric = fabricMatch[1];
-      workingText = workingText.replace(fabricMatch[0], "").trim();
-    }
-    const sizeMatch = workingText.match(CONFIG.patterns.attributes.sizeLetter);
-    if (sizeMatch) {
-      detected.sizeLetter = sizeMatch[1].toUpperCase();
-      workingText = workingText.replace(sizeMatch[0], "").trim();
-    }
-    const bustMatch = workingText.match(CONFIG.patterns.attributes.bust);
+    // --- STEP 2: QUARANTINE ATTRIBUTES (Remove noise numbers) ---
+    const bustMatch = workingText.match(
+      /(?:อก|รอบอก|หน้าผ้า)\s*(?:ได้|ถึง|ประมาณ|-)?\s*(\d{2,3})/i,
+    );
     if (bustMatch) {
-      const rangeStr = bustMatch[1];
-      const firstNum = parseInt(rangeStr.split(/[- ]/)[0]);
-      if (
-        firstNum >= CONFIG.ranges.bust.min &&
-        firstNum <= CONFIG.ranges.bust.max
-      ) {
-        detected.bust = rangeStr;
-        workingText = workingText.replace(bustMatch[0], "").trim();
-      }
-    }
-    const lengthMatch = workingText.match(CONFIG.patterns.attributes.length);
-    if (lengthMatch) {
-      const rangeStr = lengthMatch[1];
-      const firstNum = parseInt(rangeStr.split(/[- ]/)[0]);
-      if (
-        firstNum >= CONFIG.ranges.length.min &&
-        firstNum <= CONFIG.ranges.length.max
-      ) {
-        detected.length = rangeStr;
-        workingText = workingText.replace(lengthMatch[0], "").trim();
+      const b = parseInt(bustMatch[1]);
+      if (b >= CONFIG.ranges.bust.min && b <= CONFIG.ranges.bust.max) {
+        detected.sizeParts.push(`อก ${b}`);
+        workingText = workingText.replace(bustMatch[0], "");
       }
     }
 
-    // 2.2 Explicit Price
+    const lengthMatch = workingText.match(
+      /(?:ยาว|ความยาว)\s*(?:ได้|ถึง|ประมาณ|-)?\s*(\d{2})/i,
+    );
+    if (lengthMatch) {
+      const l = parseInt(lengthMatch[1]);
+      if (l >= CONFIG.ranges.length.min && l <= CONFIG.ranges.length.max) {
+        detected.sizeParts.push(`ยาว ${l}`);
+        workingText = workingText.replace(lengthMatch[0], "");
+      }
+    }
+
+    const sizeMatch = workingText.match(/\b(XXL|XL|L|M|S|XS|2XL|3XL|4XL)\b/i);
+    if (sizeMatch) {
+      detected.sizeParts.push(sizeMatch[1].toUpperCase());
+      workingText = workingText.replace(sizeMatch[0], "");
+    }
+
+    const fabricMatch = workingText.match(
+      /\b(ผ้าเด้ง|ชีฟอง|โพลิเอสเตอร์|โพลี่|ไนลอน|เรยอน|คอตตอน|ลินิน|ยืด|ไหมพรม|ซาติน|กำมะหยี่)\b/i,
+    );
+    if (fabricMatch) {
+      detected.sizeParts.push(fabricMatch[1]);
+      workingText = workingText.replace(fabricMatch[0], "");
+    }
+
+    // --- STEP 3: EXPLICIT EXTRACTION ---
     if (CONFIG.patterns.anchors.freebie.test(workingText)) {
       detected.price = 0;
-      workingText = workingText
-        .replace(CONFIG.patterns.anchors.freebie, "")
-        .trim();
+      workingText = workingText.replace(CONFIG.patterns.anchors.freebie, "");
     } else {
       const priceMatch = workingText.match(CONFIG.patterns.anchors.price);
       if (priceMatch) {
         const val = parseInt(priceMatch[1] || priceMatch[2]);
         if (isValidPrice(val)) {
           detected.price = val;
-          workingText = workingText.replace(priceMatch[0], "").trim();
+          workingText = workingText.replace(priceMatch[0], "");
         }
       }
     }
 
-    // 2.3 Explicit ID
     const idMatch = workingText.match(CONFIG.patterns.anchors.id);
     if (idMatch) {
       const val = parseInt(idMatch[1]);
       if (isValidId(val)) {
         detected.id = val;
-        workingText = workingText.replace(idMatch[0], "").trim();
-        detected.logic = "Explicit-ID";
+        workingText = workingText.replace(idMatch[0], "");
+        detected.logic =
+          detected.price !== null ? "Explicit-Both" : "Explicit-ID";
       }
     }
 
-    // --- STEP 3: IMPLICIT LOGIC ---
-    if (detected.id === null || detected.price === null) {
-      const numbers = [...workingText.matchAll(/\b(\d+)\b/g)].map((m) =>
-        parseInt(m[1]),
-      );
+    // --- STEP 4: IMPLICIT EXTRACTION (Loose Numbers) ---
+    const numbers = [...workingText.matchAll(/\b(\d+)\b/g)].map((m) =>
+      parseInt(m[1]),
+    );
 
-      if (numbers.length > 0) {
-        if (
-          numbers.length === 1 &&
-          detected.id === null &&
-          detected.price === null
-        ) {
-          const num = numbers[0];
-          const str = num.toString();
-          if (str.length >= 3 && str.length <= 4) {
-            const p2Val = parseInt(str.slice(-2));
-            const p1Val = parseInt(str.slice(0, -2));
-            if (p2Val > 0 && isValidPrice(p2Val) && isValidId(p1Val)) {
-              detected.id = p1Val;
-              detected.price = p2Val;
-              detected.logic = "Implicit-Glued-Split";
-            } else if (isValidId(num)) {
-              detected.id = num;
-              detected.logic = "Implicit-Single-ID";
-            }
-          } else if (isValidId(num)) {
-            detected.id = num;
-            detected.logic = "Implicit-Single-ID";
-          }
-        } else if (
-          numbers.length >= 2 &&
-          detected.id === null &&
-          detected.price === null
-        ) {
-          const [n1, n2] = numbers;
-          if (isValidId(n1) && isValidPrice(n2)) {
-            detected.id = n1;
-            detected.price = n2;
-            detected.logic = "Implicit-Pair";
-          } else if (isValidId(n1)) {
-            detected.id = n1;
-          }
-        } else if (
-          detected.id === null &&
-          detected.price !== null &&
-          numbers.length > 0
-        ) {
-          if (isValidId(numbers[0])) {
-            detected.id = numbers[0];
-            detected.logic = "Implicit-ID-Only";
-          }
-        } else if (
-          detected.id !== null &&
-          detected.price === null &&
-          numbers.length > 0
-        ) {
-          if (isValidPrice(numbers[0])) {
-            detected.price = numbers[0];
-            detected.logic = "Implicit-Price-Only";
-          }
+    if (numbers.length > 0) {
+      if (
+        detected.id === null &&
+        detected.price === null &&
+        numbers.length >= 2
+      ) {
+        const [n1, n2] = numbers;
+        if (isValidId(n1) && isValidPrice(n2)) {
+          detected.id = n1;
+          detected.price = n2;
+          detected.logic = "Implicit-Pair";
+        }
+      } else if (detected.id !== null && detected.price === null) {
+        const validPrices = numbers.filter(isValidPrice);
+        if (validPrices.length > 0) {
+          detected.price = validPrices[validPrices.length - 1];
+          detected.logic = "Explicit-ID + Implicit-Price";
+        }
+      } else if (detected.price !== null && detected.id === null) {
+        const validIds = numbers.filter(isValidId);
+        if (validIds.length > 0) {
+          detected.id = validIds[0];
+          detected.logic = "Implicit-ID + Explicit-Price";
         }
       }
     }
 
-    // --- STEP 4: AI FALLBACK ---
+    // --- STEP 5: AI FALLBACK (Cloud API → Ollama) ---
     if (detected.id === null && rawText.length > 5 && systemStore.isAiEnabled) {
       aiDebounceTimer = setTimeout(async () => {
         if (!isListening.value) return;
         lastAction.value = "🤔 กำลังคิด...";
 
         try {
+          // Priority 1: Cloud Price Detection API (HF Spaces)
+          const cloudResult = await callCloudPriceAPI(rawText);
+          if (cloudResult && cloudResult.id !== null) {
+            detected.id =
+              typeof cloudResult.id === "string"
+                ? parseInt(cloudResult.id)
+                : cloudResult.id;
+            if (cloudResult.price !== null && cloudResult.price !== undefined) {
+              detected.price = cloudResult.price;
+            }
+            detected.logic = `Cloud-API:${cloudResult.method}`;
+            executeAction(rawText, cleanText, detected);
+            return;
+          }
+
+          // Priority 2: Local Ollama fallback
           const aiResult = await extractPriceFromVoice(
             rawText,
             lastDetectedId.value,
           );
-
           if (aiResult) {
             if (aiResult.id !== null && aiResult.id !== undefined) {
               if (aiResult.id === "current" && lastDetectedId.value) {
                 detected.id = lastDetectedId.value;
                 detected.logic = "AI-Ollama-Context";
-              } else if (aiResult.id === "current") {
-                console.log(
-                  "AI detected 'current' but no lastDetectedId exists",
-                );
-              } else {
+              } else if (aiResult.id !== "current") {
                 detected.id =
                   typeof aiResult.id === "string"
                     ? parseInt(aiResult.id)
                     : aiResult.id;
               }
             }
-
             if (aiResult.price !== null && aiResult.price !== undefined) {
               detected.price = aiResult.price;
             }
-
-            if (
-              aiResult.size !== null &&
-              aiResult.size !== undefined &&
-              aiResult.size !== ""
-            ) {
-              const sizeParts = [];
-              if (detected.bust) sizeParts.push(`อก ${detected.bust}`);
-              if (detected.length) sizeParts.push(`ยาว ${detected.length}`);
-              if (detected.sizeLetter) sizeParts.push(detected.sizeLetter);
-              if (detected.fabric) sizeParts.push(detected.fabric);
-              if (
-                sizeParts.length === 0 ||
-                !sizeParts.join(" ").includes(aiResult.size)
-              ) {
-                sizeParts.push(aiResult.size);
-              }
-              detected.aiSize = sizeParts.join(" ");
+            if (aiResult.size) {
+              detected.sizeParts.push(aiResult.size);
             }
-
             if (detected.id !== null) {
               detected.logic = "AI-Ollama";
+              executeAction(rawText, cleanText, detected);
+            } else {
+              lastAction.value = "⚠️ AI ไม่พบรหัส";
             }
-
-            executeAction(rawText, cleanText, detected);
           }
         } catch (error) {
           console.error("AI Fallback Error:", error);
           lastAction.value = "⚠️ AI ไม่ตอบสนอง";
         }
       }, 800);
-
       return;
     } else if (
       detected.id === null &&
       rawText.length > 5 &&
       !systemStore.isAiEnabled
     ) {
-      console.log("⚠️ AI Disabled - No ID detected by regex");
       logEvent({
         raw: rawText,
         cleaned: cleanText,
@@ -496,7 +469,7 @@ export function useVoiceDetector() {
       return;
     }
 
-    // --- STEP 5: OUTPUT ACTION ---
+    // --- STEP 6: OUTPUT ACTION ---
     executeAction(rawText, cleanText, detected);
   }
 
@@ -509,10 +482,10 @@ export function useVoiceDetector() {
 
   function isValidPrice(num) {
     if (num === 0) return true;
-    if (num < 10) return false;
-    if (num % 10 === 0) return true;
-    const commonPrices = [120, 150, 199, 250, 290];
-    if (commonPrices.includes(num)) return true;
+    if (num < 10 || num > 2000) return false;
+    // Live sales prices mostly end in 0 or 9 (e.g., 50, 80, 100, 199) or specific like 55, 65
+    if (num % 10 === 0 || num % 10 === 9) return true;
+    if ([55, 65, 85, 95].includes(num)) return true;
     return false;
   }
 
@@ -543,29 +516,13 @@ export function useVoiceDetector() {
     if (detected.id) {
       if (detected.id > stockStore.stockSize || detected.id < 1) {
         lastAction.value = `⚠️ ไม่พบรายการ #${detected.id}`;
-        logEvent({
-          raw: rawText,
-          cleaned: cleanText,
-          output: { id: detected.id, error: "Out of range" },
-          logic: detected.logic,
-          status: "IGNORED",
-        });
         return;
       }
 
       const updateData = {};
-      let sizeParts = [];
-
-      if (detected.aiSize) {
-        updateData.size = detected.aiSize;
-      } else {
-        if (detected.bust) sizeParts.push(`อก ${detected.bust}`);
-        if (detected.length) sizeParts.push(`ยาว ${detected.length}`);
-        if (detected.sizeLetter) sizeParts.push(detected.sizeLetter);
-        if (detected.fabric) sizeParts.push(detected.fabric);
-        if (sizeParts.length > 0) updateData.size = sizeParts.join(" ");
+      if (detected.sizeParts && detected.sizeParts.length > 0) {
+        updateData.size = detected.sizeParts.join(" ");
       }
-
       if (detected.price !== null) updateData.price = detected.price;
 
       if (Object.keys(updateData).length > 0) {
@@ -590,23 +547,6 @@ export function useVoiceDetector() {
         });
       } else {
         lastAction.value = `ℹ️ เลือก #${detected.id}`;
-        logEvent({
-          raw: rawText,
-          cleaned: cleanText,
-          output: { id: detected.id, msg: "No data" },
-          logic: detected.logic,
-          status: "IGNORED",
-        });
-      }
-    } else {
-      if (rawText.length > 5 && !rawText.includes("แก้ไข")) {
-        logEvent({
-          raw: rawText,
-          cleaned: cleanText,
-          output: null,
-          logic: "None",
-          status: "IGNORED",
-        });
       }
     }
   }

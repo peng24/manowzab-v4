@@ -32,3 +32,19 @@ export function unlockAudio() {
 // ผูก Event รอการแตะหน้าจอครั้งแรกจากผู้ใช้
 document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
 document.addEventListener('click', unlockAudio, { once: true, passive: true });
+
+// ✅ Handle iOS Safari Background Limits
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      const checkCtx = new AudioContext();
+      if (checkCtx.state === 'suspended') {
+        isUnlocked = false;
+        document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+        document.addEventListener('click', unlockAudio, { once: true, passive: true });
+        console.warn('⚠️ AudioContext suspended on return. Awaiting user interaction to unlock.');
+      }
+    }
+  }
+});

@@ -13,7 +13,7 @@ const API_KEYS = rawKeys
   .filter((k) => k);
 
 if (API_KEYS.length === 0) {
-  throw new Error("Missing VITE_YOUTUBE_API_KEYS in environment variables");
+  throw new Error("Missing YouTube API Keys");
 }
 
 /**

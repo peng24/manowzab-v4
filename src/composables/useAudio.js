@@ -165,7 +165,25 @@ export function useAudio() {
   }
 
   function resetVoice() {
+    // 1. Clear the global unified audio queue
+    audioQueue.length = 0;
+
+    // 2. Stop any currently playing SFX
+    activeOscillators.forEach((osc) => {
+      try {
+        osc.stop();
+        osc.disconnect();
+      } catch (e) {
+        // ignore
+      }
+    });
+    activeOscillators = [];
+
+    // 3. Reset the TTS service (stops current speech and clears TTS queue)
     ttsService.reset();
+
+    // 4. Reset processing state so new incoming sounds can start immediately
+    isAudioProcessing = false;
   }
 
   // ✅ Unified Audio Queue Processor (SFX → TTS, sequential)

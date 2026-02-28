@@ -73,93 +73,94 @@ export function useAudio() {
    */
   function playSfx(type = "success") {
     return new Promise(async (resolve) => {
-      if (!systemStore.isSoundOn) {
-        resolve();
-        return;
-      }
-
-      initAudio();
-
-      if (audioCtx.value && audioCtx.value.state === "suspended") {
-        await audioCtx.value.resume();
-      }
-      if (!audioCtx.value) {
-        resolve();
-        return;
-      }
-
-      const ctx = audioCtx.value;
-      const now = ctx.currentTime;
-
-      // Stop any active sounds to prevent overlapping
-      activeOscillators.forEach((osc) => {
-        try {
-          osc.stop();
-          osc.disconnect();
-        } catch (e) {
-          // ignore
+      try {
+        if (!systemStore.isSoundOn) {
+          return;
         }
-      });
-      activeOscillators = [];
 
-      if (type === "success") {
-        // Soft Bright Chime
-        const osc1 = ctx.createOscillator();
-        const gain1 = ctx.createGain();
-        osc1.type = "sine";
-        osc1.frequency.setValueAtTime(1200, now);
-        gain1.gain.setValueAtTime(0.03, now); // Very soft
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-        osc1.connect(gain1);
-        gain1.connect(ctx.destination);
-        osc1.start(now);
-        osc1.stop(now + 0.4);
+        initAudio();
 
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.type = "sine";
-        osc2.frequency.setValueAtTime(1600, now);
-        gain2.gain.setValueAtTime(0.02, now); // Very soft
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
-        osc2.start(now);
-        osc2.stop(now + 0.3);
+        if (audioCtx.value && audioCtx.value.state === "suspended") {
+          await audioCtx.value.resume();
+        }
+        if (!audioCtx.value) {
+          return;
+        }
 
-        activeOscillators.push(osc1, osc2);
-      } else if (type === "error") {
-        // Soft Low Boop
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "sine"; // Changed from sawtooth
-        osc.frequency.setValueAtTime(250, now);
-        gain.gain.setValueAtTime(0.04, now); // Very soft
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.3);
+        const ctx = audioCtx.value;
+        const now = ctx.currentTime;
 
-        activeOscillators.push(osc);
-      } else if (type === "cancel") {
-        // Soft Pop
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "sine"; // Changed from sawtooth
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(300, now + 0.15); // Drop frequency for pop effect
-        gain.gain.setValueAtTime(0.04, now); // Very soft
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15); // Short duration
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.15);
+        // Stop any active sounds to prevent overlapping
+        activeOscillators.forEach((osc) => {
+          try {
+            osc.stop();
+            osc.disconnect();
+          } catch (e) {
+            // ignore
+          }
+        });
+        activeOscillators = [];
 
-        activeOscillators.push(osc);
+        if (type === "success") {
+          // Soft Bright Chime
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = "sine";
+          osc1.frequency.setValueAtTime(1200, now);
+          gain1.gain.setValueAtTime(0.03, now); // Very soft
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc1.connect(gain1);
+          gain1.connect(ctx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.4);
+
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = "sine";
+          osc2.frequency.setValueAtTime(1600, now);
+          gain2.gain.setValueAtTime(0.02, now); // Very soft
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start(now);
+          osc2.stop(now + 0.3);
+
+          activeOscillators.push(osc1, osc2);
+        } else if (type === "error") {
+          // Soft Low Boop
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine"; // Changed from sawtooth
+          osc.frequency.setValueAtTime(250, now);
+          gain.gain.setValueAtTime(0.04, now); // Very soft
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.3);
+
+          activeOscillators.push(osc);
+        } else if (type === "cancel") {
+          // Soft Pop
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine"; // Changed from sawtooth
+          osc.frequency.setValueAtTime(600, now);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.15); // Drop frequency for pop effect
+          gain.gain.setValueAtTime(0.04, now); // Very soft
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15); // Short duration
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.15);
+
+          activeOscillators.push(osc);
+        }
+      } catch (err) {
+        console.warn("⚠️ SFX Playback skipped:", err);
+      } finally {
+        resolve();
       }
-
-      // Resolve immediately to not block TTS
-      resolve();
     });
   }
 

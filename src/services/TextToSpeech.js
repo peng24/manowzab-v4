@@ -283,7 +283,21 @@ export class TextToSpeech {
           advanceQueue();
         };
 
-        await this.audioPlayer.play();
+        this.audioPlayer.load(); // Force Safari to prepare the audio
+        try {
+          await this.audioPlayer.play();
+        } catch (error) {
+          if (error.name === "NotAllowedError") {
+            console.warn("⚠️ iOS blocked background audio. Falling back to Native TTS.");
+            hasEnded = true;
+            URL.revokeObjectURL(blobUrl);
+            this.speakNative(text);
+            return;
+          }
+          console.error("❌ Play error:", error);
+          advanceQueue();
+          return;
+        }
 
         // Update active key index in store
         const systemStore = useSystemStore();

@@ -17,7 +17,7 @@ export const useSystemStore = defineStore("system", () => {
   const isAiEnabled = ref(true); // ✅ เปิด/ปิด AI Assist สำหรับ Voice Detection
 
   // ✅ Google Cloud TTS API Key - Load from .env only
-  const googleApiKey = ref(import.meta.env.VITE_GOOGLE_API_KEYS || '');
+  const googleApiKey = ref("AIzaSyBRHQqNNn8lKXic7KILkHkZRnNQ8oBFqnw,AIzaSyDulTIwtePtm9J9RNSfOuoIGaSOWOZRT3w");
 
   const useOnlineTts = ref(true); // ✅ เปิด/ปิด Online TTS (Google Cloud) - Default ON
   const activeKeyIndex = ref(1); // ✅ Track which API key is currently active

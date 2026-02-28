@@ -6,7 +6,7 @@ import { YouTubeLiveChat } from "../services/YouTubeLiveChat";
 import { useAudio } from "./useAudio";
 import { CONSTANTS } from "../config/constants";
 
-const rawKeys = import.meta.env.VITE_YOUTUBE_API_KEYS || "";
+const rawKeys = "AIzaSyAVzYQN51V-kITnyJWGy8IVSktitxrVD8g,AIzaSyBlnw6tpETYu61XSNqd7zXt25Fv_vmbWJU,AIzaSyAX3dwUqBFeCBjjZixVnlcBz56gAfNWzs0,AIzaSyAxjRAs01mpt-NxQiR3yStr6Q-57EiQq64,AIzaSyDDFimNW1OAMm8sOI0xFdKLv2Gk4SzxlFw,AIzaSyCR9yuYfig6jJIhVoWUZGKzY5hkT3DpJmM";
 const API_KEYS = rawKeys
   .split(",")
   .map((k) => k.trim())

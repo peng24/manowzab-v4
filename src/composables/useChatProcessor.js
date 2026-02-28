@@ -2,7 +2,7 @@ import { useStockStore } from "../stores/stock";
 import { useChatStore } from "../stores/chat";
 import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
-import { useOllama } from "./useOllama";
+
 import { useAudio } from "./useAudio";
 import { ref as dbRef, onValue, set, update, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
@@ -92,7 +92,7 @@ export function useChatProcessor() {
   const chatStore = useChatStore();
   const systemStore = useSystemStore();
   const nicknameStore = useNicknameStore();
-  const { analyzeChat } = useOllama();
+
   const { queueSpeech, queueAudio, playSfx, resetVoice, unlockAudio } =
     useAudio();
 
@@ -359,33 +359,10 @@ export function useChatProcessor() {
     // NEW LOGIC: Rule 5 -> "Ignore it".
     // So we do nothing.
 
-    // 3. AI Analysis (Fallback)
+    // 3. AI Analysis — Ollama removed, Cloud API handles voice detection only.
+    //    Chat-level AI fallback is intentionally disabled.
     if (!intent && !method && systemStore.isAiCommander) {
-      try {
-        const analyzeMsg = msg;
-        // Optimization: If Admin Proxy handled it, we don't go here.
-        // But if we did enter here, normal flow resumes.
-        const aiResult = await analyzeChat(analyzeMsg);
-        if (aiResult) {
-          if (aiResult.intent === "buy" && aiResult.id) {
-            intent = "buy";
-            targetId = aiResult.id;
-            targetPrice = aiResult.price;
-            method = "ai";
-          } else if (aiResult.intent === "cancel" && aiResult.id) {
-            intent = "cancel";
-            targetId = aiResult.id;
-            method = "ai";
-          } else if (aiResult.intent === "shipping") {
-            intent = "shipping";
-            method = "ai";
-          } else if (aiResult.intent === "question") {
-            method = "ai-skip";
-          }
-        }
-      } catch (error) {
-        logger.error("❌ AI Error (Skipped):", error);
-      }
+      // No local AI fallback — rely on regex-based detection above.
     }
 
     // 4. ✅ Push message to Firebase (Listener will update UI)

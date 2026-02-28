@@ -21,12 +21,6 @@
           <i class="fa-solid fa-comments"></i>
         </span>
         <span
-          :class="['status-item', systemStore.statusOllama]"
-          :title="getStatusTitle('ollama')"
-        >
-          <i :class="ollamaIcon"></i>
-        </span>
-        <span
           class="key-indicator"
           :title="`กำลังใช้ API Key #${systemStore.currentKeyIndex + 1}`"
         >
@@ -188,7 +182,7 @@ import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useYouTube } from "../composables/useYouTube";
 import { useGemini } from "../composables/useGemini";
-import { useOllama } from "../composables/useOllama"; // ✅ Import Ollama
+
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, update, set } from "firebase/database";
 import { db } from "../composables/useFirebase"; // เช็ค path ให้ตรงกับเครื่องคุณ
@@ -213,7 +207,7 @@ const chatStore = useChatStore();
 const stockStore = useStockStore();
 const { connectVideo, disconnect } = useYouTube();
 const { setApiKey } = useGemini();
-const { checkConnection } = useOllama(); // ✅ Destructure checkConnection
+
 const { queueSpeech, unlockAudio } = useAudio(); // ✅ เพิ่ม unlockAudio
 
 const openDashboard = inject("openDashboard");
@@ -253,15 +247,6 @@ const shippingCount = computed(() => {
   ).length;
 });
 
-// Ollama Icon Computed
-const ollamaIcon = computed(() => {
-  const status = systemStore.statusOllama;
-  if (status === "working") return "fa-solid fa-microchip fa-beat-fade";
-  if (status === "ok") return "fa-solid fa-brain";
-  if (status === "err") return "fa-solid fa-triangle-exclamation";
-  if (status === "warn") return "fa-solid fa-spinner fa-spin";
-  return "fa-solid fa-power-off"; // idle or default
-});
 
 function getStatusTitle(type) {
   // (Logic เดิม)
@@ -282,13 +267,6 @@ function getStatusTitle(type) {
       err: "❌ ไม่สามารถดึงแชท",
       idle: "⚪ ยังไม่เชื่อมต่อ",
     },
-    ollama: {
-      working: "🧠 AI กำลังประมวลผล...",
-      ok: "✅ Ollama AI พร้อมใช้งาน",
-      warn: "⚠️ กำลังเชื่อมต่อ Ollama...",
-      err: "❌ Ollama ไม่พร้อมใช้งาน",
-      idle: "⚪ Ollama ไม่ทำงาน",
-    },
   };
   const status =
     type === "db"
@@ -297,9 +275,7 @@ function getStatusTitle(type) {
         ? systemStore.statusApi
         : type === "chat"
           ? systemStore.statusChat
-          : type === "ollama"
-            ? systemStore.statusOllama
-            : "idle";
+          : "idle";
   return titles[type]?.[status] || titles[type]?.idle || "ไม่ทราบสถานะ";
 }
 
@@ -333,10 +309,7 @@ function toggleAI() {
     .then(() => {
       systemStore.isAiCommander = newState;
       queueSpeech(newState ? "เปิด AI Commander" : "ปิด AI Commander");
-      // ✅ Re-check Ollama connection status when AI is turned on
-      if (newState) {
-        checkConnection();
-      }
+
     })
     .catch((error) => logger.error("Error toggling AI:", error));
 }

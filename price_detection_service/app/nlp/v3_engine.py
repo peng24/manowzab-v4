@@ -4,19 +4,19 @@ Performs BIO-tagged sequence labeling to extract item_code, price, and size
 from Thai live commerce transcripts in <100ms.
 
 Singleton pattern: call get_engine() to get or initialize the shared instance.
-If model files are missing, predict() returns None (graceful degradation).
+Downloads from Hugging Face Hub on first load; cached for subsequent calls.
+If model is unavailable, predict() returns None (graceful degradation).
 """
 import logging
 import re
-from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-# Model directory (relative to this file's package root)
-MODEL_DIR = Path(__file__).resolve().parent.parent / "models" / "smart_hunter_v3"
+# Hugging Face Model Hub ID (auto-downloaded and cached)
+MODEL_ID = "peng24/smart-hunter-v3"
 
 # Thai phonetic → standard size mapping (same as frontend)
 SIZE_MAP = {
@@ -53,27 +53,18 @@ class SmartHunterV3:
         self._load_failed = False
 
     def _load_model(self):
-        """Lazy-load the model and tokenizer from disk."""
+        """Lazy-load the model and tokenizer from Hugging Face Hub."""
         if self._load_failed:
-            return
-
-        config_path = MODEL_DIR / "config.json"
-        if not config_path.exists():
-            logger.warning(
-                f"⚠️ V3 model not found at {MODEL_DIR}. "
-                "Place model files (config.json, model.safetensors, tokenizer.json, etc.) there."
-            )
-            self._load_failed = True
             return
 
         try:
             import torch
             from transformers import AutoModelForTokenClassification, AutoTokenizer
 
-            logger.info(f"🔧 Loading Smart Hunter V3 model from {MODEL_DIR}...")
+            logger.info(f"🔧 Loading Smart Hunter V3 model from HF Hub: {MODEL_ID}...")
 
-            self.tokenizer = AutoTokenizer.from_pretrained(str(MODEL_DIR))
-            self.model = AutoModelForTokenClassification.from_pretrained(str(MODEL_DIR))
+            self.tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+            self.model = AutoModelForTokenClassification.from_pretrained(MODEL_ID)
             self.model.eval()
 
             # Build id → label mapping from config

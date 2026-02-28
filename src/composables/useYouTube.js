@@ -6,7 +6,7 @@ import { YouTubeLiveChat } from "../services/YouTubeLiveChat";
 import { useAudio } from "./useAudio";
 import { CONSTANTS } from "../config/constants";
 
-const rawKeys = import.meta.env.VITE_YOUTUBE_API_KEYS || "";
+const rawKeys = "REMOVED_YOUTUBE_API_KEY_1,REMOVED_YOUTUBE_API_KEY_2,REMOVED_YOUTUBE_API_KEY_3,REMOVED_YOUTUBE_API_KEY_4,REMOVED_YOUTUBE_API_KEY_5,REMOVED_YOUTUBE_API_KEY_6";
 const API_KEYS = rawKeys
   .split(",")
   .map((k) => k.trim())

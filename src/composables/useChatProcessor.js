@@ -460,7 +460,11 @@ export function useChatProcessor() {
         queueAudio("success", phoneticName, msg);
       } catch (error) {
         // ✅ Error - Item might be sold out or other issue
-        logger.error("❌ Order failed:", error);
+        if (error.message && error.message.includes("ซ้ำแล้ว")) {
+          logger.warn("⚠️ Order skipped:", error.message);
+        } else {
+          logger.error("❌ Order failed:", error);
+        }
 
         Toast.fire({
           icon: "error",

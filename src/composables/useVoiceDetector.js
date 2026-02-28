@@ -3,7 +3,7 @@ import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "./useAudio";
 import { useVoiceLogger } from "./useVoiceLogger";
-import { useOllama } from "./useOllama";
+
 
 // ============================================
 // CONFIG: SMART HUNTER V3 (Livestream Optimized)
@@ -59,7 +59,7 @@ async function callCloudPriceAPI(rawText) {
     return null;
   } catch (e) {
     console.warn(
-      "☁️ Cloud API unavailable, falling back to Ollama:",
+      "☁️ Cloud API unavailable:",
       e.message,
     );
     return null;
@@ -72,13 +72,14 @@ export function useVoiceDetector() {
   const systemStore = useSystemStore();
   const { playSfx } = useAudio();
   const { logEvent } = useVoiceLogger();
-  const { extractPriceFromVoice } = useOllama();
+
 
   // State
   const isListening = ref(false);
   const transcript = ref("");
   const lastAction = ref("");
   const manualStop = ref(false);
+  const engineStatus = ref("standby");
 
   // ============================================
   // AUTO AGENT STATE (merged from useAutoPriceAgent)
@@ -111,6 +112,7 @@ export function useVoiceDetector() {
     recognition.onstart = () => {
       isListening.value = true;
       manualStop.value = false;
+      engineStatus.value = "listening";
 
       if (isAutoAgentEnabled.value) {
         agentLastProcessedIndex = 0;
@@ -144,6 +146,9 @@ export function useVoiceDetector() {
             /* ignore */
           }
         }, 500);
+      } else {
+        // Manual stop — go to standby
+        engineStatus.value = "standby";
       }
     };
 
@@ -220,7 +225,7 @@ export function useVoiceDetector() {
         }
 
         try {
-          const aiResult = await extractPriceFromVoice(textToProcess.trim());
+          const aiResult = await callCloudPriceAPI(textToProcess.trim());
           if (aiResult && aiResult.id && aiResult.price) {
             await stockStore.updateItemData(aiResult.id, {
               price: aiResult.price,
@@ -281,6 +286,8 @@ export function useVoiceDetector() {
   // CORE LOGIC: SMART HUNTER V3
   // ============================================
   async function processVoiceCommand(rawText) {
+    engineStatus.value = "processing";
+
     if (aiDebounceTimer) {
       clearTimeout(aiDebounceTimer);
       aiDebounceTimer = null;
@@ -324,9 +331,30 @@ export function useVoiceDetector() {
       }
     }
 
-    const sizeMatch = workingText.match(/\b(XXL|XL|L|M|S|XS|2XL|3XL|4XL)\b/i);
+    // Thai phonetic → standard English size mapping
+    const sizeMap = {
+      'เอส': 'S', 'เอ็ม': 'M', 'แอล': 'L', 'แอลไซส์': 'L',
+      'เอ็กแอล': 'XL', 'เอ็กซ์แอล': 'XL',
+      'ทูเอ็กแอล': '2XL', 'สองเอ็กแอล': '2XL', 'สองเอ็กซ์แอล': '2XL',
+      'สามเอ็กแอล': '3XL', 'สามเอ็กซ์แอล': '3XL', 'ทรีเอ็กแอล': '3XL',
+      'สี่เอ็กแอล': '4XL', 'สี่เอ็กซ์แอล': '4XL',
+      'ฟรีไซส์': 'Free Size', 'โอเวอร์ไซส์': 'Oversize',
+    };
+
+    const sizeRegex = /(?:ไซส์\s*)?(XXL|XL|L|M|S|XS|2XL|3XL|4XL|5XL|เอส|เอ็ม|แอล|แอลไซส์|เอ็กแอล|เอ็กซ์แอล|ทูเอ็กแอล|สองเอ็กแอล|สองเอ็กซ์แอล|สามเอ็กแอล|สามเอ็กซ์แอล|ทรีเอ็กแอล|สี่เอ็กแอล|สี่เอ็กซ์แอล|ฟรีไซส์|โอเวอร์ไซส์)/i;
+
+    const sizeMatch = workingText.match(sizeRegex);
     if (sizeMatch) {
-      detected.sizeParts.push(sizeMatch[1].toUpperCase());
+      let capturedSize = sizeMatch[1];
+
+      // Normalize: Thai phonetic → English label, or just uppercase
+      if (sizeMap[capturedSize]) {
+        capturedSize = sizeMap[capturedSize];
+      } else {
+        capturedSize = capturedSize.toUpperCase();
+      }
+
+      detected.sizeParts.push(capturedSize);
       workingText = workingText.replace(sizeMatch[0], "");
     }
 
@@ -396,14 +424,14 @@ export function useVoiceDetector() {
       }
     }
 
-    // --- STEP 5: AI FALLBACK (Cloud API → Ollama) ---
+    // --- STEP 5: AI FALLBACK (Cloud API) ---
     if (detected.id === null && rawText.length > 5 && systemStore.isAiEnabled) {
       aiDebounceTimer = setTimeout(async () => {
         if (!isListening.value) return;
         lastAction.value = "🤔 กำลังคิด...";
 
         try {
-          // Priority 1: Cloud Price Detection API (HF Spaces)
+          // Cloud Price Detection API (HF Spaces)
           const cloudResult = await callCloudPriceAPI(rawText);
           if (cloudResult && cloudResult.id !== null) {
             detected.id =
@@ -418,39 +446,19 @@ export function useVoiceDetector() {
             return;
           }
 
-          // Priority 2: Local Ollama fallback
-          const aiResult = await extractPriceFromVoice(
-            rawText,
-            lastDetectedId.value,
-          );
-          if (aiResult) {
-            if (aiResult.id !== null && aiResult.id !== undefined) {
-              if (aiResult.id === "current" && lastDetectedId.value) {
-                detected.id = lastDetectedId.value;
-                detected.logic = "AI-Ollama-Context";
-              } else if (aiResult.id !== "current") {
-                detected.id =
-                  typeof aiResult.id === "string"
-                    ? parseInt(aiResult.id)
-                    : aiResult.id;
-              }
-            }
-            if (aiResult.price !== null && aiResult.price !== undefined) {
-              detected.price = aiResult.price;
-            }
-            if (aiResult.size) {
-              detected.sizeParts.push(aiResult.size);
-            }
-            if (detected.id !== null) {
-              detected.logic = "AI-Ollama";
-              executeAction(rawText, cleanText, detected);
-            } else {
-              lastAction.value = "⚠️ AI ไม่พบรหัส";
-            }
-          }
+          // Cloud API returned no result
+          lastAction.value = "⚠️ AI ไม่พบข้อมูล";
+          engineStatus.value = "error";
+          setTimeout(() => {
+            engineStatus.value = isListening.value ? "listening" : "standby";
+          }, 1500);
         } catch (error) {
           console.error("AI Fallback Error:", error);
           lastAction.value = "⚠️ AI ไม่ตอบสนอง";
+          engineStatus.value = "error";
+          setTimeout(() => {
+            engineStatus.value = isListening.value ? "listening" : "standby";
+          }, 1500);
         }
       }, 800);
       return;
@@ -516,6 +524,10 @@ export function useVoiceDetector() {
     if (detected.id) {
       if (detected.id > stockStore.stockSize || detected.id < 1) {
         lastAction.value = `⚠️ ไม่พบรายการ #${detected.id}`;
+        engineStatus.value = "error";
+        setTimeout(() => {
+          engineStatus.value = isListening.value ? "listening" : "standby";
+        }, 1500);
         return;
       }
 
@@ -545,8 +557,14 @@ export function useVoiceDetector() {
           logic: detected.logic,
           status: "MATCHED",
         });
+
+        engineStatus.value = "success";
+        setTimeout(() => {
+          engineStatus.value = isListening.value ? "listening" : "standby";
+        }, 1500);
       } else {
         lastAction.value = `ℹ️ เลือก #${detected.id}`;
+        engineStatus.value = isListening.value ? "listening" : "standby";
       }
     }
   }
@@ -563,6 +581,7 @@ export function useVoiceDetector() {
 
     if (isListening.value) {
       manualStop.value = true;
+      engineStatus.value = "standby";
       recognition.stop();
     } else {
       manualStop.value = false;
@@ -590,6 +609,7 @@ export function useVoiceDetector() {
     transcript,
     lastAction,
     toggleMic,
+    engineStatus,
     // Auto Agent exports
     isAutoAgentEnabled,
     autoAgentStatus,

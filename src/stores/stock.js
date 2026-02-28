@@ -36,6 +36,7 @@ export const useStockStore = defineStore("stock", () => {
   function connectToStock(videoId) {
     const stockRef = dbRef(db, `stock/${videoId}`);
 
+    let isInitialLoad = true;
     const unsubStock = onValue(stockRef, (snapshot) => {
       const val = snapshot.val() || {};
       stockData.value = val;
@@ -62,7 +63,9 @@ export const useStockStore = defineStore("stock", () => {
         for (const m of milestones) {
           if (percentage >= m && !achievedMilestones.value.has(m)) {
             achievedMilestones.value.add(m);
-            triggerCelebration(m);
+            if (!isInitialLoad) {
+              triggerCelebration(m);
+            }
           }
         }
 
@@ -73,6 +76,8 @@ export const useStockStore = defineStore("stock", () => {
           lastUpdated: Date.now(),
         }).catch((err) => console.error("History Sync Error:", err));
       }
+
+      isInitialLoad = false;
     });
 
     const sizeRef = dbRef(db, `settings/${videoId}/stockSize`);

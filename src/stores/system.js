@@ -26,7 +26,7 @@ export const useSystemStore = defineStore("system", () => {
   const statusDb = ref("err");
   const statusApi = ref("ok");
   const statusChat = ref("ok");
-  const statusOllama = ref("idle"); // Ollama AI status
+
 
   // API Key Management
   const currentKeyIndex = ref(0);
@@ -46,7 +46,7 @@ export const useSystemStore = defineStore("system", () => {
     if (type === "db") statusDb.value = status;
     if (type === "api") statusApi.value = status;
     if (type === "chat") statusChat.value = status;
-    if (type === "ollama") statusOllama.value = status;
+
   }
 
   function toggleAi() {
@@ -84,7 +84,7 @@ export const useSystemStore = defineStore("system", () => {
     statusDb,
     statusApi,
     statusChat,
-    statusOllama,
+
     currentKeyIndex,
     myDeviceId,
     version,

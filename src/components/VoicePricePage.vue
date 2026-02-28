@@ -77,8 +77,9 @@
 
           <!-- Transcript / Status -->
           <div class="hearing-status" v-if="!isAutoAgentEnabled">
-            <div class="v3-badge">
-              <i class="fa-solid fa-bolt"></i> Smart Hunter V3
+            <div class="v3-badge" :class="`status-${engineStatus}`">
+              <i :class="badgeConfig.icon" class="badge-icon"></i>
+              {{ badgeConfig.text }}
             </div>
             <div class="log-transcript">"{{ transcript || "..." }}"</div>
             <div
@@ -138,10 +139,22 @@ const {
   transcript,
   lastAction,
   toggleMic,
+  engineStatus,
   isAutoAgentEnabled,
   autoAgentStatus,
   isAutoAgentProcessing,
 } = useVoiceDetector();
+
+const badgeConfig = computed(() => {
+  const map = {
+    standby: { icon: "fa-solid fa-bolt", text: "Smart Hunter V3" },
+    listening: { icon: "fa-solid fa-headphones", text: "กำลังฟัง..." },
+    processing: { icon: "fa-solid fa-magnifying-glass", text: "วิเคราะห์ข้อมูล..." },
+    success: { icon: "fa-solid fa-circle-check", text: "สำเร็จ" },
+    error: { icon: "fa-solid fa-triangle-exclamation", text: "ข้อมูลไม่ชัดเจน" },
+  };
+  return map[engineStatus.value] || map.standby;
+});
 const { downloadLogs } = useVoiceLogger();
 const isDbConnected = ref(false);
 
@@ -641,34 +654,123 @@ onUnmounted(() => {
 .v3-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #fbbf24;
-  background: rgba(251, 191, 36, 0.1);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  padding: 6px 14px;
+  padding: 6px 16px;
   border-radius: 50px;
   margin-bottom: 12px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
+  border: 1px solid transparent;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.v3-badge .badge-icon {
+  font-size: 0.8rem;
+  transition: filter 0.4s ease, transform 0.4s ease;
+}
+
+/* --- Standby: Gold --- */
+.v3-badge.status-standby {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.3);
   box-shadow: 0 0 15px rgba(251, 191, 36, 0.15);
   animation: floatBadge 3s ease-in-out infinite;
 }
-
-.v3-badge i {
-  font-size: 0.8rem;
+.v3-badge.status-standby .badge-icon {
   filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.8));
 }
 
+/* --- Listening: Cyan --- */
+.v3-badge.status-listening {
+  color: #22d3ee;
+  background: rgba(34, 211, 238, 0.1);
+  border-color: rgba(34, 211, 238, 0.35);
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.2);
+  animation: listenPulse 2s ease-in-out infinite;
+}
+.v3-badge.status-listening .badge-icon {
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.9));
+}
+
+/* --- Processing: Purple/Pink spin --- */
+.v3-badge.status-processing {
+  color: #c084fc;
+  background: linear-gradient(135deg, rgba(192, 132, 252, 0.12), rgba(244, 114, 182, 0.12));
+  border-color: rgba(192, 132, 252, 0.4);
+  box-shadow: 0 0 22px rgba(192, 132, 252, 0.25);
+  animation: processingGlow 1.5s ease-in-out infinite;
+}
+.v3-badge.status-processing .badge-icon {
+  filter: drop-shadow(0 0 6px rgba(192, 132, 252, 0.9));
+  animation: spinIcon 1.2s linear infinite;
+}
+
+/* --- Success: Green --- */
+.v3-badge.status-success {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.4);
+  box-shadow: 0 0 22px rgba(52, 211, 153, 0.25);
+  animation: successPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.v3-badge.status-success .badge-icon {
+  filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.9));
+}
+
+/* --- Error: Red --- */
+.v3-badge.status-error {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.4);
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.2);
+  animation: shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+}
+.v3-badge.status-error .badge-icon {
+  filter: drop-shadow(0 0 5px rgba(248, 113, 113, 0.9));
+}
+
+/* --- Badge Keyframes --- */
 @keyframes floatBadge {
-  0%,
-  100% {
-    transform: translateY(0);
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes listenPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(34, 211, 238, 0.15); }
+  50% { box-shadow: 0 0 24px rgba(34, 211, 238, 0.35); }
+}
+
+@keyframes processingGlow {
+  0%, 100% {
+    box-shadow: 0 0 16px rgba(192, 132, 252, 0.2);
+    border-color: rgba(192, 132, 252, 0.35);
   }
   50% {
-    transform: translateY(-3px);
+    box-shadow: 0 0 28px rgba(244, 114, 182, 0.35);
+    border-color: rgba(244, 114, 182, 0.5);
   }
+}
+
+@keyframes spinIcon {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes successPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
 }
 
 .log-transcript {

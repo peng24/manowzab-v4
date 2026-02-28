@@ -50,7 +50,7 @@ import { logger } from "./utils/logger"; // ✅ Import Logger
 import { useAudio } from "./composables/useAudio";
 import { useAwayMode } from "./composables/useAwayMode";
 import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup
-import { useOllama } from "./composables/useOllama"; // ✅ Import Ollama
+
 import { usePullToRefresh } from "./composables/usePullToRefresh"; // ✅ Import Pull to Refresh
 import { ttsService } from "./services/TextToSpeech"; // ✅ Import TTS Service
 import Header from "./components/Header.vue";
@@ -92,8 +92,7 @@ const { awayTimer, closeAwayMode, initAwayListener } = useAwayMode();
 // ✅ Use Auto Cleanup Composable
 const { initAutoCleanup } = useAutoCleanup();
 
-// ✅ Use Ollama for connection check
-const { checkConnection } = useOllama();
+
 
 const showDashboard = ref(false);
 const showHistory = ref(false);
@@ -134,8 +133,18 @@ onMounted(async () => {
   // ✅ Enable Pull to Refresh for PWA
   usePullToRefresh();
 
-  // ✅ Check Ollama connection on startup
-  checkConnection();
+  // ✅ Check Hugging Face AI backend on startup (non-blocking)
+  fetch("https://peng24-manowzab-price-detector.hf.space/health")
+    .then((res) => {
+      if (res.ok) {
+        console.log("%c✅ Hugging Face AI Connected", "color: #34d399; font-size: 12px; font-weight: bold; padding: 2px 0;");
+      } else {
+        throw new Error(`Status: ${res.status}`);
+      }
+    })
+    .catch(() => {
+      console.log("%c⚠️ Hugging Face AI Unreachable or Sleeping", "color: #fbbf24; font-size: 12px; font-weight: bold; padding: 2px 0;");
+    });
 
   // Add global listeners for audio unlock
   document.addEventListener("click", handleFirstInteraction);

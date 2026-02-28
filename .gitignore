@@ -24,3 +24,16 @@ dist-ssr
 *.sw?
 .env
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# AI Models & Generated Data
+price_detection_service/app/models/
+price_detection_service/data/
+*.safetensors
+*.bin
+*.pt

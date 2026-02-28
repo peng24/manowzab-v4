@@ -44,7 +44,7 @@ class TextRequest(BaseModel):
     """Direct text input for extraction."""
     text: str
     enable_llm_fallback: bool = False
-    llm_provider: str = "ollama"
+    llm_provider: str = "none"  # DEPRECATED — LLM fallback removed
 
 
 class AudioRequest(BaseModel):
@@ -52,7 +52,7 @@ class AudioRequest(BaseModel):
     audio_base64: str
     format: str = "wav"  # wav, mp3, ogg
     enable_llm_fallback: bool = False
-    llm_provider: str = "ollama"
+    llm_provider: str = "none"  # DEPRECATED — LLM fallback removed
 
 
 class HealthResponse(BaseModel):

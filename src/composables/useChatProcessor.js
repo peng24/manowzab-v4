@@ -10,21 +10,7 @@ import { ref } from "vue";
 import { extractMessageRuns } from "../services/YouTubeLiveChat";
 import Swal from "sweetalert2";
 import { watch } from "vue";
-
-// Logger Config
-const DEBUG_MODE = true;
-const logger = {
-  log: (...args) => {
-    if (DEBUG_MODE) console.log(...args);
-  },
-  warn: (...args) => {
-    if (DEBUG_MODE) console.warn(...args);
-  },
-  error: (...args) => {
-    console.error(...args);
-  },
-};
-
+import { logger } from "../utils/logger";
 // Saved names cache
 const savedNamesCache = ref({});
 onValue(dbRef(db, "nicknames"), (snapshot) => {
@@ -460,10 +446,10 @@ export function useChatProcessor() {
         queueAudio("success", phoneticName, msg);
       } catch (error) {
         // ✅ Error - Item might be sold out or other issue
-        if (error.message && (error.message.includes("เต็มแล้ว") || error.message.includes("ซ้ำแล้ว"))) {
-          logger.warn("⚠️ Order skipped:", error.message);
+        if (error.message && (error.message.includes("ซ้ำแล้ว") || error.message.includes("เต็มแล้ว"))) {
+          logger.warn("Order skipped:", error.message);
         } else {
-          logger.error("❌ Order failed:", error);
+          logger.error("Order failed:", error);
         }
 
         Toast.fire({

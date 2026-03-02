@@ -9,9 +9,10 @@ export class TextToSpeech {
     this.isSpeaking = false;
     this.voices = [];
     this.poller = null;
-    this.audioPlayer = new Audio(); // Single reusable audio player
+    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)(); // ✅ AudioContext stays unlocked on iOS
+    this.currentSource = null; // ✅ Track active AudioBufferSource
     this.isNativeUnlocked = false; // Track Native TTS unlock status
-    this.isGoogleUnlocked = false; // Track Google TTS Audio Element unlock status
+    this.isGoogleUnlocked = false; // Track Google TTS AudioContext unlock status
     this.stuckTimer = null; // ✅ Safety timer to detect stuck state
     this.STUCK_TIMEOUT = 15000; // ✅ 15 seconds max per utterance
 
@@ -64,46 +65,29 @@ export class TextToSpeech {
   }
 
   /**
-   * Unlock HTML5 Audio Element for Google TTS
-   * iOS Safari requires Audio elements to be "blessed" by user interaction
-   * This plays a silent WAV to unlock the audio player
-   * Uses Blob URL with WAV format for maximum iOS compatibility
+   * Unlock AudioContext for Google TTS
+   * ✅ AudioContext stays permanently unlocked after first user interaction on iOS
+   * Unlike HTMLAudioElement, it does NOT lose permission during async fetch
    */
   unlockAudioElement() {
     if (this.isGoogleUnlocked) return;
 
-    console.log("🔓 Unlocking Google TTS Audio Element...");
-
-    // ✅ SWITCH TO WAV: A valid 0.1s silent WAV file (Universally supported)
-    // RIFF Header + FMT + DATA (PCM 8-bit, Mono, 8000Hz)
-    const SILENT_WAV_B64 =
-      "UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==";
+    console.log("🔓 Unlocking Google TTS AudioContext...");
 
     try {
-      // 1. Convert WAV Base64 to Blob (Correct MIME type: audio/wav)
-      const blob = this.base64ToBlob(SILENT_WAV_B64, "audio/wav");
-      // 2. Create Object URL
-      const blobUrl = URL.createObjectURL(blob);
-
-      // 3. Set Source & Play
-      this.audioPlayer.src = blobUrl;
-
-      this.audioPlayer
-        .play()
-        .then(() => {
-          console.log("✅ Google TTS Audio Element Unlocked (WAV)");
+      if (this.audioCtx.state === "suspended") {
+        this.audioCtx.resume().then(() => {
+          console.log("✅ Google TTS AudioContext Unlocked");
           this.isGoogleUnlocked = true;
-
-          // 4. Cleanup Memory (revoke URL after a short delay)
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-        })
-        .catch((e) => {
-          console.warn("⚠️ Audio unlock failed (User interaction needed):", e);
-          // Cleanup even on error
-          URL.revokeObjectURL(blobUrl);
+        }).catch((e) => {
+          console.warn("⚠️ AudioContext resume failed:", e);
         });
+      } else {
+        console.log("✅ Google TTS AudioContext Already Running");
+        this.isGoogleUnlocked = true;
+      }
     } catch (e) {
-      console.error("❌ Audio unlock setup failed:", e);
+      console.error("❌ AudioContext unlock failed:", e);
     }
   }
 
@@ -255,60 +239,57 @@ export class TextToSpeech {
 
         const data = await response.json();
 
-        // Convert Base64 to Blob URL for memory efficiency
-        const blob = this.base64ToBlob(data.audioContent);
-        const blobUrl = URL.createObjectURL(blob);
-
-        // ✅ Guard against double processQueue calls
-        let hasEnded = false;
-        const advanceQueue = () => {
-          if (hasEnded) return;
-          hasEnded = true;
-          URL.revokeObjectURL(blobUrl);
-          this.clearStuckTimer();
-          if (this._currentOnComplete) {
-            this._currentOnComplete();
-            this._currentOnComplete = null;
-          }
-          this.isSpeaking = false;
-          this.processQueue();
-        };
-
-        // Set up single audio player
-        this.audioPlayer.src = blobUrl;
-        this.audioPlayer.onended = advanceQueue;
-
-        this.audioPlayer.onerror = (e) => {
-          console.error("❌ Audio playback error:", e);
-          advanceQueue();
-        };
-
-        this.audioPlayer.load(); // Force Safari to prepare the audio
-        try {
-          await this.audioPlayer.play();
-        } catch (error) {
-          if (error.name === "NotAllowedError") {
-            console.warn("⚠️ iOS blocked background audio. Falling back to Native TTS.");
-            hasEnded = true;
-            URL.revokeObjectURL(blobUrl);
-            this.clearStuckTimer(); // ✅ Clear stuck timer before fallback
-            // ✅ _currentOnComplete is preserved — speakNative will call it via cleanupAndAdvance
-            this.isSpeaking = false; // ✅ Reset so speakNative's processQueue path works
-            this.speakNative(text);
-            this.startStuckTimer(); // ✅ Restart stuck timer for native fallback
-            return;
-          }
-          console.error("❌ Play error:", error);
-          advanceQueue();
-          return;
+        // ✅ Convert Base64 to ArrayBuffer for AudioContext decoding
+        const binaryString = atob(data.audioContent);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let j = 0; j < len; j++) {
+          bytes[j] = binaryString.charCodeAt(j);
         }
 
-        // Update active key index in store
-        const systemStore = useSystemStore();
-        systemStore.activeKeyIndex = i + 1;
+        // ✅ Ensure AudioContext is running
+        if (this.audioCtx.state === "suspended") {
+          await this.audioCtx.resume();
+        }
 
-        console.log(`✅ Success with key ${i + 1}`);
-        return; // Success! Exit the function
+        try {
+          const audioBuffer = await this.audioCtx.decodeAudioData(bytes.buffer);
+          this.currentSource = this.audioCtx.createBufferSource();
+          this.currentSource.buffer = audioBuffer;
+          this.currentSource.connect(this.audioCtx.destination);
+
+          // ✅ Guard against double processQueue calls
+          let hasEnded = false;
+          const advanceQueue = () => {
+            if (hasEnded) return;
+            hasEnded = true;
+            this.clearStuckTimer();
+            if (this._currentOnComplete) {
+              this._currentOnComplete();
+              this._currentOnComplete = null;
+            }
+            this.isSpeaking = false;
+            this.currentSource = null;
+            this.processQueue();
+          };
+
+          this.currentSource.onended = advanceQueue;
+          this.currentSource.start(0);
+
+          // Update active key index in store
+          const systemStore2 = useSystemStore();
+          systemStore2.activeKeyIndex = i + 1;
+
+          console.log(`✅ Success with key ${i + 1}`);
+          return; // Success! Exit the function
+        } catch (decodeErr) {
+          console.error("❌ Audio decode error:", decodeErr);
+          this.clearStuckTimer();
+          this.isSpeaking = false;
+          this.speakNative(text);
+          this.startStuckTimer();
+          return;
+        }
       } catch (error) {
         // 🚨 CASE 1: Timeout (Internet Lag)
         if (error.name === "AbortError") {
@@ -490,17 +471,16 @@ export class TextToSpeech {
     // ✅ Clear stuck timer first
     this.clearStuckTimer();
 
-    if (this.audioPlayer) {
-      // 1. Remove listeners FIRST to prevent error logging during cleanup
-      this.audioPlayer.onended = null;
-      this.audioPlayer.onerror = null;
-
-      // 2. Stop playback
-      this.audioPlayer.pause();
-      this.audioPlayer.currentTime = 0;
-
-      // 3. Clear source safely
-      this.audioPlayer.removeAttribute("src");
+    // ✅ Stop current AudioContext source (replaces audioPlayer cleanup)
+    if (this.currentSource) {
+      try {
+        this.currentSource.onended = null; // Remove listener first
+        this.currentSource.stop();
+        this.currentSource.disconnect();
+      } catch (e) {
+        // Ignore — source may already be stopped
+      }
+      this.currentSource = null;
     }
 
     // Stop native speech synthesis

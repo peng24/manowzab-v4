@@ -291,7 +291,11 @@ export class TextToSpeech {
             console.warn("⚠️ iOS blocked background audio. Falling back to Native TTS.");
             hasEnded = true;
             URL.revokeObjectURL(blobUrl);
+            this.clearStuckTimer(); // ✅ Clear stuck timer before fallback
+            // ✅ _currentOnComplete is preserved — speakNative will call it via cleanupAndAdvance
+            this.isSpeaking = false; // ✅ Reset so speakNative's processQueue path works
             this.speakNative(text);
+            this.startStuckTimer(); // ✅ Restart stuck timer for native fallback
             return;
           }
           console.error("❌ Play error:", error);
@@ -418,6 +422,11 @@ export class TextToSpeech {
         console.warn(
           `⚠️ TTS stuck for ${this.STUCK_TIMEOUT / 1000}s — auto-resetting queue`,
         );
+        // ✅ Resolve pending Promise before moving on (prevents outer queue deadlock)
+        if (this._currentOnComplete) {
+          this._currentOnComplete();
+          this._currentOnComplete = null;
+        }
         this.isSpeaking = false;
         this.processQueue();
       }

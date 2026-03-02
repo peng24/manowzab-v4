@@ -187,6 +187,9 @@ export function useAudio() {
   }
 
   // ✅ Unified Audio Queue Processor (SFX → TTS, sequential)
+  // ✅ Fixed: Safety timeout + finally block to prevent deadlock on iPad
+  const QUEUE_SAFETY_TIMEOUT = 20000; // 20s max per item
+
   async function processAudioQueue() {
     if (isAudioProcessing || audioQueue.length === 0) return;
     isAudioProcessing = true;
@@ -199,18 +202,24 @@ export function useAudio() {
         await playSfx(task.sfxType);
       }
 
-      // 2. Play TTS and wait for it to finish
+      // 2. Play TTS and wait for it to finish (with safety timeout)
       if (task.message) {
         const ttsPromise = ttsService.speak(task.author, task.message);
         if (ttsPromise instanceof Promise) {
-          await ttsPromise.catch((e) => console.warn("TTS Error:", e));
+          // ✅ Race against safety timeout to prevent permanent queue stall
+          await Promise.race([
+            ttsPromise.catch((e) => console.warn("TTS Error:", e)),
+            new Promise((resolve) => setTimeout(resolve, QUEUE_SAFETY_TIMEOUT)),
+          ]);
         }
       }
     } catch (err) {
       console.error("Audio Queue Error:", err);
+    } finally {
+      // ✅ ALWAYS reset — prevents permanent deadlock
+      isAudioProcessing = false;
     }
 
-    isAudioProcessing = false;
     // Process next item in the queue
     processAudioQueue();
   }

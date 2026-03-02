@@ -1,4 +1,15 @@
 let isUnlocked = false;
+let sharedAudioCtx = null; // ✅ Reuse single AudioContext instead of creating duplicates
+
+function getOrCreateAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+
+  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+    sharedAudioCtx = new AudioContextClass();
+  }
+  return sharedAudioCtx;
+}
 
 export function unlockAudio() {
   if (isUnlocked) return;
@@ -10,16 +21,19 @@ export function unlockAudio() {
     window.speechSynthesis.speak(utterance);
   }
 
-  // ปลดล็อก Web Audio API (สำหรับเอฟเฟกต์เสียงอื่นๆ)
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (AudioContext) {
-    const audioCtx = new AudioContext();
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioCtx.createBuffer(1, 1, 22050);
-    source.connect(audioCtx.destination);
-    source.start(0);
+  // ✅ ปลดล็อก Web Audio API — ใช้ shared AudioContext แทนสร้างใหม่
+  const audioCtx = getOrCreateAudioContext();
+  if (audioCtx) {
     if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
+      audioCtx.resume().catch(() => {});
+    }
+    try {
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioCtx.createBuffer(1, 1, 22050);
+      source.connect(audioCtx.destination);
+      source.start(0);
+    } catch (e) {
+      // Ignore — may fail if context is in an invalid state
     }
   }
 
@@ -33,18 +47,20 @@ export function unlockAudio() {
 document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
 document.addEventListener('click', unlockAudio, { once: true, passive: true });
 
-// ✅ Handle iOS Safari Background Limits
+// ✅ Handle iOS Safari Background/Tab-Switch Recovery
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) {
-      const checkCtx = new AudioContext();
-      if (checkCtx.state === 'suspended') {
-        isUnlocked = false;
-        document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
-        document.addEventListener('click', unlockAudio, { once: true, passive: true });
-        console.warn('⚠️ AudioContext suspended on return. Awaiting user interaction to unlock.');
-      }
+    // ✅ Check the shared AudioContext instead of creating a new one
+    const audioCtx = getOrCreateAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      isUnlocked = false;
+      // Re-register listeners for next user interaction
+      document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+      document.addEventListener('click', unlockAudio, { once: true, passive: true });
+      console.warn('⚠️ AudioContext suspended on return. Awaiting user interaction to unlock.');
+
+      // ✅ Also try to resume immediately (may work if page just came back)
+      audioCtx.resume().catch(() => {});
     }
   }
 });

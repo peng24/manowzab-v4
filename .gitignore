@@ -31,9 +31,3 @@ __pycache__/
 .venv/
 venv/
 
-# AI Models & Generated Data
-price_detection_service/app/models/
-price_detection_service/data/
-*.safetensors
-*.bin
-*.pt

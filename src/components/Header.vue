@@ -206,7 +206,7 @@ const stockStore = useStockStore();
 const { connectVideo, disconnect } = useYouTube();
 const { setApiKey } = useGemini();
 
-const { queueSpeech, unlockAudio } = useAudio(); // ✅ เพิ่ม unlockAudio
+const { queueAudio, unlockAudio } = useAudio();
 
 const openDashboard = inject("openDashboard");
 const openHistory = inject("openHistory");
@@ -306,7 +306,7 @@ function toggleAI() {
   })
     .then(() => {
       systemStore.isAiCommander = newState;
-      queueSpeech(newState ? "เปิด AI Commander" : "ปิด AI Commander");
+      queueAudio(null, "", newState ? "เปิด AI Commander" : "ปิด AI Commander");
 
     })
     .catch((error) => logger.error("Error toggling AI:", error));
@@ -335,7 +335,7 @@ async function toggleConnection() {
     systemStore.isConnected = false;
     systemStore.statusChat = "idle"; // ✅ Changed from 'err' to 'idle'
     systemStore.statusApi = "idle"; // ✅ Reset API status too
-    queueSpeech("หยุดการเชื่อมต่อ");
+    queueAudio(null, "", "หยุดการเชื่อมต่อ");
     return;
   }
 
@@ -375,7 +375,7 @@ async function toggleConnection() {
     const success = await connectVideo(videoId.value);
     if (success) {
       systemStore.statusChat = "ok";
-      queueSpeech("เชื่อมต่อสำเร็จ กำลังอ่านคอมเมนต์");
+      queueAudio(null, "", "เชื่อมต่อสำเร็จ กำลังอ่านคอมเมนต์");
       Swal.fire({
         icon: "success",
         title: "เชื่อมต่อสำเร็จ",
@@ -446,7 +446,7 @@ function downloadCSV() {
 
 function testVoice() {
   unlockAudio(); // ✅ Unlock audio context explicitly
-  queueSpeech("ทดสอบเสียง หนึ่ง สอง สาม สี่ ห้า");
+  queueAudio(null, "", "ทดสอบเสียง หนึ่ง สอง สาม สี่ ห้า");
   showDropdown.value = false;
 }
 
@@ -623,18 +623,30 @@ function toggleTtsMode() {
   const mode = systemStore.useOnlineTts ? "Google Cloud TTS" : "Native TTS";
   logger.log("🔊 Switched to:", mode);
 
-  queueSpeech(`เปลี่ยนเป็น ${mode}`);
+  queueAudio(null, "", `เปลี่ยนเป็น ${mode}`);
 }
 
 function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ฟีเจอร์ใหม่ (Voice Upgrade)</h4>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ปรับปรุงใหม่</h4>
         <ul>
-          <li>🎙️ <b>Smart Hunter Logic</b> (จับคู่รายการ+ราคาแม่นยำขึ้น 300%)</li>
-          <li>🧹 <b>Advanced Cleaning</b> (ตัดคำเยิ่นเย้อ/แก้คำผิดอัตโนมัติ)</li>
-          <li>🔗 <b>Implicit Numbering</b> (พูดติดกันก็รู้เรื่อง เช่น 680 -> #6 ราคา 80)</li>
+          <li>🔊 <b>TTS Resilience</b> — Auto-resume AudioContext บน iPad, Google TTS timeout 2 วิ, สลับ Native อัตโนมัติหลังล้มเหลว 5 ครั้ง</li>
+          <li>🔑 <b>Unified Key Rotation</b> — YouTube API + Google TTS ใช้ระบบสลับคีย์เดียวกัน, wrap-around กลับคีย์แรกเมื่อ quota reset</li>
+          <li>🎵 <b>Audio Queue Refactor</b> — ลบ queueSpeech ซ้ำซ้อน, ทุกเสียงผ่านคิวเดียว ไม่มีเสียงทับกัน</li>
+        </ul>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🐛 แก้ไขบั๊ก</h4>
+        <ul>
+          <li>📦 <b>Popup ไม่บัง Stock Grid</b> — แจ้งเตือนทั้งหมดเปลี่ยนเป็น Toast (มุมขวาบน)</li>
+          <li>🎉 <b>Confetti ทุกออเดอร์</b> — ยิง confetti ทันทีเมื่อตรวจจับ buy intent</li>
+        </ul>
+        <h4 style="color: #f44336; margin-bottom: 5px;">🧹 ทำความสะอาด</h4>
+        <ul>
+          <li>🗑️ ลบไฟล์ที่ไม่ได้ใช้ 5 ไฟล์ (HelloWorld, performance.js, registerServiceWorker, style.css สำเนา, types/)</li>
+          <li>✂️ ลบ CSS ซ้ำซ้อน + orphan code จาก Voice feature เก่า</li>
+          <li>📝 ลบ analyzeChat() dead code ออกจาก useGemini.js</li>
+          <li>📄 อัปเดตเอกสาร AI_RULES, README, SFX Implementation ให้ตรง v4.15</li>
         </ul>
         </div>`,
     background: "#1e1e1e",

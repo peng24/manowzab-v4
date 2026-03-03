@@ -261,7 +261,7 @@ onMounted(async () => {
 </script>
 
 <style>
-@import "./assets/style.css";
+/* style.css loaded via main.js */
 
 .app-container {
   height: 100%;

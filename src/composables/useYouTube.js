@@ -28,6 +28,11 @@ export function useYouTube() {
   const viewerIntervalId = ref(null);
   const chatService = new YouTubeLiveChat(API_KEYS);
 
+  // ✅ Sync key index: when chat polling rotates keys, update the store
+  chatService.onKeyRotate = (newIndex) => {
+    systemStore.currentKeyIndex = newIndex;
+  };
+
   // Link Service Status to Store
   chatService.onStatusChange = (status) => {
     systemStore.statusChat = status;
@@ -41,9 +46,13 @@ export function useYouTube() {
    * @returns {Promise<Object>} JSON response from API.
    * @throws Will throw error if all keys are exhausted.
    */
-  async function smartFetch(url) {
+  async function smartFetch(url, _depth = 0) {
     try {
       systemStore.statusApi = "ok";
+
+      // ✅ Sync store key index → chatService before fetching
+      chatService.currentKeyIndex = systemStore.currentKeyIndex;
+
       let res = await fetch(
         url + "&key=" + API_KEYS[systemStore.currentKeyIndex],
       );
@@ -53,10 +62,15 @@ export function useYouTube() {
         console.error("❌ API Error:", data.error.message);
         systemStore.statusApi = "warn";
 
-        // Rotate Key
-        if (systemStore.currentKeyIndex < API_KEYS.length - 1) {
-          systemStore.currentKeyIndex++;
-          return smartFetch(url);
+        // ✅ Rotate Key with wrap-around and depth limit
+        if (_depth < API_KEYS.length - 1) {
+          systemStore.currentKeyIndex =
+            (systemStore.currentKeyIndex + 1) % API_KEYS.length;
+          chatService.currentKeyIndex = systemStore.currentKeyIndex;
+          console.warn(
+            `🔑 smartFetch: Rotated to key #${systemStore.currentKeyIndex + 1} (attempt ${_depth + 2}/${API_KEYS.length})`,
+          );
+          return smartFetch(url, _depth + 1);
         } else {
           systemStore.statusApi = "err";
           throw new Error("All API keys exhausted");

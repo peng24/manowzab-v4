@@ -7,7 +7,7 @@ import { AWAY_START_MESSAGES, AWAY_END_MESSAGES } from "../constants";
 
 export function useAwayMode() {
     const systemStore = useSystemStore();
-    const { queueSpeech } = useAudio();
+    const { queueAudio } = useAudio();
 
     const awayTimer = ref("00:00");
     let awayInterval = null;
@@ -74,7 +74,7 @@ export function useAwayMode() {
                 }
 
                 const startMessage = getRandomMessage(AWAY_START_MESSAGES);
-                queueSpeech(startMessage);
+                queueAudio(null, "", startMessage);
             } else if (!newState && prevState) {
                 systemStore.isAway = false;
 
@@ -85,7 +85,7 @@ export function useAwayMode() {
                 awayTimer.value = "00:00";
 
                 const endMessage = getRandomMessage(AWAY_END_MESSAGES);
-                queueSpeech(endMessage);
+                queueAudio(null, "", endMessage);
             }
         });
 

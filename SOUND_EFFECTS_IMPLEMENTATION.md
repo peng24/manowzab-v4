@@ -1,6 +1,7 @@
 # Advanced Sound Effects (SFX) System
 
 ## 🎯 Objective
+
 Replace generic "ding" sound with specific synthesized sound effects that play BEFORE Text-to-Speech, providing clear audio feedback for order success, errors, and cancellations.
 
 ## ✅ Implementation
@@ -8,6 +9,7 @@ Replace generic "ding" sound with specific synthesized sound effects that play B
 ### 1. Created `playSfx()` Function (`src/composables/useAudio.js`)
 
 **Features:**
+
 - Returns a `Promise` that resolves when sound finishes
 - Synthesizes sounds using Web Audio API (no external files)
 - Three sound types: `'success'`, `'error'`, `'cancel'`
@@ -15,26 +17,30 @@ Replace generic "ding" sound with specific synthesized sound effects that play B
 #### Sound Specifications
 
 **Success Sound (Ka-Ching!) 🎵**
+
 - Duration: 500ms
 - Type: Two ascending sine wave tones
 - Frequencies: 800Hz → 1200Hz
 - Use: Order successfully processed
 
 **Error Sound (Buzzer) 🔴**
+
 - Duration: 600ms
 - Type: Sawtooth wave (harsh tone)
 - Frequencies: 200Hz → 150Hz (descending)
 - Use: Order failed (sold out/error)
 
 **Cancel Sound (Pop) 🔵**
+
 - Duration: 300ms
 - Type: Single sine wave tone
 - Frequencies: 600Hz → 300Hz
 - Use: Order cancelled
 
 #### Code Example
+
 ```javascript
-function playSfx(type = 'success') {
+function playSfx(type = "success") {
   return new Promise((resolve) => {
     // ... AudioContext synthesis ...
     setTimeout(resolve, duration * 1000);
@@ -47,51 +53,52 @@ function playSfx(type = 'success') {
 ### 2. Updated Order Processing (`src/composables/useChatProcessor.js`)
 
 #### Import Changes
-```javascript
-// Before:
-const { queueSpeech, playDing } = useAudio();
 
-// After:
-const { queueSpeech, playSfx, speak } = useAudio();
+```javascript
+// Current (v4.15.0):
+const { queueAudio, playSfx } = useAudio();
 ```
 
 #### Multi-Buy Orders
+
 ```javascript
-// ✅ Play SFX BEFORE TTS
-await playSfx('success');
-speak(displayName, `${msg} ... ทั้งหมด ${itemIds.length} รายการ`);
+// ✅ Unified queue handles SFX → TTS sequentially
+queueAudio(
+  "success",
+  displayName,
+  `${msg} ... ทั้งหมด ${itemIds.length} รายการ`,
+);
 ```
 
 #### Single Buy Orders (with Error Handling)
+
 ```javascript
 try {
   // Process order
   await stockStore.processOrder(...);
-  
+
   // Success Toast
   Toast.fire({ icon: 'success', title: '✅ ตัดรหัส...' });
-  
-  // ✅ Play SUCCESS sound BEFORE TTS
-  await playSfx('success');
-  speak(displayName, msg);
-  
+
+  // ✅ Unified queue: SFX + TTS in sequence
+  queueAudio('success', phoneticName, msg);
+
 } catch (error) {
   // Error Toast
   Toast.fire({ icon: 'error', title: '❌ ตัดไม่ได้: ...' });
-  
-  // ✅ Play ERROR sound BEFORE TTS
-  await playSfx('error');
-  speak(displayName, msg); // Still announce to admin
+
+  // ✅ Unified queue: Error SFX + TTS
+  queueAudio('error', phoneticName, msg);
 }
 ```
 
 #### Cancel Orders
+
 ```javascript
 await stockStore.processCancel(targetId);
 
-// ✅ Play CANCEL sound BEFORE TTS
-await playSfx('cancel');
-speak(displayName, msg);
+// ✅ Unified queue: Cancel SFX + TTS
+queueAudio("cancel", phoneticName, msg);
 ```
 
 ---
@@ -99,6 +106,7 @@ speak(displayName, msg);
 ## 🔄 Audio Sequence Flow
 
 ### Success Flow
+
 ```
 User: "CF 10"
     ↓
@@ -114,6 +122,7 @@ Show Toast (✅)
 ```
 
 ### Error Flow
+
 ```
 User: "CF 10"
     ↓
@@ -129,6 +138,7 @@ Show Toast (❌)
 ```
 
 ### Cancel Flow
+
 ```
 User: "cancel 10"
     ↓
@@ -146,16 +156,19 @@ Show Toast
 ## 🎨 Sound Design Rationale
 
 ### Success (Ka-Ching)
+
 - **Why:** Positive reinforcement, familiar "cash register" sound
 - **Design:** Ascending tones create uplifting feeling
 - **Psychology:** Encourages continued purchasing
 
 ### Error (Buzzer)
+
 - **Why:** Clear indication of failure without being alarming
 - **Design:** Descending harsh tone signals "stop"
 - **Psychology:** Alerts admin to check issue
 
 ### Cancel (Pop)
+
 - **Why:** Neutral acknowledgment sound
 - **Design:** Quick fade-out, non-intrusive
 - **Psychology:** Confirms action without emotion
@@ -170,11 +183,11 @@ Show Toast
 
 ```javascript
 // ❌ Wrong (Race condition)
-playSfx('success');
+playSfx("success");
 speak(displayName, msg);
 
 // ✅ Correct (Sequential)
-await playSfx('success');
+await playSfx("success");
 speak(displayName, msg);
 ```
 
@@ -192,6 +205,7 @@ osc2.frequency.setValueAtTime(1200, now + 0.1);
 ### Error Handling
 
 The new system catches ALL order processing errors:
+
 - Sold out items
 - Firebase transaction failures
 - Network issues
@@ -203,13 +217,13 @@ Admin still hears the TTS announcement even on errors, helping them understand w
 
 ## 📊 Before vs After
 
-| Scenario | Before | After |
-|----------|--------|-------|
-| **Buy Success** | Generic ding → TTS | 🎵 Ka-ching (500ms) → 🗣️ TTS |
-| **Buy Error** | Generic ding → TTS | 🔴 Buzzer (600ms) → 🗣️ TTS + Error Toast |
-| **Cancel** | Generic ding → TTS | 🔵 Pop (300ms) → 🗣️ TTS |
-| **Error Handling** | No differentiation | Visual + Audio feedback |
-| **TTS Timing** | Immediate (race condition) | After SFX completes ✅ |
+| Scenario           | Before                     | After                                    |
+| ------------------ | -------------------------- | ---------------------------------------- |
+| **Buy Success**    | Generic ding → TTS         | 🎵 Ka-ching (500ms) → 🗣️ TTS             |
+| **Buy Error**      | Generic ding → TTS         | 🔴 Buzzer (600ms) → 🗣️ TTS + Error Toast |
+| **Cancel**         | Generic ding → TTS         | 🔵 Pop (300ms) → 🗣️ TTS                  |
+| **Error Handling** | No differentiation         | Visual + Audio feedback                  |
+| **TTS Timing**     | Immediate (race condition) | After SFX completes ✅                   |
 
 ---
 
@@ -241,18 +255,22 @@ Admin still hears the TTS announcement even on errors, helping them understand w
 ## 🎧 Testing
 
 ### Test Success Sound
+
 1. Send "CF 10" (available item)
 2. **Expected:** Ka-ching sound → "คุณ... CF 10"
 
 ### Test Error Sound
+
 1. Send "CF 10" (sold out item)
 2. **Expected:** Buzzer sound → Error toast → "คุณ... CF 10"
 
 ### Test Cancel Sound
+
 1. Send "cancel 10"
 2. **Expected:** Pop sound → "คุณ... cancel 10"
 
 ### Test Sequencing
+
 - Verify SFX completes BEFORE TTS starts
 - No overlapping audio
 - Toast appears during SFX (non-blocking)
@@ -284,6 +302,7 @@ Admin still hears the TTS announcement even on errors, helping them understand w
 ## ✅ Result
 
 The application now has a professional audio feedback system with:
+
 - 🎵 **Ka-Ching** for successful orders
 - 🔴 **Buzzer** for failed orders
 - 🔵 **Pop** for cancellations

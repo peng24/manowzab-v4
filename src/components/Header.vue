@@ -140,9 +140,7 @@
             <a @click="askAiKey" class="menu-key">
               <i class="fa-solid fa-key"></i> ตั้งค่า API Key
             </a>
-            <a @click="openVoicePricePage" class="menu-voice-page">
-              <i class="fa-solid fa-microphone"></i> เปิดหน้าตรวจเสียงราคา
-            </a>
+
             <a @click="openOverlayPage" class="menu-overlay">
               <i class="fa-solid fa-layer-group"></i> เปิดหน้าจอ Overlay (OBS)
             </a>
@@ -365,28 +363,6 @@ async function toggleConnection() {
   // ✅ เพิ่ม: Unlock Audio เพื่อให้เสียงพูดทำงาน
   unlockAudio();
 
-  // ✅ Wake up Hugging Face Space backend (non-blocking)
-  fetch("https://peng24-manowzab-price-detector.hf.space/docs", {
-    method: "GET",
-  })
-    .then((res) => {
-      if (res.ok || res.status === 404) {
-        console.log(
-          "%c✅ Hugging Face Server is Awake and Ready!",
-          "color: #22c55e; font-size: 14px; font-weight: bold; text-shadow: 0 0 8px rgba(34,197,94,0.4);",
-        );
-      } else {
-        throw new Error(`Status: ${res.status}`);
-      }
-    })
-    .catch((err) => {
-      console.log(
-        "%c❌ Failed to wake up Hugging Face Server",
-        "color: #ef4444; font-size: 14px; font-weight: bold;",
-        err.message,
-      );
-    });
-
   // ✅ เพิ่ม: ส่งรหัสไลฟ์ขึ้น Firebase เพื่อให้เครื่องอื่นรู้
   set(dbRef(db, "system/activeVideo"), videoId.value).catch((err) =>
     console.error("Sync Error:", err),
@@ -584,13 +560,7 @@ function askAiKey() {
   showDropdown.value = false;
 }
 
-function openVoicePricePage() {
-  window.open(
-    window.location.origin + window.location.pathname + "?mode=voice",
-    "_blank",
-  );
-  showDropdown.value = false;
-}
+
 
 function openOverlayPage() {
   window.open(

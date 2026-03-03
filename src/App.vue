@@ -1,10 +1,7 @@
 <template>
   <div class="app-container">
-    <!-- ✅ Voice Price Mode -->
-    <VoicePricePage v-if="isVoiceMode" />
-
     <!-- ✅ Live Overlay Mode -->
-    <LiveOverlay v-else-if="isOverlayMode" />
+    <LiveOverlay v-if="isOverlayMode" />
 
     <!-- ✅ Normal Mode -->
     <template v-else>
@@ -58,7 +55,7 @@ import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import Dashboard from "./components/Dashboard.vue";
 import HistoryModal from "./components/HistoryModal.vue";
-import VoicePricePage from "./components/VoicePricePage.vue"; // ✅ Import Voice Page
+
 import LiveOverlay from "./components/LiveOverlay.vue"; // ✅ Import Overlay
 
 const systemStore = useSystemStore();
@@ -80,7 +77,6 @@ watch(
 );
 
 const urlParams = new URLSearchParams(window.location.search);
-const isVoiceMode = urlParams.get("mode") === "voice";
 const isOverlayMode = urlParams.get("mode") === "overlay"; // ✅ Check Overlay Mode
 
 // ✅ ดึง unlockAudio มาใช้แทน playDing
@@ -132,19 +128,6 @@ onMounted(async () => {
 
   // ✅ Enable Pull to Refresh for PWA
   usePullToRefresh();
-
-  // ✅ Check Hugging Face AI backend on startup (non-blocking)
-  fetch("https://peng24-manowzab-price-detector.hf.space/health")
-    .then((res) => {
-      if (res.ok) {
-        console.log("%c✅ Hugging Face AI Connected", "color: #34d399; font-size: 12px; font-weight: bold; padding: 2px 0;");
-      } else {
-        throw new Error(`Status: ${res.status}`);
-      }
-    })
-    .catch(() => {
-      console.log("%c⚠️ Hugging Face AI Unreachable or Sleeping", "color: #fbbf24; font-size: 12px; font-weight: bold; padding: 2px 0;");
-    });
 
   // Add global listeners for audio unlock
   document.addEventListener("click", handleFirstInteraction);

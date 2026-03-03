@@ -12,6 +12,7 @@ export class YouTubeLiveChat {
     this.onError = null; // Callback for errors
     this.onStatusChange = null; // Callback for status updates ('ok' | 'err')
     this.onRecovery = null; // Callback when polling recovers after errors
+    this.onKeyRotate = null; // ✅ Callback to sync key index externally
 
     // ✅ Exponential backoff state
     this.retryCount = 0;
@@ -28,19 +29,26 @@ export class YouTubeLiveChat {
     return this.apiKeys[this.currentKeyIndex];
   }
 
+  /**
+   * ✅ Rotate to next API key with wrap-around
+   * Returns true if there's a different key to try, false if all keys exhausted in this cycle
+   */
   rotateKey() {
-    if (this.currentKeyIndex < this.apiKeys.length - 1) {
-      this.currentKeyIndex++;
-      console.warn(`🔑 Switching to API Key #${this.currentKeyIndex + 1}`);
-      return true;
-    }
-    return false;
+    const prevIndex = this.currentKeyIndex;
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+    console.warn(`🔑 Rotating API Key: #${prevIndex + 1} → #${this.currentKeyIndex + 1} (of ${this.apiKeys.length})`);
+
+    // ✅ Notify external listener to sync key index
+    if (this.onKeyRotate) this.onKeyRotate(this.currentKeyIndex);
+
+    // If we wrapped back to the starting point, all keys have been tried
+    return this.currentKeyIndex !== prevIndex;
   }
 
   /**
    * 1. API Connection: Connect to YouTube API to get liveChatId
    */
-  async fetchLiveChatId(videoId) {
+  async fetchLiveChatId(videoId, _triedKeys = 0) {
     const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${videoId}&key=${this.apiKey}`;
 
     try {
@@ -48,7 +56,9 @@ export class YouTubeLiveChat {
       const data = await response.json();
 
       if (data.error) {
-        if (this.rotateKey()) return this.fetchLiveChatId(videoId);
+        if (_triedKeys < this.apiKeys.length - 1 && this.rotateKey()) {
+          return this.fetchLiveChatId(videoId, _triedKeys + 1);
+        }
         throw new Error(data.error.message);
       }
 
@@ -103,7 +113,7 @@ export class YouTubeLiveChat {
   /**
    * Main Polling Loop (Renamed to loadChat as per requirements)
    */
-  async loadChat() {
+  async loadChat(_rotationAttempts = 0) {
     if (!this.isPolling || !this.liveChatId) return;
 
     const url = new URL(
@@ -132,17 +142,16 @@ export class YouTubeLiveChat {
         if (this.onStatusChange) this.onStatusChange("err");
         this.wasInErrorState = true;
 
-        // ✅ Smarter Rotation Logic
+        // ✅ Smarter Rotation Logic (with cycle limit)
         const errorCode = data.error.code;
         const shouldRotate = errorCode === 403 || errorCode === 429;
 
-        if (shouldRotate) {
-          if (this.rotateKey()) {
-            // Retry immediately with new key
-            this.loadChat();
-            return;
-          }
-        } else {
+        if (shouldRotate && _rotationAttempts < this.apiKeys.length - 1) {
+          this.rotateKey();
+          // Retry immediately with new key
+          this.loadChat(_rotationAttempts + 1);
+          return;
+        } else if (!shouldRotate) {
           console.warn(
             `⚠️ API Error ${errorCode}: Retrying without rotation...`,
           );

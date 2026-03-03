@@ -175,7 +175,7 @@ const DEBUG_MODE = false;
 const logger = { log: (...args) => DEBUG_MODE && console.log(...args) };
 
 const stockStore = useStockStore();
-const { playSfx, queueSpeech } = useAudio();
+const { playSfx, queueAudio } = useAudio();
 const gridContainer = ref(null);
 const highlightedId = ref(null);
 const newOrders = ref(new Set());
@@ -384,7 +384,7 @@ async function saveQueueChanges() {
   if (oldOwnerName && !newOwnerName) {
     // Case 1: Cancel (Deleted)
     playSfx();
-    queueSpeech(`ยกเลิกรายการที่ ${num} ค่ะ`);
+    queueAudio(null, "", `ยกเลิกรายการที่ ${num} ค่ะ`);
   } else if (oldOwnerName && newOwnerName && oldOwnerName !== newOwnerName) {
     // Case 2: Name Changed
     playSfx(); // Always play "Ting" sound
@@ -395,7 +395,7 @@ async function saveQueueChanges() {
 
     if (!isSamePerson) {
       // 📢 Different person -> Announce swap
-      queueSpeech(`${oldOwnerName} หลุดจอง ${newOwnerName}`);
+      queueAudio(null, "", `${oldOwnerName} หลุดจอง ${newOwnerName}`);
     } else {
       // 🤫 Same person (Typo fix) -> Silent update (Only SFX played above)
       logger.log("✏️ Typo fix detected. Silent update.");

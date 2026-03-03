@@ -59,10 +59,6 @@ export function useAudio() {
     }
   }
 
-  function queueSpeech(text) {
-    if (!systemStore.isSoundOn) return;
-    ttsService.speak("", text);
-  }
 
   let activeOscillators = [];
 
@@ -232,7 +228,6 @@ export function useAudio() {
   }
 
   return {
-    queueSpeech, // Legacy
     queueAudio, // ✅ Unified Queue API
     playSfx,
     resetVoice,

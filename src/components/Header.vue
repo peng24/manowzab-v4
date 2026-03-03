@@ -351,6 +351,9 @@ async function toggleConnection() {
       title: "Error",
       text: "ใส่ Video ID ก่อน",
       timer: 2000,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
     });
     return;
   }
@@ -378,6 +381,8 @@ async function toggleConnection() {
         title: "เชื่อมต่อสำเร็จ",
         text: "กำลังอ่านคอมเมนต์จาก YouTube Live",
         timer: 2000,
+        toast: true,
+        position: "top-end",
         showConfirmButton: false,
       });
     } else {
@@ -387,6 +392,9 @@ async function toggleConnection() {
         title: "เชื่อมต่อวิดีโอแล้ว",
         text: "ไม่พบห้องแชทสด (อาจเป็นคลิปย้อนหลัง)",
         timer: 3000,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
       });
     }
   } catch (error) {
@@ -399,6 +407,9 @@ async function toggleConnection() {
       title: "เชื่อมต่อไม่สำเร็จ",
       text: error.message,
       timer: 3000,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
     });
   } finally {
     isConnecting.value = false;
@@ -413,6 +424,9 @@ function downloadCSV() {
       title: "ไม่มีข้อมูล",
       text: "ยังไม่มีข้อความแชทเข้ามา",
       timer: 2000,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
     });
     showDropdown.value = false;
     return;
@@ -423,6 +437,8 @@ function downloadCSV() {
     title: "บันทึกแล้ว",
     text: "ดาวน์โหลด CSV สำเร็จ",
     timer: 1500,
+    toast: true,
+    position: "top-end",
     showConfirmButton: false,
   });
   showDropdown.value = false;
@@ -442,6 +458,9 @@ function toggleFullScreen() {
         icon: "error",
         title: "ไม่สามารถเข้าโหมดเต็มจอได้",
         timer: 2000,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
       });
     });
   } else {
@@ -466,6 +485,8 @@ function toggleAwayMode() {
         title: "โหมดพาลูกนอน",
         text: "ระบบจะซิงค์ไปทุกเครื่อง",
         timer: 2000,
+        toast: true,
+        position: "top-end",
         showConfirmButton: false,
       });
     });
@@ -493,6 +514,8 @@ async function toggleSimulation() {
       title: "เริ่มจำลองแชท",
       text: "กำลังจำลองข้อความแชท...",
       timer: 1500,
+      toast: true,
+      position: "top-end",
       showConfirmButton: false,
     });
     simIntervalId = setInterval(() => {
@@ -527,6 +550,8 @@ async function toggleSimulation() {
       icon: "success",
       title: "หยุดจำลองแล้ว",
       timer: 1500,
+      toast: true,
+      position: "top-end",
       showConfirmButton: false,
     });
   }

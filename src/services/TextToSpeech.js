@@ -15,6 +15,9 @@ export class TextToSpeech {
     this.isGoogleUnlocked = false; // Track Google TTS AudioContext unlock status
     this.stuckTimer = null; // ✅ Safety timer to detect stuck state
     this.STUCK_TIMEOUT = 15000; // ✅ 15 seconds max per utterance
+    this.consecutiveGoogleFailures = 0; // ✅ Track consecutive Google TTS failures
+    this.MAX_CONSECUTIVE_FAILURES = 5; // ✅ Switch to Native permanently after N failures
+    this.googleDisabledPermanently = false; // ✅ Flag for permanent Native mode
 
     // Bind methods
     this.processQueue = this.processQueue.bind(this);
@@ -88,6 +91,24 @@ export class TextToSpeech {
       }
     } catch (e) {
       console.error("❌ AudioContext unlock failed:", e);
+    }
+  }
+
+  /**
+   * ✅ Auto-resume AudioContext — recovers from iPad idle suspension
+   * Called before every speak attempt to ensure audio is ready
+   */
+  async ensureAudioContextReady() {
+    try {
+      if (this.audioCtx.state === "suspended") {
+        console.log("🔄 AudioContext suspended — attempting auto-resume...");
+        await this.audioCtx.resume();
+        console.log("✅ AudioContext resumed successfully");
+      }
+      return this.audioCtx.state === "running";
+    } catch (e) {
+      console.warn("⚠️ AudioContext auto-resume failed:", e);
+      return false;
     }
   }
 
@@ -201,9 +222,9 @@ export class TextToSpeech {
       try {
         console.log(`🔑 Trying key ${i + 1}/${keys.length}...`);
 
-        // Create AbortController with 3-second timeout
+        // Create AbortController with 2-second timeout (fast fallback)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
 
         // Call Google Cloud TTS API
         const response = await fetch(
@@ -247,9 +268,13 @@ export class TextToSpeech {
           bytes[j] = binaryString.charCodeAt(j);
         }
 
-        // ✅ Ensure AudioContext is running
-        if (this.audioCtx.state === "suspended") {
-          await this.audioCtx.resume();
+        // ✅ Ensure AudioContext is running (auto-resume for iPad idle)
+        const isReady = await this.ensureAudioContextReady();
+        if (!isReady) {
+          console.warn("⚠️ AudioContext not running after resume — falling back to Native");
+          this.consecutiveGoogleFailures++;
+          this.speakNative(text);
+          return;
         }
 
         try {
@@ -280,7 +305,9 @@ export class TextToSpeech {
           const systemStore2 = useSystemStore();
           systemStore2.activeKeyIndex = i + 1;
 
-          console.log(`✅ Success with key ${i + 1}`);
+          // ✅ Reset failure counter on success
+          this.consecutiveGoogleFailures = 0;
+          console.log(`✅ Google TTS success with key ${i + 1}`);
           return; // Success! Exit the function
         } catch (decodeErr) {
           console.error("❌ Audio decode error:", decodeErr);
@@ -291,13 +318,15 @@ export class TextToSpeech {
           return;
         }
       } catch (error) {
-        // 🚨 CASE 1: Timeout (Internet Lag)
+        // 🚨 CASE 1: Timeout (Internet Lag / iPad idle)
         if (error.name === "AbortError") {
+          this.consecutiveGoogleFailures++;
           console.warn(
-            `⏳ Key ${i + 1} timed out. Switching to Native for this message.`,
+            `⏳ Key ${i + 1} timed out (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} fails). Fallback to Native.`,
           );
+          this._checkPermanentSwitch();
           this.speakNative(text);
-          return; // Stop the loop, play Native, but KEEP useOnlineTts = true for next time.
+          return;
         }
 
         // 🚨 CASE 2: API Error (403 Quota / 500)
@@ -305,11 +334,12 @@ export class TextToSpeech {
 
         // If this was the last key, and all failed
         if (i === keys.length - 1) {
-          console.error("❌ All Google Keys failed/exhausted.");
+          this.consecutiveGoogleFailures++;
+          console.error(
+            `❌ All Google Keys failed (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} consecutive fails).`,
+          );
+          this._checkPermanentSwitch();
           this.speakNative(text);
-          // Optional: If you want to disable Google permanently when keys are full:
-          // useSystemStore().useOnlineTts = false;
-          // (But for now, leave it true to keep trying as requested)
         }
       }
     }
@@ -415,9 +445,24 @@ export class TextToSpeech {
   }
 
   /**
+   * ✅ Check if Google TTS should be permanently disabled
+   */
+  _checkPermanentSwitch() {
+    if (
+      this.consecutiveGoogleFailures >= this.MAX_CONSECUTIVE_FAILURES &&
+      !this.googleDisabledPermanently
+    ) {
+      this.googleDisabledPermanently = true;
+      console.error(
+        `🔴 Google TTS failed ${this.consecutiveGoogleFailures} times consecutively — switching to Native TTS permanently for this session.`,
+      );
+    }
+  }
+
+  /**
    * Process queue based on system store setting
    */
-  processQueue() {
+  async processQueue() {
     // Stop if queue empty or already speaking
     if (this.queue.length === 0 || this.isSpeaking) {
       return;
@@ -428,13 +473,20 @@ export class TextToSpeech {
     const text = typeof item === "string" ? item : item.text;
     this._currentOnComplete = typeof item === "object" ? item.onComplete : null;
 
+    // ✅ Auto-resume AudioContext before speaking (iPad idle recovery)
+    await this.ensureAudioContextReady();
+
     // ✅ Start stuck detection timer
     this.startStuckTimer();
 
     // Check system store setting
     const systemStore = useSystemStore();
 
-    if (systemStore.useOnlineTts && systemStore.googleApiKey) {
+    if (
+      systemStore.useOnlineTts &&
+      systemStore.googleApiKey &&
+      !this.googleDisabledPermanently
+    ) {
       this.speakOnline(text);
     } else {
       this.speakNative(text);

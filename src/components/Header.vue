@@ -636,16 +636,16 @@ function showChangelog() {
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
         <h4 style="color: #ff9800; margin-bottom: 5px;">🐛 แก้ไขบั๊ก</h4>
         <ul>
-          <li>💥 <b>แก้ Pull-to-Refresh พัง</b> — ChatPanel เรียกเล่นเสียงแต่ไม่ได้ import ฟังก์ชัน ทำให้ error ทุกครั้ง</li>
-          <li>🔔 <b>PWA Update Prompt</b> — เพิ่มปุ่มแจ้งเตือนอัปเดตเวอร์ชั่นใหม่ที่ไม่เคยแสดง</li>
-          <li>⌨️ <b>แก้ keydown listener รั่ว</b> — ตัว unlock audio ไม่ลบ listener keydown ทำให้ยิงซ้ำทุกครั้งที่กดคีย์</li>
-          <li>📛 <b>แก้ชื่อเล่นไม่ sync</b> — Object.assign เขียนข้อมูลผิดที่ทำให้ชื่อเล่นไม่ reactive</li>
-          <li>🧠 <b>แก้ Memory Leak</b> — Firebase listener ใน Dashboard และ Header ไม่เคย cleanup ตอนปิด</li>
-          <li>🎆 <b>แก้พลุยิงตอน reload</b> — เปิดหน้าเว็บใหม่ไม่ยิงพลุ milestone ซ้ำแล้ว</li>
+          <li>🔊 <b>แก้ TTS ไม่อ่านบางข้อความ</b> — ข้อความที่ซื้อซ้ำ, คิวซ้ำ, กำลัง Lock หรือ Order Failed ตอนนี้จะถูกอ่านพูดออกเสียงตามปกติแทนที่จะถูกข้ามไปเงียบๆ</li>
+          <li>🎯 <b>แก้ Chat Emoji-only ไม่อ่าน</b> — ข้อความที่มีเฉพาะ Emoji จะถูก fallback ไปอ่านด้วย MessageRuns</li>
         </ul>
-        <h4 style="color: #f44336; margin-bottom: 5px;">🧹 ทำความสะอาด</h4>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.16.2)</h4>
         <ul>
-          <li>🗑️ ลบ CSS ซ้ำ, แก้ TailwindCSS class ที่ไม่มีผล, ลบ listener ซ้ำซ้อน</li>
+          <li>💥 <b>แก้ Pull-to-Refresh พัง</b> — ChatPanel เรียกเล่นเสียงแต่ไม่ได้ import ฟังก์ชัน</li>
+          <li>🔔 <b>PWA Update Prompt</b> — เพิ่มปุ่มแจ้งเตือนอัปเดตเวอร์ชั่นใหม่ที่ไม่เคยแสดง</li>
+          <li>⌨️ <b>แก้ keydown listener รั่ว</b> — ตัว unlock audio ไม่ลบ listener keydown</li>
+          <li>📛 <b>แก้ชื่อเล่นไม่ sync</b> — Object.assign เขียนข้อมูลผิดที่ทำให้ชื่อเล่นไม่ reactive</li>
+          <li>🧠 <b>แก้ Memory Leak</b> — Firebase listener ใน Dashboard และ Header</li>
         </ul>
         </div>`,
     background: "#1e1e1e",

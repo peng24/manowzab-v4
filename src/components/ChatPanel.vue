@@ -160,7 +160,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
@@ -262,6 +262,24 @@ async function editNickname(chat) {
   }
 }
 
+// ✅ Auto-scroll timer: กลับมาข้อความล่าสุดถ้าเลื่อนขึ้นดูเกิน 15 วินาที
+let autoScrollTimer = null;
+const AUTO_SCROLL_DELAY = 15000; // 15 seconds
+
+function startAutoScrollTimer() {
+  clearAutoScrollTimer();
+  autoScrollTimer = setTimeout(() => {
+    scrollToBottom();
+  }, AUTO_SCROLL_DELAY);
+}
+
+function clearAutoScrollTimer() {
+  if (autoScrollTimer) {
+    clearTimeout(autoScrollTimer);
+    autoScrollTimer = null;
+  }
+}
+
 // ตรวจจับการ Scroll
 function handleScroll() {
   const el = chatViewport.value;
@@ -269,8 +287,16 @@ function handleScroll() {
 
   // ถ้า Scroll ขึ้นไปเกิน 100px จากด้านล่าง ถือว่า user กำลังดูประวัติ
   const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+  const wasScrolling = isUserScrolling;
   isUserScrolling = distanceToBottom > 100;
   showScrollButton.value = isUserScrolling;
+
+  // ✅ เริ่มจับเวลาเมื่อเลื่อนออกจากล่าง, หยุดเมื่อกลับมา
+  if (isUserScrolling && !wasScrolling) {
+    startAutoScrollTimer();
+  } else if (!isUserScrolling) {
+    clearAutoScrollTimer();
+  }
 }
 
 // เลื่อนลงล่างสุด
@@ -284,6 +310,7 @@ function scrollToBottom() {
 
     showScrollButton.value = false;
     isUserScrolling = false;
+    clearAutoScrollTimer();
   }
 }
 
@@ -328,10 +355,11 @@ onMounted(() => {
   if (systemStore.currentVideoId) {
     const cleanup = chatStore.syncFromFirebase(systemStore.currentVideoId);
     console.log("✅ Chat sync initialized for:", systemStore.currentVideoId);
-
-    // Store cleanup function for unmount (if needed)
-    // Note: The watcher below handles video ID changes
   }
+});
+
+onUnmounted(() => {
+  clearAutoScrollTimer();
 });
 
 // ✅ Watch for Video ID changes to re-sync
@@ -620,6 +648,30 @@ async function refreshChat() {
   display: flex;
   align-items: flex-start;
   gap: 5px; /* ✅ Reduced gap */
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: background-color 0.2s;
+}
+
+/* ✅ Chat Row Backgrounds by Type */
+.chat-row.buy {
+  background: rgba(16, 185, 129, 0.08);
+  border-left: 3px solid #10b981;
+}
+
+.chat-row.cancel {
+  background: rgba(244, 63, 94, 0.08);
+  border-left: 3px solid #f43f5e;
+}
+
+.chat-row.shipping {
+  background: rgba(168, 85, 247, 0.08);
+  border-left: 3px solid #a855f7;
+}
+
+.chat-row.admin {
+  background: rgba(245, 158, 11, 0.06);
+  border-left: 3px solid #f59e0b;
 }
 
 /* ✅ TransitionGroup Animations */
@@ -761,23 +813,31 @@ async function refreshChat() {
 }
 
 .badge-buy {
-  background-color: #c6f6d5; /* สีเขียวมินต์ */
-  color: #1c4532; /* สีเขียวเข้มจัด */
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
 }
 
 .badge-cancel {
-  background-color: #fed7d7; /* สีแดงพาสเทล */
-  color: #742a2a; /* สีแดงเข้ม */
+  background: linear-gradient(135deg, #f43f5e, #e11d48);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.4);
 }
 
 .badge-shipping {
-  background-color: #bee3f8; /* สีฟ้าสว่าง */
-  color: #234e52; /* สีกรมท่า/ฟ้าเข้ม */
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);
 }
 
 .badge-question {
-  background-color: #feebc8; /* สีส้มพีช */
-  color: #7b341e; /* สีส้มอิฐเข้ม */
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
 }
 
 .status-emoji-only {
@@ -796,24 +856,27 @@ async function refreshChat() {
 
 /* Special Types */
 .chat-row.buy .chat-bubble {
-  background-color: rgba(6, 78, 59, 0.4); /* Semi-transparent green */
-  border: 2px solid #10b981; /* Brighter green border */
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3); /* Subtle green glow */
-  color: #f1f5f9; /* Ensure white text */
+  background-color: rgba(16, 185, 129, 0.12);
+  border: 1.5px solid rgba(16, 185, 129, 0.5);
+  border-left: 3px solid #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+  color: #f1f5f9;
 }
 
 .chat-row.cancel .chat-bubble {
-  background-color: rgba(127, 29, 29, 0.4); /* Semi-transparent red */
-  border: 2px solid #ef4444; /* Brighter red border */
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3); /* Subtle red glow */
-  color: #f1f5f9; /* Ensure white text */
+  background-color: rgba(244, 63, 94, 0.12);
+  border: 1.5px solid rgba(244, 63, 94, 0.5);
+  border-left: 3px solid #f43f5e;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.15);
+  color: #f1f5f9;
 }
 
 .chat-row.shipping .chat-bubble {
-  background-color: #581c87 !important; /* Solid purple background */
-  border: 2px solid #a855f7; /* Brighter purple border */
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3); /* Subtle purple glow */
-  color: #f1f5f9; /* Ensure white text */
+  background-color: rgba(168, 85, 247, 0.12);
+  border: 1.5px solid rgba(168, 85, 247, 0.5);
+  border-left: 3px solid #a855f7;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.15);
+  color: #f1f5f9;
 }
 
 .chat-row.admin .chat-bubble {

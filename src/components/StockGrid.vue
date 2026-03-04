@@ -122,19 +122,33 @@
                     <i class="fa-solid fa-grip-vertical"></i>
                   </div>
                   <span class="queue-rank">#{{ index + 1 }}</span>
-                  <input
-                    type="text"
-                    v-model="person.owner"
-                    class="queue-input"
-                    list="buyer-options"
-                  />
-                  <datalist id="buyer-options">
-                    <option
-                      v-for="name in uniqueBuyerNames"
-                      :key="name"
-                      :value="name"
+                  <div class="autocomplete-wrapper">
+                    <input
+                      type="text"
+                      v-model="person.owner"
+                      class="queue-input"
+                      :ref="el => setQueueInputRef(el, index)"
+                      @input="onAutocompleteInput(index)"
+                      @focus="onAutocompleteFocus(index)"
+                      @blur="onAutocompleteBlur"
+                      @keydown="handleAutocompleteKeydown($event, index)"
+                      autocomplete="off"
                     />
-                  </datalist>
+                    <div
+                      v-if="activeAutocompleteIdx === index && filteredSuggestions.length > 0"
+                      class="autocomplete-dropdown"
+                    >
+                      <div
+                        v-for="(suggestion, sIdx) in filteredSuggestions"
+                        :key="suggestion"
+                        class="autocomplete-item"
+                        :class="{ active: sIdx === highlightedSuggestionIdx }"
+                        @mousedown.prevent="selectSuggestion(suggestion, index)"
+                      >
+                        <span v-html="highlightMatch(suggestion, person.owner)"></span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div class="queue-actions">
                   <button
@@ -208,6 +222,15 @@ const editingId = ref(null);
 const editingPrice = ref(0);
 const tempQueue = ref([]);
 let draggingIndex = null;
+
+// ✅ Autocomplete State
+const activeAutocompleteIdx = ref(null);
+const highlightedSuggestionIdx = ref(-1);
+const queueInputRefs = ref({});
+
+function setQueueInputRef(el, index) {
+  if (el) queueInputRefs.value[index] = el;
+}
 
 const soldCount = computed(
   () => Object.values(stockStore.stockData).filter((item) => item.owner).length,
@@ -352,11 +375,83 @@ function removeQueueItem(index) {
 }
 function manualReserve() {
   tempQueue.value.push({
-    owner: "ลูกค้าใหม่",
+    owner: "",
     uid: "manual-" + Date.now(),
     time: Date.now(),
     source: "manual",
   });
+  // Auto-focus the new input
+  nextTick(() => {
+    const newIndex = tempQueue.value.length - 1;
+    const el = queueInputRefs.value[newIndex];
+    if (el) el.focus();
+  });
+}
+
+// ✅ Autocomplete Logic
+const filteredSuggestions = computed(() => {
+  if (activeAutocompleteIdx.value === null) return [];
+  const person = tempQueue.value[activeAutocompleteIdx.value];
+  if (!person) return [];
+  const query = (person.owner || "").trim().toLowerCase();
+  if (!query) return uniqueBuyerNames.value.slice(0, 10);
+  return uniqueBuyerNames.value
+    .filter((name) => name.toLowerCase().includes(query) && name.toLowerCase() !== query)
+    .slice(0, 10);
+});
+
+function onAutocompleteInput(index) {
+  activeAutocompleteIdx.value = index;
+  highlightedSuggestionIdx.value = -1;
+}
+
+function onAutocompleteFocus(index) {
+  activeAutocompleteIdx.value = index;
+  highlightedSuggestionIdx.value = -1;
+}
+
+function onAutocompleteBlur() {
+  // Delay to allow mousedown on suggestion
+  setTimeout(() => {
+    activeAutocompleteIdx.value = null;
+    highlightedSuggestionIdx.value = -1;
+  }, 150);
+}
+
+function selectSuggestion(name, index) {
+  tempQueue.value[index].owner = name;
+  activeAutocompleteIdx.value = null;
+  highlightedSuggestionIdx.value = -1;
+}
+
+function handleAutocompleteKeydown(event, index) {
+  const suggestions = filteredSuggestions.value;
+  if (suggestions.length === 0) return;
+
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    highlightedSuggestionIdx.value = Math.min(
+      highlightedSuggestionIdx.value + 1,
+      suggestions.length - 1,
+    );
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    highlightedSuggestionIdx.value = Math.max(highlightedSuggestionIdx.value - 1, 0);
+  } else if (event.key === "Enter" && highlightedSuggestionIdx.value >= 0) {
+    event.preventDefault();
+    selectSuggestion(suggestions[highlightedSuggestionIdx.value], index);
+  } else if (event.key === "Escape") {
+    activeAutocompleteIdx.value = null;
+    highlightedSuggestionIdx.value = -1;
+  }
+}
+
+function highlightMatch(text, query) {
+  if (!query) return text;
+  const q = query.trim();
+  if (!q) return text;
+  const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  return text.replace(regex, '<span class="autocomplete-highlight">$1</span>');
 }
 
 async function saveQueueChanges() {

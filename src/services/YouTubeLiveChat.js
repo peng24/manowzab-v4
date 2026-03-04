@@ -1,7 +1,7 @@
 export class YouTubeLiveChat {
-  constructor(apiKeys) {
+  constructor(apiKeys, initialKeyIndex = 0) {
     this.apiKeys = Array.isArray(apiKeys) ? apiKeys : [apiKeys];
-    this.currentKeyIndex = 0;
+    this.currentKeyIndex = initialKeyIndex % this.apiKeys.length;
     this.liveChatId = null;
     this.nextPageToken = null;
     this.pollingInterval = 5000;

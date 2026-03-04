@@ -16,6 +16,22 @@ if (API_KEYS.length === 0) {
   throw new Error("Missing YouTube API Keys");
 }
 
+// ✅ Round-Robin: โหลด key index ล่าสุดจาก localStorage แล้วเริ่มจาก key ถัดไป
+const STORAGE_KEY = "ytApiKeyIndex";
+function getNextKeyIndex() {
+  const lastIndex = parseInt(localStorage.getItem(STORAGE_KEY) || "0");
+  const nextIndex = (lastIndex + 1) % API_KEYS.length;
+  localStorage.setItem(STORAGE_KEY, String(nextIndex));
+  console.log(
+    `🔑 Round-Robin: เริ่มจาก Key #${nextIndex + 1}/${API_KEYS.length} (ครั้งก่อนใช้ #${lastIndex + 1})`,
+  );
+  return nextIndex;
+}
+
+function saveKeyIndex(index) {
+  localStorage.setItem(STORAGE_KEY, String(index));
+}
+
 /**
  * Composable for managing YouTube Live connection.
  * Handles API connection, chat polling, viewer counts, and disconnect logic.
@@ -26,11 +42,16 @@ export function useYouTube() {
 
   const activeChatId = ref("");
   const viewerIntervalId = ref(null);
-  const chatService = new YouTubeLiveChat(API_KEYS);
 
-  // ✅ Sync key index: when chat polling rotates keys, update the store
+  // ✅ เริ่มจาก key ถัดจากครั้งก่อน (Round-Robin)
+  const initialKeyIndex = getNextKeyIndex();
+  const chatService = new YouTubeLiveChat(API_KEYS, initialKeyIndex);
+  systemStore.currentKeyIndex = initialKeyIndex;
+
+  // ✅ Sync key index: when chat polling rotates keys, update the store + localStorage
   chatService.onKeyRotate = (newIndex) => {
     systemStore.currentKeyIndex = newIndex;
+    saveKeyIndex(newIndex);
   };
 
   // Link Service Status to Store
@@ -67,6 +88,7 @@ export function useYouTube() {
           systemStore.currentKeyIndex =
             (systemStore.currentKeyIndex + 1) % API_KEYS.length;
           chatService.currentKeyIndex = systemStore.currentKeyIndex;
+          saveKeyIndex(systemStore.currentKeyIndex);
           console.warn(
             `🔑 smartFetch: Rotated to key #${systemStore.currentKeyIndex + 1} (attempt ${_depth + 2}/${API_KEYS.length})`,
           );

@@ -55,21 +55,30 @@ export const useStockStore = defineStore("stock", () => {
           }
         });
 
-        // ✅ Check Milestones for Celebration (50%, 80%, 100%)
-        const currentSize = stockSize.value > 0 ? stockSize.value : 70;
-        const percentage = (totalItems / currentSize) * 100;
+        // ✅ Check Milestones for Celebration (50%, 80%, 100%) — Skip on initial load
+        if (!isInitialLoad) {
+          const currentSize = stockSize.value > 0 ? stockSize.value : 70;
+          const percentage = (totalItems / currentSize) * 100;
 
-        if (percentage >= 50 && !milestones.value.fifty) {
-          triggerCelebration(50);
-          milestones.value.fifty = true;
-        }
-        if (percentage >= 80 && !milestones.value.eighty) {
-          triggerCelebration(80);
-          milestones.value.eighty = true;
-        }
-        if (percentage >= 100 && !milestones.value.hundred) {
-          triggerCelebration(100);
-          milestones.value.hundred = true;
+          if (percentage >= 50 && !milestones.value.fifty) {
+            triggerCelebration(50);
+            milestones.value.fifty = true;
+          }
+          if (percentage >= 80 && !milestones.value.eighty) {
+            triggerCelebration(80);
+            milestones.value.eighty = true;
+          }
+          if (percentage >= 100 && !milestones.value.hundred) {
+            triggerCelebration(100);
+            milestones.value.hundred = true;
+          }
+        } else {
+          // ✅ On initial load, just mark already-passed milestones as done
+          const currentSize = stockSize.value > 0 ? stockSize.value : 70;
+          const percentage = (totalItems / currentSize) * 100;
+          if (percentage >= 50) milestones.value.fifty = true;
+          if (percentage >= 80) milestones.value.eighty = true;
+          if (percentage >= 100) milestones.value.hundred = true;
         }
 
         const historyRef = dbRef(db, `history/${videoId}`);

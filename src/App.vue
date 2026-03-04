@@ -5,6 +5,7 @@
 
     <!-- ✅ Normal Mode -->
     <template v-else>
+      <UpdatePrompt />
       <Header />
 
       <div v-if="systemStore.isAway" class="away-banner">
@@ -57,6 +58,7 @@ import Dashboard from "./components/Dashboard.vue";
 import HistoryModal from "./components/HistoryModal.vue";
 
 import LiveOverlay from "./components/LiveOverlay.vue"; // ✅ Import Overlay
+import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
@@ -102,9 +104,10 @@ async function handleFirstInteraction() {
   const unlocked = await unlockAudio(); // Unlocks all audio systems
 
   if (unlocked) {
-    // Remove listeners to prevent duplicate calls
+    // Remove ALL listeners to prevent duplicate calls
     document.removeEventListener("click", handleFirstInteraction);
     document.removeEventListener("touchstart", handleFirstInteraction);
+    document.removeEventListener("keydown", handleFirstInteraction);
     logger.log("✅ Audio unlocked on first interaction");
   }
 }
@@ -231,14 +234,7 @@ onMounted(async () => {
   });
   cleanupFns.push(unsubActiveVideo);
 
-  const unsubSettings = onValue(
-    dbRef(db, "settings/" + systemStore.currentVideoId + "/stockSize"),
-    (snap) => {
-      const val = snap.val();
-      if (val) stockStore.stockSize = val;
-    },
-  );
-  cleanupFns.push(unsubSettings);
+  // ✅ stockSize listener is already handled inside connectToStock()
 
   const unsubAi = onValue(dbRef(db, "system/aiCommander"), (snap) => {
     const data = snap.val();

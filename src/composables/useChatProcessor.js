@@ -17,7 +17,6 @@ const savedNamesCache = ref({});
 onValue(dbRef(db, "nicknames"), (snapshot) => {
   const data = snapshot.val() || {};
   savedNamesCache.value = data;
-  Object.assign(savedNamesCache, data);
 
   // ✅ Reactive Update: อัปเดตชื่อในแชทเก่าทันที
   const chatStore = useChatStore();

@@ -210,7 +210,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useChatStore } from "../stores/chat";
@@ -473,16 +473,24 @@ function syncChatFromMemory() {
 }
 
 
+const cleanupFns = [];
+
 onMounted(() => {
   // Listen to shipping data
-  onValue(dbRef(db, "shipping"), (snapshot) => {
+  const unsubShipping = onValue(dbRef(db, "shipping"), (snapshot) => {
     shippingData.value = snapshot.val() || {};
   });
+  cleanupFns.push(unsubShipping);
 
   // Listen to saved names
-  onValue(dbRef(db, "nicknames"), (snapshot) => {
+  const unsubNames = onValue(dbRef(db, "nicknames"), (snapshot) => {
     savedNames.value = snapshot.val() || {};
   });
+  cleanupFns.push(unsubNames);
+});
+
+onUnmounted(() => {
+  cleanupFns.forEach(fn => fn && fn());
 });
 </script>
 

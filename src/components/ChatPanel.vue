@@ -172,7 +172,7 @@ import Swal from "sweetalert2";
 const chatStore = useChatStore();
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
-const { resetVoice } = useAudio();
+const { resetVoice, playSfx } = useAudio();
 
 const chatViewport = ref(null);
 const showScrollButton = ref(false);
@@ -634,7 +634,6 @@ async function refreshChat() {
   padding-bottom: calc(
     20px + env(safe-area-inset-bottom)
   ); /* ✅ Safe Area for Mobile */
-  scroll-behavior: smooth;
   scroll-behavior: smooth;
 }
 

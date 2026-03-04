@@ -11,7 +11,7 @@ import { extractMessageRuns } from "../services/YouTubeLiveChat";
 import Swal from "sweetalert2";
 import { watch } from "vue";
 import { logger } from "../utils/logger";
-import { triggerCelebration } from "../utils/celebration";
+
 // Saved names cache
 const savedNamesCache = ref({});
 onValue(dbRef(db, "nicknames"), (snapshot) => {
@@ -198,8 +198,6 @@ export function useChatProcessor() {
         .filter((n) => n > 0);
 
       if (itemIds.length > 0) {
-        // 🎉 Confetti! Buy intent detected
-        triggerCelebration();
         // ✅ Auto-Expand Stock for Multi-Buy
         const maxId = Math.max(...itemIds);
         if (maxId > stockStore.stockSize) {
@@ -374,8 +372,6 @@ export function useChatProcessor() {
 
     // 5. Process Order & Audio Logic (Updated with SFX)
     if (intent === "buy" && targetId > 0) {
-      // 🎉 Confetti! Buy intent detected
-      triggerCelebration();
       // ✅ Auto-Expand Stock for Single Buy
       if (targetId > stockStore.stockSize) {
         const newSize = Math.ceil(targetId / 10) * 10;

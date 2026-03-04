@@ -630,23 +630,10 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ปรับปรุงใหม่</h4>
-        <ul>
-          <li>🔊 <b>TTS Resilience</b> — Auto-resume AudioContext บน iPad, Google TTS timeout 2 วิ, สลับ Native อัตโนมัติหลังล้มเหลว 5 ครั้ง</li>
-          <li>🔑 <b>Unified Key Rotation</b> — YouTube API + Google TTS ใช้ระบบสลับคีย์เดียวกัน, wrap-around กลับคีย์แรกเมื่อ quota reset</li>
-          <li>🎵 <b>Audio Queue Refactor</b> — ลบ queueSpeech ซ้ำซ้อน, ทุกเสียงผ่านคิวเดียว ไม่มีเสียงทับกัน</li>
-        </ul>
         <h4 style="color: #ff9800; margin-bottom: 5px;">🐛 แก้ไขบั๊ก</h4>
         <ul>
-          <li>📦 <b>Popup ไม่บัง Stock Grid</b> — แจ้งเตือนทั้งหมดเปลี่ยนเป็น Toast (มุมขวาบน)</li>
-          <li>🎉 <b>Confetti ทุกออเดอร์</b> — ยิง confetti ทันทีเมื่อตรวจจับ buy intent</li>
-        </ul>
-        <h4 style="color: #f44336; margin-bottom: 5px;">🧹 ทำความสะอาด</h4>
-        <ul>
-          <li>🗑️ ลบไฟล์ที่ไม่ได้ใช้ 5 ไฟล์ (HelloWorld, performance.js, registerServiceWorker, style.css สำเนา, types/)</li>
-          <li>✂️ ลบ CSS ซ้ำซ้อน + orphan code จาก Voice feature เก่า</li>
-          <li>📝 ลบ analyzeChat() dead code ออกจาก useGemini.js</li>
-          <li>📄 อัปเดตเอกสาร AI_RULES, README, SFX Implementation ให้ตรง v4.15</li>
+          <li>🎉 <b>Confetti Milestone</b> — ยิงพลุเฉพาะเมื่อยอดขายครบ 50%, 80%, 100% (ไม่ยิงทุกออเดอร์แล้ว)</li>
+          <li>🎆 <b>เพิ่ม 100% Milestone</b> — เพิ่มจุดยิงพลุตอนขายครบ 100% พร้อม reset เมื่อเคลียร์สต๊อก</li>
         </ul>
         </div>`,
     background: "#1e1e1e",

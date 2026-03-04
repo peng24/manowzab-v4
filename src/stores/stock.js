@@ -24,7 +24,7 @@ export const useStockStore = defineStore("stock", () => {
   const stockSize = ref(70);
 
   /** @type {import('vue').Ref<Object>} Tracks which percentage milestones have been celebrated */
-  const milestones = ref({ fifty: false, eighty: false });
+  const milestones = ref({ fifty: false, eighty: false, hundred: false });
 
   const systemStore = useSystemStore();
 
@@ -55,7 +55,7 @@ export const useStockStore = defineStore("stock", () => {
           }
         });
 
-        // ✅ Check Milestones for Celebration (50%, 80%)
+        // ✅ Check Milestones for Celebration (50%, 80%, 100%)
         const currentSize = stockSize.value > 0 ? stockSize.value : 70;
         const percentage = (totalItems / currentSize) * 100;
 
@@ -66,6 +66,10 @@ export const useStockStore = defineStore("stock", () => {
         if (percentage >= 80 && !milestones.value.eighty) {
           triggerCelebration(80);
           milestones.value.eighty = true;
+        }
+        if (percentage >= 100 && !milestones.value.hundred) {
+          triggerCelebration(100);
+          milestones.value.hundred = true;
         }
 
         const historyRef = dbRef(db, `history/${videoId}`);
@@ -218,7 +222,7 @@ export const useStockStore = defineStore("stock", () => {
    */
   function clearAllStock() {
     remove(dbRef(db, `stock/${systemStore.currentVideoId}`));
-    milestones.value = { fifty: false, eighty: false }; // ✅ Reset milestones for the next round
+    milestones.value = { fifty: false, eighty: false, hundred: false }; // ✅ Reset milestones for the next round
   }
 
   /**

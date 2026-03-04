@@ -630,10 +630,10 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🐛 แก้ไขบั๊ก</h4>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ปรับปรุงใหม่</h4>
         <ul>
-          <li>🎉 <b>Confetti Milestone</b> — ยิงพลุเฉพาะเมื่อยอดขายครบ 50%, 80%, 100% (ไม่ยิงทุกออเดอร์แล้ว)</li>
-          <li>🎆 <b>เพิ่ม 100% Milestone</b> — เพิ่มจุดยิงพลุตอนขายครบ 100% พร้อม reset เมื่อเคลียร์สต๊อก</li>
+          <li>🔇 <b>ไม่แจ้งเตือนซ้ำ/เต็ม</b> — ลบ Error Toast และเสียง Error SFX เมื่อจองซ้ำหรือสินค้าเต็ม ระบบจะข้ามไปเงียบๆ</li>
+          <li>📋 <b>ระบบคิวอัตโนมัติ</b> — ถ้าสินค้ามีคนจองแล้ว จะเข้าคิวแทน เมื่อยกเลิกคิวถัดไปขึ้นมาอัตโนมัติ</li>
         </ul>
         </div>`,
     background: "#1e1e1e",

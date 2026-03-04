@@ -127,7 +127,12 @@ export function useChatProcessor() {
     if (!item.snippet || !item.authorDetails) return;
 
     const msg = item.snippet.displayMessage || "";
-    if (!msg) return;
+    if (!msg) {
+      // ถ้าไม่มี displayMessage → ลอง fallback จาก messageRuns (emoji-only etc.)
+      const runs = extractMessageRuns(item);
+      const fallbackText = runs.map(r => r.text || '').join('').trim();
+      if (!fallbackText) return; // ไม่มีข้อความจริงๆ → ข้าม
+    }
 
     // ✅ Normalize Thai numerals → Arabic digits for regex matching
     const normalizedMsg = thaiToArabic(msg);
@@ -410,7 +415,9 @@ export function useChatProcessor() {
 
       try {
         if (processingLocks.has(targetId)) {
-          return; // ✅ Silently skip — already processing
+          // ✅ ยังอ่านข้อความแม้ item กำลังถูกประมวลผล
+          queueAudio(null, phoneticName, msg);
+          return;
         }
         processingLocks.add(targetId);
 
@@ -424,13 +431,15 @@ export function useChatProcessor() {
           method,
         );
 
-        // ✅ Silently skip if already owned or already in queue
+        // ✅ ยังอ่านข้อความแม้ซื้อซ้ำ/อยู่ในคิวแล้ว
         if (result.action === "already_owned" || result.action === "already_queued") {
+          queueAudio(null, phoneticName, msg);
           return;
         }
 
         if (!result.success) {
           logger.warn("Order failed:", result.error);
+          queueAudio(null, phoneticName, msg);
           return;
         }
 

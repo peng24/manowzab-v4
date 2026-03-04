@@ -411,11 +411,11 @@ export function useChatProcessor() {
 
       try {
         if (processingLocks.has(targetId)) {
-          throw new Error("คิวเต็ม/ซ้ำแล้ว");
+          return; // ✅ Silently skip — already processing
         }
         processingLocks.add(targetId);
 
-        // ✅ Try to process order
+        // ✅ Try to process order (auto-queues if item is taken)
         const result = await stockStore.processOrder(
           targetId,
           ownerName,
@@ -425,16 +425,14 @@ export function useChatProcessor() {
           method,
         );
 
-        if (
-          !result.success ||
-          (result.action !== "claimed" && result.action !== "queued")
-        ) {
-          throw new Error(
-            result.error ||
-              (result.action === "already_owned"
-                ? "ซ้ำแล้ว"
-                : "เต็มแล้ว/อื่นๆ"),
-          );
+        // ✅ Silently skip if already owned or already in queue
+        if (result.action === "already_owned" || result.action === "already_queued") {
+          return;
+        }
+
+        if (!result.success) {
+          logger.warn("Order failed:", result.error);
+          return;
         }
 
         // ✅ Success - Show Toast
@@ -445,21 +443,6 @@ export function useChatProcessor() {
 
         // ✅ Queue SUCCESS SFX + TTS (non-blocking)
         queueAudio("success", phoneticName, msg);
-      } catch (error) {
-        // ✅ Error - Item might be sold out or other issue
-        if (error.message && (error.message.includes("ซ้ำแล้ว") || error.message.includes("เต็มแล้ว"))) {
-          logger.warn("Order skipped:", error.message);
-        } else {
-          logger.error("Order failed:", error);
-        }
-
-        Toast.fire({
-          icon: "error",
-          title: `❌ ตัดไม่ได้: ${error.message || "เต็มแล้ว"}`,
-        });
-
-        // ✅ Queue ERROR SFX + TTS (non-blocking)
-        queueAudio("error", phoneticName, msg);
       } finally {
         processingLocks.delete(targetId);
       }

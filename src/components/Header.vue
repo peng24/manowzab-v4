@@ -72,14 +72,17 @@
 
       <!-- TTS Toggle - Vibrant Blue Gradient (Fixed) -->
       <button
-        :class="['btn', 'relative', 'border-0', 'text-white']"
+        :class="['btn']"
         :style="{
           background: systemStore.useOnlineTts
-            ? 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)' // Vivid Blue Gradient
-            : 'linear-gradient(135deg, #4B5563 0%, #374151 100%)', // Dark Gray
+            ? 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)'
+            : 'linear-gradient(135deg, #4B5563 0%, #374151 100%)',
           boxShadow: systemStore.useOnlineTts
             ? '0 4px 15px rgba(0, 114, 255, 0.4)'
             : 'none',
+          border: 'none',
+          color: 'white',
+          position: 'relative',
         }"
         @click="toggleTtsMode"
         :title="
@@ -91,17 +94,17 @@
         <!-- Icon -->
         <i
           :class="[
-            'text-lg drop-shadow-sm',
             systemStore.useOnlineTts
               ? 'fa-solid fa-cloud'
               : 'fa-solid fa-robot',
           ]"
+          style="font-size: 1.1em; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
         ></i>
 
         <!-- Key Index Number -->
         <span
           v-if="systemStore.useOnlineTts"
-          class="ml-2 text-lg font-bold font-mono drop-shadow-sm"
+          style="margin-left: 6px; font-size: 1.1em; font-weight: bold; font-family: monospace; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
         >
           {{ systemStore.activeKeyIndex }}
         </span>
@@ -219,6 +222,7 @@ const shippingData = ref({});
 const dropdownRef = ref(null);
 const dropdownStyle = ref({});
 let simIntervalId = null;
+let unsubShipping = null;
 
 // ✅ Watcher: ซิงค์รหัส Video ID จาก Firebase (ถ้าเครื่องอื่นเปลี่ยน เครื่องนี้เปลี่ยนด้วย)
 watch(
@@ -608,7 +612,7 @@ function forceUpdate() {
   }).then((result) => {
     if (result.isConfirmed) {
       localStorage.removeItem("app_version");
-      window.location.reload(true);
+      window.location.reload();
     }
   });
   showDropdown.value = false;
@@ -630,13 +634,18 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ปรับปรุงใหม่</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🐛 แก้ไขบั๊ก</h4>
         <ul>
-          <li>🔍 <b>Custom Autocomplete</b> — พิมพ์ชื่อในหน้าแก้ไขรายการ จะแนะนำชื่อจากรายชื่อลูกค้าเดิม รองรับ Keyboard ↑↓/Enter/Escape</li>
-          <li>🎨 <b>สีแชทใหม่</b> — ปรับสี Badge และพื้นหลังแชท จอง(เขียว) ยกเลิก(แดง) ส่งเลย(ม่วง) ให้สวยชัดเจนขึ้น</li>
-          <li>⏱️ <b>Auto-Scroll 15 วินาที</b> — ถ้าเลื่อนดูแชทเก่าเกิน 15 วินาที จะเด้งกลับมาข้อความล่าสุดอัตโนมัติ</li>
-          <li>➕ <b>เพิ่มชื่อ Auto-Focus</b> — กดเพิ่มชื่อแล้ว cursor จะไปที่ช่องใหม่ทันที</li>
-          <li>🔑 <b>Round-Robin API Key</b> — กระจายการใช้งาน YouTube API Key ทุกตัวให้สม่ำเสมอ ไม่ใช้แค่ key แรก</li>
+          <li>💥 <b>แก้ Pull-to-Refresh พัง</b> — ChatPanel เรียกเล่นเสียงแต่ไม่ได้ import ฟังก์ชัน ทำให้ error ทุกครั้ง</li>
+          <li>🔔 <b>PWA Update Prompt</b> — เพิ่มปุ่มแจ้งเตือนอัปเดตเวอร์ชั่นใหม่ที่ไม่เคยแสดง</li>
+          <li>⌨️ <b>แก้ keydown listener รั่ว</b> — ตัว unlock audio ไม่ลบ listener keydown ทำให้ยิงซ้ำทุกครั้งที่กดคีย์</li>
+          <li>📛 <b>แก้ชื่อเล่นไม่ sync</b> — Object.assign เขียนข้อมูลผิดที่ทำให้ชื่อเล่นไม่ reactive</li>
+          <li>🧠 <b>แก้ Memory Leak</b> — Firebase listener ใน Dashboard และ Header ไม่เคย cleanup ตอนปิด</li>
+          <li>🎆 <b>แก้พลุยิงตอน reload</b> — เปิดหน้าเว็บใหม่ไม่ยิงพลุ milestone ซ้ำแล้ว</li>
+        </ul>
+        <h4 style="color: #f44336; margin-bottom: 5px;">🧹 ทำความสะอาด</h4>
+        <ul>
+          <li>🗑️ ลบ CSS ซ้ำ, แก้ TailwindCSS class ที่ไม่มีผล, ลบ listener ซ้ำซ้อน</li>
         </ul>
         </div>`,
     background: "#1e1e1e",
@@ -649,7 +658,7 @@ function showChangelog() {
 
 onMounted(() => {
   logger.log("🎯 Header mounted");
-  onValue(dbRef(db, "shipping"), (snapshot) => {
+  unsubShipping = onValue(dbRef(db, "shipping"), (snapshot) => {
     shippingData.value = snapshot.val() || {};
   });
   document.addEventListener("click", handleClickOutside);
@@ -661,6 +670,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   logger.log("👋 Header unmounting");
+  if (unsubShipping) unsubShipping();
   document.removeEventListener("click", handleClickOutside);
   if (simIntervalId) clearInterval(simIntervalId);
   if (videoId.value) localStorage.setItem("lastVideoId", videoId.value);

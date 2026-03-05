@@ -634,18 +634,18 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🐛 แก้ไขบั๊ก</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🐛 อัปเดตล่าสุด (4.16.5)</h4>
+        <ul>
+          <li>🗣️ <b>แก้ปัญหาหุ่นยนต์สะกดชื่อ</b> — ป้องกันระบบอ่านสะกดชื่อเล่นสั้นๆ เป็นทีละตัวอักษร (เช่น "ปอ" เป็น "ปอ-ออ" หรือ "เอ" เป็น "ออ-เอ") โดยระบบจะเติมคำว่า "คุณ" นำหน้าชื่อที่ไม่มีคำนำหน้าให้อัตโนมัติ เพื่อบังคับให้ AI ออกเสียงเป็นชื่อคนอย่างถูกต้องและไพเราะขึ้น</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.16.4)</h4>
+        <ul>
+          <li>🔊 <b>เพิ่มเสียงเตือน (Error) กรณีของซ้ำ/คิวเต็ม</b> — เมื่อมีลูกค้าพิมพ์สั่งซื้อเข้ามา แต่รหัสสินค้านั้นมีคนได้ไปแล้ว หรือกำลังประมวลผลอยู่ ระบบจะอ่านแชทพร้อมส่งเสียง "Error" เพื่อให้แม่ค้ารู้ว่า "ระบบอ่านแล้วแต่ไม่ได้ของ" (แก้ปัญหาแม่ค้าคิดว่าระบบไม่อ่านแชท)</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.16.3)</h4>
         <ul>
           <li>🔊 <b>แก้ TTS ไม่อ่านบางข้อความ</b> — ข้อความที่ซื้อซ้ำ, คิวซ้ำ, กำลัง Lock หรือ Order Failed ตอนนี้จะถูกอ่านพูดออกเสียงตามปกติแทนที่จะถูกข้ามไปเงียบๆ</li>
           <li>🎯 <b>แก้ Chat Emoji-only ไม่อ่าน</b> — ข้อความที่มีเฉพาะ Emoji จะถูก fallback ไปอ่านด้วย MessageRuns</li>
-        </ul>
-        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.16.2)</h4>
-        <ul>
-          <li>💥 <b>แก้ Pull-to-Refresh พัง</b> — ChatPanel เรียกเล่นเสียงแต่ไม่ได้ import ฟังก์ชัน</li>
-          <li>🔔 <b>PWA Update Prompt</b> — เพิ่มปุ่มแจ้งเตือนอัปเดตเวอร์ชั่นใหม่ที่ไม่เคยแสดง</li>
-          <li>⌨️ <b>แก้ keydown listener รั่ว</b> — ตัว unlock audio ไม่ลบ listener keydown</li>
-          <li>📛 <b>แก้ชื่อเล่นไม่ sync</b> — Object.assign เขียนข้อมูลผิดที่ทำให้ชื่อเล่นไม่ reactive</li>
-          <li>🧠 <b>แก้ Memory Leak</b> — Firebase listener ใน Dashboard และ Header</li>
         </ul>
         </div>`,
     background: "#1e1e1e",

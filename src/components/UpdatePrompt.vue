@@ -32,8 +32,9 @@ function close() {
 <style scoped>
 .pwa-toast {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
   background-color: #1e293b;
   color: white;
   padding: 16px;

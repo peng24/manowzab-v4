@@ -415,8 +415,8 @@ export function useChatProcessor() {
 
       try {
         if (processingLocks.has(targetId)) {
-          // ✅ ยังอ่านข้อความแม้ item กำลังถูกประมวลผล
-          queueAudio(null, phoneticName, msg);
+          // ✅ ยังอ่านข้อความแม้ item กำลังถูกประมวลผล (เพิ่มเสียง error ให้รู้ว่าชนกัน)
+          queueAudio("error", phoneticName, msg);
           return;
         }
         processingLocks.add(targetId);
@@ -431,15 +431,15 @@ export function useChatProcessor() {
           method,
         );
 
-        // ✅ ยังอ่านข้อความแม้ซื้อซ้ำ/อยู่ในคิวแล้ว
+        // ✅ ยังอ่านข้อความแม้ซื้อซ้ำ/อยู่ในคิวแล้ว (เพิ่มเสียง error ให้รู้ว่าไม่อ่านข้าม)
         if (result.action === "already_owned" || result.action === "already_queued") {
-          queueAudio(null, phoneticName, msg);
+          queueAudio("error", phoneticName, msg);
           return;
         }
 
         if (!result.success) {
           logger.warn("Order failed:", result.error);
-          queueAudio(null, phoneticName, msg);
+          queueAudio("error", phoneticName, msg);
           return;
         }
 

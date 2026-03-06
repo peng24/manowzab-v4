@@ -15,13 +15,32 @@
 
 <script setup>
 import { useRegisterSW } from "virtual:pwa-register/vue";
+import { watch, onUnmounted } from "vue";
 
 const { needRefresh, updateServiceWorker } = useRegisterSW();
 
+let timeoutId = null;
+
+// ปิดอัตโนมัติภายใน 1 นาที (60 วินาที) ถ้าไม่มีการกดอัปเดต
+watch(needRefresh, (newVal) => {
+  if (newVal) {
+    timeoutId = setTimeout(() => {
+      close();
+    }, 60000);
+  } else if (timeoutId) {
+    clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+});
+
+onUnmounted(() => {
+  if (timeoutId) clearTimeout(timeoutId);
+});
+
 async function handleUpdate() {
-  await updateServiceWorker();
-  // Force reload to apply the new version immediately
-  window.location.reload();
+  if (timeoutId) clearTimeout(timeoutId);
+  // แก้ปัญหาหน้าว่าง โดยให้ updateServiceWorker(true) จัดการ reload เมื่อ SW พร้อม
+  await updateServiceWorker(true);
 }
 
 function close() {

@@ -147,6 +147,9 @@
             <a @click="openOverlayPage" class="menu-overlay">
               <i class="fa-solid fa-layer-group"></i> เปิดหน้าจอ Overlay (OBS)
             </a>
+            <a href="https://peng24.github.io/manowzab-sales/" target="_blank" class="menu-sales">
+              <i class="fa-solid fa-chart-line"></i> ยอดขาย
+            </a>
             <a @click="forceUpdate" class="menu-update">
               <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
             </a>

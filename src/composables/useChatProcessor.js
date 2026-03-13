@@ -37,8 +37,8 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
 
 // 🚀 Performance: Regex patterns at module level
 const multiBuyRegex = /^(\d+(?:[\s,]+\d+)+)(?:\s+(.*))?$/;
-const adminProxyNumFirstRegex = /^(\d+)\s+(.+)$/;
-const adminProxyNameFirstRegex = /^([^\d]+)\s+(\d+)$/;
+const adminProxyNumFirstRegex = /^(\d+)\s*(.+)$/;
+const adminProxyNameFirstRegex = /^([^\d]+?)\s*(\d+)$/;
 const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
 const questionRegex =
   /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
@@ -46,10 +46,11 @@ const pureNumberRegex = /^\s*(\d+)\s*$/;
 const explicitBuyRegex =
   /(?:(?:F|f|cf|CF|รับ|เอา)\s*(\d+))|(?:(\d+)\s*(?:F|f|cf|CF|รับ|เอา))/i;
 const numberWithPoliteRegex =
-  /^(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
+  /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
 const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
+const customerNameNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,}?)\s+(\d+)$/;
 const cancelRegex =
-  /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i;
+  /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s+[\s\S]*?(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i;
 const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
 
 // ✅ Thai Numeral → Arabic Digit Converter
@@ -287,7 +288,7 @@ export function useChatProcessor() {
     const earlyMatchCancel = normalizedMsg.match(cancelRegex);
     if (earlyMatchCancel) {
       intent = "cancel";
-      targetId = parseInt(earlyMatchCancel[1] || earlyMatchCancel[2]);
+      targetId = parseInt(earlyMatchCancel[1] || earlyMatchCancel[2] || earlyMatchCancel[3]);
       method = "regex-cancel";
     } else if (shippingRegex.test(normalizedMsg)) {
       intent = "shipping";
@@ -300,6 +301,7 @@ export function useChatProcessor() {
       const matchExplicit = normalizedMsg.match(explicitBuyRegex);
       const matchPolite = normalizedMsg.match(numberWithPoliteRegex);
       const matchDash = normalizedMsg.match(dashBuyRegex);
+      const matchCustomerName = normalizedMsg.match(customerNameNumRegex);
       const matchImplicit = normalizedMsg.match(implicitBuyRegex);
 
       // ✅ Check Admin Proxy (Both Name-First and Number-First)
@@ -336,6 +338,15 @@ export function useChatProcessor() {
         intent = "buy";
         targetId = parseInt(matchDash[2]);
         method = "regex-dash";
+      } else if (matchCustomerName) {
+        // Guard: ต้องไม่ใช่คำถาม/shipping keyword
+        const nameOnly = matchCustomerName[1].trim();
+        if (!questionRegex.test(nameOnly) && !shippingRegex.test(nameOnly)) {
+          intent = "buy";
+          targetId = parseInt(matchCustomerName[2]);
+          forcedOwnerName = nameOnly;
+          method = "regex-customer-name";
+        }
       } else if (matchImplicit) {
         if (currentOverlayItem.value) {
           intent = "buy";

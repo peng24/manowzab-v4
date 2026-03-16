@@ -30,7 +30,7 @@ export async function preloadCelebrationAudio() {
 preloadCelebrationAudio();
 
 export function triggerCelebration(percentage) {
-  const duration = 1500; // Very short burst (1.5 seconds)
+  const duration = 5000; // Celebration burst (5 seconds)
   const animationEnd = Date.now() + duration;
 
   // ✅ Play the preloaded audio buffer directly from memory

@@ -41,14 +41,18 @@
           placeholder="เพิ่มลูกค้า (ชื่อ)"
           @keyup.enter="addManualCustomer"
         />
-        <input
-          type="text"
-          :value="newDate"
-          @input="onNewDateInput"
-          class="sm-input sm-date"
-          placeholder="วว/ดด/ปปปป"
-          maxlength="10"
-        />
+        <div style="position: relative;">
+          <ThaiDatePicker v-model="newDateFormatted" position="bottom-right">
+            <input
+              type="text"
+              :value="newDate"
+              @input="onNewDateInput"
+              class="sm-input sm-date"
+              placeholder="วว/ดด/ปปปป"
+              maxlength="10"
+            />
+          </ThaiDatePicker>
+        </div>
         <button class="btn btn-success sm-add-btn" @click="addManualCustomer" :disabled="!newName.trim()">
           <i class="fa-solid fa-plus"></i> เพิ่ม
         </button>
@@ -98,15 +102,17 @@
                 <div class="date-cell">
                   <span v-if="c.deliveryDate" class="thai-date">{{ formatThaiDate(c.deliveryDate) }}</span>
                   <span v-else class="no-date">ดด/วว/ปป</span>
-                  <input
-                    type="text"
-                    class="sm-date-input-text"
-                    :value="formatToDDMMYYYY(c.deliveryDate)"
-                    @input="onTableRowDateInput"
-                    @change="handleTableDateChange(c.id, $event.target.value)"
-                    placeholder="วว/ดด/ปปปป"
-                    maxlength="10"
-                  />
+                  <ThaiDatePicker :modelValue="c.deliveryDate" position="bottom-center" @update:modelValue="val => updateField(c.id, 'deliveryDate', val)">
+                    <input
+                      type="text"
+                      class="sm-date-input-text"
+                      :value="formatToDDMMYYYY(c.deliveryDate)"
+                      @input="onTableRowDateInput"
+                      @change="handleTableDateChange(c.id, $event.target.value)"
+                      placeholder="วว/ดด/ปปปป"
+                      maxlength="10"
+                    />
+                  </ThaiDatePicker>
                 </div>
               </td>
               <td class="td-center">
@@ -167,6 +173,7 @@ import { db } from "../composables/useFirebase";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import Swal from "sweetalert2";
+import ThaiDatePicker from "./ThaiDatePicker.vue";
 
 const emit = defineEmits(["close"]);
 const openDashboard = inject("openDashboard");
@@ -180,6 +187,22 @@ const newName = ref("");
 const newDate = ref("");
 const showDone = ref(false);
 let unsubListener = null;
+
+const newDateFormatted = computed({
+  get() {
+    return parseDDMMYYYY(newDate.value) || '';
+  },
+  set(val) {
+    if (!val) {
+      newDate.value = '';
+    } else {
+      const parts = val.split('-');
+      if (parts.length === 3) {
+        newDate.value = `${parts[2]}/${parts[1]}/${parseInt(parts[0]) + 543}`;
+      }
+    }
+  }
+});
 
 // ✅ Thai month abbreviations
 const thaiMonths = [

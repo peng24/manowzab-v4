@@ -36,7 +36,7 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
 });
 
 // 🚀 Performance: Regex patterns at module level
-const multiBuyRegex = /^(\d+(?:[\s,]+\d+)+)(?:\s+(.*))?$/;
+const multiBuyRegex = /^(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/;
 const adminProxyNumFirstRegex = /^(\d+)\s*(.+)$/;
 const adminProxyNameFirstRegex = /^([^\d]+?)\s*(\d+)$/;
 const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
@@ -73,6 +73,7 @@ const Toast = Swal.mixin({
 
 // ✅ Concurrency Lock for Chat Processing
 const processingLocks = new Set();
+const warnedNewCustomers = new Set(); // Track new customers who have been read instructions
 
 export function useChatProcessor() {
   const stockStore = useStockStore();
@@ -146,7 +147,9 @@ export function useChatProcessor() {
 
     // Check Nickname
     let displayName = realName;
+    let isNewCustomer = true;
     if (savedNamesCache.value[uid]) {
+      isNewCustomer = false;
       displayName =
         typeof savedNamesCache.value[uid] === "object"
           ? savedNamesCache.value[uid].nick
@@ -158,6 +161,13 @@ export function useChatProcessor() {
 
     const isAdmin =
       /admin|แอดมิน/i.test(displayName) || /admin|แอดมิน/i.test(realName);
+
+    // ✅ Prepare TTS Message (Append instructions for new customers once)
+    let ttsMessage = msg;
+    if (isNewCustomer && !isAdmin && !warnedNewCustomers.has(uid)) {
+      warnedNewCustomers.add(uid);
+      ttsMessage = `${msg} ... ลูกค้าใหม่ พิมพ์ชื่อ ตามด้วยหมายเลขรายการ เพื่อทำการจอง ... ร้านนาวมีค่าส่งนะคะ ... ปลายทาง 50 บาท ... โอนเงิน 40 บาท`;
+    }
 
     // Determine intent
     let intent = null;
@@ -198,7 +208,7 @@ export function useChatProcessor() {
 
       // Parse all IDs (Allow IDs > stockSize)
       const itemIds = numbersStr
-        .split(/\s+/)
+        .split(/[\s,_]+/)
         .map((n) => parseInt(n))
         .filter((n) => n > 0);
 
@@ -276,7 +286,7 @@ export function useChatProcessor() {
         queueAudio(
           "success",
           phoneticName,
-          `${msg} ... ทั้งหมด ${itemIds.length} รายการ`,
+          `${ttsMessage} ... ทั้งหมด ${itemIds.length} รายการ`,
         );
 
         // Exit early - don't process further
@@ -421,7 +431,7 @@ export function useChatProcessor() {
       try {
         if (processingLocks.has(targetId)) {
           // ✅ ยังอ่านข้อความแม้ item กำลังถูกประมวลผล (เพิ่มเสียง error ให้รู้ว่าชนกัน)
-          queueAudio("error", phoneticName, msg);
+          queueAudio("error", phoneticName, ttsMessage);
           return;
         }
         processingLocks.add(targetId);
@@ -438,13 +448,13 @@ export function useChatProcessor() {
 
         // ✅ ยังอ่านข้อความแม้ซื้อซ้ำ/อยู่ในคิวแล้ว (เพิ่มเสียง error ให้รู้ว่าไม่อ่านข้าม)
         if (result.action === "already_owned" || result.action === "already_queued") {
-          queueAudio("error", phoneticName, msg);
+          queueAudio("error", phoneticName, ttsMessage);
           return;
         }
 
         if (!result.success) {
           logger.warn("Order failed:", result.error);
-          queueAudio("error", phoneticName, msg);
+          queueAudio("error", phoneticName, ttsMessage);
           return;
         }
 
@@ -455,7 +465,7 @@ export function useChatProcessor() {
         });
 
         // ✅ Queue SUCCESS SFX + TTS (non-blocking)
-        queueAudio("success", phoneticName, msg);
+        queueAudio("success", phoneticName, ttsMessage);
       } finally {
         processingLocks.delete(targetId);
       }
@@ -466,7 +476,7 @@ export function useChatProcessor() {
         await stockStore.processCancel(targetId);
 
         // ✅ Queue CANCEL SFX + TTS (non-blocking)
-        queueAudio("cancel", phoneticName, msg);
+        queueAudio("cancel", phoneticName, ttsMessage);
       }
     } else {
       // --- Other Intents / General Chat ---
@@ -491,10 +501,10 @@ export function useChatProcessor() {
           type: "user",
         });
 
-        queueAudio(null, phoneticName, msg);
+        queueAudio(null, phoneticName, ttsMessage);
       } else {
         // Read EVERYTHING else
-        queueAudio(null, phoneticName, msg);
+        queueAudio(null, phoneticName, ttsMessage);
       }
     }
   }

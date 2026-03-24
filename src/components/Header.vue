@@ -41,14 +41,14 @@
 
 
 
-      <button
-        class="btn btn-shipping-mgr"
+      <div
+        class="shipping-mgr-icon"
         @click="openShippingManager"
         title="รายการจัดส่ง"
       >
-        📦
+        <span class="box-emoji">📦</span>
         <span v-if="todayDeliveryCount > 0" class="delivery-badge">{{ todayDeliveryCount }}</span>
-      </button>
+      </div>
 
       <input
         type="text"
@@ -672,7 +672,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.20.0)</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.21.0)</h4>
+        <ul>
+          <li>🎨 <b>เปลี่ยนปุ่มคลังสินค้าเป็นไอคอน</b> — ปรับดีไซน์ปุ่มจัดการรายการจัดส่งให้เป็นไอคอนกล่องพัสดุขนาดใหญ่ ไม่มีพื้นหลัง เพื่อความกลมกลืนและสวยงามมากขึ้น</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.20.0)</h4>
         <ul>
           <li>🔊 <b>เพิ่มเสียงแนะนำลูกค้าใหม่</b> — ระบบจะพูดเตือนกติกาการจอง (พิมพ์ชื่อและรหัส) ให้ลูกค้าใหม่โดยอัตโนมัติ 1 ครั้ง</li>
           <li>🎟️ <b>จองหลายรายการแบบมี _ คั่น</b> — รองรับการพิมพ์รหัสคั่นด้วยขีดล่าง (เช่น 11_37 หรือ ๑๑_๓๗) ให้ระบบจองรวดเดียวได้แล้ว</li>

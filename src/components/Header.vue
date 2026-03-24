@@ -26,6 +26,14 @@
         >
           <i class="fa-solid fa-key"></i> {{ systemStore.currentKeyIndex + 1 }}
         </span>
+        <span
+          class="version-badge"
+          :title="getVersionTooltip()"
+          @click="showChangelog"
+          style="cursor: pointer; margin-left: 5px;"
+        >
+          {{ systemStore.version }}
+        </span>
       </div>
 
       <button class="btn btn-dark" @click="openHistory">🕒</button>
@@ -157,14 +165,6 @@
       </div>
       <div class="live-title">{{ systemStore.liveTitle }}</div>
 
-      <div
-        class="version-badge"
-        :title="getVersionTooltip()"
-        @click="showChangelog"
-        style="cursor: pointer"
-      >
-        {{ systemStore.version }}
-      </div>
     </div>
 
     <!-- 📦 Delivery Strip (always visible, real-time) -->
@@ -672,7 +672,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.19.0)</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.19.2)</h4>
+        <ul>
+          <li>✨ <b>ปรับปรุง Layout หน้าจอหลัก</b> — ย้ายช่อง Live Chat ให้เต็มความสูงด้านขวา และจัดวางเลขเวอร์ชั่นในตำแหน่งใหม่ที่แถบเมนูด้านบน</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.19.0)</h4>
         <ul>
           <li>🤖 <b>Auto-Sync ระบบจัดส่ง</b> — Dashboard ส่งข้อมูลลูกค้า+จำนวนสินค้า ไป Shipping Manager อัตโนมัติ! รองรับสะสมข้ามไลฟ์ พร้อมปุ่ม Sync All และ breakdown ต่อไลฟ์</li>
         </ul>

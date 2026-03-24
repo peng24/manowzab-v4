@@ -40,7 +40,11 @@
           class="sm-input"
           placeholder="เพิ่มลูกค้า (ชื่อ)"
           @keyup.enter="addManualCustomer"
+          list="customerNamesList"
         />
+        <datalist id="customerNamesList">
+          <option v-for="name in uniqueCustomerNames" :key="name" :value="name"></option>
+        </datalist>
         <div style="position: relative;">
           <ThaiDatePicker v-model="newDateFormatted" position="bottom-right">
             <input
@@ -380,6 +384,27 @@ const doneCount = computed(() =>
   allCustomers.value.filter((c) => c.status === "done").length
 );
 
+const uniqueCustomerNames = computed(() => {
+  const names = new Set();
+  
+  allCustomers.value.forEach(c => {
+    if (c.name) names.add(c.name);
+  });
+  
+  if (stockStore.stockData) {
+    Object.values(stockStore.stockData).forEach(item => {
+      if (item && item.owner) names.add(item.owner);
+      if (item && item.queue) {
+        item.queue.forEach(q => {
+          if (q.owner) names.add(q.owner);
+        });
+      }
+    });
+  }
+  
+  return Array.from(names).sort();
+});
+
 // Countdown Logic
 function getCountdown(deliveryDate) {
   if (!deliveryDate) return { text: "ยังไม่กำหนด", color: "gray", days: Infinity };
@@ -409,12 +434,20 @@ function addManualCustomer() {
   const name = newName.value.trim();
   if (!name) return;
 
-  const parsedDate = parseDDMMYYYY(newDate.value);
+  let parsedDate = parseDDMMYYYY(newDate.value);
+  if (!parsedDate) {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    parsedDate = `${y}-${m}-${d}`;
+  }
+
   const manualUid = "manual-" + Date.now();
   update(dbRef(db, `delivery_customers/${manualUid}`), {
     name,
     itemCount: 0,
-    deliveryDate: parsedDate || null,
+    deliveryDate: parsedDate,
     note: "",
     status: "pending",
     createdAt: Date.now(),

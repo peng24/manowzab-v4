@@ -145,6 +145,9 @@
             <a @click="openOverlayPage" class="menu-overlay">
               <i class="fa-solid fa-layer-group"></i> เปิดหน้าจอ Overlay (OBS)
             </a>
+            <a @click="openShippingMobilePage" class="menu-shipping-mobile">
+              <i class="fa-solid fa-mobile-screen"></i> จัดการจัดส่ง (มือถือ)
+            </a>
             <a href="https://peng24.github.io/manowzab-sales/" target="_blank" class="menu-sales">
               <i class="fa-solid fa-chart-line"></i> ยอดขาย
             </a>
@@ -632,6 +635,14 @@ async function toggleSimulation() {
 function openOverlayPage() {
   window.open(
     window.location.origin + window.location.pathname + "?mode=overlay",
+    "_blank",
+  );
+  showDropdown.value = false;
+}
+
+function openShippingMobilePage() {
+  window.open(
+    window.location.origin + window.location.pathname + "?mode=shipping",
     "_blank",
   );
   showDropdown.value = false;

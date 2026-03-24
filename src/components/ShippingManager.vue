@@ -102,10 +102,11 @@
                 <div class="date-cell">
                   <span v-if="c.deliveryDate" class="thai-date">{{ formatThaiDate(c.deliveryDate) }}</span>
                   <span v-else class="no-date">ดด/วว/ปป</span>
-                  <ThaiDatePicker :modelValue="c.deliveryDate" position="bottom-center" @update:modelValue="val => updateField(c.id, 'deliveryDate', val)">
+                  <ThaiDatePicker :modelValue="c.deliveryDate" position="bottom-center" @update:modelValue="val => updateField(c.id, 'deliveryDate', val)" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
                     <input
                       type="text"
                       class="sm-date-input-text"
+                      style="width: 100%; height: 100%; box-sizing: border-box;"
                       :value="formatToDDMMYYYY(c.deliveryDate)"
                       @input="onTableRowDateInput"
                       @change="handleTableDateChange(c.id, $event.target.value)"

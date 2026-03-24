@@ -3,6 +3,9 @@
     <!-- ✅ Live Overlay Mode -->
     <LiveOverlay v-if="isOverlayMode" />
 
+    <!-- ✅ Shipping Mobile Mode -->
+    <ShippingMobileView v-else-if="isShippingMode" />
+
     <!-- ✅ Normal Mode -->
     <template v-else>
       <UpdatePrompt />
@@ -61,6 +64,7 @@ import ChatPanel from "./components/ChatPanel.vue";
 import Dashboard from "./components/Dashboard.vue";
 import HistoryModal from "./components/HistoryModal.vue";
 import ShippingManager from "./components/ShippingManager.vue";
+import ShippingMobileView from "./components/ShippingMobileView.vue"; // ✅ Import new component
 
 import LiveOverlay from "./components/LiveOverlay.vue"; // ✅ Import Overlay
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
@@ -85,6 +89,7 @@ watch(
 
 const urlParams = new URLSearchParams(window.location.search);
 const isOverlayMode = urlParams.get("mode") === "overlay"; // ✅ Check Overlay Mode
+const isShippingMode = urlParams.get("mode") === "shipping"; // ✅ Check Shipping Mode
 
 // ✅ ดึง unlockAudio มาใช้แทน playDing
 const { unlockAudio } = useAudio();

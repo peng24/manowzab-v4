@@ -41,14 +41,7 @@
 
 
 
-      <div
-        class="shipping-mgr-icon"
-        @click="openShippingManager"
-        title="รายการจัดส่ง"
-      >
-        <span class="box-emoji">📦</span>
-        <span v-if="todayDeliveryCount > 0" class="delivery-badge">{{ todayDeliveryCount }}</span>
-      </div>
+
 
       <input
         type="text"
@@ -171,9 +164,17 @@
     </div>
 
     <!-- 📦 Delivery Strip (always visible, real-time) -->
-    <div class="delivery-strip" v-if="deliveryStrip.length > 0">
-      <span class="ds-label">📦</span>
-      <div class="ds-scroll">
+    <div class="delivery-strip">
+      <div
+        class="shipping-mgr-icon"
+        @click="openShippingManager"
+        title="รายการจัดส่ง"
+        style="transform: scale(0.9); cursor: pointer;"
+      >
+        <span class="box-emoji">📦</span>
+        <span v-if="todayDeliveryCount > 0" class="delivery-badge">{{ todayDeliveryCount }}</span>
+      </div>
+      <div class="ds-scroll" v-if="deliveryStrip.length > 0">
         <span
           v-for="c in deliveryStrip"
           :key="c.id"
@@ -683,7 +684,14 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.21.0)</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.21.3) - 24 มี.ค. 2026</h4>
+        <ul>
+          <li>🚚 <b>ปรับปรุงหน้ารายการจัดส่ง</b> — นำปุ่ม Dashboard (รูปรถ) ออกจากส่วนหัวเพื่อความเรียบง่าย</li>
+          <li>✨ <b>Auto-complete ชื่อลูกค้า</b> — เพิ่มระบบเกี้ยวรายชื่ออัตโนมัติ (Auto-complete) จากลูกค้าเดิมและในสต๊อก</li>
+          <li>📅 <b>วันที่จัดส่งอัตโนมัติ</b> — หากไม่ได้ระบุวันที่จัดส่ง ระบบจะกำหนดให้เป็นวันที่ในปัจจุบัน (วันนี้) ให้ทันที</li>
+          <li>📦 <b>ย้ายปุ่ม Shipping Manager</b> — ย้ายปุ่มรูปกล่องพัสดุลงไปรวมกับแถบ Delivery ด้านล่างเพื่อความต่อเนื่อง</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.21.0)</h4>
         <ul>
           <li>🎨 <b>เปลี่ยนปุ่มคลังสินค้าเป็นไอคอน</b> — ปรับดีไซน์ปุ่มจัดการรายการจัดส่งให้เป็นไอคอนกล่องพัสดุขนาดใหญ่ ไม่มีพื้นหลัง เพื่อความกลมกลืนและสวยงามมากขึ้น</li>
         </ul>

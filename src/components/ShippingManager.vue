@@ -5,9 +5,6 @@
       <div class="sm-header">
         <div class="sm-title">📦 รายการจัดส่ง</div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="btn btn-shipping-mgr" @click="openDashboard" title="เปิด Dashboard">
-            🚚
-          </button>
           <button class="btn btn-dark" @click="$emit('close')">ปิด</button>
         </div>
       </div>
@@ -181,7 +178,6 @@ import Swal from "sweetalert2";
 import ThaiDatePicker from "./ThaiDatePicker.vue";
 
 const emit = defineEmits(["close"]);
-const openDashboard = inject("openDashboard");
 
 const stockStore = useStockStore();
 const systemStore = useSystemStore();

@@ -41,7 +41,14 @@
           placeholder="เพิ่มลูกค้า (ชื่อ)"
           @keyup.enter="addManualCustomer"
         />
-        <input type="date" v-model="newDate" class="sm-input sm-date" />
+        <input
+          type="text"
+          :value="newDate"
+          @input="onNewDateInput"
+          class="sm-input sm-date"
+          placeholder="วว/ดด/ปปปป"
+          maxlength="10"
+        />
         <button class="btn btn-success sm-add-btn" @click="addManualCustomer" :disabled="!newName.trim()">
           <i class="fa-solid fa-plus"></i> เพิ่ม
         </button>
@@ -90,12 +97,15 @@
               <td class="td-center">
                 <div class="date-cell">
                   <span v-if="c.deliveryDate" class="thai-date">{{ formatThaiDate(c.deliveryDate) }}</span>
-                  <span v-else class="no-date">ยังไม่ตั้ง</span>
+                  <span v-else class="no-date">ดด/วว/ปป</span>
                   <input
-                    type="date"
-                    class="sm-date-input-hidden"
-                    :value="c.deliveryDate || ''"
-                    @change="updateField(c.id, 'deliveryDate', $event.target.value)"
+                    type="text"
+                    class="sm-date-input-text"
+                    :value="formatToDDMMYYYY(c.deliveryDate)"
+                    @input="onTableRowDateInput"
+                    @change="handleTableDateChange(c.id, $event.target.value)"
+                    placeholder="วว/ดด/ปปปป"
+                    maxlength="10"
                   />
                 </div>
               </td>
@@ -180,10 +190,61 @@ const thaiMonths = [
 function formatThaiDate(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
   const day = d.getDate();
   const month = thaiMonths[d.getMonth()];
   const year = (d.getFullYear() + 543) % 100; // พ.ศ. 2 หลัก
   return `${day} ${month} ${year}`;
+}
+
+function formatToDDMMYYYY(dateStr) {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  return dateStr;
+}
+
+function parseDDMMYYYY(str) {
+  if (!str) return null;
+  const parts = str.split('/');
+  if (parts.length === 3) {
+    let [d, m, y] = parts;
+    if (y.length === 2) {
+      y = (parseInt(y) > 50 ? '19' : '20') + y;
+    } else if (y.length === 4 && parseInt(y) > 2500) {
+      y = (parseInt(y) - 543).toString();
+    }
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return null;
+}
+
+function formatMaskedDateInput(v) {
+  v = v.replace(/\D/g, "");
+  if (v.length > 8) v = v.substring(0, 8);
+  if (v.length >= 5) {
+    v = `${v.substring(0, 2)}/${v.substring(2, 4)}/${v.substring(4)}`;
+  } else if (v.length >= 3) {
+    v = `${v.substring(0, 2)}/${v.substring(2)}`;
+  }
+  return v;
+}
+
+function onNewDateInput(e) {
+  newDate.value = formatMaskedDateInput(e.target.value);
+  e.target.value = newDate.value;
+}
+
+function onTableRowDateInput(e) {
+  e.target.value = formatMaskedDateInput(e.target.value);
+}
+
+function handleTableDateChange(id, val) {
+  const parsed = parseDDMMYYYY(val);
+  updateField(id, 'deliveryDate', parsed || null);
 }
 
 // Firebase Listener
@@ -324,11 +385,12 @@ function addManualCustomer() {
   const name = newName.value.trim();
   if (!name) return;
 
+  const parsedDate = parseDDMMYYYY(newDate.value);
   const manualUid = "manual-" + Date.now();
   update(dbRef(db, `delivery_customers/${manualUid}`), {
     name,
     itemCount: 0,
-    deliveryDate: newDate.value || null,
+    deliveryDate: parsedDate || null,
     note: "",
     status: "pending",
     createdAt: Date.now(),
@@ -506,8 +568,10 @@ function deleteCustomer(id, name) {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 90px;
   gap: 6px;
-  cursor: pointer;
+  cursor: text;
 }
 
 .thai-date {
@@ -518,14 +582,30 @@ function deleteCustomer(id, name) {
 
 .no-date { color: #555; font-size: 0.85em; }
 
-.sm-date-input-hidden {
+.sm-date-input-text {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   opacity: 0;
-  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #fff;
+  text-align: center;
+  font-family: inherit;
+  font-size: 0.95em;
+  border-radius: 4px;
+  cursor: text;
+  transition: all 0.2s;
+}
+
+.sm-date-input-text:focus {
+  opacity: 1;
+  background: #1e1e1e;
+  border-color: #3b82f6;
+  outline: none;
+  z-index: 10;
 }
 
 /* Editable Inputs */

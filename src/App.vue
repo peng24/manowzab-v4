@@ -6,31 +6,34 @@
     <!-- ✅ Normal Mode -->
     <template v-else>
       <UpdatePrompt />
-      <Header />
+      <div class="app-layout">
+        <div class="left-column">
+          <Header />
 
-      <div v-if="systemStore.isAway" class="away-banner">
-        <div class="away-content">
-          <div class="away-icon">🌙</div>
-          <div class="away-text">
-            <div class="away-title">แอดมินพาลูกนอน</div>
-            <div class="away-subtitle">
-              กรุณารอสักครู่ หรือส่งข้อความทักทายไว้ค่ะ
+          <div v-if="systemStore.isAway" class="away-banner">
+            <div class="away-content">
+              <div class="away-icon">🌙</div>
+              <div class="away-text">
+                <div class="away-title">แอดมินพาลูกนอน</div>
+                <div class="away-subtitle">
+                  กรุณารอสักครู่ หรือส่งข้อความทักทายไว้ค่ะ
+                </div>
+              </div>
+              <span class="away-timer">{{ awayTimer }}</span>
+              <button class="away-btn" @click="closeAwayMode">
+                <i class="fa-solid fa-check"></i> ลูกหลับแล้ว
+              </button>
             </div>
           </div>
-          <span class="away-timer">{{ awayTimer }}</span>
-          <button class="away-btn" @click="closeAwayMode">
-            <i class="fa-solid fa-check"></i> ลูกหลับแล้ว
-          </button>
+
+          <div class="main-container">
+            <StockGrid />
+            <Dashboard v-if="showDashboard" @close="showDashboard = false" />
+            <HistoryModal v-if="showHistory" @close="showHistory = false" />
+            <ShippingManager v-if="showShippingManager" @close="showShippingManager = false" />
+          </div>
         </div>
-      </div>
-
-      <div class="main-container">
-        <StockGrid />
         <ChatPanel />
-
-        <Dashboard v-if="showDashboard" @close="showDashboard = false" />
-        <HistoryModal v-if="showHistory" @close="showHistory = false" />
-        <ShippingManager v-if="showShippingManager" @close="showShippingManager = false" />
       </div>
     </template>
   </div>

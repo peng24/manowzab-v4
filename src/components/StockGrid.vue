@@ -19,8 +19,17 @@
 
       <div class="header-center stock-stats">
         <span class="stats-label">ขายแล้ว:</span>
-        <span class="stat-sold">{{ soldCount }}</span>
+        <span class="stat-sold">{{ animatedSoldCount }}</span>
         <span style="opacity: 0.5">/{{ stockStore.stockSize }}</span>
+        <div class="sale-percent-badge" :class="[percentColorClass, { 'pulse': isPulsingPercent }]">
+          {{ animatedPercentage }}%
+        </div>
+        <div class="mini-progress-track">
+          <div class="mini-progress-fill" :style="{ width: soldPercentage + '%', background: progressBarColor }">
+            <div class="mini-shimmer"></div>
+          </div>
+        </div>
+        <span class="motivational-badge" :key="motivationalText">{{ motivationalText }}</span>
       </div>
 
       <div></div>
@@ -180,7 +189,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, nextTick } from "vue";
+import { computed, ref, watch, nextTick, onUnmounted } from "vue";
 import { useStockStore } from "../stores/stock";
 import { useAudio } from "../composables/useAudio";
 import Swal from "sweetalert2";
@@ -239,6 +248,70 @@ const soldCount = computed(
 const soldPercentage = computed(() => {
   if (stockStore.stockSize === 0) return 0;
   return Math.round((soldCount.value / stockStore.stockSize) * 100);
+});
+
+// ✅ Animated Counter Logic
+const animatedSoldCount = ref(0);
+const animatedPercentage = ref(0);
+const isPulsingPercent = ref(false);
+let soldAnimFrame = null;
+let pctAnimFrame = null;
+
+function easeOutQuart(t) {
+  return 1 - Math.pow(1 - t, 4);
+}
+
+function animateValue(fromVal, toVal, duration, onUpdate, onDone) {
+  const startTime = performance.now();
+  let frame = null;
+  function step(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const easedProgress = easeOutQuart(progress);
+    const current = Math.round(fromVal + (toVal - fromVal) * easedProgress);
+    onUpdate(current);
+    if (progress < 1) {
+      frame = requestAnimationFrame(step);
+    } else {
+      if (onDone) onDone();
+    }
+  }
+  frame = requestAnimationFrame(step);
+  return frame;
+}
+
+watch(soldCount, (newVal, oldVal) => {
+  if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
+  const from = oldVal ?? 0;
+  soldAnimFrame = animateValue(from, newVal, 500, (v) => {
+    animatedSoldCount.value = v;
+  });
+}, { immediate: true });
+
+watch(soldPercentage, (newVal, oldVal) => {
+  if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
+  const from = oldVal ?? 0;
+  // Trigger pulse effect
+  isPulsingPercent.value = false;
+  void document.body.offsetWidth; // force reflow
+  isPulsingPercent.value = true;
+  setTimeout(() => { isPulsingPercent.value = false; }, 600);
+  pctAnimFrame = animateValue(from, newVal, 500, (v) => {
+    animatedPercentage.value = v;
+  });
+}, { immediate: true });
+
+const percentColorClass = computed(() => {
+  const pct = soldPercentage.value;
+  if (pct <= 20) return 'pct-low';
+  if (pct <= 50) return 'pct-medium';
+  if (pct <= 80) return 'pct-high';
+  return 'pct-complete';
+});
+
+onUnmounted(() => {
+  if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
+  if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
 });
 
 const motivationalText = computed(() => {
@@ -693,6 +766,7 @@ async function refreshStock() {
   text-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
   margin-left: 5px;
   margin-right: 5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .stock-stats {
@@ -711,12 +785,104 @@ async function refreshStock() {
   white-space: nowrap;
 }
 
-.stat-sold {
-  color: #00e676;
-  font-size: 1.8em;
-  font-weight: bold;
-  text-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
-  margin: 0 3px;
+/* ✅ Animated Percentage Badge */
+.sale-percent-badge {
+  font-size: 1.1em;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.4s ease, background 0.4s ease, box-shadow 0.4s ease;
+}
+
+.sale-percent-badge.pct-low {
+  color: #9ca3af;
+  background: rgba(156, 163, 175, 0.12);
+}
+
+.sale-percent-badge.pct-medium {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.2);
+}
+
+.sale-percent-badge.pct-high {
+  color: #fb923c;
+  background: rgba(251, 146, 60, 0.15);
+  box-shadow: 0 0 12px rgba(251, 146, 60, 0.3);
+}
+
+.sale-percent-badge.pct-complete {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
+.sale-percent-badge.pulse {
+  animation: pulse-badge 0.5s ease-out;
+}
+
+@keyframes pulse-badge {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* ✅ Mini Progress Bar */
+.mini-progress-track {
+  width: 80px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.mini-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.6s ease-out, background 0.6s ease-out;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 8px rgba(255, 107, 53, 0.4);
+}
+
+.mini-shimmer {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  animation: mini-shimmer-slide 1.8s infinite;
+}
+
+@keyframes mini-shimmer-slide {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* ✅ Motivational Badge */
+.motivational-badge {
+  font-size: 0.95em;
+  font-weight: 700;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+  white-space: nowrap;
+  animation: gentle-bounce 2.5s ease-in-out infinite;
+}
+
+@keyframes gentle-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 .stats-row {

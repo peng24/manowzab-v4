@@ -28,17 +28,6 @@
         </span>
       </div>
 
-      <button
-        :class="[
-          'btn',
-          'btn-ai',
-          systemStore.isAiCommander ? 'active' : 'inactive',
-        ]"
-        @click="toggleAI"
-      >
-        🤖 AI: {{ systemStore.isAiCommander ? "เปิด" : "ปิด" }}
-      </button>
-
       <button class="btn btn-dark" @click="openHistory">🕒</button>
 
       <button
@@ -140,10 +129,6 @@
               ></i>
               {{ isSimulating ? "หยุดจำลอง" : "เริ่มจำลองแชท" }}
             </a>
-            <a @click="askAiKey" class="menu-key">
-              <i class="fa-solid fa-key"></i> ตั้งค่า API Key
-            </a>
-
             <a @click="openOverlayPage" class="menu-overlay">
               <i class="fa-solid fa-layer-group"></i> เปิดหน้าจอ Overlay (OBS)
             </a>
@@ -185,8 +170,6 @@ import { useSystemStore } from "../stores/system";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useYouTube } from "../composables/useYouTube";
-import { useGemini } from "../composables/useGemini";
-
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, update, set } from "firebase/database";
 import { db } from "../composables/useFirebase"; // เช็ค path ให้ตรงกับเครื่องคุณ
@@ -210,7 +193,6 @@ const systemStore = useSystemStore();
 const chatStore = useChatStore();
 const stockStore = useStockStore();
 const { connectVideo, disconnect } = useYouTube();
-const { setApiKey } = useGemini();
 
 const { queueAudio, unlockAudio } = useAudio();
 
@@ -303,20 +285,6 @@ function toggleDropdown(event) {
 
 function handleClickOutside(event) {
   if (showDropdown.value) showDropdown.value = false;
-}
-
-function toggleAI() {
-  // (Logic เดิม + ซิงค์)
-  const newState = !systemStore.isAiCommander;
-  update(dbRef(db, "system/aiCommander"), {
-    enabled: newState ? systemStore.myDeviceId : null,
-  })
-    .then(() => {
-      systemStore.isAiCommander = newState;
-      queueAudio(null, "", newState ? "เปิด AI Commander" : "ปิด AI Commander");
-
-    })
-    .catch((error) => logger.error("Error toggling AI:", error));
 }
 
 // ✅ Extract YouTube Video ID from various URL formats
@@ -565,35 +533,6 @@ async function toggleSimulation() {
   showDropdown.value = false;
 }
 
-function askAiKey() {
-  // (Logic เดิม)
-  const currentKey = localStorage.getItem("geminiApiKey") || "";
-  Swal.fire({
-    title: "ตั้งค่า Gemini API Key",
-    html: '<a href="https://aistudio.google.com/" target="_blank" style="color:#29b6f6">กดขอ Key ฟรีที่นี่</a>',
-    input: "text",
-    inputValue: currentKey,
-    inputPlaceholder: "ใส่ API Key ของคุณ",
-    showCancelButton: true,
-    confirmButtonText: "บันทึก",
-    cancelButtonText: "ยกเลิก",
-  }).then((result) => {
-    if (result.isConfirmed && result.value) {
-      setApiKey(result.value);
-      Swal.fire({
-        icon: "success",
-        title: "บันทึกแล้ว",
-        text: "API Key ถูกบันทึกเรียบร้อย",
-        timer: 1500,
-        showConfirmButton: false,
-      });
-    }
-  });
-  showDropdown.value = false;
-}
-
-
-
 function openOverlayPage() {
   window.open(
     window.location.origin + window.location.pathname + "?mode=overlay",
@@ -637,7 +576,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.16.7)</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.17.0)</h4>
+        <ul>
+          <li>📊 <b>แสดง % ยอดขายแบบเรียลไทม์</b> — เพิ่มเปอร์เซ็นต์ยอดขายข้างๆ จำนวนขายแล้ว บนหัว StockGrid พร้อม Animated Counting Effect ที่นับขึ้น-ลงแบบ smooth, Progress Bar พร้อม Shimmer, และข้อความเชียร์ที่เปลี่ยนตาม % (สีเทา → เหลือง → ส้ม → เขียว)</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.16.7)</h4>
         <ul>
           <li>🔄 <b>แก้บั๊กอัปเดตแล้วเป็นหน้าว่าง</b> — ปรับให้ระบบรอโหลดหน้าเว็บเบื้องหลังให้เสร็จสมบูรณ์ ก่อนจะรีเฟรช ป้องกันหน้าจอผู้ใช้ขาวบอด</li>
           <li>⏳ <b>ซ่อนแจ้งเตือนอัตโนมัติ</b> — หากมีแจ้งเตือนอัปเดตระบบแล้วไม่ได้กดภายใน 1 นาที ระบบจะซ่อนแจ้งเตือนไปเองอัตโนมัติ เพื่อไม่ให้ค้างบังหน้าจอไลฟ์</li>

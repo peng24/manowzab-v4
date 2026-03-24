@@ -318,35 +318,6 @@ body {
   background: #222;
 }
 
-.btn-ai {
-  background: #6a1b9a;
-  color: #fff;
-  font-weight: 600;
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-ai.active {
-  background: linear-gradient(45deg, #6a1b9a, #8e24aa);
-  animation: pulseAi 2s infinite;
-}
-
-.btn-ai.inactive {
-  background: #444;
-  color: #888;
-}
-
-@keyframes pulseAi {
-  0%,
-  100% {
-    box-shadow: 0 0 5px rgba(156, 39, 176, 0.5);
-  }
-
-  50% {
-    box-shadow: 0 0 15px rgba(156, 39, 176, 0.8);
-  }
-}
-
 .btn-shipping {
   background: #1976d2;
   color: #fff;

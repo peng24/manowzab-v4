@@ -9,9 +9,8 @@ export function useAutoCleanup() {
     const isCleaning = ref(false);
 
     async function initAutoCleanup() {
-        // 1. Safety Check: Run only if Admin (AI Commander)
-        // We check both systemStore (if synced) and localStorage (for local override)
-        const isAdmin = systemStore.isAiCommander || localStorage.getItem("isAdmin") === "true";
+        // 1. Safety Check: Run only if Admin
+        const isAdmin = localStorage.getItem("isAdmin") === "true";
 
         if (!isAdmin) {
             // Silent skip - no need to log this

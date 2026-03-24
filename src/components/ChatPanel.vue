@@ -140,7 +140,6 @@
 
               <!-- Force Process Button -->
               <div
-                v-if="chat.isAdmin || systemStore.isAiCommander"
                 class="force-process-btn"
               >
                 <button @click="forceProcess(chat)" class="btn-mini">

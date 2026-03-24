@@ -10,11 +10,9 @@ export const useSystemStore = defineStore("system", () => {
   const currentVideoId = ref("");
   const viewerCount = ref(0);
   const liveTitle = ref("รอกระแสข้อมูล...");
-  const isAiCommander = ref(false);
   const isAway = ref(false); // สถานะโหมดพาลูกนอน
   const isSoundOn = ref(true); // ✅ เปิด/ปิดเสียง
   const isHost = ref(false); // ✅ สถานะเครื่องแม่ข่าย (Host)
-  const isAiEnabled = ref(true); // ✅ เปิด/ปิด AI Assist สำหรับ Voice Detection
 
   // ✅ Google Cloud TTS API Key - Load from .env only
   const googleApiKey = ref("AIzaSyBRHQqNNn8lKXic7KILkHkZRnNQ8oBFqnw,AIzaSyDulTIwtePtm9J9RNSfOuoIGaSOWOZRT3w");
@@ -49,10 +47,6 @@ export const useSystemStore = defineStore("system", () => {
 
   }
 
-  function toggleAi() {
-    isAiEnabled.value = !isAiEnabled.value;
-  }
-
   // ✅ Host Listener (Take Over Logic)
   function initHostListener() {
     const hostRef = dbRef(db, "system/hostId");
@@ -76,11 +70,9 @@ export const useSystemStore = defineStore("system", () => {
     currentVideoId,
     viewerCount,
     liveTitle,
-    isAiCommander,
     isAway,
     isSoundOn, // ✅ Export
     isHost, // ✅ Export
-    isAiEnabled, // ✅ Export
     statusDb,
     statusApi,
     statusChat,
@@ -89,7 +81,6 @@ export const useSystemStore = defineStore("system", () => {
     myDeviceId,
     version,
     setStatus,
-    toggleAi,
     initHostListener, // ✅ Export
     googleApiKey, // ✅ Export (from .env)
     useOnlineTts, // ✅ Export

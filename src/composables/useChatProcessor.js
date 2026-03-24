@@ -361,12 +361,6 @@ export function useChatProcessor() {
     // NEW LOGIC: Rule 5 -> "Ignore it".
     // So we do nothing.
 
-    // 3. AI Analysis — Ollama removed, Cloud API handles voice detection only.
-    //    Chat-level AI fallback is intentionally disabled.
-    if (!intent && !method && systemStore.isAiCommander) {
-      // No local AI fallback — rely on regex-based detection above.
-    }
-
     // 4. ✅ Push message to Firebase (Listener will update UI)
     chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
       id: item.id,

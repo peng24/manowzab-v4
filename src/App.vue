@@ -236,18 +236,6 @@ onMounted(async () => {
 
   // ✅ stockSize listener is already handled inside connectToStock()
 
-  const unsubAi = onValue(dbRef(db, "system/aiCommander"), (snap) => {
-    const data = snap.val();
-    if (data && typeof data === "object" && data.enabled) {
-      systemStore.isAiCommander = data.enabled === systemStore.myDeviceId;
-    } else if (data === systemStore.myDeviceId) {
-      systemStore.isAiCommander = true;
-    } else {
-      systemStore.isAiCommander = false;
-    }
-  });
-  cleanupFns.push(unsubAi);
-
   // ✅ Register Cleanup
   onUnmounted(() => {
     console.log("♻️ Cleaning up App.vue listeners...");

@@ -106,6 +106,21 @@ description: Mandatory verification checklist after every code change
 
 ---
 
+## 📦 10. ระบบจัดการจัดส่ง (Shipping Manager)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 10.1 | Firebase CRUD (`delivery_customers/{uid}`) | `src/components/ShippingManager.vue` | เพิ่ม/แก้ไข/ลบลูกค้า + real-time listener |
+| 10.2 | `addToShipping()` + Auto-Sync | `src/components/Dashboard.vue` | เพิ่มลงคิวส่ง + auto-create delivery_customers + session breakdown |
+| 10.3 | `syncAllToDelivery()` | `src/components/Dashboard.vue` | Sync ลูกค้าทั้ง shipping list ไป delivery_customers ทีเดียว |
+| 10.4 | `recalcItemCount(uid)` | `src/components/Dashboard.vue` | คำนวณ itemCount ใหม่จาก sessions ทั้งหมด |
+| 10.5 | Real-time Stock Watcher | `src/components/ShippingManager.vue` | watch stockData → auto-update จำนวนสินค้าใน delivery_customers |
+| 10.6 | Delivery Strip (Header) | `src/components/Header.vue` | แถบรายชื่อลูกค้า real-time บน header (pills สี overdue/today/soon/later) |
+| 10.7 | Countdown + Thai Date | `src/components/ShippingManager.vue` | นับถอยหลัง (เลย/วันนี้/พรุ่งนี้/อีก X วัน) + วันที่ไทย (24 มี.ค. 69) |
+| 10.8 | Mark Done + Reset | `src/components/ShippingManager.vue` | เสร็จ → status=done, itemCount=0, sessions=null |
+
+---
+
 ## How to Verify
 
 1. Review the diff of changed files

@@ -3,7 +3,12 @@
     <div class="dashboard-content">
       <div class="dashboard-header">
         <div class="dash-title">🚚 คิวจัดส่ง (รอบปัจจุบัน)</div>
-        <button class="btn btn-dark" @click="$emit('close')">ปิด</button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn btn-shipping-mgr" @click="syncAllToDelivery" title="Sync ทุกคนไป Shipping Manager">
+            📦 Sync All
+          </button>
+          <button class="btn btn-dark" @click="$emit('close')">ปิด</button>
+        </div>
       </div>
 
       <!-- Sales Stats Section -->
@@ -324,27 +329,110 @@ const percentageColorClass = computed(() => {
   return "color-complete";
 });
 
-function addToShipping() {
+async function addToShipping() {
   if (!selectedCustomer.value) return;
 
-  const path = `shipping/${systemStore.currentVideoId}/${selectedCustomer.value}`;
-  update(dbRef(db, path), {
+  const uid = selectedCustomer.value;
+  const order = customerOrders.value[uid];
+  const videoId = systemStore.currentVideoId;
+  const customerName = savedNames.value[uid]?.nick || order.name;
+
+  // 1. Mark ready in shipping (เดิม)
+  const path = `shipping/${videoId}/${uid}`;
+  await update(dbRef(db, path), {
     ready: true,
     timestamp: Date.now(),
-  })
-    .then(() => {
-      Swal.fire({
-        icon: "success",
-        title: "เพิ่มลงรายการส่งของแล้ว",
-        timer: 1500,
-        showConfirmButton: false,
-      });
-      selectedCustomer.value = "";
-    })
-    .catch((error) => {
-      console.error("Error adding to shipping:", error);
-      Swal.fire("Error", "เพิ่มไม่สำเร็จ", "error");
+  });
+
+  // 2. AUTO-SYNC to delivery_customers/{uid}
+  await syncCustomerToDelivery(uid, customerName, order, videoId);
+
+  Swal.fire({
+    icon: "success",
+    title: "เพิ่มลงรายการส่งของ + Sync แล้ว",
+    text: `${customerName}: ${order.items.length} รายการ`,
+    timer: 1500,
+    showConfirmButton: false,
+  });
+  selectedCustomer.value = "";
+}
+
+// ✅ Auto-sync ลูกค้าคนเดียว
+async function syncCustomerToDelivery(uid, name, order, videoId) {
+  const sessionData = {
+    count: order.items.length,
+    totalPrice: order.totalPrice,
+  };
+
+  // Create/update customer base info
+  const customerRef = dbRef(db, `delivery_customers/${uid}`);
+  const snap = await get(customerRef);
+  const existing = snap.val();
+
+  if (!existing) {
+    // New customer
+    await update(customerRef, {
+      name,
+      deliveryDate: null,
+      note: "",
+      status: "pending",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
+  } else {
+    // Existing — update name + timestamp, keep status if not done
+    const updates = { name, updatedAt: Date.now() };
+    if (existing.status === "done") updates.status = "pending";
+    await update(customerRef, updates);
+  }
+
+  // Save session breakdown
+  await update(dbRef(db, `delivery_customers/${uid}/sessions/${videoId}`), sessionData);
+
+  // Recalculate total itemCount
+  await recalcItemCount(uid);
+}
+
+// ✅ คำนวณ itemCount ใหม่จาก sessions
+async function recalcItemCount(uid) {
+  const sessionsSnap = await get(dbRef(db, `delivery_customers/${uid}/sessions`));
+  const sessions = sessionsSnap.val() || {};
+  const totalCount = Object.values(sessions).reduce((sum, s) => sum + (s.count || 0), 0);
+  const totalPrice = Object.values(sessions).reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+  await update(dbRef(db, `delivery_customers/${uid}`), {
+    itemCount: totalCount,
+    totalPrice: totalPrice,
+    updatedAt: Date.now(),
+  });
+}
+
+// ✅ Sync ทั้งรายการ shipping list ไป delivery_customers
+async function syncAllToDelivery() {
+  const videoId = systemStore.currentVideoId;
+  if (!videoId) return;
+
+  const list = shippingList.value;
+  if (list.length === 0) {
+    Swal.fire({ icon: "info", title: "ไม่มีลูกค้าใน shipping list", timer: 1500, showConfirmButton: false });
+    return;
+  }
+
+  let count = 0;
+  for (const item of list) {
+    const order = customerOrders.value[item.uid];
+    if (order) {
+      await syncCustomerToDelivery(item.uid, item.name, order, videoId);
+      count++;
+    }
+  }
+
+  Swal.fire({
+    icon: "success",
+    title: `📦 Sync เสร็จ!`,
+    text: `Sync ${count} คน ไป Shipping Manager แล้ว`,
+    timer: 2000,
+    showConfirmButton: false,
+  });
 }
 
 function removeFromShipping(uid) {

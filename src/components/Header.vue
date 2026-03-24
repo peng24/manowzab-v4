@@ -672,7 +672,12 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.19.2)</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.20.0)</h4>
+        <ul>
+          <li>🔊 <b>เพิ่มเสียงแนะนำลูกค้าใหม่</b> — ระบบจะพูดเตือนกติกาการจอง (พิมพ์ชื่อและรหัส) ให้ลูกค้าใหม่โดยอัตโนมัติ 1 ครั้ง</li>
+          <li>🎟️ <b>จองหลายรายการแบบมี _ คั่น</b> — รองรับการพิมพ์รหัสคั่นด้วยขีดล่าง (เช่น 11_37 หรือ ๑๑_๓๗) ให้ระบบจองรวดเดียวได้แล้ว</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.19.2)</h4>
         <ul>
           <li>✨ <b>ปรับปรุง Layout หน้าจอหลัก</b> — ย้ายช่อง Live Chat ให้เต็มความสูงด้านขวา และจัดวางเลขเวอร์ชั่นในตำแหน่งใหม่ที่แถบเมนูด้านบน</li>
         </ul>

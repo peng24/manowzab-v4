@@ -393,15 +393,36 @@ body {
   color: #888;
 }
 
-.btn-shipping-mgr {
+.shipping-mgr-icon {
   position: relative;
-  background: #7c3aed;
-  color: #fff;
-  font-weight: 600;
+  font-size: 2em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  line-height: 1;
+  padding: 0 4px;
+  user-select: none;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
-.btn-shipping-mgr:hover:not(:disabled) {
-  background: #6d28d9;
+.shipping-mgr-icon:hover {
+  transform: scale(1.15) rotate(-5deg);
+  filter: drop-shadow(0 4px 8px rgba(124, 58, 237, 0.5));
+}
+
+.shipping-mgr-icon:active {
+  transform: scale(0.95);
+}
+
+.shipping-mgr-icon .delivery-badge {
+  font-size: 0.4em; /* Scale the badge relative to the large icon */
+  top: -2px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
 }
 
 .delivery-badge {

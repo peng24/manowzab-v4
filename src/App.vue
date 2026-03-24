@@ -30,6 +30,7 @@
 
         <Dashboard v-if="showDashboard" @close="showDashboard = false" />
         <HistoryModal v-if="showHistory" @close="showHistory = false" />
+        <ShippingManager v-if="showShippingManager" @close="showShippingManager = false" />
       </div>
     </template>
   </div>
@@ -56,6 +57,7 @@ import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import Dashboard from "./components/Dashboard.vue";
 import HistoryModal from "./components/HistoryModal.vue";
+import ShippingManager from "./components/ShippingManager.vue";
 
 import LiveOverlay from "./components/LiveOverlay.vue"; // ✅ Import Overlay
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
@@ -94,10 +96,12 @@ const { initAutoCleanup } = useAutoCleanup();
 
 const showDashboard = ref(false);
 const showHistory = ref(false);
+const showShippingManager = ref(false);
 
 // Provide functions for child components
 provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
+provide("openShippingManager", () => (showShippingManager.value = true));
 
 // ✅ Unlock Audio Function (All audio types: SFX, Native TTS, Google TTS)
 async function handleFirstInteraction() {

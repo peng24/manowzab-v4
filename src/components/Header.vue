@@ -30,11 +30,16 @@
 
       <button class="btn btn-dark" @click="openHistory">🕒</button>
 
+
+
+
       <button
-        :class="['btn', 'btn-shipping', shippingCount > 0 ? '' : 'empty']"
-        @click="openDashboard"
+        class="btn btn-shipping-mgr"
+        @click="openShippingManager"
+        title="รายการจัดส่ง"
       >
-        🚚 ({{ shippingCount }})
+        📦
+        <span v-if="todayDeliveryCount > 0" class="delivery-badge">{{ todayDeliveryCount }}</span>
       </button>
 
       <input
@@ -161,6 +166,23 @@
         {{ systemStore.version }}
       </div>
     </div>
+
+    <!-- 📦 Delivery Strip (always visible, real-time) -->
+    <div class="delivery-strip" v-if="deliveryStrip.length > 0">
+      <span class="ds-label">📦</span>
+      <div class="ds-scroll">
+        <span
+          v-for="c in deliveryStrip"
+          :key="c.id"
+          class="ds-pill"
+          :class="'ds-' + c.urgency"
+          :title="c.tooltip"
+        >
+          {{ c.name }}
+          <span class="ds-info" v-if="c.info">{{ c.info }}</span>
+        </span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -198,6 +220,7 @@ const { queueAudio, unlockAudio } = useAudio();
 
 const openDashboard = inject("openDashboard");
 const openHistory = inject("openHistory");
+const openShippingManager = inject("openShippingManager");
 
 const videoId = ref("");
 const showDropdown = ref(false);
@@ -232,6 +255,79 @@ const shippingCount = computed(() => {
   return Object.keys(currentShipping).filter(
     (uid) => currentShipping[uid]?.ready && activeBuyerUids.has(uid),
   ).length;
+});
+
+// 📦 Delivery Count (today)
+const deliveryCustomers = ref([]);
+let unsubDelivery = null;
+
+const todayDeliveryCount = computed(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return deliveryCustomers.value.filter((c) => {
+    if (c.status === 'done' || !c.deliveryDate) return false;
+    const target = new Date(c.deliveryDate);
+    target.setHours(0, 0, 0, 0);
+    return target.getTime() <= today.getTime();
+  }).length;
+});
+
+// 📦 Thai months for delivery strip
+const thaiMonths = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+];
+
+function formatThaiDateShort(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return `${d.getDate()} ${thaiMonths[d.getMonth()]}`;
+}
+
+function getDeliveryDays(dateStr) {
+  if (!dateStr) return Infinity;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr); target.setHours(0, 0, 0, 0);
+  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+}
+
+// 📦 Delivery Strip — sorted pills for the header bar
+const deliveryStrip = computed(() => {
+  return deliveryCustomers.value
+    .filter((c) => c.status !== 'done')
+    .map((c) => {
+      const days = getDeliveryDays(c.deliveryDate);
+      let urgency, info, tooltip;
+
+      if (!c.deliveryDate) {
+        urgency = 'none';
+        info = '';
+        tooltip = `${c.name}: ยังไม่กำหนดวันส่ง (${c.itemCount || 0} ชิ้น)`;
+      } else if (days < 0) {
+        urgency = 'overdue';
+        info = `เลย ${Math.abs(days)} วัน!`;
+        tooltip = `${c.name}: เลยกำหนด ${Math.abs(days)} วัน (${c.itemCount || 0} ชิ้น)`;
+      } else if (days === 0) {
+        urgency = 'today';
+        info = 'วันนี้!';
+        tooltip = `${c.name}: ส่งวันนี้ (${c.itemCount || 0} ชิ้น)`;
+      } else if (days === 1) {
+        urgency = 'soon';
+        info = 'พรุ่งนี้';
+        tooltip = `${c.name}: พรุ่งนี้ (${c.itemCount || 0} ชิ้น)`;
+      } else if (days <= 3) {
+        urgency = 'soon';
+        info = `อีก ${days} วัน`;
+        tooltip = `${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;
+      } else {
+        urgency = 'later';
+        info = formatThaiDateShort(c.deliveryDate);
+        tooltip = `${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;
+      }
+
+      return { id: c.uid || c.name, name: c.name, urgency, info, days, tooltip, count: c.itemCount || 0 };
+    })
+    .sort((a, b) => a.days - b.days);
 });
 
 
@@ -576,9 +672,13 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.17.0)</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.19.0)</h4>
         <ul>
-          <li>📊 <b>แสดง % ยอดขายแบบเรียลไทม์</b> — เพิ่มเปอร์เซ็นต์ยอดขายข้างๆ จำนวนขายแล้ว บนหัว StockGrid พร้อม Animated Counting Effect ที่นับขึ้น-ลงแบบ smooth, Progress Bar พร้อม Shimmer, และข้อความเชียร์ที่เปลี่ยนตาม % (สีเทา → เหลือง → ส้ม → เขียว)</li>
+          <li>🤖 <b>Auto-Sync ระบบจัดส่ง</b> — Dashboard ส่งข้อมูลลูกค้า+จำนวนสินค้า ไป Shipping Manager อัตโนมัติ! รองรับสะสมข้ามไลฟ์ พร้อมปุ่ม Sync All และ breakdown ต่อไลฟ์</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.18.0)</h4>
+        <ul>
+          <li>📦 <b>ระบบจัดการจัดส่งสินค้า</b> — หน้าจัดการลูกค้า, นัดวันส่ง, นับถอยหลัง, badge แจ้งเตือน</li>
         </ul>
         <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.16.7)</h4>
         <ul>
@@ -616,6 +716,11 @@ onMounted(() => {
   unsubShipping = onValue(dbRef(db, "shipping"), (snapshot) => {
     shippingData.value = snapshot.val() || {};
   });
+  // 📦 Listen delivery_customers for badge count
+  unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
+    const data = snapshot.val() || {};
+    deliveryCustomers.value = Object.values(data);
+  });
   document.addEventListener("click", handleClickOutside);
   const savedVideoId = localStorage.getItem("lastVideoId");
   if (savedVideoId) {
@@ -626,6 +731,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   logger.log("👋 Header unmounting");
   if (unsubShipping) unsubShipping();
+  if (unsubDelivery) unsubDelivery();
   document.removeEventListener("click", handleClickOutside);
   if (simIntervalId) clearInterval(simIntervalId);
   if (videoId.value) localStorage.setItem("lastVideoId", videoId.value);

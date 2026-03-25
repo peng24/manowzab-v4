@@ -303,6 +303,83 @@ export function useChatProcessor() {
     } else if (shippingRegex.test(normalizedMsg)) {
       intent = "shipping";
       method = "regex-ship";
+
+      // --- AUTO SHIP LOGIC ---
+      let autoShipDate = null;
+      let autoShipName = displayName;
+      let autoShipUid = uid;
+      let isAutoShip = false;
+
+      let shipMsg = normalizedMsg;
+      if (isAdmin) {
+        const proxyShipMatch = normalizedMsg.match(/^([ก-๛a-zA-Z\s]+?)\s+(ส่งเลย|ส่งพรุ่งนี้|ส่งวันนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้|ส่ง\s*(?:วันที่\s*)?\d{1,2}.*)$/);
+        if (proxyShipMatch) {
+          autoShipName = proxyShipMatch[1].trim();
+          let foundUid = Object.keys(savedNamesCache.value).find(k => {
+             const v = savedNamesCache.value[k];
+             return (typeof v === "object" ? v.nick : v) === autoShipName;
+          });
+          if (!foundUid) {
+             foundUid = "manual-" + Date.now() + "-" + Math.random().toString(36).substring(2,5);
+          }
+          autoShipUid = foundUid;
+          shipMsg = proxyShipMatch[2];
+        }
+      }
+
+      const shipNowMatch = shipMsg.match(/ส่งเลย|ส่งวันนี้/);
+      const shipTmrMatch = shipMsg.match(/ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/);
+      const shipDateMatch = shipMsg.match(/ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/);
+
+      if (shipNowMatch) {
+        isAutoShip = true;
+        autoShipDate = new Date();
+      } else if (shipTmrMatch) {
+        isAutoShip = true;
+        autoShipDate = new Date();
+        autoShipDate.setDate(autoShipDate.getDate() + 1);
+      } else if (shipDateMatch) {
+        isAutoShip = true;
+        autoShipDate = new Date();
+        const day = parseInt(shipDateMatch[1]);
+        autoShipDate.setDate(day);
+        
+        const monthStr = shipDateMatch[2];
+        if (monthStr) {
+          const mNamesShort = ["มค", "กพ", "มีค", "เมย", "พค", "มิย", "กค", "สค", "กย", "ตค", "พย", "ธค"];
+          const mNamesFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+          const cleanMonth = monthStr.replace(/\./g, '');
+          let mIndex = mNamesShort.indexOf(cleanMonth);
+          if (mIndex === -1) mIndex = mNamesFull.indexOf(cleanMonth);
+          if (mIndex !== -1) {
+            autoShipDate.setMonth(mIndex);
+          }
+        }
+        if (autoShipDate < new Date() && (new Date().getDate() - day) > 15) {
+          autoShipDate.setMonth(autoShipDate.getMonth() + 1);
+        }
+      }
+
+      if (isAutoShip) {
+        const y = autoShipDate.getFullYear();
+        const m = String(autoShipDate.getMonth() + 1).padStart(2, '0');
+        const d = String(autoShipDate.getDate()).padStart(2, '0');
+        const parsedDate = `${y}-${m}-${d}`;
+
+        update(dbRef(db, `delivery_customers/${autoShipUid}`), {
+          name: autoShipName,
+          deliveryDate: parsedDate,
+          status: "pending",
+          updatedAt: Date.now()
+        });
+        
+        Toast.fire({
+          icon: "success",
+          title: `📦 เพิ่มรอบส่งให้ ${autoShipName} แล้ว`,
+        });
+      }
+      // --- END AUTO SHIP LOGIC ---
+
     } else if (questionRegex.test(normalizedMsg)) {
       method = "question-skip";
     } else {

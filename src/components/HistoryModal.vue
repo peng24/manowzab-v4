@@ -137,13 +137,14 @@
                      <th width="120" class="text-right">ราคา</th>
                      <th width="100" class="text-center">ช่องทาง</th>
                      <th width="120">เวลา</th>
+                     <th width="120" class="text-center">จัดการ</th>
                    </tr>
                  </thead>
                  <tbody>
                    <tr v-if="filteredOrders.length === 0">
-                      <td colspan="6" class="text-center py-20 text-muted">ไม่พบข้อมูลคำสั่งซื้อ</td>
+                      <td colspan="7" class="text-center py-20 text-muted">ไม่พบข้อมูลคำสั่งซื้อ</td>
                    </tr>
-                   <tr v-for="(order, index) in filteredOrders" :key="order.stockId" @click="openEditModal({ id: order.stockId, ...order })" class="cursor-pointer hover:bg-slate-700">
+                   <tr v-for="(order, index) in filteredOrders" :key="order.stockId" class="hover:bg-slate-700">
                      <td class="text-muted">#{{ index + 1 }}</td>
                      <td class="font-bold">{{ order.stockId }}</td>
                      <td>
@@ -158,6 +159,16 @@
                      </td>
                      <td class="text-sm text-muted">
                         {{ formatTime(order.timestamp) }}
+                     </td>
+                     <td class="text-center">
+                        <div class="action-btns">
+                           <button class="btn-action btn-action-edit" @click.stop="openEditModal({ id: order.stockId, ...order })" title="แก้ไข">
+                             <i class="fa-solid fa-pen"></i>
+                           </button>
+                           <button class="btn-action btn-action-delete" @click.stop="removeReservationDirect(order.stockId, order.owner)" title="ลบชื่อคนจอง">
+                             <i class="fa-solid fa-user-xmark"></i>
+                           </button>
+                        </div>
                      </td>
                    </tr>
                  </tbody>
@@ -177,7 +188,7 @@
                     <div 
                         v-for="item in allGridItems" 
                         :key="item.id"
-                        class="grid-item cursor-pointer hover:border-blue-400"
+                        class="grid-item"
                         :class="{ 'empty': item.isEmpty, 'sold': !item.isEmpty }"
                         @click="openEditModal(item)"
                     >
@@ -198,15 +209,29 @@
   <!-- Edit Modal (Teleport or Overlay) -->
   <Teleport to="body">
     <div v-if="isEditModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]" @click.self="closeEditModal">
-        <div class="bg-[#1e293b] p-6 rounded-lg w-[90%] max-w-sm shadow-2xl border border-slate-600">
-            <h3 class="text-xl text-white mb-4 flex items-center gap-2">
-              <i class="fa-solid fa-pen-to-square"></i> แก้ไขรายการที่ {{ editingItem?.id }}
-            </h3>
+        <div class="edit-modal-box">
+            <div class="edit-modal-header">
+              <h3>
+                <i class="fa-solid fa-pen-to-square"></i> รายการที่ {{ editingItem?.id }}
+              </h3>
+              <span class="reservation-badge" :class="editingItem?.owner ? 'badge-reserved' : 'badge-empty'">
+                {{ editingItem?.owner ? '🟢 จองแล้ว' : '⚪ ว่าง' }}
+              </span>
+            </div>
             
             <div class="space-y-4">
                 <div>
-                    <label class="block text-slate-400 text-sm mb-1">ชื่อลูกค้า</label>
-                    <input v-model="editForm.owner" type="text" class="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white" placeholder="ใส่ชื่อลูกค้า">
+                    <label class="block text-slate-400 text-sm mb-1">ชื่อคนจอง</label>
+                    <input 
+                      v-model="editForm.owner" 
+                      type="text" 
+                      class="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white" 
+                      placeholder="พิมพ์ชื่อคนจอง..."
+                      list="customer-suggestions"
+                    >
+                    <datalist id="customer-suggestions">
+                      <option v-for="name in customerNames" :key="name" :value="name" />
+                    </datalist>
                 </div>
                 <div>
                     <label class="block text-slate-400 text-sm mb-1">ราคา</label>
@@ -214,14 +239,22 @@
                 </div>
             </div>
             
-            <div class="mt-6 flex gap-2 justify-end">
-               <button class="btn btn-danger mr-auto" @click="clearItem">
-                  <i class="fa-solid fa-eraser"></i> ล้าง
-               </button>
-               <button class="btn btn-outline" @click="closeEditModal">ยกเลิก</button>
-               <button class="btn btn-success" @click="saveEdit">
-                  <i class="fa-solid fa-save"></i> บันทึก
-               </button>
+            <div class="edit-modal-actions">
+               <div class="edit-modal-actions-left">
+                 <button v-if="editingItem?.owner" class="btn btn-warning" @click="removeReservation">
+                   <i class="fa-solid fa-user-xmark"></i> ลบชื่อคนจอง
+                 </button>
+                 <button class="btn btn-danger" @click="clearItem">
+                   <i class="fa-solid fa-eraser"></i> ล้างทั้งหมด
+                 </button>
+               </div>
+               <div class="edit-modal-actions-right">
+                 <button class="btn btn-outline" @click="closeEditModal">ยกเลิก</button>
+                 <button class="btn btn-success" @click="saveEdit">
+                   <i :class="editingItem?.owner ? 'fa-solid fa-save' : 'fa-solid fa-plus'"></i>
+                   {{ editingItem?.owner ? 'บันทึก' : 'จองให้' }}
+                 </button>
+               </div>
             </div>
         </div>
     </div>
@@ -288,6 +321,16 @@ const filteredOrders = computed(() => {
      o.stockId.toString().includes(q) ||
      (o.owner && o.owner.toLowerCase().includes(q))
   );
+});
+
+// Unique customer names for autocomplete
+const customerNames = computed(() => {
+    if (!selectedItem.value || !selectedItem.value.orders) return [];
+    const names = new Set();
+    Object.values(selectedItem.value.orders).forEach(order => {
+        if (order.owner) names.add(order.owner);
+    });
+    return [...names].sort();
 });
 
 // Grid Items Logic (Fill gaps 1..stockSize)
@@ -430,6 +473,65 @@ async function saveEdit() {
     await history.updateHistoryItem(selectedId.value, editingItem.value.id, updatedData);
     
     closeEditModal();
+}
+
+async function removeReservation() {
+    if (!editingItem.value) return;
+    
+    const result = await Swal.fire({
+        title: "ลบชื่อคนจอง?",
+        text: `ยกเลิกจอง "${editingItem.value.owner}" จากรายการที่ ${editingItem.value.id}?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#f59e0b",
+        confirmButtonText: "ลบชื่อ",
+        cancelButtonText: "ยกเลิก"
+    });
+    
+    if (result.isConfirmed) {
+        // Local Update — remove owner only
+        if (selectedItem.value.orders && selectedItem.value.orders[editingItem.value.id]) {
+            delete selectedItem.value.orders[editingItem.value.id].owner;
+            delete selectedItem.value.orders[editingItem.value.id].uid;
+        }
+        
+        // Firebase Update — set owner & uid to null
+        await history.updateHistoryItem(selectedId.value, editingItem.value.id, {
+            owner: null,
+            uid: null,
+            method: 'manual-remove',
+            removedAt: Date.now()
+        });
+        closeEditModal();
+    }
+}
+
+async function removeReservationDirect(stockId, ownerName) {
+    const result = await Swal.fire({
+        title: "ลบชื่อคนจอง?",
+        text: `ยกเลิกจอง "${ownerName}" จากรายการที่ ${stockId}?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#f59e0b",
+        confirmButtonText: "ลบชื่อ",
+        cancelButtonText: "ยกเลิก"
+    });
+    
+    if (result.isConfirmed) {
+        // Local Update
+        if (selectedItem.value.orders && selectedItem.value.orders[stockId]) {
+            delete selectedItem.value.orders[stockId].owner;
+            delete selectedItem.value.orders[stockId].uid;
+        }
+        
+        // Firebase Update
+        await history.updateHistoryItem(selectedId.value, stockId, {
+            owner: null,
+            uid: null,
+            method: 'manual-remove',
+            removedAt: Date.now()
+        });
+    }
 }
 
 async function clearItem() {
@@ -702,8 +804,109 @@ async function fixHistoryData() {
 .btn-success:hover { background: #059669; }
 .btn-danger { background: #ef4444; color: white; }
 .btn-danger:hover { background: #dc2626; }
+.btn-warning { background: #f59e0b; color: white; }
+.btn-warning:hover { background: #d97706; }
 .btn-icon-sm { background: transparent; border: none; color: #94a3b8; cursor: pointer; }
 .btn-icon-sm:hover { color: #fff; }
+
+/* Action buttons in list view */
+.action-btns {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.btn-action {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85em;
+  transition: all 0.2s;
+}
+
+.btn-action-edit:hover {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.btn-action-delete:hover {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: white;
+}
+
+/* Edit Modal Box */
+.edit-modal-box {
+  background: #1e293b;
+  padding: 24px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border: 1px solid #334155;
+}
+
+.edit-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.edit-modal-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reservation-badge {
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.badge-reserved {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-empty {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.edit-modal-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.edit-modal-actions-left {
+  display: flex;
+  gap: 6px;
+}
+
+.edit-modal-actions-right {
+  display: flex;
+  gap: 6px;
+}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -741,6 +944,14 @@ async function fixHistoryData() {
     justify-content: center;
     position: relative;
     padding: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.grid-item:hover {
+    border-color: #3b82f6;
+    transform: scale(1.03);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
 }
 
 .grid-item.empty {

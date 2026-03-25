@@ -36,9 +36,9 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
 });
 
 // 🚀 Performance: Regex patterns at module level
-const multiBuyRegex = /^(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/;
-const adminProxyNumFirstRegex = /^(\d+)\s*(.+)$/;
-const adminProxyNameFirstRegex = /^([^\d]+?)\s*(\d+)$/;
+const multiBuyRegex = /^(?:F|f|cf|CF|รับ|เอา)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
+const adminProxyNumFirstRegex = /^(\d+)\s+([ก-๛a-zA-Z].*)$/;
+const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z][^]*?)\s+(\d+)$/;
 const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
 const questionRegex =
   /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;

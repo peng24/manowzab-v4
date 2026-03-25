@@ -2,48 +2,43 @@ import { ref } from "vue";
 import { useSystemStore } from "../stores/system";
 import { ttsService } from "../services/TextToSpeech";
 
+// ✅ Global Singleton AudioContext (Shared across all components)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
 // ✅ Global Unified Audio Queue (persists across re-renders)
 const audioQueue = [];
 let isAudioProcessing = false;
 
 export function useAudio() {
   const systemStore = useSystemStore();
-  const audioCtx = ref(null);
   const isSpeaking = ref(false); // Reactive wrapper for UI if needed
-
-  function initAudio() {
-    if (!audioCtx.value) {
-      audioCtx.value = new (window.AudioContext || window.webkitAudioContext)();
-    }
-  }
 
   // ✅ Unlock all audio types on iOS (AudioContext, Native TTS, HTML5 Audio)
   async function unlockAudio() {
-    initAudio();
-    if (!audioCtx.value) return false;
+    if (!audioCtx) return false;
 
     try {
-      if (audioCtx.value.state === "suspended") {
-        await audioCtx.value.resume();
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
       }
     } catch (err) {
       console.warn("Audio resume failed:", err);
     }
 
-    if (audioCtx.value.state !== "running") return false;
+    if (audioCtx.state !== "running") return false;
 
     try {
       // 1. Unlock AudioContext (for SFX)
-      const oscillator = audioCtx.value.createOscillator();
-      const gainNode = audioCtx.value.createGain();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
 
       gainNode.gain.value = 0; // 🔇 Silent
 
       oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.value.destination);
+      gainNode.connect(audioCtx.destination);
 
       oscillator.start();
-      oscillator.stop(audioCtx.value.currentTime + 0.001);
+      oscillator.stop(audioCtx.currentTime + 0.001);
 
       // 2. Unlock Native TTS (SpeechSynthesis API)
       ttsService.unlockNative();
@@ -74,16 +69,14 @@ export function useAudio() {
           return;
         }
 
-        initAudio();
-
-        if (audioCtx.value && audioCtx.value.state === "suspended") {
-          await audioCtx.value.resume();
+        if (audioCtx && audioCtx.state === "suspended") {
+          await audioCtx.resume();
         }
-        if (!audioCtx.value) {
+        if (!audioCtx) {
           return;
         }
 
-        const ctx = audioCtx.value;
+        const ctx = audioCtx;
         const now = ctx.currentTime;
 
         // Stop any active sounds to prevent overlapping
@@ -214,10 +207,9 @@ export function useAudio() {
     } finally {
       // ✅ ALWAYS reset — prevents permanent deadlock
       isAudioProcessing = false;
+      // ✅ Use setTimeout to avoid stack overflow on very large queues
+      setTimeout(() => processAudioQueue(), 0);
     }
-
-    // Process next item in the queue
-    processAudioQueue();
   }
 
   // ✅ Unified Entry Point: queues SFX + TTS as a single sequential task

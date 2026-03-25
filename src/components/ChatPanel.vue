@@ -890,8 +890,19 @@ async function refreshChat() {
   transition: opacity 0.2s;
 }
 
-.chat-bubble:hover .force-process-btn {
-  opacity: 1;
+/* ✅ Desktop: Show on hover */
+@media (min-width: 1025px) {
+  .chat-bubble:hover .force-process-btn {
+    opacity: 1;
+  }
+}
+
+/* ✅ Mobile/Tablet: Always show with medium opacity */
+@media (max-width: 1024px) {
+  .force-process-btn {
+    opacity: 0.6;
+    right: -32px; /* Slightly closer on mobile */
+  }
 }
 
 .btn-mini {

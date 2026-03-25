@@ -184,35 +184,36 @@ export const useStockStore = defineStore("stock", () => {
    * @returns {Promise<{previousOwner: string, nextOwner: string|null}|null>} Info about the cancellation for TTS.
    */
   async function processCancel(num) {
-    const current = stockData.value[num];
-    if (!current) return null;
-
-    const previousOwner = current.owner;
+    const itemRef = dbRef(db, `stock/${systemStore.currentVideoId}/${num}`);
+    let previousOwner = null;
     let nextOwner = null;
 
     try {
-      if (current.queue && current.queue.length > 0) {
-        // Promote next in queue
-        const next = current.queue[0];
-        const nextQ = current.queue.slice(1);
-        const newData = {
-          owner: next.owner,
-          uid: next.uid,
-          time: Date.now(),
-          queue: nextQ,
-          source: "queue",
-        };
-        if (current.price) newData.price = current.price;
+      await runTransaction(itemRef, (currentData) => {
+        if (!currentData) return null; // Nothing to cancel
 
-        await set(
-          dbRef(db, `stock/${systemStore.currentVideoId}/${num}`),
-          newData,
-        );
-        nextOwner = next.owner;
-      } else {
-        // Delete item if no queue
-        await remove(dbRef(db, `stock/${systemStore.currentVideoId}/${num}`));
-      }
+        previousOwner = currentData.owner;
+
+        if (currentData.queue && currentData.queue.length > 0) {
+          // Promote next in queue
+          const next = currentData.queue[0];
+          const nextQ = currentData.queue.slice(1);
+          
+          nextOwner = next.owner;
+          
+          return {
+            ...currentData,
+            owner: next.owner,
+            uid: next.uid,
+            time: Date.now(),
+            queue: nextQ,
+            source: "queue",
+          };
+        } else {
+          // No one in queue, delete the item
+          return null;
+        }
+      });
 
       return { success: true, previousOwner, nextOwner, error: null };
     } catch (e) {

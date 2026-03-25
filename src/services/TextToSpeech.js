@@ -209,7 +209,7 @@ export class TextToSpeech {
 
     // Sanitize and limit text
     const sanitized = this.sanitize(text);
-    const safeText = sanitized.substring(0, 200); // Limit for API
+    const safeText = sanitized.substring(0, 500); // Limit for API (Aligned with sanitize)
 
     console.log(
       `☁️ Google Cloud TTS: ${safeText.substring(0, 50)}... (${keys.length} keys available)`,

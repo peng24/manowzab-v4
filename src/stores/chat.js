@@ -71,12 +71,16 @@ export const useChatStore = defineStore("chat", () => {
       return;
     }
 
-    let csvContent = "\uFEFFId,Author name,Comment,Video time,Message time\n";
+    let csvContent = "\uFEFF\"Id\",\"Author name\",\"Comment\",\"Video time\",\"Message time\"\n";
 
     fullChatLog.value.forEach((row) => {
-      const safeComment = row.comment ? row.comment.replace(/"/g, '""') : "";
-      const safeAuthor = row.author ? row.author.replace(/"/g, '""') : "";
-      csvContent += `${row.id},"${safeAuthor}","${safeComment}",${row.videoTime},"${row.messageTime}"\n`;
+      const safeId = row.id ? String(row.id).replace(/"/g, '""') : "";
+      const safeComment = row.comment ? String(row.comment).replace(/"/g, '""') : "";
+      const safeAuthor = row.author ? String(row.author).replace(/"/g, '""') : "";
+      const safeVideoTime = row.videoTime ? String(row.videoTime).replace(/"/g, '""') : "";
+      const safeMessageTime = row.messageTime ? String(row.messageTime).replace(/"/g, '""') : "";
+      
+      csvContent += `"${safeId}","${safeAuthor}","${safeComment}","${safeVideoTime}","${safeMessageTime}"\n`;
     });
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });

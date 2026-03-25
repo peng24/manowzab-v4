@@ -1117,6 +1117,33 @@ async function refreshStock() {
 /* ... */
 
 /* Responsive Adjustments */
+@media (max-width: 768px) {
+  .stock-header {
+    height: auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+    padding: 15px;
+  }
+  .stock-input-group {
+    width: 100%;
+    justify-content: center;
+  }
+  .header-center {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 5px;
+  }
+}
+
 @media (max-width: 1180px) {
   .stock-grid {
     grid-template-columns: repeat(

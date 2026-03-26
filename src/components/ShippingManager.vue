@@ -427,10 +427,65 @@ function getSessionBreakdown(customer) {
 
 // CRUD
 function addManualCustomer() {
-  const name = newName.value.trim();
+  let name = newName.value.trim();
   if (!name) return;
 
   let parsedDate = parseDDMMYYYY(newDate.value);
+
+  // --- Apply Chat-Like Logic ---
+  const shipNowMatch = name.match(/ส่งเลย|ส่งวันนี้/);
+  const shipTmrMatch = name.match(/ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/);
+  const shipDateMatch = name.match(/ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/);
+
+  let matchedKeyword = null;
+  if (shipNowMatch) matchedKeyword = shipNowMatch[0];
+  else if (shipTmrMatch) matchedKeyword = shipTmrMatch[0];
+  else if (shipDateMatch) matchedKeyword = shipDateMatch[0];
+
+  if (matchedKeyword) {
+    // 1. Clean the name
+    let cleanName = name
+      .replace(matchedKeyword, "")
+      .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
+      .trim();
+
+    if (cleanName.length > 0) {
+      name = cleanName;
+    }
+
+    // 2. Auto-set the date if not explicitly manually filled in the date input
+    if (!newDate.value) {
+      let autoShipDate = new Date();
+      if (shipNowMatch) {
+         // today
+      } else if (shipTmrMatch) {
+         autoShipDate.setDate(autoShipDate.getDate() + 1);
+      } else if (shipDateMatch) {
+         const day = parseInt(shipDateMatch[1]);
+         autoShipDate.setDate(day);
+         const monthStr = shipDateMatch[2];
+         if (monthStr) {
+           const mNamesShort = ["มค", "กพ", "มีค", "เมย", "พค", "มิย", "กค", "สค", "กย", "ตค", "พย", "ธค"];
+           const mNamesFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+           const cleanMonth = monthStr.replace(/\./g, '');
+           let mIndex = mNamesShort.indexOf(cleanMonth);
+           if (mIndex === -1) mIndex = mNamesFull.indexOf(cleanMonth);
+           if (mIndex !== -1) {
+             autoShipDate.setMonth(mIndex);
+           }
+         }
+         if (autoShipDate < new Date() && (new Date().getDate() - day) > 15) {
+           autoShipDate.setMonth(autoShipDate.getMonth() + 1);
+         }
+      }
+      const y = autoShipDate.getFullYear();
+      const m = String(autoShipDate.getMonth() + 1).padStart(2, '0');
+      const d = String(autoShipDate.getDate()).padStart(2, '0');
+      parsedDate = `${y}-${m}-${d}`;
+    }
+  }
+
+  // Backup fallback: Today
   if (!parsedDate) {
     const today = new Date();
     const y = today.getFullYear();
@@ -439,14 +494,20 @@ function addManualCustomer() {
     parsedDate = `${y}-${m}-${d}`;
   }
 
-  const manualUid = "manual-" + Date.now();
-  update(dbRef(db, `delivery_customers/${manualUid}`), {
+  // Find if customer already exists to update them instead of duplicating
+  let targetUid = "manual-" + Date.now();
+  const existingCustomer = allCustomers.value.find(c => c.name === name && c.status !== "done");
+  if (existingCustomer) {
+    targetUid = existingCustomer.id;
+  }
+
+  update(dbRef(db, `delivery_customers/${targetUid}`), {
     name,
-    itemCount: 0,
+    itemCount: existingCustomer ? existingCustomer.itemCount : 0,
     deliveryDate: parsedDate,
-    note: "",
+    note: existingCustomer ? existingCustomer.note : "",
     status: "pending",
-    createdAt: Date.now(),
+    createdAt: existingCustomer ? existingCustomer.createdAt : Date.now(),
     updatedAt: Date.now(),
   }).then(() => {
     newName.value = "";

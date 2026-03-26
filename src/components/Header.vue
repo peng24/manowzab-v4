@@ -684,7 +684,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.22.1) - 25 มี.ค. 2026</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.23.0) - 26 มี.ค. 2026</h4>
+        <ul>
+          <li>🤖 <b>ปรับตรรกะการดึงข้อมูลการจัดส่ง </b> — ตอนนี้ระบบดึงรายชื่อการจัดเตรียมส่งจากคอมเมนต์ (เช่น "ส่งพรุ่งนี้ พี่แจง") ได้แม่นยำและยืดหยุ่นเหมือนระบบจองของหน้าแชทหลักแล้ว! ไม่ต้องพิมพ์เว้นวรรคให้เป๊ะก็รู้เรื่อง</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.22.1)</h4>
         <ul>
           <li>🤖 <b>เพิ่มกฎ AI ประจำโปรเจกต์</b> — สร้าง \`GEMINI.md\` เพื่อเป็นข้อกำหนดทางสถาปัตยกรรม (Vue 3, Firebase, Audio Queue) ให้ AI ทำงานร่วมกับระบบปัจจุบันได้อย่างปลอดภัย ไม่กระทบระบบเดิม!</li>
         </ul>

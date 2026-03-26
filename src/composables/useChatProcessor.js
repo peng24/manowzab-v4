@@ -310,26 +310,37 @@ export function useChatProcessor() {
       let autoShipUid = uid;
       let isAutoShip = false;
 
-      let shipMsg = normalizedMsg;
-      if (isAdmin) {
-        const proxyShipMatch = normalizedMsg.match(/^([ก-๛a-zA-Z\s]+?)\s+(ส่งเลย|ส่งพรุ่งนี้|ส่งวันนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้|ส่ง\s*(?:วันที่\s*)?\d{1,2}.*)$/);
-        if (proxyShipMatch) {
-          autoShipName = proxyShipMatch[1].trim();
+      const shipNowMatch = normalizedMsg.match(/ส่งเลย|ส่งวันนี้/);
+      const shipTmrMatch = normalizedMsg.match(/ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/);
+      const shipDateMatch = normalizedMsg.match(/ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/);
+
+      let matchedKeyword = null;
+      if (shipNowMatch) matchedKeyword = shipNowMatch[0];
+      else if (shipTmrMatch) matchedKeyword = shipTmrMatch[0];
+      else if (shipDateMatch) matchedKeyword = shipDateMatch[0];
+
+      if (isAdmin && matchedKeyword) {
+        // Clean Name Logic (same robust fallback used in chat buying)
+        let cleanName = normalizedMsg
+          .replace(matchedKeyword, "")
+          .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
+          .trim();
+
+        if (cleanName.length > 0) {
+          autoShipName = cleanName;
+          
           let foundUid = Object.keys(savedNamesCache.value).find(k => {
              const v = savedNamesCache.value[k];
-             return (typeof v === "object" ? v.nick : v) === autoShipName;
+             const nick = typeof v === "object" ? v.nick : v;
+             return nick && nick.trim() === autoShipName;
           });
+          
           if (!foundUid) {
              foundUid = "manual-" + Date.now() + "-" + Math.random().toString(36).substring(2,5);
           }
           autoShipUid = foundUid;
-          shipMsg = proxyShipMatch[2];
         }
       }
-
-      const shipNowMatch = shipMsg.match(/ส่งเลย|ส่งวันนี้/);
-      const shipTmrMatch = shipMsg.match(/ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/);
-      const shipDateMatch = shipMsg.match(/ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/);
 
       if (shipNowMatch) {
         isAutoShip = true;

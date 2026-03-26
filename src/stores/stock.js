@@ -34,6 +34,9 @@ export const useStockStore = defineStore("stock", () => {
    * @returns {Function} Cleanup function to unsubscribe listeners.
    */
   function connectToStock(videoId) {
+    // ✅ Reset milestones when connecting to a new session
+    milestones.value = { fifty: false, eighty: false, hundred: false };
+    
     const stockRef = dbRef(db, `stock/${videoId}`);
 
     let isInitialLoad = true;

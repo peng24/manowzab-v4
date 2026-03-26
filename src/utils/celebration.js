@@ -78,16 +78,20 @@ export function triggerCelebration(percentage) {
     // Fire from left edge
     confetti({
       particleCount,
-      startVelocity: 30,
-      spread: 360,
-      origin: { x: Math.random() * 0.2, y: Math.random() - 0.2 },
+      startVelocity: 45,
+      spread: 60,
+      angle: 60,
+      zIndex: 9999,
+      origin: { x: 0, y: 1 },
     });
     // Fire from right edge
     confetti({
       particleCount,
-      startVelocity: 30,
-      spread: 360,
-      origin: { x: Math.random() * 0.2 + 0.8, y: Math.random() - 0.2 },
+      startVelocity: 45,
+      spread: 60,
+      angle: 120,
+      zIndex: 9999,
+      origin: { x: 1, y: 1 },
     });
   }, 250);
 }

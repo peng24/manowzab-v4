@@ -1,0 +1,1 @@
+{"name":"Manowzab Command Center","short_name":"Manowzab","description":"ระบบจัดการหลังบ้าน Manowzab","start_url":"/manowzab-v4/","display":"standalone","background_color":"#0f172a","theme_color":"#121212","lang":"en","scope":"/manowzab-v4/","icons":[{"src":"pwa-192x192.png","sizes":"192x192","type":"image/png"},{"src":"pwa-512x512.png","sizes":"512x512","type":"image/png"}]}

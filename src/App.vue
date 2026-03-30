@@ -194,6 +194,10 @@ onMounted(async () => {
       set(myConnectionRef, {
         online: true,
         lastSeen: Date.now(),
+        ttsKey: systemStore.activeKeyIndex, // ✅ Set initial TTS key status
+      }).then(() => {
+        // ✅ After presence is registered, balance the TTS keys among active devices
+        systemStore.assignOptimalTtsKey();
       }).catch((err) => console.error("Presence error:", err));
 
       onDisconnect(myConnectionRef).remove();

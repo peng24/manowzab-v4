@@ -4,7 +4,7 @@ import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
 
 import { useAudio } from "./useAudio";
-import { ref as dbRef, onValue, set, update, push } from "firebase/database";
+import { ref as dbRef, onValue, set, update, push, get } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 import { extractMessageRuns } from "../services/YouTubeLiveChat";
@@ -377,7 +377,22 @@ export function useChatProcessor() {
         const d = String(autoShipDate.getDate()).padStart(2, '0');
         const parsedDate = `${y}-${m}-${d}`;
 
-        update(dbRef(db, `delivery_customers/${autoShipUid}`), {
+        // ✅ DEDUP: Check if customer with same name already exists in delivery_customers
+        let targetUid = autoShipUid;
+        try {
+          const existingSnap = await get(dbRef(db, 'delivery_customers'));
+          const existingData = existingSnap.val() || {};
+          const existingEntry = Object.entries(existingData).find(([, val]) =>
+            val.name === autoShipName && val.status !== 'done'
+          );
+          if (existingEntry) {
+            targetUid = existingEntry[0]; // Reuse existing key
+          }
+        } catch (e) {
+          logger.warn('Dedup check failed, proceeding with new entry:', e);
+        }
+
+        update(dbRef(db, `delivery_customers/${targetUid}`), {
           name: autoShipName,
           deliveryDate: parsedDate,
           status: "pending",

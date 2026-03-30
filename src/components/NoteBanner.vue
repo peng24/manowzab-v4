@@ -10,10 +10,7 @@
       >
         <!-- Collapsed View -->
         <div class="note-bar" @click="toggleCollapse(note.id)">
-          <span
-            class="note-dot"
-            :style="{ background: note.color || '#3b82f6' }"
-          ></span>
+
           <span class="note-preview" v-if="collapsedNotes[note.id]">
             {{ truncate(note.text, 40) }}
           </span>
@@ -126,11 +123,12 @@ onUnmounted(() => {
 
 .note-banner {
   pointer-events: auto;
-  background: rgba(30, 30, 30, 0.95);
-  backdrop-filter: blur(12px);
+  background: rgba(30, 30, 30, 0.25);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-radius: 10px;
   border-left: 4px solid var(--note-color);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.08);
   animation: noteAppear 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   transition: all 0.3s ease;
   overflow: hidden;
@@ -162,14 +160,7 @@ onUnmounted(() => {
   min-height: 44px;
 }
 
-.note-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 5px;
-  box-shadow: 0 0 8px var(--note-color);
-}
+
 
 .note-preview {
   flex: 1;

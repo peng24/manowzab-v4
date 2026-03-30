@@ -21,7 +21,7 @@ export const useStockStore = defineStore("stock", () => {
   const stockData = ref({});
 
   /** @type {import('vue').Ref<number>} Total number of stock items */
-  const stockSize = ref(70);
+  const stockSize = ref(parseInt(localStorage.getItem('lastStockSize')) || 50);
 
   /** @type {import('vue').Ref<Object>} Tracks which percentage milestones have been celebrated */
   const milestones = ref({ fifty: false, eighty: false, hundred: false });
@@ -100,6 +100,7 @@ export const useStockStore = defineStore("stock", () => {
       const val = snapshot.val();
       if (val) {
         stockSize.value = val;
+        localStorage.setItem('lastStockSize', val);
       }
     });
 
@@ -259,6 +260,7 @@ export const useStockStore = defineStore("stock", () => {
       `settings/${systemStore.currentVideoId}/stockSize`,
     );
     set(sizeRef, newSize);
+    localStorage.setItem('lastStockSize', newSize);
   }
 
   /**

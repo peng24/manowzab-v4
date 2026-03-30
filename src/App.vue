@@ -35,6 +35,7 @@
             <HistoryModal v-if="showHistory" @close="showHistory = false" />
             <ShippingManager v-if="showShippingManager" @close="showShippingManager = false" />
           </div>
+          <NoteBanner />
         </div>
         <ChatPanel />
       </div>
@@ -68,6 +69,7 @@ import ShippingMobileView from "./components/ShippingMobileView.vue"; // ✅ Imp
 
 import LiveOverlay from "./components/LiveOverlay.vue"; // ✅ Import Overlay
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
+import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();

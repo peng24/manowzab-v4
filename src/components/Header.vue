@@ -144,12 +144,18 @@
             <a href="https://peng24.github.io/manowzab-sales/" target="_blank" class="menu-sales">
               <i class="fa-solid fa-chart-line"></i> ยอดขาย
             </a>
+            <a @click="openNoteEditor" class="menu-note">
+              <i class="fa-solid fa-note-sticky"></i> จัดการ Note
+            </a>
             <a @click="forceUpdate" class="menu-update">
               <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
             </a>
           </div>
         </Teleport>
       </div>
+
+      <!-- ✅ Note Editor Modal -->
+      <NoteEditor ref="noteEditorRef" />
     </div>
 
     <div class="header-info">
@@ -200,6 +206,7 @@ import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, update, set } from "firebase/database";
 import { db } from "../composables/useFirebase"; // เช็ค path ให้ตรงกับเครื่องคุณ
 import Swal from "sweetalert2";
+import NoteEditor from "./NoteEditor.vue"; // ✅ Import Note Editor
 
 // Logger Configuration (คงเดิม)
 const DEBUG_MODE = false;
@@ -233,6 +240,7 @@ const isConnecting = ref(false);
 const shippingData = ref({});
 const dropdownRef = ref(null);
 const dropdownStyle = ref({});
+const noteEditorRef = ref(null); // ✅ Note Editor Ref
 let simIntervalId = null;
 let unsubShipping = null;
 
@@ -649,6 +657,13 @@ function openShippingMobilePage() {
   showDropdown.value = false;
 }
 
+function openNoteEditor() {
+  if (noteEditorRef.value) {
+    noteEditorRef.value.openEditor();
+  }
+  showDropdown.value = false;
+}
+
 function forceUpdate() {
   // (Logic เดิม)
   Swal.fire({
@@ -684,7 +699,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.23.1) - 30 มี.ค. 2026</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.24.0) - 30 มี.ค. 2026</h4>
+        <ul>
+          <li>📝 <b>ระบบ Note แบบ Sync ทุกหน้าจอ</b> — สร้าง Note ได้จากเมนู Tools เพื่อแสดงข้อความแจ้งเตือนบนทุกเครื่อง (Sync ผ่าน Firebase) เลือกสีได้อิสระ 16 สี ย่อ/ขยายได้ ปิดถาวรได้ แสดงเป็นแถบลอยที่มุมซ้ายล่างไม่บังแชทหรือตาราง ไม่อ่านออกเสียง!</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.23.1) - 30 มี.ค. 2026</h4>
         <ul>
           <li>🐛 <b>แก้บั๊กรายการจัดส่งซ้ำ</b> — เมื่อระบบตรวจจับคำสั่งจัดส่งจากแชทสด (เช่น "ยุพิน ชร. ส่งเลย") ระบบจะเช็คก่อนว่ามีลูกค้าชื่อเดียวกันอยู่แล้วหรือไม่ ถ้ามีจะอัปเดตรายการเดิมแทนการสร้างใหม่ ป้องกันรายการซ้ำ 2 แถว!</li>
         </ul>

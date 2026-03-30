@@ -215,8 +215,11 @@ export class TextToSpeech {
       `☁️ Google Cloud TTS: ${safeText.substring(0, 50)}... (${keys.length} keys available)`,
     );
 
-    // Try each key sequentially
-    for (let i = 0; i < keys.length; i++) {
+    // Rotate keys sequentially, starting from the machine's assigned activeKeyIndex
+    const startIndex = (systemStore.activeKeyIndex || 1) - 1;
+
+    for (let count = 0; count < keys.length; count++) {
+      const i = (startIndex + count) % keys.length;
       const currentKey = keys[i];
 
       try {
@@ -301,9 +304,12 @@ export class TextToSpeech {
           this.currentSource.onended = advanceQueue;
           this.currentSource.start(0);
 
-          // Update active key index in store
+          // Update active key index in store and sync if fallback key succeeded
           const systemStore2 = useSystemStore();
-          systemStore2.activeKeyIndex = i + 1;
+          if (systemStore2.activeKeyIndex !== i + 1) {
+            systemStore2.activeKeyIndex = i + 1;
+            systemStore2.updatePresenceTtsKey(); // ✅ Show other machines we took this key
+          }
 
           // ✅ Reset failure counter on success
           this.consecutiveGoogleFailures = 0;

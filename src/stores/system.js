@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { ref as dbRef, onValue } from "firebase/database";
+import { ref as dbRef, onValue, get, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import pkg from "../../package.json";
 
@@ -65,6 +65,57 @@ export const useSystemStore = defineStore("system", () => {
     });
   }
 
+  // ✅ Auto distribute TTS Keys across machines to balance quota
+  async function assignOptimalTtsKey() {
+    try {
+      const keysCount = googleApiKey.value.split(",").filter(k => k.trim()).length;
+      if (keysCount <= 1) return; // Nothing to distribute
+
+      const presenceRef = dbRef(db, "presence");
+      const snapshot = await get(presenceRef);
+      if (!snapshot.exists()) return;
+
+      const presenceData = snapshot.val();
+      const keyUsage = {};
+      for (let i = 1; i <= keysCount; i++) keyUsage[i] = 0;
+
+      // Count key usage from OTHER online devices
+      Object.entries(presenceData).forEach(([deviceId, device]) => {
+        if (device.online && device.ttsKey && deviceId !== myDeviceId.value) {
+           if (keyUsage[device.ttsKey] !== undefined) {
+              keyUsage[device.ttsKey]++;
+           }
+        }
+      });
+
+      // Find the key with minimum usage
+      let minUsage = Infinity;
+      let selectedKey = activeKeyIndex.value;
+      for (let i = 1; i <= keysCount; i++) {
+         if (keyUsage[i] < minUsage) {
+            minUsage = keyUsage[i];
+            selectedKey = i;
+         }
+      }
+
+      if (activeKeyIndex.value !== selectedKey) {
+        activeKeyIndex.value = selectedKey;
+        console.log(`🤖 Optimal TTS Key Assigned: Key #${selectedKey} (Usage: ${JSON.stringify(keyUsage)})`);
+        updatePresenceTtsKey(); // Sync new key selection to Firebase
+      } else {
+        console.log(`🤖 TTS Key remains #${selectedKey} (Usage: ${JSON.stringify(keyUsage)})`);
+      }
+    } catch(e) {
+      console.warn("Failed to assign optimal TTS key", e);
+    }
+  }
+
+  // ✅ Sync current TTS Key so other devices can see our usage
+  function updatePresenceTtsKey() {
+      const myConnectionRef = dbRef(db, `presence/${myDeviceId.value}`);
+      update(myConnectionRef, { ttsKey: activeKeyIndex.value }).catch(()=> {});
+  }
+
   return {
     isConnected,
     currentVideoId,
@@ -82,6 +133,8 @@ export const useSystemStore = defineStore("system", () => {
     version,
     setStatus,
     initHostListener, // ✅ Export
+    assignOptimalTtsKey, // ✅ Export
+    updatePresenceTtsKey, // ✅ Export
     googleApiKey, // ✅ Export (from .env)
     useOnlineTts, // ✅ Export
     activeKeyIndex, // ✅ Export

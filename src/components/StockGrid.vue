@@ -118,6 +118,12 @@
               <i class="fa-solid fa-list-ol"></i> รายการที่ {{ editingId }}
             </h3>
             <div style="display: flex; gap: 8px; align-items: center">
+              <button class="btn btn-dark btn-sm" @click="saveAndNavigate('prev')" title="บันทึกและไปรายการก่อนหน้า (ลูกศรซ้าย)">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+              <button class="btn btn-dark btn-sm" @click="saveAndNavigate('next')" title="บันทึกและไปรายการถัดไป (ลูกศรขวา)">
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
               <button class="btn btn-danger btn-sm" @click="clearItemData" title="ล้างข้อมูล">
                 <i class="fa-solid fa-eraser"></i> ล้าง
               </button>
@@ -316,6 +322,8 @@ onMounted(() => {
     deliveryCustomers.value = Object.values(data);
   });
   cleanupFns.push(unsubDelivery);
+
+  window.addEventListener('keydown', handleGlobalKeydown);
 });
 
 // ✅ Pull-to-Refresh State
@@ -434,6 +442,7 @@ onUnmounted(() => {
     }
   });
   cleanupFns.length = 0;
+  window.removeEventListener('keydown', handleGlobalKeydown);
   console.log("🧹 Memory Cleaned Up!");
 });
 
@@ -682,7 +691,7 @@ function highlightMatch(text, query) {
   return text.replace(regex, '<span class="autocomplete-highlight">$1</span>');
 }
 
-async function saveQueueChanges() {
+async function saveQueueChanges(preventClose = false) {
   const num = editingId.value;
   // ✅ Re-fetch latest state at save time to prevent race conditions
   const currentDbItem = getStockItem(num);
@@ -750,6 +759,10 @@ async function saveQueueChanges() {
     await stockStore.processCancel(num);
   }
 
+  if (preventClose === true) {
+    return;
+  }
+
   closeModal();
   Swal.fire({
     icon: "success",
@@ -759,6 +772,43 @@ async function saveQueueChanges() {
     showConfirmButton: false,
     timer: 1500,
   });
+}
+
+async function saveAndNavigate(direction) {
+  await saveQueueChanges(true); // Save but prevent modal close
+
+  let nextId = editingId.value;
+  if (direction === 'prev') {
+    nextId = Math.max(1, nextId - 1);
+  } else if (direction === 'next') {
+    nextId = Math.min(stockStore.stockSize, nextId + 1);
+  }
+
+  if (nextId !== editingId.value) {
+    if (activeAutocompleteIdx.value !== null) {
+      activeAutocompleteIdx.value = null; // Clear autocomplete
+    }
+    openQueueModal(nextId);
+  } else {
+    closeModal();
+  }
+}
+
+function handleGlobalKeydown(e) {
+  if (!showModal.value) return;
+
+  if (e.key === 'ArrowLeft') {
+    // If they are in a text input, let them move cursor
+    if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+    
+    e.preventDefault();
+    saveAndNavigate('prev');
+  } else if (e.key === 'ArrowRight') {
+    if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+
+    e.preventDefault();
+    saveAndNavigate('next');
+  }
 }
 
 function confirmClear() {

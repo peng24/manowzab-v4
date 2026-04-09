@@ -601,7 +601,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.26.1) - 9 เม.ย. 2026</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.26.2) - 9 เม.ย. 2026</h4>
+        <ul>
+          <li>🤖 <b>เพิ่มคำศัพท์ใหม่สำหรับวิเคราะห์แชท</b> — อัปเดตระบบวิเคราะห์ข้อความเพื่อให้รองรับคำว่า "ขอผ่าน", "ยกเลก", "ยืดใหม", "เิา", "เปลี่ยนใจ", "หรอ", "ปะ", "ยังไง" และดักจับประโยครูปแบบ "รับค่ะ35" ได้อย่างแม่นยำยิ่งขึ้น</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.26.1) - 9 เม.ย. 2026</h4>
         <ul>
           <li>🧹 <b>ป้องกัน Memory Leak ทั่วระบบ</b> — ใช้ Array Pattern เพื่อเคลียร์ Firebase Listeners ตามหน้าต่างป็อปอัปและระบบต่างๆ (Stock, จัดจัดส่ง, Overlay, Note) ทิ้งอย่างหมดจดเมื่อปิดหน้าต่าง ปิดช่องโหว่กินแรมเมื่อไลฟ์ต่อเนื่องหลายชั่วโมง</li>
         </ul>

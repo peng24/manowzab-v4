@@ -36,22 +36,18 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
 });
 
 // 🚀 Performance: Regex patterns at module level
-const multiBuyRegex = /^(?:F|f|cf|CF|รับ|เอา)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
+const multiBuyRegex = /^(?:F|f|cf|CF|รับ|เอา|เิา)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
 const adminProxyNumFirstRegex = /^(\d+)\s+([ก-๛a-zA-Z].*)$/;
 const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z][^]*?)\s+(\d+)$/;
 const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
-const questionRegex =
-  /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์/;
+const questionRegex = /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์|ใหม|หรอ|ปะ|ยังไง/;
 const pureNumberRegex = /^\s*(\d+)\s*$/;
-const explicitBuyRegex =
-  /(?:(?:F|f|cf|CF|รับ|เอา)\s*(\d+))|(?:(\d+)\s*(?:F|f|cf|CF|รับ|เอา))/i;
-const numberWithPoliteRegex =
-  /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
+const explicitBuyRegex = /(?:(?:F|f|cf|CF|รับ|เอา|เิา)\s*(?:ค่ะ|ครับ|จ้า|นะ|คะ)?\s*(\d+))|(?:(\d+)\s*(?:ค่ะ|ครับ|จ้า|นะ|คะ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา))/i;
+const numberWithPoliteRegex = /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
 const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 const customerNameNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,}?)\s+(\d+)$/;
-const cancelRegex =
-  /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)\s*[-]?\s*(\d+)|(\d+)\s+[\s\S]*?(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด)|(\d+)\s*(?:cc|cancel|ยกเลิก|ไม่เอา|หลุด))/i;
-const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|F|f|cf|CF)(?:\s|$)/;
+const cancelRegex = /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ)\s*[-]?\s*(\d+)|(\d+)\s+[\s\S]*?(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ)|(\d+)\s*(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ))/i;
+const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|เิา|F|f|cf|CF)(?:\s|$)/;
 
 // ✅ Thai Numeral → Arabic Digit Converter
 function thaiToArabic(text) {

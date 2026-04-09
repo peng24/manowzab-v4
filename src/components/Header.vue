@@ -168,31 +168,6 @@
       <div class="live-title">{{ systemStore.liveTitle }}</div>
 
     </div>
-
-    <!-- 📦 Delivery Strip (always visible, real-time) -->
-    <div class="delivery-strip">
-      <div
-        class="shipping-mgr-icon"
-        @click="openShippingManager"
-        title="รายการจัดส่ง"
-        style="transform: scale(0.9); cursor: pointer;"
-      >
-        <span class="box-emoji">📦</span>
-        <span v-if="todayDeliveryCount > 0" class="delivery-badge">{{ todayDeliveryCount }}</span>
-      </div>
-      <div class="ds-scroll" v-if="deliveryStrip.length > 0">
-        <span
-          v-for="c in deliveryStrip"
-          :key="c.id"
-          class="ds-pill"
-          :class="'ds-' + c.urgency"
-          :title="c.tooltip"
-        >
-          {{ c.name }}
-          <span class="ds-info" v-if="c.info">{{ c.info }}</span>
-        </span>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -267,79 +242,6 @@ const shippingCount = computed(() => {
   return Object.keys(currentShipping).filter(
     (uid) => currentShipping[uid]?.ready && activeBuyerUids.has(uid),
   ).length;
-});
-
-// 📦 Delivery Count (today)
-const deliveryCustomers = ref([]);
-let unsubDelivery = null;
-
-const todayDeliveryCount = computed(() => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return deliveryCustomers.value.filter((c) => {
-    if (c.status === 'done' || !c.deliveryDate) return false;
-    const target = new Date(c.deliveryDate);
-    target.setHours(0, 0, 0, 0);
-    return target.getTime() <= today.getTime();
-  }).length;
-});
-
-// 📦 Thai months for delivery strip
-const thaiMonths = [
-  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
-  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
-];
-
-function formatThaiDateShort(dateStr) {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  return `${d.getDate()} ${thaiMonths[d.getMonth()]}`;
-}
-
-function getDeliveryDays(dateStr) {
-  if (!dateStr) return Infinity;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr); target.setHours(0, 0, 0, 0);
-  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
-}
-
-// 📦 Delivery Strip — sorted pills for the header bar
-const deliveryStrip = computed(() => {
-  return deliveryCustomers.value
-    .filter((c) => c.status !== 'done')
-    .map((c) => {
-      const days = getDeliveryDays(c.deliveryDate);
-      let urgency, info, tooltip;
-
-      if (!c.deliveryDate) {
-        urgency = 'none';
-        info = '';
-        tooltip = `${c.name}: ยังไม่กำหนดวันส่ง (${c.itemCount || 0} ชิ้น)`;
-      } else if (days < 0) {
-        urgency = 'overdue';
-        info = `เลย ${Math.abs(days)} วัน!`;
-        tooltip = `${c.name}: เลยกำหนด ${Math.abs(days)} วัน (${c.itemCount || 0} ชิ้น)`;
-      } else if (days === 0) {
-        urgency = 'today';
-        info = 'วันนี้!';
-        tooltip = `${c.name}: ส่งวันนี้ (${c.itemCount || 0} ชิ้น)`;
-      } else if (days === 1) {
-        urgency = 'soon';
-        info = 'พรุ่งนี้';
-        tooltip = `${c.name}: พรุ่งนี้ (${c.itemCount || 0} ชิ้น)`;
-      } else if (days <= 3) {
-        urgency = 'soon';
-        info = `อีก ${days} วัน`;
-        tooltip = `${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;
-      } else {
-        urgency = 'later';
-        info = formatThaiDateShort(c.deliveryDate);
-        tooltip = `${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;
-      }
-
-      return { id: c.uid || c.name, name: c.name, urgency, info, days, tooltip, count: c.itemCount || 0 };
-    })
-    .sort((a, b) => a.days - b.days);
 });
 
 
@@ -699,7 +601,21 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.24.0) - 30 มี.ค. 2026</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.26.0) - 9 เม.ย. 2026</h4>
+        <ul>
+          <li>💎 <b>ปรับโฉม Stock Header & Delivery Strip</b> — ย้ายแถบพัสดุ (Delivery Strip) เข้าไปรวมใน Stock Header เป็นแถวเดียวสุด Minimal ช่วยประหยัดพื้นที่หน้าจอแนวตั้ง</li>
+          <li>📱 <b>ซ่อนองค์ประกอบที่ไม่จำเป็นบนมือถือ</b> — ปรับแต่ง UI ให้เหมาะสมกับการใช้งานบนมือถือ โดยซ่อนป้ายชื่อที่ไม่จำเป็นเพื่อให้ข้อมูลสำคัญแสดงได้ครบถ้วนในบรรทัดเดียว</li>
+          <li>🎯 <b>แก้ไขไอคอน Shipping หายไป</b> — แก้ไขบั๊กที่ปุ่ม Shipping Manager แบบย่อหายไปตอนไม่มีรายการพัสดุ ทำให้เปิด Modal ไม่ได้</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.25.0) - 9 เม.ย. 2026</h4>
+        <ul>
+          <li>🛡️ <b>แก้ Race Condition ตอนแก้ไขราคา</b> — ถ้าลูกค้า CF เข้ามาขณะที่ Modal เปิดอยู่ ระบบจะอัปเดตเฉพาะราคา โดยไม่ลบข้อมูลเจ้าของที่เพิ่งจองเข้ามา</li>
+          <li>🔔 <b>Modal อัปเดตแบบ Real-time</b> — เมื่อมีลูกค้า CF ขณะ Modal เปิดอยู่ (และยังไม่มีเจ้าของ) ระบบจะเติมชื่อลูกค้าเข้ามาทันทีพร้อมเสียงเตือน</li>
+          <li>💎 <b>ปรับดีไซน์ Modal ใหม่ทั้งหมด</b> — Glassmorphism overlay, ช่องราคาขนาดใหญ่เป็นจุดโฟกัส, เจ้าของ (👑 ได้ของ) ขอบเรืองแสงเขียว แยกชัดจากคิวสำรอง (ขอบเส้นประจาง)</li>
+          <li>🧹 <b>เพิ่มปุ่ม "ล้าง" (Clear)</b> — ล้างราคาและรายชื่อทั้งหมดในคลิกเดียว (มีถาม Confirm ก่อน)</li>
+          <li>⌨️ <b>Auto-focus + Enter ที่ช่องราคา</b> — เปิด Modal ปุ๊บ โฟกัสช่องราคาปั๊บ กด Enter บันทึกเลย</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.24.0) - 30 มี.ค. 2026</h4>
         <ul>
           <li>📝 <b>ระบบ Note แบบ Sync ทุกหน้าจอ</b> — สร้าง Note ได้จากเมนู Tools เพื่อแสดงข้อความแจ้งเตือนบนทุกเครื่อง (Sync ผ่าน Firebase) เลือกสีได้อิสระ 16 สี ย่อ/ขยายได้ ปิดถาวรได้ แสดงเป็นแถบลอยที่มุมซ้ายล่างไม่บังแชทหรือตาราง ไม่อ่านออกเสียง!</li>
         </ul>
@@ -784,11 +700,6 @@ onMounted(() => {
   unsubShipping = onValue(dbRef(db, "shipping"), (snapshot) => {
     shippingData.value = snapshot.val() || {};
   });
-  // 📦 Listen delivery_customers for badge count
-  unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
-    const data = snapshot.val() || {};
-    deliveryCustomers.value = Object.values(data);
-  });
   document.addEventListener("click", handleClickOutside);
   const savedVideoId = localStorage.getItem("lastVideoId");
   if (savedVideoId) {
@@ -799,7 +710,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   logger.log("👋 Header unmounting");
   if (unsubShipping) unsubShipping();
-  if (unsubDelivery) unsubDelivery();
   document.removeEventListener("click", handleClickOutside);
   if (simIntervalId) clearInterval(simIntervalId);
   if (videoId.value) localStorage.setItem("lastVideoId", videoId.value);

@@ -170,7 +170,7 @@ const allCustomers = ref([]);
 const newName = ref("");
 const newDate = ref("");
 const showDone = ref(false);
-let unsubListener = null;
+const cleanupFns = [];
 
 const newDateFormatted = computed({
   get() {
@@ -254,10 +254,9 @@ function handleTableDateChange(id, val) {
   updateField(id, 'deliveryDate', parsed || null);
 }
 
-// Firebase Listener
 onMounted(() => {
   const customersRef = dbRef(db, "delivery_customers");
-  unsubListener = onValue(customersRef, (snapshot) => {
+  const unsubListener = onValue(customersRef, (snapshot) => {
     const data = snapshot.val() || {};
     allCustomers.value = Object.keys(data).map((key) => ({
       id: key,
@@ -266,10 +265,17 @@ onMounted(() => {
       sessions: data[key].sessions || null,
     }));
   });
+  cleanupFns.push(unsubListener);
 });
 
 onUnmounted(() => {
-  if (unsubListener) unsubListener();
+  cleanupFns.forEach(fn => {
+    if (typeof fn === 'function') {
+      fn();
+    }
+  });
+  cleanupFns.length = 0;
+  console.log("🧹 Memory Cleaned Up!");
 });
 
 // ✅ REAL-TIME SYNC

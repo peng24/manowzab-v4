@@ -52,7 +52,7 @@ import { db } from "../composables/useFirebase";
 
 const allNotes = ref({});
 const collapsedNotes = ref({});
-let unsubNotes = null;
+const cleanupFns = [];
 
 // Dismissed notes stored in localStorage
 const DISMISSED_KEY = "manowzab_dismissed_notes";
@@ -98,13 +98,20 @@ function truncate(text, len) {
 }
 
 onMounted(() => {
-  unsubNotes = onValue(dbRef(db, "notes"), (snapshot) => {
+  const unsubNotes = onValue(dbRef(db, "notes"), (snapshot) => {
     allNotes.value = snapshot.val() || {};
   });
+  cleanupFns.push(unsubNotes);
 });
 
 onUnmounted(() => {
-  if (unsubNotes) unsubNotes();
+  cleanupFns.forEach(fn => {
+    if (typeof fn === 'function') {
+      fn();
+    }
+  });
+  cleanupFns.length = 0;
+  console.log("🧹 Memory Cleaned Up!");
 });
 </script>
 

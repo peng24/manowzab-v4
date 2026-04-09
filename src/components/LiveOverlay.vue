@@ -27,10 +27,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useSystemStore } from '../stores/system';
 import { useFirebase } from '../composables/useFirebase';
 import { ref as dbRef, onValue } from "firebase/database";
+
+const cleanupFns = [];
 
 const systemStore = useSystemStore();
 const { db } = useFirebase();
@@ -44,12 +46,13 @@ onMounted(() => {
     if (!videoId) {
         // Fallback: Listen to Active Video from Firebase for global sync
         const activeVidRef = dbRef(db, "system/activeVideo");
-        onValue(activeVidRef, (snap) => {
+        const unsubActiveVideo = onValue(activeVidRef, (snap) => {
             const vid = snap.val();
             if (vid && vid !== "demo") {
                  listenToOverlay(vid);
             }
         });
+        cleanupFns.push(unsubActiveVideo);
     } else {
         listenToOverlay(videoId);
     }
@@ -57,13 +60,24 @@ onMounted(() => {
 
 function listenToOverlay(videoId) {
     const overlayRef = dbRef(db, `overlay/${videoId}/current_item`);
-    onValue(overlayRef, (snapshot) => {
+    const unsubOverlay = onValue(overlayRef, (snapshot) => {
         const data = snapshot.val();
         if (data) {
             currentItem.value = data;
         }
     });
+    cleanupFns.push(unsubOverlay);
 }
+
+onUnmounted(() => {
+    cleanupFns.forEach(fn => {
+        if (typeof fn === 'function') {
+            fn();
+        }
+    });
+    cleanupFns.length = 0;
+    console.log("🧹 Memory Cleaned Up!");
+});
 </script>
 
 <style scoped>

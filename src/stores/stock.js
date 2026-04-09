@@ -28,12 +28,19 @@ export const useStockStore = defineStore("stock", () => {
 
   const systemStore = useSystemStore();
 
+  let currentUnsubscribe = null;
+
   /**
    * Connects to the stock node in Firebase for a specific video.
    * @param {string} videoId - The YouTube Video ID or 'demo'.
    * @returns {Function} Cleanup function to unsubscribe listeners.
    */
   function connectToStock(videoId) {
+    if (currentUnsubscribe) {
+      currentUnsubscribe();
+      currentUnsubscribe = null;
+    }
+
     // ✅ Reset milestones when connecting to a new session
     milestones.value = { fifty: false, eighty: false, hundred: false };
     
@@ -104,10 +111,12 @@ export const useStockStore = defineStore("stock", () => {
       }
     });
 
-    return () => {
+    currentUnsubscribe = () => {
       unsubStock();
       unsubSize();
     };
+
+    return currentUnsubscribe;
   }
 
   /**

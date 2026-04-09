@@ -578,7 +578,13 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  cleanupFns.forEach(fn => fn && fn());
+  cleanupFns.forEach(fn => {
+    if (typeof fn === 'function') {
+      fn();
+    }
+  });
+  cleanupFns.length = 0;
+  console.log("🧹 Memory Cleaned Up!");
 });
 </script>
 

@@ -248,7 +248,7 @@ const newOrders = ref(new Set());
 
 // 📦 Delivery Strip State
 const deliveryCustomers = ref([]);
-let unsubDelivery = null;
+const cleanupFns = [];
 
 const thaiMonths = [
   "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
@@ -311,10 +311,11 @@ const deliveryStrip = computed(() => {
 
 onMounted(() => {
   // 📦 Listen delivery_customers for badge count + strip
-  unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
+  const unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
     const data = snapshot.val() || {};
     deliveryCustomers.value = Object.values(data);
   });
+  cleanupFns.push(unsubDelivery);
 });
 
 // ✅ Pull-to-Refresh State
@@ -427,7 +428,13 @@ const percentColorClass = computed(() => {
 onUnmounted(() => {
   if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
   if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
-  if (unsubDelivery) unsubDelivery();
+  cleanupFns.forEach(fn => {
+    if (typeof fn === 'function') {
+      fn();
+    }
+  });
+  cleanupFns.length = 0;
+  console.log("🧹 Memory Cleaned Up!");
 });
 
 const motivationalText = computed(() => {

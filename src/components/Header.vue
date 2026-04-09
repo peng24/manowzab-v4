@@ -217,7 +217,7 @@ const dropdownRef = ref(null);
 const dropdownStyle = ref({});
 const noteEditorRef = ref(null); // ✅ Note Editor Ref
 let simIntervalId = null;
-let unsubShipping = null;
+const cleanupFns = [];
 
 // ✅ Watcher: ซิงค์รหัส Video ID จาก Firebase (ถ้าเครื่องอื่นเปลี่ยน เครื่องนี้เปลี่ยนด้วย)
 watch(
@@ -601,7 +601,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.26.0) - 9 เม.ย. 2026</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.26.1) - 9 เม.ย. 2026</h4>
+        <ul>
+          <li>🧹 <b>ป้องกัน Memory Leak ทั่วระบบ</b> — ใช้ Array Pattern เพื่อเคลียร์ Firebase Listeners ตามหน้าต่างป็อปอัปและระบบต่างๆ (Stock, จัดจัดส่ง, Overlay, Note) ทิ้งอย่างหมดจดเมื่อปิดหน้าต่าง ปิดช่องโหว่กินแรมเมื่อไลฟ์ต่อเนื่องหลายชั่วโมง</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.26.0) - 9 เม.ย. 2026</h4>
         <ul>
           <li>💎 <b>ปรับโฉม Stock Header & Delivery Strip</b> — ย้ายแถบพัสดุ (Delivery Strip) เข้าไปรวมใน Stock Header เป็นแถวเดียวสุด Minimal ช่วยประหยัดพื้นที่หน้าจอแนวตั้ง</li>
           <li>📱 <b>ซ่อนองค์ประกอบที่ไม่จำเป็นบนมือถือ</b> — ปรับแต่ง UI ให้เหมาะสมกับการใช้งานบนมือถือ โดยซ่อนป้ายชื่อที่ไม่จำเป็นเพื่อให้ข้อมูลสำคัญแสดงได้ครบถ้วนในบรรทัดเดียว</li>
@@ -697,9 +701,10 @@ function showChangelog() {
 
 onMounted(() => {
   logger.log("🎯 Header mounted");
-  unsubShipping = onValue(dbRef(db, "shipping"), (snapshot) => {
+  const unsubShipping = onValue(dbRef(db, "shipping"), (snapshot) => {
     shippingData.value = snapshot.val() || {};
   });
+  cleanupFns.push(unsubShipping);
   document.addEventListener("click", handleClickOutside);
   const savedVideoId = localStorage.getItem("lastVideoId");
   if (savedVideoId) {
@@ -709,7 +714,13 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   logger.log("👋 Header unmounting");
-  if (unsubShipping) unsubShipping();
+  cleanupFns.forEach(fn => {
+    if (typeof fn === 'function') {
+      fn();
+    }
+  });
+  cleanupFns.length = 0;
+  console.log("🧹 Memory Cleaned Up!");
   document.removeEventListener("click", handleClickOutside);
   if (simIntervalId) clearInterval(simIntervalId);
   if (videoId.value) localStorage.setItem("lastVideoId", videoId.value);

@@ -104,8 +104,10 @@
               <input
                 type="number"
                 v-model="editingPrice"
+                ref="priceInputRef"
                 class="edit-input"
                 style="width: 100px"
+                @keyup.enter="saveQueueChanges"
               />
               <span>บาท</span>
             </div>
@@ -230,6 +232,7 @@ const showModal = ref(false);
 const editingId = ref(null);
 const editingPrice = ref(0);
 const tempQueue = ref([]);
+const priceInputRef = ref(null);
 let draggingIndex = null;
 
 // ✅ Autocomplete State
@@ -429,6 +432,7 @@ function openQueueModal(num) {
     tempQueue.value.push(...JSON.parse(JSON.stringify(item.queue)));
   }
   showModal.value = true;
+  nextTick(() => { if (priceInputRef.value) priceInputRef.value.focus(); });
 }
 
 function closeModal() {
@@ -529,10 +533,11 @@ function highlightMatch(text, query) {
 
 async function saveQueueChanges() {
   const num = editingId.value;
-  const oldItem = getStockItem(num);
+  // ✅ Re-fetch latest state at save time to prevent race conditions
+  const currentDbItem = getStockItem(num);
   const newOwnerName =
     tempQueue.value.length > 0 ? tempQueue.value[0].owner : null;
-  const oldOwnerName = oldItem.owner;
+  const oldOwnerName = currentDbItem.owner;
 
   let newData = null;
   if (tempQueue.value.length > 0) {
@@ -559,7 +564,7 @@ async function saveQueueChanges() {
 
     // Check if it's the same UID (Typo fix) or different UID (New Person)
     // We compare the UID of the item currently in stock vs the new data being saved
-    const isSamePerson = oldItem.uid === newData.uid;
+    const isSamePerson = currentDbItem.uid === newData.uid;
 
     if (!isSamePerson) {
       // 📢 Different person -> Announce swap
@@ -573,15 +578,22 @@ async function saveQueueChanges() {
   if (newData) {
     await stockStore.updateItemData(num, newData);
   } else if (editingPrice.value > 0) {
-    // ✅ Case: Empty item but Price is set (OVERWRITE to clear owner)
-    await stockStore.updateItemData(num, {
-      price: editingPrice.value,
-      owner: null,
-      uid: null,
-      queue: null,
-      time: null,
-      source: null,
-    });
+    // ✅ Race-condition guard: tempQueue is empty but a customer CF'd in DB while modal was open
+    if (currentDbItem.owner) {
+      // Partial update — ONLY send price, preserve real-time owner/uid/queue/time/source
+      await stockStore.updateItemData(num, { price: editingPrice.value });
+      logger.log("🛡️ Partial price update — preserved background CF owner:", currentDbItem.owner);
+    } else {
+      // No owner in DB either — safe to send full clear payload with price
+      await stockStore.updateItemData(num, {
+        price: editingPrice.value,
+        owner: null,
+        uid: null,
+        queue: null,
+        time: null,
+        source: null,
+      });
+    }
     playSfx();
   } else {
     await stockStore.processCancel(num);
@@ -678,6 +690,42 @@ async function refreshStock() {
     console.error("Error refreshing stock:", error);
   }
 }
+
+// ✅ Task 2: Real-time modal reactivity — auto-populate tempQueue on background CF
+watch(
+  () => stockStore.stockData,
+  (newVal) => {
+    if (!showModal.value || !editingId.value) return;
+
+    // Only act when the modal currently has NO owner (tempQueue empty)
+    const hasLocalOwner = tempQueue.value.length > 0 && tempQueue.value[0].owner;
+    if (hasLocalOwner) return;
+
+    const incomingItem = newVal[editingId.value];
+    if (!incomingItem || !incomingItem.owner) return;
+
+    // A customer CF'd in the background while the modal was open — populate tempQueue
+    logger.log("🔔 Background CF detected in modal — auto-populating:", incomingItem.owner);
+
+    tempQueue.value = [
+      {
+        owner: incomingItem.owner,
+        uid: incomingItem.uid || "unknown",
+        time: incomingItem.time || Date.now(),
+        source: incomingItem.source || "chat",
+      },
+    ];
+
+    // Append existing queue entries if any
+    if (incomingItem.queue && incomingItem.queue.length > 0) {
+      tempQueue.value.push(...JSON.parse(JSON.stringify(incomingItem.queue)));
+    }
+
+    // 🔊 Notify admin with SFX
+    playSfx();
+  },
+  { deep: true },
+);
 </script>
 
 <style scoped>

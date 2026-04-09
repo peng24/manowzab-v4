@@ -1,38 +1,64 @@
 <template>
   <div class="stock-panel">
     <div class="stock-header">
-      <div class="stock-input-group">
-        รายการ:
-        <input
-          type="number"
-          v-model.lazy="localStockSize"
-          class="edit-input"
-          style="
-            width: 70px;
-            text-align: center;
-            font-size: 1.1em;
-            font-weight: bold;
-          "
-          @change="saveStockSize"
-        />
-      </div>
-
-      <div class="header-center stock-stats">
-        <span class="stats-label">ขายแล้ว:</span>
-        <span class="stat-sold">{{ animatedSoldCount }}</span>
-        <span style="opacity: 0.5">/{{ stockStore.stockSize }}</span>
-        <div class="sale-percent-badge" :class="[percentColorClass, { 'pulse': isPulsingPercent }]">
-          {{ animatedPercentage }}%
+      <div class="header-main-row">
+        <div class="stock-input-group">
+          รายการ:
+          <input
+            type="number"
+            v-model.lazy="localStockSize"
+            class="edit-input"
+            style="
+              width: 60px;
+              text-align: center;
+              font-size: 1em;
+              font-weight: bold;
+            "
+            @change="saveStockSize"
+          />
         </div>
-        <div class="mini-progress-track">
-          <div class="mini-progress-fill" :style="{ width: soldPercentage + '%', background: progressBarColor }">
-            <div class="mini-shimmer"></div>
+
+        <div class="stock-stats">
+          <span class="stats-label">ขายแล้ว:</span>
+          <span class="stat-sold">{{ animatedSoldCount }}</span>
+          <span style="opacity: 0.5; font-size: 0.85em">/{{ stockStore.stockSize }}</span>
+          <div class="sale-percent-badge" :class="[percentColorClass, { 'pulse': isPulsingPercent }]">
+            {{ animatedPercentage }}%
+          </div>
+          <span class="motivational-badge" :key="motivationalText">{{ motivationalText }}</span>
+        </div>
+
+        <!-- 📦 Delivery Strip (moved from Header) -->
+        <div class="delivery-strip">
+          <div
+            class="shipping-mgr-icon"
+            @click="openShippingManager"
+            title="รายการจัดส่ง"
+            style="cursor: pointer;"
+          >
+            <span class="box-emoji">📦</span>
+            <span v-if="todayDeliveryCount > 0" class="delivery-badge">{{ todayDeliveryCount }}</span>
+          </div>
+          <div class="ds-scroll" v-if="deliveryStrip.length > 0">
+            <span
+              v-for="c in deliveryStrip"
+              :key="c.id"
+              class="ds-pill"
+              :class="'ds-' + c.urgency"
+              :title="c.tooltip"
+            >
+              {{ c.name }}
+              <span class="ds-info" v-if="c.info">{{ c.info }}</span>
+            </span>
           </div>
         </div>
-        <span class="motivational-badge" :key="motivationalText">{{ motivationalText }}</span>
       </div>
 
-      <div></div>
+      <div class="mini-progress-track">
+        <div class="mini-progress-fill" :style="{ width: soldPercentage + '%', background: progressBarColor }">
+          <div class="mini-shimmer"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ✅ Pull-to-Refresh Indicator -->
@@ -91,38 +117,45 @@
             <h3 class="text-success">
               <i class="fa-solid fa-list-ol"></i> รายการที่ {{ editingId }}
             </h3>
-            <button class="btn btn-dark" @click="closeModal">
-              <i class="fa-solid fa-xmark"></i>
-            </button>
+            <div style="display: flex; gap: 8px; align-items: center">
+              <button class="btn btn-danger btn-sm" @click="clearItemData" title="ล้างข้อมูล">
+                <i class="fa-solid fa-eraser"></i> ล้าง
+              </button>
+              <button class="btn btn-dark" @click="closeModal">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
           </div>
           <div class="queue-body">
-            <div
-              class="flex-center gap-10 mb-10 p-10"
-              style="background: #2a2a2a; border-radius: 8px"
-            >
-              <span>ราคา:</span>
-              <input
-                type="number"
-                v-model="editingPrice"
-                ref="priceInputRef"
-                class="edit-input"
-                style="width: 100px"
-                @keyup.enter="saveQueueChanges"
-              />
-              <span>บาท</span>
+            <div class="price-input-section">
+              <label class="price-label">
+                <i class="fa-solid fa-tag"></i> ราคา
+              </label>
+              <div class="price-input-row">
+                <input
+                  type="number"
+                  v-model="editingPrice"
+                  ref="priceInputRef"
+                  class="price-input-field"
+                  placeholder="0"
+                  @keyup.enter="saveQueueChanges"
+                />
+                <span class="price-unit">บาท</span>
+              </div>
             </div>
             <div class="queue-list">
               <div
                 v-if="tempQueue.length === 0"
-                class="text-center p-10 text-secondary"
+                class="queue-empty-state"
               >
+                <i class="fa-solid fa-inbox" style="font-size: 1.8em; opacity: 0.3; margin-bottom: 4px"></i>
                 ไม่มีการจอง
               </div>
               <div
                 v-for="(person, index) in tempQueue"
                 :key="index"
                 class="queue-item"
-                :class="{ active: index === 0 }"
+                :class="{ 'queue-item--owner': index === 0, 'queue-item--backup': index > 0 }"
                 draggable="true"
                 @dragstart="dragStart(index)"
                 @dragover.prevent
@@ -132,7 +165,13 @@
                   <div class="drag-handle">
                     <i class="fa-solid fa-grip-vertical"></i>
                   </div>
-                  <span class="queue-rank">#{{ index + 1 }}</span>
+                  <span class="queue-rank" :class="{ 'queue-rank--owner': index === 0 }">#{{ index + 1 }}</span>
+                  <span v-if="index === 0" class="owner-badge">
+                    <i class="fa-solid fa-crown"></i> ได้ของ
+                  </span>
+                  <span v-else class="backup-badge">
+                    สำรอง
+                  </span>
                   <div class="autocomplete-wrapper">
                     <input
                       type="text"
@@ -174,8 +213,7 @@
             </div>
           </div>
           <div
-            class="queue-header"
-            style="justify-content: flex-end; gap: 10px"
+            class="queue-footer"
           >
             <button class="btn btn-dark" @click="manualReserve">
               <i class="fa-solid fa-plus"></i> เพิ่มชื่อ
@@ -191,9 +229,11 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, nextTick, onUnmounted } from "vue";
+import { computed, ref, watch, nextTick, inject, onMounted, onUnmounted } from "vue";
 import { useStockStore } from "../stores/stock";
 import { useAudio } from "../composables/useAudio";
+import { ref as dbRef, onValue } from "firebase/database";
+import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 
 const DEBUG_MODE = false;
@@ -201,9 +241,81 @@ const logger = { log: (...args) => DEBUG_MODE && console.log(...args) };
 
 const stockStore = useStockStore();
 const { playSfx, queueAudio } = useAudio();
+const openShippingManager = inject("openShippingManager");
 const gridContainer = ref(null);
 const highlightedId = ref(null);
 const newOrders = ref(new Set());
+
+// 📦 Delivery Strip State
+const deliveryCustomers = ref([]);
+let unsubDelivery = null;
+
+const thaiMonths = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+];
+
+function formatThaiDateShort(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return `${d.getDate()} ${thaiMonths[d.getMonth()]}`;
+}
+
+function getDeliveryDays(dateStr) {
+  if (!dateStr) return Infinity;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr); target.setHours(0, 0, 0, 0);
+  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+}
+
+const todayDeliveryCount = computed(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return deliveryCustomers.value.filter((c) => {
+    if (c.status === 'done' || !c.deliveryDate) return false;
+    const target = new Date(c.deliveryDate);
+    target.setHours(0, 0, 0, 0);
+    return target.getTime() <= today.getTime();
+  }).length;
+});
+
+const deliveryStrip = computed(() => {
+  return deliveryCustomers.value
+    .filter((c) => c.status !== 'done')
+    .map((c) => {
+      const days = getDeliveryDays(c.deliveryDate);
+      let urgency, info, tooltip;
+      if (!c.deliveryDate) {
+        urgency = 'none'; info = '';
+        tooltip = `${c.name}: ยังไม่กำหนดวันส่ง (${c.itemCount || 0} ชิ้น)`;
+      } else if (days < 0) {
+        urgency = 'overdue'; info = `เลย ${Math.abs(days)} วัน!`;
+        tooltip = `${c.name}: เลยกำหนด ${Math.abs(days)} วัน (${c.itemCount || 0} ชิ้น)`;
+      } else if (days === 0) {
+        urgency = 'today'; info = 'วันนี้!';
+        tooltip = `${c.name}: ส่งวันนี้ (${c.itemCount || 0} ชิ้น)`;
+      } else if (days === 1) {
+        urgency = 'soon'; info = 'พรุ่งนี้';
+        tooltip = `${c.name}: พรุ่งนี้ (${c.itemCount || 0} ชิ้น)`;
+      } else if (days <= 3) {
+        urgency = 'soon'; info = `อีก ${days} วัน`;
+        tooltip = `${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;
+      } else {
+        urgency = 'later'; info = formatThaiDateShort(c.deliveryDate);
+        tooltip = `${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;
+      }
+      return { id: c.uid || c.name, name: c.name, urgency, info, days, tooltip, count: c.itemCount || 0 };
+    })
+    .sort((a, b) => a.days - b.days);
+});
+
+onMounted(() => {
+  // 📦 Listen delivery_customers for badge count + strip
+  unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
+    const data = snapshot.val() || {};
+    deliveryCustomers.value = Object.values(data);
+  });
+});
 
 // ✅ Pull-to-Refresh State
 const isPulling = ref(false);
@@ -315,6 +427,7 @@ const percentColorClass = computed(() => {
 onUnmounted(() => {
   if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
   if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
+  if (unsubDelivery) unsubDelivery();
 });
 
 const motivationalText = computed(() => {
@@ -437,6 +550,37 @@ function openQueueModal(num) {
 
 function closeModal() {
   showModal.value = false;
+}
+
+function clearItemData() {
+  Swal.fire({
+    title: 'ล้างข้อมูลรายการนี้?',
+    text: 'ราคาและรายชื่อจะถูกล้างทั้งหมด',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#555',
+    confirmButtonText: 'ล้างเลย',
+    cancelButtonText: 'ยกเลิก',
+    background: '#1e1e1e',
+    color: '#fff',
+  }).then((result) => {
+    if (result.isConfirmed) {
+      editingPrice.value = 0;
+      tempQueue.value = [];
+      Swal.fire({
+        icon: 'success',
+        title: 'ล้างแล้ว',
+        text: 'กดบันทึกเพื่อยืนยัน',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 1500,
+        background: '#1e1e1e',
+        color: '#fff',
+      });
+    }
+  });
 }
 function dragStart(index) {
   draggingIndex = index;
@@ -778,66 +922,70 @@ watch(
 }
 
 .stock-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
+  position: relative;
+  padding: 4px 10px;
   background: #252525;
   border-bottom: 1px solid var(--border-color);
-  position: relative;
-  height: 70px;
+  min-height: 40px;
 }
+
+.header-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+
+/* Hide scrollbar for a cleaner look */
+.header-main-row::-webkit-scrollbar { display: none; }
+.header-main-row { -ms-overflow-style: none; scrollbar-width: none; }
 
 .stock-input-group {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 1.1em;
+  gap: 6px;
+  font-size: 0.9em;
   font-weight: 600;
   color: var(--text-secondary);
-  z-index: 2;
-}
-
-.header-center {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
 .stat-sold {
   color: #00e676;
-  font-size: 1.8em;
+  font-size: 1.3em;
   font-weight: bold;
-  text-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
-  margin-left: 5px;
-  margin-right: 5px;
+  text-shadow: 0 0 8px rgba(0, 230, 118, 0.3);
+  margin: 0 2px;
   font-variant-numeric: tabular-nums;
 }
 
 .stock-stats {
-  font-size: 1.1em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95em;
   font-weight: 600;
   color: var(--text-secondary);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .stats-label {
-  color: #999;
-  font-size: 0.95em;
+  color: #888;
+  font-size: 0.85em;
   white-space: nowrap;
 }
 
 /* ✅ Animated Percentage Badge */
 .sale-percent-badge {
-  font-size: 1.1em;
+  font-size: 0.9em;
   font-weight: 800;
-  padding: 2px 10px;
+  padding: 1px 8px;
   border-radius: 20px;
   white-space: nowrap;
   letter-spacing: 0.5px;
@@ -878,24 +1026,24 @@ watch(
   100% { transform: scale(1); }
 }
 
-/* ✅ Mini Progress Bar */
+/* ✅ Edge Progress Bar — 2px line at bottom of header */
 .mini-progress-track {
-  width: 80px;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 99px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0;
   overflow: hidden;
-  flex-shrink: 0;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .mini-progress-fill {
   height: 100%;
-  border-radius: 99px;
+  border-radius: 0;
   transition: width 0.6s ease-out, background 0.6s ease-out;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 0 8px rgba(255, 107, 53, 0.4);
 }
 
 .mini-shimmer {
@@ -907,7 +1055,7 @@ watch(
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0.5) 50%,
     transparent 100%
   );
   animation: mini-shimmer-slide 1.8s infinite;
@@ -920,17 +1068,67 @@ watch(
 
 /* ✅ Motivational Badge */
 .motivational-badge {
-  font-size: 0.95em;
+  font-size: 0.8em;
   font-weight: 700;
   color: #ffd700;
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
   white-space: nowrap;
-  animation: gentle-bounce 2.5s ease-in-out infinite;
 }
 
-@keyframes gentle-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+/* ✅ Miniaturized Delivery Strip */
+.delivery-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1); /* Separator */
+  flex-shrink: 0;
+}
+
+.shipping-mgr-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; /* Smaller size */
+  height: 28px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.box-emoji {
+  font-size: 14px; /* Smaller emoji */
+}
+
+.delivery-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ff4500;
+  color: white;
+  font-size: 10px; /* Smaller badge */
+  font-weight: bold;
+  padding: 2px 4px;
+  border-radius: 10px;
+}
+
+.ds-scroll {
+  display: flex;
+  gap: 4px;
+}
+
+.ds-pill {
+  font-size: 0.8em; /* Reduced text size */
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ds-info {
+  font-size: 0.85em;
+  opacity: 0.8;
 }
 
 .stats-row {
@@ -1167,28 +1365,35 @@ watch(
 /* Responsive Adjustments */
 @media (max-width: 768px) {
   .stock-header {
-    height: auto;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 15px;
-    padding: 15px;
+    padding: 4px 8px;
+    min-height: 36px;
+    gap: 8px;
   }
   .stock-input-group {
-    width: 100%;
-    justify-content: center;
+    font-size: 0.85em;
+    gap: 4px;
   }
-  .header-center {
-    position: relative;
-    left: auto;
-    top: auto;
-    transform: none;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 5px;
+  .stock-input-group .edit-input {
+    height: 26px;
+    width: 50px !important;
+    font-size: 0.9em !important;
+    padding: 2px 6px;
+  }
+  .stats-label {
+    display: none;
+  }
+  .motivational-badge {
+    display: none;
+  }
+  .stat-sold {
+    font-size: 1.1em;
+  }
+  .sale-percent-badge {
+    font-size: 0.8em;
+    padding: 1px 6px;
+  }
+  .delivery-strip {
+    display: none;
   }
 }
 

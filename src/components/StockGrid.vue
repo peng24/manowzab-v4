@@ -693,7 +693,7 @@ function highlightMatch(text, query) {
 
 async function saveQueueChanges(preventClose = false) {
   const num = editingId.value;
-  // ✅ Re-fetch latest state at save time to prevent race conditions
+  // Re-fetch latest state at save time to prevent race conditions
   const currentDbItem = getStockItem(num);
   const newOwnerName =
     tempQueue.value.length > 0 ? tempQueue.value[0].owner : null;
@@ -713,50 +713,35 @@ async function saveQueueChanges(preventClose = false) {
     };
   }
 
-  // ✅ Logic Update: Smart TTS handling
+  // Logic Update: Smart TTS handling
   if (oldOwnerName && !newOwnerName) {
     // Case 1: Cancel (Deleted)
     playSfx();
     queueAudio(null, "", `ยกเลิกรายการที่ ${num} ค่ะ`);
   } else if (oldOwnerName && newOwnerName && oldOwnerName !== newOwnerName) {
     // Case 2: Name Changed
-    playSfx(); // Always play "Ting" sound
-
-    // Check if it's the same UID (Typo fix) or different UID (New Person)
-    // We compare the UID of the item currently in stock vs the new data being saved
+    playSfx(); 
     const isSamePerson = currentDbItem.uid === newData.uid;
-
     if (!isSamePerson) {
-      // 📢 Different person -> Announce swap
       queueAudio(null, "", `${oldOwnerName} หลุดจอง ${newOwnerName}`);
     } else {
-      // 🤫 Same person (Typo fix) -> Silent update (Only SFX played above)
       logger.log("✏️ Typo fix detected. Silent update.");
     }
   }
 
+  // แก้ไขบั๊กไม่ยอมลบชื่อคนจองเวลามีราคา
   if (newData) {
     await stockStore.updateItemData(num, newData);
-  } else if (editingPrice.value > 0) {
-    // ✅ Race-condition guard: tempQueue is empty but a customer CF'd in DB while modal was open
-    if (currentDbItem.owner) {
-      // Partial update — ONLY send price, preserve real-time owner/uid/queue/time/source
-      await stockStore.updateItemData(num, { price: editingPrice.value });
-      logger.log("🛡️ Partial price update — preserved background CF owner:", currentDbItem.owner);
-    } else {
-      // No owner in DB either — safe to send full clear payload with price
-      await stockStore.updateItemData(num, {
-        price: editingPrice.value,
-        owner: null,
-        uid: null,
-        queue: null,
-        time: null,
-        source: null,
-      });
-    }
-    playSfx();
   } else {
-    await stockStore.processCancel(num);
+    // เคลียร์ข้อมูลคนจองทั้งหมด แต่ยังเก็บราคาไว้ (ถ้ามี)
+    await stockStore.updateItemData(num, {
+      price: editingPrice.value > 0 ? editingPrice.value : null,
+      owner: null,
+      uid: null,
+      queue: null,
+      time: null,
+      source: null,
+    });
   }
 
   if (preventClose === true) {

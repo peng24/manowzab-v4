@@ -40,6 +40,7 @@ description: Mandatory verification checklist after every code change
 | 3.4 | `clearAllStock()` | `src/stores/stock.js` | ล้างสต็อกทั้งหมด + reset milestones |
 | 3.5 | `updateStockSize(newSize)` | `src/stores/stock.js` | ขยาย/ย่อ grid + auto-expand เมื่อจองเกินจำนวน |
 | 3.6 | `updateItemData(num, newData)` | `src/stores/stock.js` | อัปเดตราคา/ไซส์ + sync Overlay |
+| 3.7 | `saveQueueChanges()` | `src/components/StockGrid.vue` | เวลายกเลิกจอง (ลบรายชื่อทิ้งทั้งหมด) หากมีการตั้งราคาไว้ ต้องเคลียร์ข้อมูลเจ้าของ/คิวเป็น null แต่ยังคงราคาไว้ (แก้บั๊กชื่อค้าง) |
 
 ---
 

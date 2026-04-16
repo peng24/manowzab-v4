@@ -34,6 +34,7 @@
             <Dashboard v-if="showDashboard" @close="showDashboard = false" />
             <HistoryModal v-if="showHistory" @close="showHistory = false" />
             <ShippingManager v-if="showShippingManager" @close="showShippingManager = false" />
+            <PhoneticManager v-if="showPhoneticManager" @close="showPhoneticManager = false" />
           </div>
           <NoteBanner />
         </div>
@@ -70,6 +71,7 @@ import ShippingMobileView from "./components/ShippingMobileView.vue"; // ✅ Imp
 import LiveOverlay from "./components/LiveOverlay.vue"; // ✅ Import Overlay
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
+import PhoneticManager from "./components/PhoneticManager.vue"; // ✅ Import Phonetic Manager
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
@@ -107,11 +109,13 @@ const { initAutoCleanup } = useAutoCleanup();
 const showDashboard = ref(false);
 const showHistory = ref(false);
 const showShippingManager = ref(false);
+const showPhoneticManager = ref(false);
 
 // Provide functions for child components
 provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
 provide("openShippingManager", () => (showShippingManager.value = true));
+provide("openPhoneticManager", () => (showPhoneticManager.value = true));
 
 // ✅ Unlock Audio Function (All audio types: SFX, Native TTS, Google TTS)
 async function handleFirstInteraction() {

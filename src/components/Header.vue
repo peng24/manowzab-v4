@@ -150,6 +150,9 @@
             <a @click="forceUpdate" class="menu-update">
               <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
             </a>
+            <a @click="openPhoneticMgr" class="menu-phonetic">
+              <i class="fa-solid fa-volume-high"></i> จัดการคำอ่าน (TTS)
+            </a>
           </div>
         </Teleport>
       </div>
@@ -207,6 +210,7 @@ const { queueAudio, unlockAudio } = useAudio();
 const openDashboard = inject("openDashboard");
 const openHistory = inject("openHistory");
 const openShippingManager = inject("openShippingManager");
+const openPhoneticManager = inject("openPhoneticManager");
 
 const videoId = ref("");
 const showDropdown = ref(false);
@@ -566,6 +570,11 @@ function openNoteEditor() {
   showDropdown.value = false;
 }
 
+function openPhoneticMgr() {
+  if (openPhoneticManager) openPhoneticManager();
+  showDropdown.value = false;
+}
+
 function forceUpdate() {
   // (Logic เดิม)
   Swal.fire({
@@ -601,7 +610,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.27.0) - 9 เม.ย. 2026</h4>
+        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.28.0) - 16 เม.ย. 2026</h4>
+        <ul>
+          <li>🔊 <b>ระบบจัดการคำอ่าน (Phonetic Manager)</b> — เมนูใหม่สำหรับเพิ่ม/แก้ไขคำอ่านชื่อลูกค้าแบบ Custom เพื่อให้ระบบ TTS อ่านออกเสียงได้ถูกต้องแม่นยำยิ่งขึ้น พร้อมปุ่ม Preview เพื่อทดสอบฟังสียงก่อนบันทึกจริง</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.27.0) - 9 เม.ย. 2026</h4>
         <ul>
           <li>⌨️ <b>ระบบการนำทางด้วยคีย์บอร์ด (Arrow Keys)</b> — เพิ่มปุ่มและความสามารถในการกดลูกศร ซ้าย-ขวา เพื่อเลื่อนไปแก้ไขรายการถัดไปหรือก่อนหน้าได้ทันที พร้อมบันทึกข้อมูลอัตโนมัติ ช่วยเพิ่มความเร็วในการกรอกและแก้ไขราคา</li>
         </ul>

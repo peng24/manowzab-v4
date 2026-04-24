@@ -54,7 +54,6 @@ import { ref as dbRef, onValue, onDisconnect, set } from "firebase/database";
 import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { db, auth } from "./composables/useFirebase";
 import { logger } from "./utils/logger"; // ✅ Import Logger
-import { useAudio } from "./composables/useAudio";
 import { useAwayMode } from "./composables/useAwayMode";
 import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup
 
@@ -93,10 +92,7 @@ watch(
 
 const urlParams = new URLSearchParams(window.location.search);
 const isOverlayMode = urlParams.get("mode") === "overlay"; // ✅ Check Overlay Mode
-const isShippingMode = urlParams.get("mode") === "shipping"; // ✅ Check Shipping Mode
-
-// ✅ ดึง unlockAudio มาใช้แทน playDing
-const { unlockAudio } = useAudio();
+// ✅ Check Shipping Mode
 
 // ✅ Use Away Mode Composable
 const { awayTimer, closeAwayMode, initAwayListener } = useAwayMode();
@@ -116,19 +112,6 @@ provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
 provide("openShippingManager", () => (showShippingManager.value = true));
 provide("openPhoneticManager", () => (showPhoneticManager.value = true));
-
-// ✅ Unlock Audio Function (All audio types: SFX, Native TTS, Google TTS)
-async function handleFirstInteraction() {
-  const unlocked = await unlockAudio(); // Unlocks all audio systems
-
-  if (unlocked) {
-    // Remove ALL listeners to prevent duplicate calls
-    document.removeEventListener("click", handleFirstInteraction);
-    document.removeEventListener("touchstart", handleFirstInteraction);
-    document.removeEventListener("keydown", handleFirstInteraction);
-    logger.log("✅ Audio unlocked on first interaction");
-  }
-}
 
 onMounted(async () => {
   console.log("🚀 App mounted");
@@ -150,19 +133,7 @@ onMounted(async () => {
   // ✅ Enable Pull to Refresh for PWA
   usePullToRefresh();
 
-  // Add global listeners for audio unlock
-  document.addEventListener("click", handleFirstInteraction);
-  document.addEventListener("touchstart", handleFirstInteraction);
-  document.addEventListener("keydown", handleFirstInteraction);
-
   const cleanupFns = [];
-
-  // Clean up these specific listeners on unmount (if not yet removed)
-  cleanupFns.push(() => {
-    document.removeEventListener("click", handleFirstInteraction);
-    document.removeEventListener("touchstart", handleFirstInteraction);
-    document.removeEventListener("keydown", handleFirstInteraction);
-  });
 
   // ✅ Initialize Listeners (Capture cleanup functions)
   const unsubNick = nicknameStore.initNicknameListener();

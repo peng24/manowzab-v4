@@ -124,7 +124,7 @@
               <i class="fa-solid fa-volume-high"></i> ทดสอบเสียง
             </a>
             <a @click="toggleFullScreen" class="menu-screen">
-              <i class="fa-solid fa-expand"></i> เต็มจอ (iPad)
+              <i class="fa-solid fa-expand"></i> เต็มจอ
             </a>
             <a @click="toggleAwayMode" class="menu-away">
               <i class="fa-solid fa-moon"></i> โหมดพาลูกนอน
@@ -205,7 +205,7 @@ const chatStore = useChatStore();
 const stockStore = useStockStore();
 const { connectVideo, disconnect } = useYouTube();
 
-const { queueAudio, unlockAudio } = useAudio();
+const { queueAudio } = useAudio();
 
 const openDashboard = inject("openDashboard");
 const openHistory = inject("openHistory");
@@ -352,9 +352,6 @@ async function toggleConnection() {
   systemStore.currentVideoId = videoId.value;
   stockStore.connectToStock(videoId.value);
 
-  // ✅ เพิ่ม: Unlock Audio เพื่อให้เสียงพูดทำงาน
-  unlockAudio();
-
   // ✅ เพิ่ม: ส่งรหัสไลฟ์ขึ้น Firebase เพื่อให้เครื่องอื่นรู้
   set(dbRef(db, "system/activeVideo"), videoId.value).catch((err) =>
     console.error("Sync Error:", err),
@@ -434,7 +431,6 @@ function downloadCSV() {
 }
 
 function testVoice() {
-  unlockAudio(); // ✅ Unlock audio context explicitly
   queueAudio(null, "", "ทดสอบเสียง หนึ่ง สอง สาม สี่ ห้า");
   showDropdown.value = false;
 }
@@ -610,7 +606,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-        <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.29.2) - 24 เม.ย. 2026</h4>
+      <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.29.3) - 24 เม.ย. 2026</h4>
+        <ul>
+          <li>🧹 <b>ทำความสะอาดโค้ด</b> — ลบระบบ iOS/iPad Audio Unlock (ปลดล็อคเสียงบน iPad) ออกจากระบบ เนื่องจากไม่ได้ใช้งานบน iPad แล้ว เพื่อให้ระบบมีขนาดเล็กลงและทำงานได้รวดเร็วขึ้น</li>
+        </ul>
+        <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.29.2) - 24 เม.ย. 2026</h4>
         <ul>
           <li>🛠️ <b>ปรับปรุงโครงสร้าง Gitignore</b> — ปรับปรุงไฟล์ .gitignore ให้ครอบคลุมการละเว้นไฟล์ขยะจากระบบปฏิบัติการ, ไฟล์ Environment (เพื่อความปลอดภัย), ไฟล์ประวัติชั่วคราว, และโฟลเดอร์ของ AI Agents เพื่อให้การจัดการ Source Code สะอาดและปลอดภัยยิ่งขึ้น</li>
         </ul>

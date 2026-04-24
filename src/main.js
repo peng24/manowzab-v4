@@ -3,7 +3,6 @@ import { createPinia } from "pinia";
 import App from "./App.vue";
 import "./assets/style.css";
 import { globalErrorHandler } from "./utils/errorHandler";
-import "./utils/iosAudioUnlock.js";
 import { logger } from "./utils/logger";
 
 const app = createApp(App);

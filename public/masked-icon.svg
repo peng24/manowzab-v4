@@ -1,4 +1,3 @@
 <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="15%" fill="#0f172a"/>
-  <path d="M150 150 L150 362 A 20 20 0 0 0 190 362 L190 250 L235 300 A 20 20 0 0 0 277 300 L322 250 L322 362 A 20 20 0 0 0 362 362 L362 150 A 20 20 0 0 0 322 150 L256 220 L190 150 A 20 20 0 0 0 150 150 Z" fill="#4ade80"/>
+  <path d="M140 380 L140 180 A 10 10 0 0 1 155 170 L256 270 L357 170 A 10 10 0 0 1 372 180 L372 380" fill="none" stroke="#000" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

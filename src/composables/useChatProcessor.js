@@ -162,7 +162,7 @@ export function useChatProcessor() {
     let ttsMessage = msg;
     if (isNewCustomer && !isAdmin && !warnedNewCustomers.has(uid)) {
       warnedNewCustomers.add(uid);
-      ttsMessage = `${msg} ... ลูกค้าใหม่ พิมพ์ชื่อ ตามด้วยหมายเลขรายการ เพื่อทำการจอง ... ร้านนาวมีค่าส่งนะคะ ... ปลายทาง 50 บาท ... โอนเงิน 40 บาท`;
+      ttsMessage = `${msg} ... ลูกค้าใหม่ พิมพ์ชื่อ ตามด้วยรหัสเพื่อจอง ... ค่าส่ง โอน 40 ... ปลายทาง 50 ค่ะ`;
     }
 
     // Determine intent

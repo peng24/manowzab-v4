@@ -7,22 +7,44 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Node / Dependencies
+node_modules/
+
+# Production / Build
+dist/
+dist-ssr/
 *.local
 
-# Editor directories and files
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Temporary / Scratch Files
+tmp/
+temp/
+tmp_*
+*.csv
+
+# AI Agents / Tools
+.agent/
+.gemini/
+.cursor/
+
+# Editor / IDE
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+!.vscode/settings.json
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-.env
+
+# System Files
+.DS_Store
+Thumbs.db
 
 # Python
 __pycache__/
@@ -30,4 +52,3 @@ __pycache__/
 *$py.class
 .venv/
 venv/
-

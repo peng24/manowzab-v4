@@ -730,7 +730,13 @@ function showChangelog() {
     color: "#fff",
     confirmButtonText: "รับทราบ!",
     confirmButtonColor: "#00e676",
-    width: 600,
+    showCloseButton: true,
+    allowOutsideClick: true,
+    backdrop: `
+      rgba(0,0,0,0.5)
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    `
   });
 }
 

@@ -104,7 +104,7 @@
                 {{ getIntentBadge(chat.type).label }}
               </span>
               <span v-else-if="chat.type === 'spam'" class="status-emoji-only"
-                >🍋</span
+                >💬</span
               >
 
               <span v-if="chat.realName !== chat.displayName" class="real-name">
@@ -210,7 +210,7 @@ function getIntentBadge(type) {
     case "question":
       return { icon: "💬", label: "ถาม", class: "badge-question" };
     default:
-      return null; // Return null so we can fallback to just 🍋 for spam
+      return null; // Return null so we can fallback to just 💬 for spam
   }
 }
 

@@ -77,7 +77,7 @@ export function useChatProcessor() {
   const systemStore = useSystemStore();
   const nicknameStore = useNicknameStore();
 
-  const { queueAudio, playSfx, resetVoice, unlockAudio } =
+  const { queueAudio, playSfx, resetVoice } =
     useAudio();
 
   // ✅ Local State for Implicit Buy Logic

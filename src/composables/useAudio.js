@@ -13,47 +13,6 @@ export function useAudio() {
   const systemStore = useSystemStore();
   const isSpeaking = ref(false); // Reactive wrapper for UI if needed
 
-  // ✅ Unlock all audio types on iOS (AudioContext, Native TTS, HTML5 Audio)
-  async function unlockAudio() {
-    if (!audioCtx) return false;
-
-    try {
-      if (audioCtx.state === "suspended") {
-        await audioCtx.resume();
-      }
-    } catch (err) {
-      console.warn("Audio resume failed:", err);
-    }
-
-    if (audioCtx.state !== "running") return false;
-
-    try {
-      // 1. Unlock AudioContext (for SFX)
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-
-      gainNode.gain.value = 0; // 🔇 Silent
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-
-      oscillator.start();
-      oscillator.stop(audioCtx.currentTime + 0.001);
-
-      // 2. Unlock Native TTS (SpeechSynthesis API)
-      ttsService.unlockNative();
-
-      // 3. Unlock Google TTS Audio Element (HTML5 Audio)
-      ttsService.unlockAudioElement();
-
-      console.log("🔓 All audio systems unlocked!");
-      return true;
-    } catch (e) {
-      console.error("Silent unlock failed:", e);
-      return false;
-    }
-  }
-
 
   let activeOscillators = [];
 
@@ -223,6 +182,5 @@ export function useAudio() {
     queueAudio, // ✅ Unified Queue API
     playSfx,
     resetVoice,
-    unlockAudio,
   };
 }

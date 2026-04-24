@@ -9,10 +9,8 @@ export class TextToSpeech {
     this.isSpeaking = false;
     this.voices = [];
     this.poller = null;
-    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)(); // ✅ AudioContext stays unlocked on iOS
+    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     this.currentSource = null; // ✅ Track active AudioBufferSource
-    this.isNativeUnlocked = false; // Track Native TTS unlock status
-    this.isGoogleUnlocked = false; // Track Google TTS AudioContext unlock status
     this.stuckTimer = null; // ✅ Safety timer to detect stuck state
     this.STUCK_TIMEOUT = 15000; // ✅ 15 seconds max per utterance
     this.consecutiveGoogleFailures = 0; // ✅ Track consecutive Google TTS failures
@@ -50,48 +48,6 @@ export class TextToSpeech {
     }
 
     console.log("🔍 Loaded " + this.voices.length + " voices.");
-  }
-
-  /**
-   * Unlock Native TTS by speaking a silent utterance
-   * This is needed on iOS to prime the TTS engine immediately upon user interaction
-   */
-  unlockNative() {
-    if (this.isNativeUnlocked) return;
-    console.log("🔓 Unlocking Native TTS...");
-    const utterance = new SpeechSynthesisUtterance("");
-    utterance.volume = 0; // Silent
-    utterance.onend = () => {
-      this.isNativeUnlocked = true;
-    };
-    window.speechSynthesis.speak(utterance);
-  }
-
-  /**
-   * Unlock AudioContext for Google TTS
-   * ✅ AudioContext stays permanently unlocked after first user interaction on iOS
-   * Unlike HTMLAudioElement, it does NOT lose permission during async fetch
-   */
-  unlockAudioElement() {
-    if (this.isGoogleUnlocked) return;
-
-    console.log("🔓 Unlocking Google TTS AudioContext...");
-
-    try {
-      if (this.audioCtx.state === "suspended") {
-        this.audioCtx.resume().then(() => {
-          console.log("✅ Google TTS AudioContext Unlocked");
-          this.isGoogleUnlocked = true;
-        }).catch((e) => {
-          console.warn("⚠️ AudioContext resume failed:", e);
-        });
-      } else {
-        console.log("✅ Google TTS AudioContext Already Running");
-        this.isGoogleUnlocked = true;
-      }
-    } catch (e) {
-      console.error("❌ AudioContext unlock failed:", e);
-    }
   }
 
   /**

@@ -606,7 +606,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-      <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.29.3) - 24 เม.ย. 2026</h4>
+      <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.29.4) - 25 เม.ย. 2026</h4>
+        <ul>
+          <li>🎨 <b>แก้ไขพื้นหลังเบลอ (Blur)</b> — ปิดการแสดงผลพื้นหลังเบลอสำหรับแจ้งเตือนแบบ Toast มุมขวาบน (เช่น โหมดพาลูกนอน และแจ้งเตือนทั่วไป) เพื่อไม่ให้บดบังหน้าจอหลักและตารางการทำงาน</li>
+        </ul>
+      <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.29.3) - 24 เม.ย. 2026</h4>
         <ul>
           <li>🧹 <b>ทำความสะอาดโค้ด</b> — ลบระบบ iOS/iPad Audio Unlock (ปลดล็อคเสียงบน iPad) ออกจากระบบ เนื่องจากไม่ได้ใช้งานบน iPad แล้ว เพื่อให้ระบบมีขนาดเล็กลงและทำงานได้รวดเร็วขึ้น</li>
         </ul>

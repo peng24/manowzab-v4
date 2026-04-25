@@ -1909,7 +1909,8 @@ body {
 }
 
 /* SweetAlert2 Global Blur & Close Button Adjustments */
-div:where(.swal2-container).swal2-backdrop-show, div:where(.swal2-container).swal2-noanimation {
+div:where(.swal2-container).swal2-backdrop-show:not(.swal2-top-end):not(.swal2-toast), 
+div:where(.swal2-container).swal2-noanimation:not(.swal2-top-end):not(.swal2-toast) {
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
   background: rgba(0, 0, 0, 0.6) !important;

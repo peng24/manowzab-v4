@@ -1,13 +1,5 @@
 <template>
   <div class="app-container">
-    <!-- ✅ Live Overlay Mode -->
-    <LiveOverlay v-if="isOverlayMode" />
-
-    <!-- ✅ Shipping Mobile Mode -->
-    <ShippingMobileView v-else-if="isShippingMode" />
-
-    <!-- ✅ Normal Mode -->
-    <template v-else>
       <UpdatePrompt />
       <div class="app-layout">
         <div class="left-column">
@@ -40,7 +32,6 @@
         </div>
         <ChatPanel />
       </div>
-    </template>
   </div>
 </template>
 
@@ -65,9 +56,6 @@ import ChatPanel from "./components/ChatPanel.vue";
 import Dashboard from "./components/Dashboard.vue";
 import HistoryModal from "./components/HistoryModal.vue";
 import ShippingManager from "./components/ShippingManager.vue";
-import ShippingMobileView from "./components/ShippingMobileView.vue"; // ✅ Import new component
-
-import LiveOverlay from "./components/LiveOverlay.vue"; // ✅ Import Overlay
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import PhoneticManager from "./components/PhoneticManager.vue"; // ✅ Import Phonetic Manager
@@ -89,10 +77,6 @@ watch(
     }
   },
 );
-
-const urlParams = new URLSearchParams(window.location.search);
-const isOverlayMode = urlParams.get("mode") === "overlay"; // ✅ Check Overlay Mode
-// ✅ Check Shipping Mode
 
 // ✅ Use Away Mode Composable
 const { awayTimer, closeAwayMode, initAwayListener } = useAwayMode();

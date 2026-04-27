@@ -1688,14 +1688,6 @@ body {
   color: #000;
 }
 
-.menu-overlay i {
-  background: linear-gradient(135deg, #ec4899, #db2777);
-}
-
-.menu-shipping-mobile i {
-  background: linear-gradient(135deg, #06b6d4, #0891b2);
-}
-
 .menu-sales i {
   background: linear-gradient(135deg, #14b8a6, #0d9488);
 }

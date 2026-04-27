@@ -47,7 +47,6 @@ const numberWithPoliteRegex = /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้
 const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 const customerNameNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,}?)\s+(\d+)$/;
 const cancelRegex = /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ)\s*[-]?\s*(\d+)|(\d+)\s+[\s\S]*?(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ)|(\d+)\s*(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ))/i;
-const implicitBuyRegex = /(?:^|\s)(?:รับ|เอา|เิา|F|f|cf|CF)(?:\s|$)/;
 
 // ✅ Thai Numeral → Arabic Digit Converter
 function thaiToArabic(text) {
@@ -79,36 +78,6 @@ export function useChatProcessor() {
 
   const { queueAudio, playSfx, resetVoice } =
     useAudio();
-
-  // ✅ Local State for Implicit Buy Logic
-  const currentOverlayItem = ref(null);
-
-  // ✅ Watch & Listen for Overlay Changes
-  function setupOverlayListener() {
-    if (!systemStore.currentVideoId) return;
-
-    const overlayRef = dbRef(
-      db,
-      `overlay/${systemStore.currentVideoId}/current_item`,
-    );
-    onValue(overlayRef, (snapshot) => {
-      const val = snapshot.val();
-      if (val && val.id) {
-        currentOverlayItem.value = val.id; // Store only ID for simplicity
-      } else {
-        currentOverlayItem.value = null;
-      }
-    });
-  }
-
-  // Initial Setup & Watch for Video ID change
-  setupOverlayListener();
-  watch(
-    () => systemStore.currentVideoId,
-    (newId) => {
-      if (newId) setupOverlayListener();
-    },
-  );
 
   // extractMessageRuns is now imported from ../services/YouTubeLiveChat
 
@@ -189,9 +158,6 @@ export function useChatProcessor() {
     // 5. Dash Buy Pattern (Name-Number)
 
     // 6. Cancel Logic (Refined - supports dash)
-
-    // 7. Implicit "Current Item" Logic (Keyword ONLY)
-    // Matches: "รับ", "เอา", "F", "cf" (standing alone or surrounded by spaces)
 
     // --- Execution ---
 
@@ -411,7 +377,6 @@ export function useChatProcessor() {
       const matchPolite = normalizedMsg.match(numberWithPoliteRegex);
       const matchDash = normalizedMsg.match(dashBuyRegex);
       const matchCustomerName = normalizedMsg.match(customerNameNumRegex);
-      const matchImplicit = normalizedMsg.match(implicitBuyRegex);
 
       // ✅ Check Admin Proxy (Both Name-First and Number-First)
       let matchAdminNumFirst = isAdmin
@@ -455,12 +420,6 @@ export function useChatProcessor() {
           targetId = parseInt(matchCustomerName[2]);
           forcedOwnerName = nameOnly;
           method = "regex-customer-name";
-        }
-      } else if (matchImplicit) {
-        if (currentOverlayItem.value) {
-          intent = "buy";
-          targetId = parseInt(currentOverlayItem.value);
-          method = "regex-implicit";
         }
       }
     }

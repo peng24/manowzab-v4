@@ -135,12 +135,6 @@
               ></i>
               {{ isSimulating ? "หยุดจำลอง" : "เริ่มจำลองแชท" }}
             </a>
-            <a @click="openOverlayPage" class="menu-overlay">
-              <i class="fa-solid fa-layer-group"></i> เปิดหน้าจอ Overlay (OBS)
-            </a>
-            <a @click="openShippingMobilePage" class="menu-shipping-mobile">
-              <i class="fa-solid fa-mobile-screen"></i> จัดการจัดส่ง (มือถือ)
-            </a>
             <a href="https://peng24.github.io/manowzab-sales/" target="_blank" class="menu-sales">
               <i class="fa-solid fa-chart-line"></i> ยอดขาย
             </a>
@@ -543,22 +537,6 @@ async function toggleSimulation() {
   showDropdown.value = false;
 }
 
-function openOverlayPage() {
-  window.open(
-    window.location.origin + window.location.pathname + "?mode=overlay",
-    "_blank",
-  );
-  showDropdown.value = false;
-}
-
-function openShippingMobilePage() {
-  window.open(
-    window.location.origin + window.location.pathname + "?mode=shipping",
-    "_blank",
-  );
-  showDropdown.value = false;
-}
-
 function openNoteEditor() {
   if (noteEditorRef.value) {
     noteEditorRef.value.openEditor();
@@ -606,7 +584,11 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-      <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.29.4) - 25 เม.ย. 2026</h4>
+      <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.29.5) - 27 เม.ย. 2026</h4>
+        <ul>
+          <li>🧹 <b>ทำความสะอาดโปรเจกต์</b> — ถอดระบบ Overlay (หน้าจอสำหรับโปรแกรม OBS) และระบบจัดการจัดส่งเวอร์ชันมือถือ (Mobile Shipping) ออกจากโปรเจกต์ทั้งหมด เพื่อลดความซ้ำซ้อนและทำให้ระบบหลักทำงานได้รวดเร็วขึ้น</li>
+        </ul>
+      <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.29.4) - 25 เม.ย. 2026</h4>
         <ul>
           <li>🎨 <b>แก้ไขพื้นหลังเบลอ (Blur)</b> — ปิดการแสดงผลพื้นหลังเบลอสำหรับแจ้งเตือนแบบ Toast มุมขวาบน (เช่น โหมดพาลูกนอน และแจ้งเตือนทั่วไป) เพื่อไม่ให้บดบังหน้าจอหลักและตารางการทำงาน</li>
         </ul>

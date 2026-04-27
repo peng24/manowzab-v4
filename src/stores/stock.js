@@ -273,7 +273,7 @@ export const useStockStore = defineStore("stock", () => {
   }
 
   /**
-   * Updates generic item data (Price, Size, etc.) and syncs with Overlay.
+   * Updates generic item data (Price, Size, etc.).
    * @param {number} num - Item ID
    * @param {Object} newData - Data to update (e.g. { price: 100, size: "XL" })
    */
@@ -285,19 +285,6 @@ export const useStockStore = defineStore("stock", () => {
       dbRef(db, `stock/${systemStore.currentVideoId}/${num}`),
       newData,
     );
-
-    // 2. Update Overlay "Current Item" (Only if we have price/size)
-    if (newData.price || newData.size) {
-      await update(
-        dbRef(db, `overlay/${systemStore.currentVideoId}/current_item`),
-        {
-          id: num,
-          price: newData.price || null,
-          size: newData.size || null,
-          updatedAt: Date.now(),
-        },
-      );
-    }
   }
 
   return {

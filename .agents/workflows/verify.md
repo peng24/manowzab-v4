@@ -118,7 +118,20 @@ description: Mandatory verification checklist after every code change
 | 10.5 | Real-time Stock Watcher | `src/components/ShippingManager.vue` | watch stockData → auto-update จำนวนสินค้าใน delivery_customers |
 | 10.6 | Delivery Strip (Header) | `src/components/Header.vue` | แถบรายชื่อลูกค้า real-time บน header (pills สี overdue/today/soon/later) |
 | 10.7 | Countdown + Thai Date | `src/components/ShippingManager.vue` | นับถอยหลัง (เลย/วันนี้/พรุ่งนี้/อีก X วัน) + วันที่ไทย (24 มี.ค. 69) |
-| 10.8 | Mark Done + Reset | `src/components/ShippingManager.vue` | เสร็จ → status=done, itemCount=0, sessions=null |
+| 10.8 | Mark Done + Reset | `src/components/ShippingManager.vue` | เสร็จ → status=done, itemCount=0, sessions=null + สะสม totalBookings |
+
+---
+
+## 🛒 11. ระบบนับจำนวนจอง (Booking Count Tracker)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 11.1 | `bookingCount` ใน `shippingList` computed | `src/components/Dashboard.vue` | ดึง `order.items.length` จาก `customerOrders` (real-time จาก stockData) แสดงจำนวนจอง |
+| 11.2 | Badge 🛒 หลังชื่อลูกค้า | `src/components/Dashboard.vue` | แสดง badge สีม่วง `🛒X` หลังชื่อในตาราง Dashboard เมื่อ bookingCount > 0 |
+| 11.3 | Real-time Update | `src/components/Dashboard.vue` | จองเพิ่ม → ตัวเลข badge เพิ่มทันที, ยกเลิก → ลดทันที (ใช้ stockData ที่ sync อยู่แล้ว ไม่ต้องเพิ่ม listener) |
+| 11.4 | `totalBookings` สะสมใน `markDone()` | `src/components/ShippingManager.vue` | เมื่อกด ✅ เสร็จ → `runTransaction` บวก itemCount เข้า totalBookings ก่อน reset เป็น 0 |
+| 11.5 | แสดง "ลูกค้าประจำ" | `src/components/ShippingManager.vue` | แสดงข้อความ "ลูกค้าประจำ • เคยสั่งรวม X ชิ้น" ใต้ชื่อลูกค้าเมื่อ totalBookings > 0 |
+| 11.6 | Owner Count Badge `×N` | `src/components/StockGrid.vue` | แสดง ×N สีฟ้าหลังชื่อ owner ในตาราง StockGrid เมื่อจอง >= 2 ชิ้น (real-time จาก stockData) |
 
 ---
 

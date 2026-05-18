@@ -95,12 +95,13 @@
           <div class="stock-num">{{ i }}</div>
           <div :class="['stock-status', { empty: !getStockItem(i).owner }]">
             {{ getStockItem(i).owner || "ว่าง" }}
-            <span
-              v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner) >= 2"
-              class="owner-count-badge"
-              :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner)} ชิ้น`"
-            >×{{ getOwnerCount(getStockItem(i).owner) }}</span>
           </div>
+          <div
+            v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner) >= 2"
+            class="owner-count-badge"
+            :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner)} ชิ้น — คลิกเพื่อจัดการ`"
+            @click.stop="showOwnerItems(getStockItem(i).owner)"
+          >👗 {{ getOwnerCount(getStockItem(i).owner) }} ตัว</div>
           <div v-if="getStockItem(i).price" class="stock-price">
             {{ getStockItem(i).price }} บาท
           </div>
@@ -495,6 +496,117 @@ const ownerItemCounts = computed(() => {
 
 function getOwnerCount(ownerName) {
   return ownerItemCounts.value[ownerName] || 0;
+}
+
+// 👗 แสดงรายการสินค้าทั้งหมดของลูกค้าคนนี้ + ปุ่มลบ
+function showOwnerItems(ownerName) {
+  const items = [];
+  Object.keys(stockStore.stockData).forEach((num) => {
+    const item = stockStore.stockData[num];
+    if (item.owner === ownerName) {
+      items.push({ num: parseInt(num), price: item.price || 0, time: item.time || 0 });
+    }
+  });
+  items.sort((a, b) => a.num - b.num);
+
+  const totalPrice = items.reduce((sum, i) => sum + (parseInt(i.price) || 0), 0);
+
+  // ฟอร์แมตวันที่ไทย
+  function formatTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const day = d.getDate();
+    const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const month = months[d.getMonth()];
+    const hour = d.getHours().toString().padStart(2, '0');
+    const min = d.getMinutes().toString().padStart(2, '0');
+    return `${day} ${month} ${hour}:${min}`;
+  }
+
+  const itemsHtml = items.map((item, idx) => {
+    const priceText = item.price ? `${parseInt(item.price).toLocaleString()}` : '';
+    const timeText = item.time ? formatTime(item.time) : '';
+    return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin:4px 0; background:linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius:10px; border:1px solid #2a2a4a; transition:all 0.2s;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#2a2a4a'">
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span style="background:linear-gradient(135deg, #6366f1, #8b5cf6); color:#fff; font-weight:700; padding:2px 10px; border-radius:20px; font-size:0.9em; white-space:nowrap;">#${item.num}</span>
+          ${priceText ? `<span style="color:#fbbf24; font-weight:600; font-size:0.85em;">💰 ${priceText} ฿</span>` : '<span style="color:#666; font-size:0.8em;">ยังไม่ตั้งราคา</span>'}
+        </div>
+        ${timeText ? `<div style="font-size:0.7em; color:#6b7280; margin-top:4px; padding-left:2px;">📅 ${timeText}</div>` : ''}
+      </div>
+      <button onclick="document.dispatchEvent(new CustomEvent('remove-owner-item', {detail: ${item.num}}))" 
+              style="background:linear-gradient(135deg, #dc2626, #b91c1c); color:white; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.8em; font-weight:600; flex-shrink:0; transition:all 0.2s; box-shadow:0 2px 6px rgba(220,38,38,0.3);"
+              onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(220,38,38,0.5)'"
+              onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 6px rgba(220,38,38,0.3)'">
+        <i class="fa-solid fa-trash-can"></i> ลบ
+      </button>
+    </div>`;
+  }).join('');
+
+  Swal.fire({
+    title: `👗 ${ownerName}`,
+    html: `<div style="text-align:left;">
+      <div style="display:flex; justify-content:center; gap:16px; margin-bottom:12px;">
+        <div style="text-align:center; background:#1a1a2e; padding:8px 16px; border-radius:10px; border:1px solid #2a2a4a;">
+          <div style="font-size:1.4em; font-weight:700; color:#8b5cf6;">${items.length}</div>
+          <div style="font-size:0.7em; color:#9ca3af;">รายการ</div>
+        </div>
+        <div style="text-align:center; background:#1a1a2e; padding:8px 16px; border-radius:10px; border:1px solid #2a2a4a;">
+          <div style="font-size:1.4em; font-weight:700; color:#fbbf24;">฿${totalPrice.toLocaleString()}</div>
+          <div style="font-size:0.7em; color:#9ca3af;">ราคารวม</div>
+        </div>
+      </div>
+      <div style="max-height:280px; overflow-y:auto; padding-right:4px;">
+        ${itemsHtml}
+      </div>
+    </div>`,
+    background: 'linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%)',
+    color: '#fff',
+    showConfirmButton: true,
+    confirmButtonText: '<i class="fa-solid fa-xmark"></i> ปิด',
+    confirmButtonColor: '#374151',
+    showCloseButton: true,
+    width: 400,
+    didOpen: () => {
+      // ฟัง event ลบรายการ
+      const handler = async (e) => {
+        const num = e.detail;
+        const result = await Swal.fire({
+          title: `ลบ #${num} ของ ${ownerName}?`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'ลบเลย',
+          cancelButtonText: 'ยกเลิก',
+          confirmButtonColor: '#d32f2f',
+          background: '#1e1e1e',
+          color: '#fff',
+        });
+        if (result.isConfirmed) {
+          await stockStore.processCancel(num);
+          Swal.fire({
+            icon: 'success',
+            title: `ลบ #${num} แล้ว`,
+            toast: true,
+            position: 'top-end',
+            timer: 1500,
+            showConfirmButton: false,
+          });
+          // เปิด popup ใหม่ด้วยข้อมูลอัปเดต
+          setTimeout(() => showOwnerItems(ownerName), 300);
+        }
+      };
+      document.addEventListener('remove-owner-item', handler);
+      // cleanup เมื่อปิด
+      const swalEl = Swal.getPopup();
+      const observer = new MutationObserver(() => {
+        if (!document.contains(swalEl)) {
+          document.removeEventListener('remove-owner-item', handler);
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    },
+  });
 }
 function getQueueLength(num) {
   const item = stockStore.stockData[num];
@@ -1529,15 +1641,22 @@ watch(
   border: 2px solid #2a2a2a; /* Border matching card bg to make it pop */
 }
 
-/* 🛢 Owner Booking Count Badge (×N) */
+/* 🛢 Owner Booking Count Badge (👗 N ตัว) */
 .owner-count-badge {
-  display: inline;
-  font-size: 0.7em;
+  display: block;
+  font-size: 0.65em;
   color: #60a5fa;
-  font-weight: 700;
-  margin-left: 2px;
-  opacity: 0.85;
-  vertical-align: super;
-  letter-spacing: -0.5px;
+  font-weight: 600;
+  margin-top: 1px;
+  opacity: 0.9;
+  text-align: center;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.owner-count-badge:hover {
+  color: #93c5fd;
+  text-decoration: underline;
 }
 </style>

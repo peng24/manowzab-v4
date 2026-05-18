@@ -92,6 +92,9 @@
                   :value="c.name"
                   @change="updateField(c.id, 'name', $event.target.value)"
                 />
+                <div class="lifetime-bookings" v-if="c.totalBookings > 0">
+                  ลูกค้าประจำ • เคยสั่งรวม {{ c.totalBookings }} ชิ้น
+                </div>
               </td>
               <td class="td-center">
                 <span class="item-count-auto" :title="getSessionBreakdown(c)">
@@ -170,7 +173,7 @@
 
 <script setup>
 import { ref, computed, inject, onMounted, onUnmounted, watch } from "vue";
-import { ref as dbRef, onValue, update, remove, get } from "firebase/database";
+import { ref as dbRef, onValue, update, remove, get, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
@@ -538,9 +541,19 @@ function markDone(customer) {
     confirmButtonText: "ยืนยัน",
     cancelButtonText: "ยกเลิก",
     confirmButtonColor: "#10b981",
-  }).then((r) => {
+  }).then(async (r) => {
     if (r.isConfirmed) {
-      update(dbRef(db, `delivery_customers/${customer.id}`), {
+      // ✅ สะสม totalBookings ก่อน reset (Lifetime booking count)
+      const currentCount = customer.itemCount || 0;
+      if (currentCount > 0) {
+        const totalRef = dbRef(db, `delivery_customers/${customer.id}/totalBookings`);
+        await runTransaction(totalRef, (currentTotal) => {
+          return (currentTotal || 0) + currentCount;
+        });
+      }
+
+      // ✅ Reset สถานะ + เคลียร์ sessions เพื่อเริ่มนับใหม่
+      await update(dbRef(db, `delivery_customers/${customer.id}`), {
         status: "done",
         itemCount: 0,
         sessions: null,
@@ -682,6 +695,16 @@ function deleteCustomer(id, name) {
 }
 
 .session-info-icon { font-size: 0.75em; color: #666; cursor: help; }
+
+/* Lifetime Bookings (ลูกค้าประจำ) */
+.lifetime-bookings {
+  font-size: 0.7em;
+  color: #8b5cf6;
+  margin-top: 2px;
+  padding-left: 8px;
+  opacity: 0.85;
+  letter-spacing: 0.3px;
+}
 
 /* Thai Date Cell */
 .date-cell {

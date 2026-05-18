@@ -95,6 +95,11 @@
           <div class="stock-num">{{ i }}</div>
           <div :class="['stock-status', { empty: !getStockItem(i).owner }]">
             {{ getStockItem(i).owner || "ว่าง" }}
+            <span
+              v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner) >= 2"
+              class="owner-count-badge"
+              :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner)} ชิ้น`"
+            >×{{ getOwnerCount(getStockItem(i).owner) }}</span>
           </div>
           <div v-if="getStockItem(i).price" class="stock-price">
             {{ getStockItem(i).price }} บาท
@@ -475,6 +480,21 @@ const uniqueBuyerNames = computed(() => {
 
 function getStockItem(num) {
   return stockStore.stockData[num] || {};
+}
+
+// 🛢 นับจำนวนสินค้าต่อ owner (แสดงเฉพาะ >= 2 ชิ้น)
+const ownerItemCounts = computed(() => {
+  const counts = {};
+  Object.values(stockStore.stockData).forEach((item) => {
+    if (item.owner) {
+      counts[item.owner] = (counts[item.owner] || 0) + 1;
+    }
+  });
+  return counts;
+});
+
+function getOwnerCount(ownerName) {
+  return ownerItemCounts.value[ownerName] || 0;
 }
 function getQueueLength(num) {
   const item = stockStore.stockData[num];
@@ -1507,5 +1527,17 @@ watch(
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
   z-index: 20;
   border: 2px solid #2a2a2a; /* Border matching card bg to make it pop */
+}
+
+/* 🛢 Owner Booking Count Badge (×N) */
+.owner-count-badge {
+  display: inline;
+  font-size: 0.7em;
+  color: #60a5fa;
+  font-weight: 700;
+  margin-left: 2px;
+  opacity: 0.85;
+  vertical-align: super;
+  letter-spacing: -0.5px;
 }
 </style>

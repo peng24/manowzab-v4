@@ -107,12 +107,21 @@
             <tr v-for="(item, index) in shippingList" :key="item.uid">
               <td>{{ index + 1 }}</td>
               <td>
-                <input
-                  class="edit-input"
-                  v-model="item.editableName"
-                  @change="updateCustomerName(item.uid, item.editableName)"
-                  placeholder="พิมพ์ชื่อแล้ว Enter"
-                />
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input
+                    class="edit-input"
+                    v-model="item.editableName"
+                    @change="updateCustomerName(item.uid, item.editableName)"
+                    placeholder="พิมพ์ชื่อแล้ว Enter"
+                  />
+                  <span
+                    class="booking-badge"
+                    v-if="item.bookingCount > 0"
+                    :title="`จองแล้ว ${item.bookingCount} ชิ้น`"
+                  >
+                    🛒{{ item.bookingCount }}
+                  </span>
+                </div>
               </td>
               <td style="font-size: 0.9em">{{ item.itemsText }}</td>
               <td style="text-align: center">
@@ -281,6 +290,7 @@ const shippingList = computed(() => {
         editableName: savedNames.value[uid]?.nick || order.name,
         itemsText,
         totalPrice: order.totalPrice,
+        bookingCount: order.items.length,  // 🆕 จำนวนสินค้าที่จอง (real-time จาก stockData)
       };
     });
 });
@@ -734,6 +744,28 @@ onUnmounted(() => {
   .percent-text {
     font-size: 0.75rem;
   }
+}
+
+/* 🛒 Booking Count Badge */
+.booking-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 0.75em;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  animation: badge-pop 0.3s ease-out;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
+  flex-shrink: 0;
+}
+
+@keyframes badge-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 </style>

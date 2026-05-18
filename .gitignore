@@ -9,6 +9,7 @@ lerna-debug.log*
 
 # Node / Dependencies
 node_modules/
+.npm
 
 # Production / Build
 dist/
@@ -30,6 +31,8 @@ tmp_*
 .agent/
 .gemini/
 .cursor/
+.copilot/
+.aider*
 
 # Editor / IDE
 .vscode/*
@@ -45,6 +48,9 @@ tmp_*
 # System Files
 .DS_Store
 Thumbs.db
+Desktop.ini
+ehthumbs.db
+ehthumbs_vista.db
 
 # Python
 __pycache__/
@@ -52,3 +58,8 @@ __pycache__/
 *$py.class
 .venv/
 venv/
+
+# Testing / Coverage
+coverage/
+*.lcov
+.nyc_output/

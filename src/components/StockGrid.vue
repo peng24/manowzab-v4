@@ -1644,7 +1644,7 @@ watch(
 /* 🛢 Owner Booking Count Badge (👗 N ตัว) */
 .owner-count-badge {
   display: block;
-  font-size: 0.65em;
+  font-size: 0.85em;
   color: #60a5fa;
   font-weight: 600;
   margin-top: 1px;

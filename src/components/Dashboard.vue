@@ -753,9 +753,9 @@ onUnmounted(() => {
   gap: 2px;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
-  font-size: 0.75em;
+  font-size: 0.95em;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 12px;
   white-space: nowrap;
   animation: badge-pop 0.3s ease-out;

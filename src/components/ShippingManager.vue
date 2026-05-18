@@ -323,18 +323,32 @@ watch(
       if (customer.status === "done") continue;
       const uid = customer.id;
       const order = orders[uid];
-      if (!order) continue;
+      
+      let newCount = 0;
+      let newTotalPrice = 0;
+      
+      if (order) {
+        newCount = order.count;
+        newTotalPrice = order.totalPrice;
+      } else if (customer.sessions?.[videoId]) {
+        // ลูกค้ายกเลิกสินค้าชิ้นสุดท้ายในไลฟ์ปัจจุบัน ต้องปรับให้เป็น 0
+        newCount = 0;
+        newTotalPrice = 0;
+      } else {
+        // ไม่มีรายการในไลฟ์นี้ และไม่เคยมี session ของไลฟ์นี้ ข้ามไป
+        continue;
+      }
 
       // Check if this session data changed
       const currentSession = customer.sessions?.[videoId];
-      if (currentSession && currentSession.count === order.count && currentSession.totalPrice === order.totalPrice) {
+      if (currentSession && currentSession.count === newCount && currentSession.totalPrice === newTotalPrice) {
         continue; // No change
       }
 
       // Update session + recalc
       await update(dbRef(db, `delivery_customers/${uid}/sessions/${videoId}`), {
-        count: order.count,
-        totalPrice: order.totalPrice,
+        count: newCount,
+        totalPrice: newTotalPrice,
       });
 
       // Recalc total

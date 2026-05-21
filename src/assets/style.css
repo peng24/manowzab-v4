@@ -321,6 +321,25 @@ body {
   text-overflow: ellipsis;
   color: var(--text-primary);
   font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.finished-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ff8a8a;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: 600;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+  flex-shrink: 0;
 }
 
 .version-badge {

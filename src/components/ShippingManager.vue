@@ -320,9 +320,21 @@ watch(
 
     // Auto-update only customers already in delivery_customers
     for (const customer of allCustomers.value) {
-      if (customer.status === "done") continue;
       const uid = customer.id;
       const order = orders[uid];
+
+      if (customer.status === "done") {
+        if (order && order.count > 0) {
+          // Revert status to pending in Firebase if they place a new order
+          await update(dbRef(db, `delivery_customers/${uid}`), {
+            status: "pending",
+            updatedAt: Date.now(),
+          });
+          customer.status = "pending";
+        } else {
+          continue;
+        }
+      }
       
       let newCount = 0;
       let newTotalPrice = 0;

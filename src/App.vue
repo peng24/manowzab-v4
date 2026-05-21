@@ -207,9 +207,32 @@ onMounted(async () => {
     if (vid && vid !== "demo") {
       systemStore.currentVideoId = vid;
       stockStore.connectToStock(vid);
+    } else {
+      systemStore.currentVideoId = "";
+      systemStore.liveTitle = "รอกระแสข้อมูล...";
+      systemStore.isLiveFinished = false;
     }
   });
   cleanupFns.push(unsubActiveVideo);
+
+  const unsubActiveVideoTitle = onValue(dbRef(db, "system/activeVideoTitle"), (snap) => {
+    const title = snap.val();
+    if (title && systemStore.currentVideoId && systemStore.currentVideoId !== "demo") {
+      systemStore.liveTitle = title;
+    } else if (!systemStore.currentVideoId || systemStore.currentVideoId === "demo") {
+      systemStore.liveTitle = "รอกระแสข้อมูล...";
+    }
+  });
+  cleanupFns.push(unsubActiveVideoTitle);
+
+  const unsubIsLiveFinished = onValue(dbRef(db, "system/isLiveFinished"), (snap) => {
+    if (systemStore.currentVideoId && systemStore.currentVideoId !== "demo") {
+      systemStore.isLiveFinished = snap.val() === true;
+    } else {
+      systemStore.isLiveFinished = false;
+    }
+  });
+  cleanupFns.push(unsubIsLiveFinished);
 
   // ✅ stockSize listener is already handled inside connectToStock()
 

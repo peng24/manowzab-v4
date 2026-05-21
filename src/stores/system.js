@@ -10,6 +10,7 @@ export const useSystemStore = defineStore("system", () => {
   const currentVideoId = ref("");
   const viewerCount = ref(0);
   const liveTitle = ref("รอกระแสข้อมูล...");
+  const isLiveFinished = ref(false);
   const isAway = ref(false); // สถานะโหมดพาลูกนอน
   const isSoundOn = ref(true); // ✅ เปิด/ปิดเสียง
   const isHost = ref(false); // ✅ สถานะเครื่องแม่ข่าย (Host)
@@ -121,6 +122,7 @@ export const useSystemStore = defineStore("system", () => {
     currentVideoId,
     viewerCount,
     liveTitle,
+    isLiveFinished,
     isAway,
     isSoundOn, // ✅ Export
     isHost, // ✅ Export

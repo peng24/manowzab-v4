@@ -117,9 +117,9 @@
                   <span
                     class="booking-badge"
                     v-if="item.bookingCount > 0"
-                    :title="`จองแล้ว ${item.bookingCount} ชิ้น`"
+                    :title="`จองได้ ${item.bookingCount} ตัว`"
                   >
-                    🛒{{ item.bookingCount }}
+                    👗 {{ item.bookingCount }} ตัว
                   </span>
                 </div>
               </td>
@@ -241,6 +241,7 @@ const chatStore = useChatStore();
 const selectedCustomer = ref("");
 const shippingData = ref({});
 const savedNames = ref({});
+const deliveryCustomers = ref({}); // 🆕 ข้อมูลลูกค้าจัดส่งทั้งหมด (รวมวันก่อนหน้า)
 
 // Chat History State
 const selectedChatUid = ref(null);
@@ -275,6 +276,7 @@ const customerOrders = computed(() => {
 // Get ready customers (in shipping list)
 const shippingList = computed(() => {
   const currentShipping = shippingData.value[systemStore.currentVideoId] || {};
+  const videoId = systemStore.currentVideoId;
 
   return Object.keys(customerOrders.value)
     .filter((uid) => currentShipping[uid]?.ready)
@@ -284,13 +286,29 @@ const shippingList = computed(() => {
         .map((i) => `#${i.num}${i.price > 0 ? `(${i.price})` : ""}`)
         .join(", ");
 
+      // คำนวณจำนวนจองรวมจากวันอื่นๆ ที่ยังค้างส่งอยู่
+      let bookingCount = order.items.length;
+      const delCust = deliveryCustomers.value[uid];
+      if (delCust) {
+        if (delCust.status === "done") {
+          bookingCount = 0;
+        } else if (delCust.status === "pending") {
+          const hasTodaySession = delCust.sessions && delCust.sessions[videoId];
+          if (hasTodaySession) {
+            bookingCount = delCust.itemCount || 0;
+          } else {
+            bookingCount = (delCust.itemCount || 0) + order.items.length;
+          }
+        }
+      }
+
       return {
         uid,
         name: savedNames.value[uid]?.nick || order.name,
         editableName: savedNames.value[uid]?.nick || order.name,
         itemsText,
         totalPrice: order.totalPrice,
-        bookingCount: order.items.length,  // 🆕 จำนวนสินค้าที่จอง (real-time จาก stockData)
+        bookingCount,
       };
     });
 });
@@ -298,14 +316,34 @@ const shippingList = computed(() => {
 // Get not ready customers
 const notReadyCustomers = computed(() => {
   const currentShipping = shippingData.value[systemStore.currentVideoId] || {};
+  const videoId = systemStore.currentVideoId;
 
   return Object.keys(customerOrders.value)
     .filter((uid) => !currentShipping[uid]?.ready)
-    .map((uid) => ({
-      uid,
-      name: savedNames.value[uid]?.nick || customerOrders.value[uid].name,
-      itemCount: customerOrders.value[uid].items.length,
-    }));
+    .map((uid) => {
+      const order = customerOrders.value[uid];
+
+      let bookingCount = order.items.length;
+      const delCust = deliveryCustomers.value[uid];
+      if (delCust) {
+        if (delCust.status === "done") {
+          bookingCount = 0;
+        } else if (delCust.status === "pending") {
+          const hasTodaySession = delCust.sessions && delCust.sessions[videoId];
+          if (hasTodaySession) {
+            bookingCount = delCust.itemCount || 0;
+          } else {
+            bookingCount = (delCust.itemCount || 0) + order.items.length;
+          }
+        }
+      }
+
+      return {
+        uid,
+        name: savedNames.value[uid]?.nick || order.name,
+        itemCount: bookingCount,
+      };
+    });
 });
 
 // Sales Stats
@@ -585,6 +623,12 @@ onMounted(() => {
     savedNames.value = snapshot.val() || {};
   });
   cleanupFns.push(unsubNames);
+
+  // Listen to delivery customers
+  const unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
+    deliveryCustomers.value = snapshot.val() || {};
+  });
+  cleanupFns.push(unsubDelivery);
 });
 
 onUnmounted(() => {
@@ -751,7 +795,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
   color: #fff;
   font-size: 0.95em;
   font-weight: 700;
@@ -759,7 +803,7 @@ onUnmounted(() => {
   border-radius: 12px;
   white-space: nowrap;
   animation: badge-pop 0.3s ease-out;
-  box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.3);
   flex-shrink: 0;
 }
 

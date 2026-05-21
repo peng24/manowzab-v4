@@ -97,11 +97,11 @@
             {{ getStockItem(i).owner || "ว่าง" }}
           </div>
           <div
-            v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner) >= 2"
+            v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 2"
             class="owner-count-badge"
-            :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner)} ชิ้น — คลิกเพื่อจัดการ`"
+            :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
             @click.stop="showOwnerItems(getStockItem(i).owner)"
-          >👗 {{ getOwnerCount(getStockItem(i).owner) }} ตัว</div>
+          >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
           <div v-if="getStockItem(i).price" class="stock-price">
             {{ getStockItem(i).price }} บาท
           </div>
@@ -243,6 +243,7 @@
 <script setup>
 import { computed, ref, watch, nextTick, inject, onMounted, onUnmounted } from "vue";
 import { useStockStore } from "../stores/stock";
+import { useSystemStore } from "../stores/system";
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
@@ -252,6 +253,7 @@ const DEBUG_MODE = false;
 const logger = { log: (...args) => DEBUG_MODE && console.log(...args) };
 
 const stockStore = useStockStore();
+const systemStore = useSystemStore();
 const { playSfx, queueAudio } = useAudio();
 const openShippingManager = inject("openShippingManager");
 const gridContainer = ref(null);
@@ -325,7 +327,11 @@ onMounted(() => {
   // 📦 Listen delivery_customers for badge count + strip
   const unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
     const data = snapshot.val() || {};
-    deliveryCustomers.value = Object.values(data);
+    deliveryCustomers.value = Object.keys(data).map((key) => ({
+      id: key,
+      uid: key,
+      ...data[key],
+    }));
   });
   cleanupFns.push(unsubDelivery);
 
@@ -494,8 +500,58 @@ const ownerItemCounts = computed(() => {
   return counts;
 });
 
-function getOwnerCount(ownerName) {
-  return ownerItemCounts.value[ownerName] || 0;
+// 👗 คำนวณยอดจองสะสมรวมของวันอื่นๆ (ป้องกันนับซ้ำ)
+const trueOwnerCounts = computed(() => {
+  const counts = {};
+  const videoId = systemStore.currentVideoId;
+
+  // 1. นับจำนวนรายการของวันนี้แยกตาม uid และ owner name
+  const todayCountsByUid = {};
+  const todayCountsByName = {};
+
+  Object.values(stockStore.stockData).forEach((item) => {
+    if (item.owner) {
+      if (item.uid) {
+        todayCountsByUid[item.uid] = (todayCountsByUid[item.uid] || 0) + 1;
+      }
+      todayCountsByName[item.owner] = (todayCountsByName[item.owner] || 0) + 1;
+    }
+  });
+
+  // 2. คำนวณยอดรวมของแต่ละคน (วันนี้ + อดีตที่ยังค้างส่ง)
+  Object.values(stockStore.stockData).forEach((item) => {
+    if (item.owner) {
+      const name = item.owner;
+      const uid = item.uid;
+      const key = uid || name;
+
+      if (counts[key] !== undefined) return;
+
+      const todayCount = uid ? (todayCountsByUid[uid] || 0) : (todayCountsByName[name] || 0);
+
+      // ค้นหาใน deliveryCustomers
+      const delCust = deliveryCustomers.value.find(c => (uid && c.id === uid) || c.name === name);
+
+      let pastCount = 0;
+      if (delCust && delCust.status !== "done") {
+        const sessions = delCust.sessions || {};
+        Object.keys(sessions).forEach((vid) => {
+          if (vid !== videoId) {
+            pastCount += sessions[vid].count || 0;
+          }
+        });
+      }
+
+      counts[key] = todayCount + pastCount;
+    }
+  });
+
+  return counts;
+});
+
+function getOwnerCount(ownerName, uid = null) {
+  const key = uid || ownerName;
+  return trueOwnerCounts.value[key] !== undefined ? trueOwnerCounts.value[key] : (ownerItemCounts.value[ownerName] || 0);
 }
 
 // 👗 แสดงรายการสินค้าทั้งหมดของลูกค้าคนนี้ + ปุ่มลบ

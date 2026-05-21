@@ -134,6 +134,15 @@ export function useYouTube() {
           title: item.snippet.title,
           timestamp: Date.now(),
         }).catch((error) => console.error("Error saving history:", error));
+
+        // Save active video title and finished status to Firebase system node
+        set(dbRef(db, "system/activeVideoTitle"), item.snippet.title).catch(
+          (err) => console.error("Error setting activeVideoTitle:", err),
+        );
+        const isEnded = !!item.liveStreamingDetails?.actualEndTime;
+        set(dbRef(db, "system/isLiveFinished"), isEnded).catch(
+          (err) => console.error("Error setting isLiveFinished:", err),
+        );
       }
 
       // Initialize Chat Store
@@ -213,6 +222,11 @@ export function useYouTube() {
         // Check if Stream Ended
         if (details.actualEndTime) {
           console.log("🏁 Stream Finished:", details.actualEndTime);
+
+          // Update Firebase status
+          set(dbRef(db, "system/isLiveFinished"), true).catch(
+            (err) => console.error("Error setting isLiveFinished on stream end:", err),
+          );
 
           if (viewerIntervalId.value) {
             clearInterval(viewerIntervalId.value);

@@ -314,10 +314,10 @@ watch(
           };
         }
 
-        // Revert status to pending if they placed a new order
-        if (isNewOrder) {
-          currentVal.status = "pending";
-        }
+        // Revert status to pending if they placed a new order (Disabled to prevent booking customers from showing up in shipping list)
+        // if (isNewOrder) {
+        //   currentVal.status = "pending";
+        // }
 
         // Recalculate totals (excluding sessions that are already marked done)
         const allSessions = currentVal.sessions || {};

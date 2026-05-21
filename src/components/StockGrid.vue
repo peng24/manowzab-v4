@@ -97,7 +97,7 @@
             {{ getStockItem(i).owner || "ว่าง" }}
           </div>
           <div
-            v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 2"
+            v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
             class="owner-count-badge"
             :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
             @click.stop="showOwnerItems(getStockItem(i).owner)"

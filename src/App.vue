@@ -296,24 +296,37 @@ watch(
 
         if (!currentVal.sessions) currentVal.sessions = {};
 
+        const prevSession = currentVal.sessions[videoId] || { count: 0, totalPrice: 0, status: "pending" };
+        const prevCount = prevSession.count || 0;
+        const prevStatus = prevSession.status || "pending";
+
+        // Revert status to pending if the customer has booked a NEW item in this session (new count is greater than prev)
+        const isNewOrder = (prevStatus === "done" && newSession.count > prevCount) ||
+                           (prevStatus !== "done" && newSession.count > prevCount);
+
         if (newSession.count === 0) {
           delete currentVal.sessions[videoId];
         } else {
           currentVal.sessions[videoId] = {
             count: newSession.count,
             totalPrice: newSession.totalPrice,
+            status: isNewOrder ? "pending" : prevStatus
           };
         }
 
         // Revert status to pending if they placed a new order
-        if (currentVal.status === "done" && newSession.count > 0) {
+        if (isNewOrder) {
           currentVal.status = "pending";
         }
 
-        // Recalculate totals
+        // Recalculate totals (excluding sessions that are already marked done)
         const allSessions = currentVal.sessions || {};
-        currentVal.itemCount = Object.values(allSessions).reduce((sum, s) => sum + (s.count || 0), 0);
-        currentVal.totalPrice = Object.values(allSessions).reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+        currentVal.itemCount = Object.values(allSessions)
+          .filter(s => s.status !== "done")
+          .reduce((sum, s) => sum + (s.count || 0), 0);
+        currentVal.totalPrice = Object.values(allSessions)
+          .filter(s => s.status !== "done")
+          .reduce((sum, s) => sum + (s.totalPrice || 0), 0);
         currentVal.updatedAt = Date.now();
 
         return currentVal;

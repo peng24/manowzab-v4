@@ -145,7 +145,7 @@
                   <button
                     v-else
                     class="action-btn undo-btn"
-                    @click="undoDone(c.id)"
+                    @click="undoDone(c)"
                     title="ยังไม่เสร็จ"
                   >↩️</button>
                   <button
@@ -502,23 +502,39 @@ function markDone(customer) {
         });
       }
 
-      // ✅ Reset สถานะ + เคลียร์ sessions เพื่อเริ่มนับใหม่
-      await update(dbRef(db, `delivery_customers/${customer.id}`), {
+      // ✅ Reset สถานะ (เซ็ต status: "done" ของลูกค้าและทุก sessions เป็น "done")
+      const updates = {
         status: "done",
         itemCount: 0,
-        sessions: null,
         updatedAt: Date.now(),
-      });
+      };
+      if (customer.sessions) {
+        Object.keys(customer.sessions).forEach((vid) => {
+          updates[`sessions/${vid}/status`] = "done";
+        });
+      }
+
+      await update(dbRef(db, `delivery_customers/${customer.id}`), updates);
       Swal.fire({ icon: "success", title: "เสร็จเรียบร้อย!", toast: true, position: "top-end", timer: 1500, showConfirmButton: false });
     }
   });
 }
 
-function undoDone(id) {
-  update(dbRef(db, `delivery_customers/${id}`), {
+function undoDone(customer) {
+  const updates = {
     status: "pending",
     updatedAt: Date.now(),
-  });
+  };
+  if (customer.sessions) {
+    Object.keys(customer.sessions).forEach((vid) => {
+      updates[`sessions/${vid}/status`] = "pending";
+    });
+  }
+  const allSessions = customer.sessions || {};
+  updates.itemCount = Object.values(allSessions).reduce((sum, s) => sum + (s.count || 0), 0);
+  updates.totalPrice = Object.values(allSessions).reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+
+  update(dbRef(db, `delivery_customers/${customer.id}`), updates);
 }
 
 function deleteCustomer(id, name) {

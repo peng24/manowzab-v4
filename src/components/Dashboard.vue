@@ -406,6 +406,7 @@ async function syncCustomerToDelivery(uid, name, order, videoId) {
   const sessionData = {
     count: order.items.length,
     totalPrice: order.totalPrice,
+    status: "pending", // explicitly set session status to pending when syncing/adding
   };
 
   // Create/update customer base info
@@ -437,12 +438,16 @@ async function syncCustomerToDelivery(uid, name, order, videoId) {
   await recalcItemCount(uid);
 }
 
-// ✅ คำนวณ itemCount ใหม่จาก sessions
+// ✅ คำนวณ itemCount ใหม่จาก sessions (กรองเฉพาะ session ที่ยังไม่จัดส่ง)
 async function recalcItemCount(uid) {
   const sessionsSnap = await get(dbRef(db, `delivery_customers/${uid}/sessions`));
   const sessions = sessionsSnap.val() || {};
-  const totalCount = Object.values(sessions).reduce((sum, s) => sum + (s.count || 0), 0);
-  const totalPrice = Object.values(sessions).reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+  const totalCount = Object.values(sessions)
+    .filter(s => s.status !== "done")
+    .reduce((sum, s) => sum + (s.count || 0), 0);
+  const totalPrice = Object.values(sessions)
+    .filter(s => s.status !== "done")
+    .reduce((sum, s) => sum + (s.totalPrice || 0), 0);
   await update(dbRef(db, `delivery_customers/${uid}`), {
     itemCount: totalCount,
     totalPrice: totalPrice,

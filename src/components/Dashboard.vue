@@ -289,17 +289,15 @@ const shippingList = computed(() => {
       // คำนวณจำนวนจองรวมจากวันอื่นๆ ที่ยังค้างส่งอยู่
       let bookingCount = order.items.length;
       const delCust = deliveryCustomers.value[uid];
-      if (delCust) {
-        if (delCust.status === "done") {
-          bookingCount = 0;
-        } else if (delCust.status === "pending") {
-          const hasTodaySession = delCust.sessions && delCust.sessions[videoId];
-          if (hasTodaySession) {
-            bookingCount = delCust.itemCount || 0;
-          } else {
-            bookingCount = (delCust.itemCount || 0) + order.items.length;
+      if (delCust && delCust.status !== "done") {
+        const sessions = delCust.sessions || {};
+        let pastCount = 0;
+        Object.keys(sessions).forEach((vid) => {
+          if (vid !== videoId) {
+            pastCount += sessions[vid].count || 0;
           }
-        }
+        });
+        bookingCount += pastCount;
       }
 
       return {
@@ -325,17 +323,15 @@ const notReadyCustomers = computed(() => {
 
       let bookingCount = order.items.length;
       const delCust = deliveryCustomers.value[uid];
-      if (delCust) {
-        if (delCust.status === "done") {
-          bookingCount = 0;
-        } else if (delCust.status === "pending") {
-          const hasTodaySession = delCust.sessions && delCust.sessions[videoId];
-          if (hasTodaySession) {
-            bookingCount = delCust.itemCount || 0;
-          } else {
-            bookingCount = (delCust.itemCount || 0) + order.items.length;
+      if (delCust && delCust.status !== "done") {
+        const sessions = delCust.sessions || {};
+        let pastCount = 0;
+        Object.keys(sessions).forEach((vid) => {
+          if (vid !== videoId) {
+            pastCount += sessions[vid].count || 0;
           }
-        }
+        });
+        bookingCount += pastCount;
       }
 
       return {

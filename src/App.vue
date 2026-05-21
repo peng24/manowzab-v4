@@ -41,7 +41,7 @@ import { useSystemStore } from "./stores/system";
 import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
 import { useNicknameStore } from "./stores/nickname";
-import { ref as dbRef, onValue, onDisconnect, set } from "firebase/database";
+import { ref as dbRef, onValue, onDisconnect, set, runTransaction } from "firebase/database";
 import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { db, auth } from "./composables/useFirebase";
 import { logger } from "./utils/logger"; // ✅ Import Logger
@@ -242,6 +242,86 @@ onMounted(async () => {
     cleanupFns.forEach((fn) => fn && fn());
   });
 });
+
+// ✅ Centralized Delivery Customer Sync Watcher
+let lastSessionCounts = {};
+watch(
+  [() => stockStore.stockData, () => systemStore.currentVideoId],
+  async ([newStockData, videoId]) => {
+    if (!videoId || videoId === "demo") {
+      lastSessionCounts = {};
+      return;
+    }
+
+    // 1. Calculate today's session counts per uid
+    const currentSessionCounts = {};
+    Object.keys(newStockData || {}).forEach((num) => {
+      const item = newStockData[num];
+      if (item?.uid) {
+        if (!currentSessionCounts[item.uid]) {
+          currentSessionCounts[item.uid] = { count: 0, totalPrice: 0 };
+        }
+        currentSessionCounts[item.uid].count++;
+        currentSessionCounts[item.uid].totalPrice += item.price ? parseInt(item.price) : 0;
+      }
+    });
+
+    // 2. Identify whose counts/prices changed
+    const allUids = new Set([
+      ...Object.keys(currentSessionCounts),
+      ...Object.keys(lastSessionCounts),
+    ]);
+
+    const changedUids = [];
+    allUids.forEach((uid) => {
+      const prev = lastSessionCounts[uid] || { count: 0, totalPrice: 0 };
+      const curr = currentSessionCounts[uid] || { count: 0, totalPrice: 0 };
+      if (prev.count !== curr.count || prev.totalPrice !== curr.totalPrice) {
+        changedUids.push(uid);
+      }
+    });
+
+    // Cache current counts immediately to avoid concurrent runs re-processing
+    lastSessionCounts = currentSessionCounts;
+
+    if (changedUids.length === 0) return;
+
+    // 3. Atomically update changed customers via transactions
+    for (const uid of changedUids) {
+      const newSession = currentSessionCounts[uid] || { count: 0, totalPrice: 0 };
+      const customerRef = dbRef(db, `delivery_customers/${uid}`);
+
+      runTransaction(customerRef, (currentVal) => {
+        if (!currentVal) return currentVal; // Only sync customers already in delivery_customers
+
+        if (!currentVal.sessions) currentVal.sessions = {};
+
+        if (newSession.count === 0) {
+          delete currentVal.sessions[videoId];
+        } else {
+          currentVal.sessions[videoId] = {
+            count: newSession.count,
+            totalPrice: newSession.totalPrice,
+          };
+        }
+
+        // Revert status to pending if they placed a new order
+        if (currentVal.status === "done" && newSession.count > 0) {
+          currentVal.status = "pending";
+        }
+
+        // Recalculate totals
+        const allSessions = currentVal.sessions || {};
+        currentVal.itemCount = Object.values(allSessions).reduce((sum, s) => sum + (s.count || 0), 0);
+        currentVal.totalPrice = Object.values(allSessions).reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+        currentVal.updatedAt = Date.now();
+
+        return currentVal;
+      }).catch((err) => console.error(`Error updating delivery customer ${uid} via transaction:`, err));
+    }
+  },
+  { deep: true }
+);
 </script>
 
 <style>

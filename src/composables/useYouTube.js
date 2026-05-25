@@ -42,6 +42,7 @@ export function useYouTube() {
 
   const activeChatId = ref("");
   const viewerIntervalId = ref(null);
+  let unsubVoiceListener = null;
 
   // ✅ เริ่มจาก key ถัดจากครั้งก่อน (Round-Robin)
   const initialKeyIndex = getNextKeyIndex();
@@ -164,8 +165,12 @@ export function useYouTube() {
 
         // Dynamic parameters for Message Processor
         const { useChatProcessor } = await import("./useChatProcessor");
-        const { processMessage } = useChatProcessor();
+        const { processMessage, initManowPriceVoiceListener } = useChatProcessor();
         processMessageFunc = processMessage;
+
+        // Start Voice Chat Listener
+        if (unsubVoiceListener) unsubVoiceListener();
+        unsubVoiceListener = initManowPriceVoiceListener(videoId);
 
         // Start Chat Service
         chatService.liveChatId = activeChatId.value;
@@ -262,6 +267,12 @@ export function useYouTube() {
     if (viewerIntervalId.value) {
       clearInterval(viewerIntervalId.value);
       viewerIntervalId.value = null;
+    }
+
+    if (unsubVoiceListener) {
+      console.log("🎙️ Cleaning up voice listener...");
+      unsubVoiceListener();
+      unsubVoiceListener = null;
     }
 
     activeChatId.value = "";

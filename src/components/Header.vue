@@ -147,6 +147,9 @@
             <a @click="openPhoneticMgr" class="menu-phonetic">
               <i class="fa-solid fa-volume-high"></i> จัดการคำอ่าน (TTS)
             </a>
+            <a @click="openPreview" class="menu-preview">
+              <i class="fa-solid fa-tv"></i> สตรีมสด (Preview)
+            </a>
           </div>
         </Teleport>
       </div>
@@ -210,6 +213,7 @@ const openDashboard = inject("openDashboard");
 const openHistory = inject("openHistory");
 const openShippingManager = inject("openShippingManager");
 const openPhoneticManager = inject("openPhoneticManager");
+const openManowPricePreview = inject("openManowPricePreview");
 
 const videoId = ref("");
 const showDropdown = ref(false);
@@ -554,6 +558,11 @@ function openPhoneticMgr() {
   showDropdown.value = false;
 }
 
+function openPreview() {
+  if (openManowPricePreview) openManowPricePreview();
+  showDropdown.value = false;
+}
+
 function forceUpdate() {
   // (Logic เดิม)
   Swal.fire({
@@ -589,7 +598,14 @@ function showChangelog() {
   Swal.fire({
     title: `🚀 ${systemStore.version} Patch Notes`,
     html: `<div style="text-align: left; font-size: 0.9em; line-height: 1.6;">
-      <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.32.0) - 21 พ.ค. 2026</h4>
+      <h4 style="color: #ff9800; margin-bottom: 5px;">🌟 อัปเดตล่าสุด (4.32.1) - 25 พ.ค. 2026</h4>
+        <ul>
+          <li>🎙️ <b>ระบบควบคุมการประมวลผลเสียงพูดสด (Voice Transcribing Bugfixes)</b> — ป้องกันปัญหาอ่านเสียงสั่งการย้อนหลังซ้ำซ้อน (Historical Replay) เมื่อเชื่อมต่อเข้าระบบใหม่ โดยการกรองเฉพาะข้อความที่เกิดขึ้นหลังเริ่มระบบ</li>
+          <li>🔊 <b>ป้องกันเสียงพูดสะท้อนวนลูป (TTS Feedback Loop)</b> — ปิดการอ่านออกเสียงข้อความทั่วไปจากการถอดเสียงพูดสด เพื่อป้องกันไม่ให้คอมพิวเตอร์อ่านทวนเสียงพูดของแอดมินวนซ้ำเข้าไมโครโฟน แต่ยังคงรันเสียง Beep แจ้งเตือนเมื่อจองหรือ CC สำเร็จ</li>
+          <li>👑 <b>สิทธิ์แอดมินสำหรับเสียงพูดสด</b> — ปรับให้ผู้พูดเสียงสดได้รับสิทธิ์แอดมินโดยอัตโนมัติ เพื่อให้สามารถสั่งซื้อแทนลูกค้า (Proxy Buy) และสั่งการคำสั่งขนส่งต่าง ๆ ผ่านเสียงได้</li>
+          <li>⚡ <b>ลดภาระเบราว์เซอร์หน้าพรีวิว</b> — จำกัดการดึงข้อมูลเสียงสดในหน้าพรีวิวให้ดึงเฉพาะ 40 รายการล่าสุด เพื่อเพิ่มความเร็วในการเปิดหน้าต่าง</li>
+        </ul>
+      <h4 style="color: #00e676; margin-bottom: 5px;">✨ ก่อนหน้า (4.32.0) - 21 พ.ค. 2026</h4>
         <ul>
           <li>👗 <b>แสดงจำนวนจองเริ่มต้นตั้งแต่ 1 ชิ้น</b> — ปรับปรุงการแสดงผลของ Badge ยอดจองสินค้า (👗) ในหน้าตารางสินค้า StockGrid ให้แสดงตั้งแต่การจอง 1 ชิ้นขึ้นไป (จากเดิมที่ต้องจองตั้งแต่ 2 ชิ้น)</li>
           <li>🚚 <b>ป้องกันลูกค้าจองเพิ่มเข้าคิวส่งอัตโนมัติ</b> — ยกเลิกการซิงค์เปลี่ยนสถานะของลูกค้าเป็น "รอดำเนินการ" (Pending) โดยอัตโนมัติเมื่อมีการจองสินค้าใหม่ ทำให้ลูกค้าที่ไม่ต้องการส่งแบบอัตโนมัติไม่ถูกดึงไปแสดงในรายการเตรียมส่ง (จะเข้าก็ต่อเมื่อแอดมินกดซิงค์/เพิ่มเอง หรือลูกค้าพิมพ์คำส่งสินค้า)</li>

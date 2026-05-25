@@ -4,7 +4,7 @@ import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
 
 import { useAudio } from "./useAudio";
-import { ref as dbRef, onValue, set, update, push, get } from "firebase/database";
+import { ref as dbRef, onValue, set, update, push, get, onChildAdded } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 import { extractMessageRuns } from "../services/YouTubeLiveChat";
@@ -110,10 +110,13 @@ export function useChatProcessor() {
       item.authorDetails.profileImageUrl ||
       "https://www.gstatic.com/youtube/img/creator/avatars/sample_avatar.png";
 
+    // 🟢 ตรวจสอบว่าเป็น Voice Chat หรือไม่
+    const isVoiceChat = uid === "voice-chat-uid" || (uid && uid.includes("voice-chat"));
+
     // Check Nickname
     let displayName = realName;
-    let isNewCustomer = true;
-    if (savedNamesCache.value[uid]) {
+    let isNewCustomer = isVoiceChat ? false : true;
+    if (!isVoiceChat && savedNamesCache.value[uid]) {
       isNewCustomer = false;
       displayName =
         typeof savedNamesCache.value[uid] === "object"
@@ -125,6 +128,7 @@ export function useChatProcessor() {
     const phoneticName = nicknameStore.getPhoneticName(uid, displayName);
 
     const isAdmin =
+      isVoiceChat ||
       /admin|แอดมิน/i.test(displayName) || /admin|แอดมิน/i.test(realName);
 
     // ✅ Prepare TTS Message (Append instructions for new customers once)
@@ -248,7 +252,7 @@ export function useChatProcessor() {
         queueAudio(
           "success",
           phoneticName,
-          `${ttsMessage} ... ทั้งหมด ${itemIds.length} รายการ`,
+          isVoiceChat ? "" : `${ttsMessage} ... ทั้งหมด ${itemIds.length} รายการ`,
         );
 
         // Exit early - don't process further
@@ -429,6 +433,11 @@ export function useChatProcessor() {
     // NEW LOGIC: Rule 5 -> "Ignore it".
     // So we do nothing.
 
+    // ⚠️ Skip voice chat messages with no actionable intent
+    if (isVoiceChat && !intent) {
+      return;
+    }
+
     // 4. ✅ Push message to Firebase (Listener will update UI)
     chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
       id: item.id,
@@ -489,7 +498,7 @@ export function useChatProcessor() {
       try {
         if (processingLocks.has(targetId)) {
           // ✅ ยังอ่านข้อความแม้ item กำลังถูกประมวลผล (เพิ่มเสียง error ให้รู้ว่าชนกัน)
-          queueAudio("error", phoneticName, ttsMessage);
+          queueAudio("error", phoneticName, isVoiceChat ? "" : ttsMessage);
           return;
         }
         processingLocks.add(targetId);
@@ -506,13 +515,13 @@ export function useChatProcessor() {
 
         // ✅ ยังอ่านข้อความแม้ซื้อซ้ำ/อยู่ในคิวแล้ว (เพิ่มเสียง error ให้รู้ว่าไม่อ่านข้าม)
         if (result.action === "already_owned" || result.action === "already_queued") {
-          queueAudio("error", phoneticName, ttsMessage);
+          queueAudio("error", phoneticName, isVoiceChat ? "" : ttsMessage);
           return;
         }
 
         if (!result.success) {
           logger.warn("Order failed:", result.error);
-          queueAudio("error", phoneticName, ttsMessage);
+          queueAudio("error", phoneticName, isVoiceChat ? "" : ttsMessage);
           return;
         }
 
@@ -523,7 +532,7 @@ export function useChatProcessor() {
         });
 
         // ✅ Queue SUCCESS SFX + TTS (non-blocking)
-        queueAudio("success", phoneticName, ttsMessage);
+        queueAudio("success", phoneticName, isVoiceChat ? "" : ttsMessage);
       } finally {
         processingLocks.delete(targetId);
       }
@@ -534,38 +543,79 @@ export function useChatProcessor() {
         await stockStore.processCancel(targetId);
 
         // ✅ Queue CANCEL SFX + TTS (non-blocking)
-        queueAudio("cancel", phoneticName, ttsMessage);
+        queueAudio("cancel", phoneticName, isVoiceChat ? "" : ttsMessage);
       }
     } else {
       // --- Other Intents / General Chat ---
       if (intent === "shipping") {
-        const shippingRef = dbRef(
-          db,
-          `shipping/${systemStore.currentVideoId}/${uid}`,
-        );
-        update(shippingRef, {
-          ready: true,
-          timestamp: Date.now(),
-          lastMessage: msg,
-        }).catch((e) => logger.error("Shipping update error:", e));
+        if (!isVoiceChat) {
+          const shippingRef = dbRef(
+            db,
+            `shipping/${systemStore.currentVideoId}/${uid}`,
+          );
+          update(shippingRef, {
+            ready: true,
+            timestamp: Date.now(),
+            lastMessage: msg,
+          }).catch((e) => logger.error("Shipping update error:", e));
 
-        const historyRef = dbRef(
-          db,
-          `shipping/${systemStore.currentVideoId}/${uid}/history`,
-        );
-        push(historyRef, {
-          text: msg,
-          timestamp: Date.now(),
-          type: "user",
-        });
+          const historyRef = dbRef(
+            db,
+            `shipping/${systemStore.currentVideoId}/${uid}/history`,
+          );
+          push(historyRef, {
+            text: msg,
+            timestamp: Date.now(),
+            type: "user",
+          });
+        }
 
-        queueAudio(null, phoneticName, ttsMessage);
+        queueAudio(null, phoneticName, isVoiceChat ? "" : ttsMessage);
       } else {
         // Read EVERYTHING else
-        queueAudio(null, phoneticName, ttsMessage);
+        queueAudio(null, phoneticName, isVoiceChat ? "" : ttsMessage);
       }
     }
   }
 
-  return { processMessage };
+  function initManowPriceVoiceListener(videoId) {
+    if (!videoId || videoId === "demo") return null;
+
+    const listenerInitTime = Date.now();
+    console.log(`🎙️ Initializing ManowPriceVoiceListener for video: ${videoId}`);
+    const voiceChatRef = dbRef(db, `voice_chats/${videoId}`);
+
+    return onChildAdded(voiceChatRef, (snapshot) => {
+      const val = snapshot.val();
+      if (!val) return;
+
+      const msgTime = val.timestamp || Date.now();
+      // Skip historical voice messages added before the listener initialized (with 5-second buffer)
+      if (msgTime < listenerInitTime - 5000) {
+        console.log("🎙️ Skipping historical voice chat:", val.text);
+        return;
+      }
+
+      console.log("🎙️ New Voice Chat Message Detected:", val);
+
+      const dataItem = {
+        id: snapshot.key,
+        snippet: {
+          displayMessage: val.text || val.snippet?.displayMessage || "",
+          publishedAt: val.timestamp || new Date().toISOString()
+        },
+        authorDetails: {
+          channelId: val.authorDetails?.channelId || "voice-chat-uid",
+          displayName: val.authorDetails?.displayName || "Voice Chat",
+          profileImageUrl: val.authorDetails?.profileImageUrl || ""
+        }
+      };
+
+      processMessage(dataItem);
+    }, (error) => {
+      console.error("Voice Listener Error:", error);
+    });
+  }
+
+  return { processMessage, initManowPriceVoiceListener };
 }

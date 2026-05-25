@@ -27,6 +27,7 @@
             <HistoryModal v-if="showHistory" @close="showHistory = false" />
             <ShippingManager v-if="showShippingManager" @close="showShippingManager = false" />
             <PhoneticManager v-if="showPhoneticManager" @close="showPhoneticManager = false" />
+            <ManowPricePreview v-if="showManowPricePreview" @close="showManowPricePreview = false" />
           </div>
           <NoteBanner />
         </div>
@@ -59,6 +60,7 @@ import ShippingManager from "./components/ShippingManager.vue";
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import PhoneticManager from "./components/PhoneticManager.vue"; // ✅ Import Phonetic Manager
+import ManowPricePreview from "./components/ManowPricePreview.vue";
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
@@ -90,12 +92,14 @@ const showDashboard = ref(false);
 const showHistory = ref(false);
 const showShippingManager = ref(false);
 const showPhoneticManager = ref(false);
+const showManowPricePreview = ref(false);
 
 // Provide functions for child components
 provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
 provide("openShippingManager", () => (showShippingManager.value = true));
 provide("openPhoneticManager", () => (showPhoneticManager.value = true));
+provide("openManowPricePreview", () => (showManowPricePreview.value = true));
 
 onMounted(async () => {
   console.log("🚀 App mounted");

@@ -42,11 +42,12 @@ const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z][^]*?)\s+(\d+)$/;
 const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
 const questionRegex = /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์|ใหม|หรอ|ปะ|ยังไง/;
 const pureNumberRegex = /^\s*(\d+)\s*$/;
-const explicitBuyRegex = /(?:(?:F|f|cf|CF|รับ|เอา|เิา)\s*(?:ค่ะ|ครับ|จ้า|นะ|คะ)?\s*(\d+))|(?:(\d+)\s*(?:ค่ะ|ครับ|จ้า|นะ|คะ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา))/i;
+const explicitBuyRegex = /(?:(?:F|f|cf|CF|รับ|เอา|เิา|ลอง|รหัส|ระหัส|เบอร์)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(\d+))|(?:(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา|ลอง|รหัส|ระหัส|เบอร์))/i;
 const numberWithPoliteRegex = /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
 const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 const customerNameNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,}?)\s+(\d+)$/;
-const cancelRegex = /(?:^|\s)(?:(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ)\s*[-]?\s*(\d+)|(\d+)\s+[\s\S]*?(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ)|(\d+)\s*(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ))/i;
+const cancelKeywordRegex = /cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ขอผ่าน|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า/i;
+const standalonePassRegex = /^(?:ขอ)?ผ่าน\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|ก่อน|นะ|เลย)*$/i;
 
 // ✅ Thai Numeral → Arabic Digit Converter
 function thaiToArabic(text) {
@@ -261,11 +262,71 @@ export function useChatProcessor() {
     }
 
     // 🔴 CANCEL CHECK
-    const earlyMatchCancel = normalizedMsg.match(cancelRegex);
-    if (earlyMatchCancel) {
+    let isCancel = false;
+
+    // 1. Check strict standalone "ผ่าน"
+    if (standalonePassRegex.test(normalizedMsg)) {
+      isCancel = true;
+      method = "regex-cancel-standalone";
+    } else {
+      // 2. Check cancel with number patterns (keyword first)
+      const matchWithNum = normalizedMsg.match(/(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)/i);
+      if (matchWithNum) {
+        const keyword = matchWithNum[0].toLowerCase();
+        let validCancel = true;
+        if (keyword.includes("ผ่าน")) {
+          const paymentWords = /พร้อมเพย์|ธนาคาร|กสิกร|ไทยพาณิชย์|กรุงไทย|ออมสิน|กรุงเทพ|ทรู|วอลเลท|wallet|บัญชี|แอป|โอน/;
+          if (paymentWords.test(normalizedMsg)) {
+            validCancel = false;
+          }
+        }
+        if (validCancel) {
+          isCancel = true;
+          targetId = parseInt(matchWithNum[1]);
+          method = "regex-cancel-with-num";
+        }
+      }
+
+      // 3. Check number first patterns
+      if (!isCancel) {
+        const matchNumFirst = normalizedMsg.match(/(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|ผ่าน|ขอผ่าน|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i);
+        if (matchNumFirst) {
+          const keyword = matchNumFirst[0].toLowerCase();
+          let validCancel = true;
+          if (keyword.includes("ผ่าน")) {
+            const paymentWords = /พร้อมเพย์|ธนาคาร|กสิกร|ไทยพาณิชย์|กรุงไทย|ออมสิน|กรุงเทพ|ทรู|วอลเลท|wallet|บัญชี|แอป|โอน/;
+            if (paymentWords.test(normalizedMsg)) {
+              validCancel = false;
+            }
+          }
+          if (validCancel) {
+            isCancel = true;
+            targetId = parseInt(matchNumFirst[1]);
+            method = "regex-cancel-num-first";
+          }
+        }
+      }
+
+      // 4. Check no-number cancel keywords
+      if (!isCancel && cancelKeywordRegex.test(normalizedMsg)) {
+        isCancel = true;
+        method = "contextual-cancel";
+      }
+    }
+
+    if (isCancel) {
       intent = "cancel";
-      targetId = parseInt(earlyMatchCancel[1] || earlyMatchCancel[2] || earlyMatchCancel[3]);
-      method = "regex-cancel";
+      if (!targetId) {
+        // Call helper to search for most recent item
+        const recentId = stockStore.findMostRecentItemForUser(uid, displayName);
+        if (recentId) {
+          targetId = recentId;
+        }
+      }
+    }
+
+    if (intent === "cancel") {
+      // Done cancel detection, bypass shipping and other checks
     } else if (shippingRegex.test(normalizedMsg)) {
       intent = "shipping";
       method = "regex-ship";
@@ -536,14 +597,32 @@ export function useChatProcessor() {
       } finally {
         processingLocks.delete(targetId);
       }
-    } else if (intent === "cancel" && targetId > 0) {
+    } else if (intent === "cancel") {
       // --- Cancel Logic ---
-      const currentItem = stockStore.stockData[targetId];
-      if (isAdmin || (currentItem && currentItem.uid === uid)) {
-        await stockStore.processCancel(targetId);
+      let cancelSuccess = false;
 
-        // ✅ Queue CANCEL SFX + TTS (non-blocking)
+      if (targetId && targetId > 0) {
+        const currentItem = stockStore.stockData[targetId];
+        const isUserInQueue = currentItem && currentItem.queue && currentItem.queue.some(
+          q => (uid && q.uid === uid) || (displayName && q.owner === displayName)
+        );
+        const isUserOwner = currentItem && (
+          (uid && currentItem.uid === uid) || (displayName && currentItem.owner === displayName)
+        );
+
+        if (isAdmin || isUserOwner || isUserInQueue) {
+          const result = await stockStore.processCancel(targetId, uid, displayName);
+          if (result && result.success && (result.previousOwner || result.cancelledFromQueue)) {
+            cancelSuccess = true;
+          }
+        }
+      }
+
+      // ✅ Play correct sound based on cancel success (Requirement #2)
+      if (cancelSuccess) {
         queueAudio("cancel", phoneticName, isVoiceChat ? "" : ttsMessage);
+      } else {
+        queueAudio(null, phoneticName, isVoiceChat ? "" : ttsMessage);
       }
     } else {
       // --- Other Intents / General Chat ---

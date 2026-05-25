@@ -191,53 +191,130 @@ export const useStockStore = defineStore("stock", () => {
   }
 
   /**
-   * Cancels an order and promotes the next person in queue.
+   * Cancels an order and promotes the next person in queue, or removes a user from the queue.
    *
    * @param {number} num - The item number to cancel.
-   * @returns {Promise<{previousOwner: string, nextOwner: string|null}|null>} Info about the cancellation for TTS.
+   * @param {string|null} uid - Unique ID of the buyer to cancel.
+   * @param {string|null} ownerName - Display name of the buyer to cancel.
+   * @returns {Promise<{previousOwner: string|null, nextOwner: string|null, cancelledFromQueue: boolean}|null>} Info about the cancellation for TTS.
    */
-  async function processCancel(num) {
+  async function processCancel(num, uid = null, ownerName = null) {
     const itemRef = dbRef(db, `stock/${systemStore.currentVideoId}/${num}`);
     let previousOwner = null;
     let nextOwner = null;
+    let cancelledFromQueue = false;
 
     try {
       await runTransaction(itemRef, (currentData) => {
         if (!currentData) return null; // Nothing to cancel
 
-        previousOwner = currentData.owner;
+        // Check if the cancellation is for the owner
+        const isOwner = (!uid && !ownerName) ||
+                        (uid && currentData.uid === uid) ||
+                        (ownerName && currentData.owner === ownerName);
 
-        if (currentData.queue && currentData.queue.length > 0) {
-          // Promote next in queue
-          const next = currentData.queue[0];
-          const nextQ = currentData.queue.slice(1);
-          
-          nextOwner = next.owner;
-          
-          return {
-            ...currentData,
-            owner: next.owner,
-            uid: next.uid,
-            time: Date.now(),
-            queue: nextQ,
-            source: "queue",
-          };
+        if (isOwner) {
+          previousOwner = currentData.owner;
+
+          if (currentData.queue && currentData.queue.length > 0) {
+            // Promote next in queue
+            const next = currentData.queue[0];
+            const nextQ = currentData.queue.slice(1);
+            
+            nextOwner = next.owner;
+            
+            return {
+              ...currentData,
+              owner: next.owner,
+              uid: next.uid,
+              time: Date.now(),
+              queue: nextQ,
+              source: "queue",
+            };
+          } else {
+            // No one in queue, delete the item
+            return null;
+          }
         } else {
-          // No one in queue, delete the item
-          return null;
+          // The cancellation targets a user in the queue
+          if (currentData.queue && currentData.queue.length > 0) {
+            const initialLen = currentData.queue.length;
+            currentData.queue = currentData.queue.filter((q) => {
+              const matchesUid = uid && q.uid === uid;
+              const matchesName = ownerName && q.owner === ownerName;
+              return !(matchesUid || matchesName);
+            });
+
+            if (currentData.queue.length < initialLen) {
+              cancelledFromQueue = true;
+            }
+          }
+          return currentData;
         }
       });
 
-      return { success: true, previousOwner, nextOwner, error: null };
+      return { success: true, previousOwner, nextOwner, cancelledFromQueue, error: null };
     } catch (e) {
       console.error("Cancel failed: ", e);
       return {
         success: false,
         previousOwner,
         nextOwner: null,
+        cancelledFromQueue: false,
         error: e.message,
       };
     }
+  }
+
+  /**
+   * Finds the most recent item number that the user (by uid or displayName)
+   * has booked or is queued for.
+   * Sorts by time descending, and defaults to item ID descending on collisions/missing values.
+   */
+  function findMostRecentItemForUser(uid, displayName) {
+    let mostRecentId = null;
+    let maxTime = -2; // Start lower than missing (-1) or 0
+
+    Object.entries(stockData.value).forEach(([id, item]) => {
+      const num = parseInt(id);
+      if (isNaN(num)) return;
+
+      // 1. Check if owner
+      const isOwner = (uid && item.uid === uid) || (displayName && item.owner === displayName);
+      if (isOwner) {
+        const itemTime = (item.time !== undefined && item.time !== null) ? item.time : -1;
+        if (itemTime > maxTime) {
+          maxTime = itemTime;
+          mostRecentId = num;
+        } else if (itemTime === maxTime && maxTime !== -2) {
+          // Fallback: pick the higher item number
+          if (mostRecentId === null || num > mostRecentId) {
+            mostRecentId = num;
+          }
+        }
+      }
+
+      // 2. Check if in queue
+      if (item.queue && item.queue.length > 0) {
+        item.queue.forEach((q) => {
+          const isQueued = (uid && q.uid === uid) || (displayName && q.owner === displayName);
+          if (isQueued) {
+            const qTime = (q.time !== undefined && q.time !== null) ? q.time : -1;
+            if (qTime > maxTime) {
+              maxTime = qTime;
+              mostRecentId = num;
+            } else if (qTime === maxTime && maxTime !== -2) {
+              // Fallback: pick the higher item number
+              if (mostRecentId === null || num > mostRecentId) {
+                mostRecentId = num;
+              }
+            }
+          }
+        });
+      }
+    });
+
+    return mostRecentId;
   }
 
   /**
@@ -293,6 +370,7 @@ export const useStockStore = defineStore("stock", () => {
     connectToStock,
     processOrder,
     processCancel,
+    findMostRecentItemForUser,
     clearAllStock,
     updateStockPrice,
     updateStockSize,

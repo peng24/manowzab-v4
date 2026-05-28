@@ -131,7 +131,9 @@ description: Mandatory verification checklist after every code change
 | 11.3 | Real-time Update | `src/components/Dashboard.vue` | จองเพิ่ม → ตัวเลข badge เพิ่มทันที, ยกเลิก → ลดทันที (ใช้ stockData ที่ sync อยู่แล้ว ไม่ต้องเพิ่ม listener) |
 | 11.4 | `totalBookings` สะสมใน `markDone()` | `src/components/ShippingManager.vue` | เมื่อกด ✅ เสร็จ → `runTransaction` บวก itemCount เข้า totalBookings ก่อน reset เป็น 0 |
 | 11.5 | แสดง "ลูกค้าประจำ" | `src/components/ShippingManager.vue` | แสดงข้อความ "ลูกค้าประจำ • เคยสั่งรวม X ชิ้น" ใต้ชื่อลูกค้าเมื่อ totalBookings > 0 |
-| 11.6 | Owner Count Badge `×N` | `src/components/StockGrid.vue` | แสดง ×N สีฟ้าหลังชื่อ owner ในตาราง StockGrid เมื่อจอง >= 2 ชิ้น (real-time จาก stockData) |
+| 11.6 | Owner Count Badge `👗 N ตัว` | `src/components/StockGrid.vue` | แสดง 👗 N ตัว สีฟ้าหลังชื่อ owner ในตาราง StockGrid เมื่อมียอดจองสะสม >= 1 ชิ้น |
+| 11.7 | ยอดจองสะสมรวมทุกวัน (Badge Count Sync) | `src/components/StockGrid.vue` | `getOwnerCount()` ต้องรวมยอดจองวันนี้ (local) + อดีตที่ค้างส่ง (database) เสมอ |
+| 11.8 | แสดงรายละเอียดจองสะสมย้อนหลังและลบข้ามเซสชั่น | `src/components/StockGrid.vue` | `showOwnerItems()` ดึงรายการของวันนี้ + อดีตที่ยังไม่จัดส่ง (แสดงแค่วันที่สั้นๆ เช่น "26 พ.ค. 69") และลบออกจากอดีตพร้อมปรับลด itemCount/totalPrice ได้ถูกต้อง |
 
 ---
 

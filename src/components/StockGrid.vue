@@ -245,7 +245,7 @@ import { computed, ref, watch, nextTick, inject, onMounted, onUnmounted } from "
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "../composables/useAudio";
-import { ref as dbRef, onValue } from "firebase/database";
+import { ref as dbRef, onValue, get, remove, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 
@@ -500,70 +500,137 @@ const ownerItemCounts = computed(() => {
   return counts;
 });
 
-// 👗 คำนวณยอดจองสะสมรวมของวันอื่นๆ (ป้องกันนับซ้ำ)
-const trueOwnerCounts = computed(() => {
-  const counts = {};
-  const videoId = systemStore.currentVideoId;
-
-  // 1. นับจำนวนรายการของวันนี้แยกตาม uid และ owner name
-  const todayCountsByUid = {};
-  const todayCountsByName = {};
-
-  Object.values(stockStore.stockData).forEach((item) => {
-    if (item.owner) {
-      if (item.uid) {
-        todayCountsByUid[item.uid] = (todayCountsByUid[item.uid] || 0) + 1;
-      }
-      todayCountsByName[item.owner] = (todayCountsByName[item.owner] || 0) + 1;
-    }
-  });
-
-  // 2. คำนวณยอดรวมของแต่ละคน (วันนี้ + อดีตที่ยังค้างส่ง)
-  Object.values(stockStore.stockData).forEach((item) => {
-    if (item.owner) {
-      const name = item.owner;
-      const uid = item.uid;
-      const key = uid || name;
-
-      if (counts[key] !== undefined) return;
-
-      const todayCount = uid ? (todayCountsByUid[uid] || 0) : (todayCountsByName[name] || 0);
-
-      // ค้นหาใน deliveryCustomers
-      const delCust = deliveryCustomers.value.find(c => (uid && c.id === uid) || c.name === name);
-
-      let pastCount = 0;
-      if (delCust && delCust.status !== "done") {
-        const sessions = delCust.sessions || {};
-        Object.keys(sessions).forEach((vid) => {
-          if (vid !== videoId) {
-            pastCount += sessions[vid].count || 0;
-          }
-        });
-      }
-
-      counts[key] = todayCount + pastCount;
-    }
-  });
-
-  return counts;
-});
-
+// 👗 ดึงข้อมูลยอดจองสะสมจาก Database (ทุกรอบส่งที่ยังไม่จัดส่ง) + รวมของรอบปัจจุบันด้วย
 function getOwnerCount(ownerName, uid = null) {
-  const key = uid || ownerName;
-  return trueOwnerCounts.value[key] !== undefined ? trueOwnerCounts.value[key] : (ownerItemCounts.value[ownerName] || 0);
+  const todayCount = ownerItemCounts.value[ownerName] || 0;
+  const cust = deliveryCustomers.value.find(
+    (c) => (uid && c.uid === uid) || c.name === ownerName
+  );
+  if (cust) {
+    const videoId = systemStore.currentVideoId;
+    let pastCount = 0;
+    if (cust.sessions) {
+      Object.keys(cust.sessions).forEach((vid) => {
+        if (vid !== videoId) {
+          const session = cust.sessions[vid];
+          if (session && session.status !== "done") {
+            pastCount += session.count || 0;
+          }
+        }
+      });
+    }
+    return todayCount + pastCount;
+  }
+  return todayCount;
 }
 
-// 👗 แสดงรายการสินค้าทั้งหมดของลูกค้าคนนี้ + ปุ่มลบ
-function showOwnerItems(ownerName) {
+// ฟังก์ชันสกัดเอาเฉพาะวันที่จากชื่อไลฟ์สดที่ยาวๆ
+function extractDateFromTitle(title) {
+  if (!title) return "";
+  const dateRegex = /(\d{1,2})\s*(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s*(\d{2,4})?/i;
+  const match = title.match(dateRegex);
+  if (match) {
+    const day = match[1];
+    const month = match[2];
+    const year = match[3] ? ` ${match[3]}` : "";
+    return `${day} ${month}${year}`;
+  }
+  return title.length > 15 ? title.substring(0, 15) + "..." : title;
+}
+
+// 👗 แสดงรายการสินค้าทั้งหมดของลูกค้าคนนี้ (รวมทุกวันสะสม) + ปุ่มลบ
+async function showOwnerItems(ownerName) {
+  // หา UID จากรายการวันนี้ที่มีชื่อตรงกัน
+  let uid = null;
+  Object.values(stockStore.stockData).forEach((item) => {
+    if (item.owner === ownerName && item.uid) {
+      uid = item.uid;
+    }
+  });
+
+  const cust = deliveryCustomers.value.find(
+    (c) => (uid && c.uid === uid) || c.name === ownerName
+  );
+
+  const currentVideoId = systemStore.currentVideoId;
+  const pastPendingVids = [];
+  if (cust && cust.sessions) {
+    Object.keys(cust.sessions).forEach((vid) => {
+      if (vid !== currentVideoId && cust.sessions[vid].status !== "done") {
+        pastPendingVids.push(vid);
+      }
+    });
+  }
+
+  // ดึงรายการวันนี้ก่อน
   const items = [];
   Object.keys(stockStore.stockData).forEach((num) => {
     const item = stockStore.stockData[num];
     if (item.owner === ownerName) {
-      items.push({ num: parseInt(num), price: item.price || 0, time: item.time || 0 });
+      items.push({
+        num: parseInt(num),
+        price: item.price || 0,
+        time: item.time || 0,
+        videoId: currentVideoId,
+        isToday: true,
+        title: "วันนี้"
+      });
     }
   });
-  items.sort((a, b) => a.num - b.num);
+
+  if (pastPendingVids.length > 0) {
+    // แสดง loading ในระหว่างโหลดข้อมูลสะสมจากรอบอื่น
+    Swal.fire({
+      title: "กำลังโหลดข้อมูลสะสม...",
+      html: "กรุณารอสักครู่",
+      background: 'linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%)',
+      color: '#fff',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      const promises = pastPendingVids.map(async (vid) => {
+        const [stockSnap, historySnap] = await Promise.all([
+          get(dbRef(db, `stock/${vid}`)),
+          get(dbRef(db, `history/${vid}`))
+        ]);
+        const stockData = stockSnap.val() || {};
+        const historyData = historySnap.val() || {};
+        const title = historyData.title || vid;
+        const cleanTitle = extractDateFromTitle(title);
+
+        Object.keys(stockData).forEach((num) => {
+          const item = stockData[num];
+          if (item.owner === ownerName || (item.uid && cust.uid && item.uid === cust.uid)) {
+            items.push({
+              num: parseInt(num),
+              price: item.price || 0,
+              time: item.time || 0,
+              videoId: vid,
+              isToday: false,
+              title: cleanTitle
+            });
+          }
+        });
+      });
+
+      await Promise.all(promises);
+    } catch (e) {
+      console.error("Error fetching past session items:", e);
+    }
+  }
+
+
+  // เรียงลำดับวันนี้ขึ้นก่อน ตามด้วยคลิปย้อนหลัง และเลขที่จอง
+  items.sort((a, b) => {
+    if (a.isToday && !b.isToday) return -1;
+    if (!a.isToday && b.isToday) return 1;
+    if (a.videoId !== b.videoId) return a.videoId.localeCompare(b.videoId);
+    return a.num - b.num;
+  });
 
   const totalPrice = items.reduce((sum, i) => sum + (parseInt(i.price) || 0), 0);
 
@@ -579,18 +646,21 @@ function showOwnerItems(ownerName) {
     return `${day} ${month} ${hour}:${min}`;
   }
 
-  const itemsHtml = items.map((item, idx) => {
+  const itemsHtml = items.map((item) => {
     const priceText = item.price ? `${parseInt(item.price).toLocaleString()}` : '';
     const timeText = item.time ? formatTime(item.time) : '';
+    const removeDetail = `${item.num}|${item.videoId}`;
+    const badgeText = item.isToday ? `#${item.num}` : `#${item.num} (${item.title})`;
+
     return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin:4px 0; background:linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius:10px; border:1px solid #2a2a4a; transition:all 0.2s;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#2a2a4a'">
       <div style="flex:1; min-width:0;">
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <span style="background:linear-gradient(135deg, #6366f1, #8b5cf6); color:#fff; font-weight:700; padding:2px 10px; border-radius:20px; font-size:0.9em; white-space:nowrap;">#${item.num}</span>
+          <span style="background:linear-gradient(135deg, #6366f1, #8b5cf6); color:#fff; font-weight:700; padding:2px 10px; border-radius:20px; font-size:0.9em; white-space:nowrap;">${badgeText}</span>
           ${priceText ? `<span style="color:#fbbf24; font-weight:600; font-size:0.85em;">💰 ${priceText} ฿</span>` : '<span style="color:#666; font-size:0.8em;">ยังไม่ตั้งราคา</span>'}
         </div>
         ${timeText ? `<div style="font-size:0.7em; color:#6b7280; margin-top:4px; padding-left:2px;">📅 ${timeText}</div>` : ''}
       </div>
-      <button onclick="document.dispatchEvent(new CustomEvent('remove-owner-item', {detail: ${item.num}}))" 
+      <button onclick="document.dispatchEvent(new CustomEvent('remove-owner-item', {detail: '${removeDetail}'}))" 
               style="background:linear-gradient(135deg, #dc2626, #b91c1c); color:white; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.8em; font-weight:600; flex-shrink:0; transition:all 0.2s; box-shadow:0 2px 6px rgba(220,38,38,0.3);"
               onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(220,38,38,0.5)'"
               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 6px rgba(220,38,38,0.3)'">
@@ -622,13 +692,17 @@ function showOwnerItems(ownerName) {
     confirmButtonText: '<i class="fa-solid fa-xmark"></i> ปิด',
     confirmButtonColor: '#374151',
     showCloseButton: true,
-    width: 400,
+    width: 420,
     didOpen: () => {
       // ฟัง event ลบรายการ
       const handler = async (e) => {
-        const num = e.detail;
+        const [numStr, vid] = e.detail.split('|');
+        const num = parseInt(numStr);
+        const isToday = vid === currentVideoId;
+
         const result = await Swal.fire({
           title: `ลบ #${num} ของ ${ownerName}?`,
+          text: !isToday ? `สินค้านี้อยู่ในรอบส่งย้อนหลัง` : `ราคาและคิวทั้งหมดในช่องนี้จะถูกลบ`,
           icon: 'warning',
           showCancelButton: true,
           confirmButtonText: 'ลบเลย',
@@ -637,20 +711,94 @@ function showOwnerItems(ownerName) {
           background: '#1e1e1e',
           color: '#fff',
         });
+
         if (result.isConfirmed) {
-          await stockStore.processCancel(num);
+          if (isToday) {
+            // ลบรายการของวันนี้ตามปกติ
+            await stockStore.processCancel(num);
+          } else {
+            // ลบรายการของวันก่อนหน้า (Past Session)
+            const pastItemRef = dbRef(db, `stock/${vid}/${num}`);
+            await remove(pastItemRef);
+
+            // อัปเดตข้อมูลเซสชั่นใน delivery_customers
+            if (cust) {
+              const sessionRef = dbRef(db, `delivery_customers/${cust.uid || cust.id}/sessions/${vid}`);
+              const sessionSnap = await get(sessionRef);
+              if (sessionSnap.exists()) {
+                const sData = sessionSnap.val();
+                const newCount = Math.max((sData.count || 0) - 1, 0);
+
+                // ดึงรายการสต็อกที่เหลือในเซสชั่นนั้นมาคำนวณราคารวมใหม่
+                const itemSnap = await get(dbRef(db, `stock/${vid}`));
+                const allStock = itemSnap.val() || {};
+                let newTotalPrice = 0;
+                Object.values(allStock).forEach(i => {
+                  if (i.owner === ownerName || (i.uid && cust.uid && i.uid === cust.uid)) {
+                    newTotalPrice += i.price ? parseInt(i.price) : 0;
+                  }
+                });
+
+                if (newCount === 0) {
+                  await remove(sessionRef);
+                } else {
+                  await update(sessionRef, {
+                    count: newCount,
+                    totalPrice: newTotalPrice
+                  });
+                }
+
+                // คำนวณยอดสะสม itemCount และ totalPrice ใหม่ในหน้าจัดส่ง
+                const sessionsSnap = await get(dbRef(db, `delivery_customers/${cust.uid || cust.id}/sessions`));
+                const sessions = sessionsSnap.val() || {};
+                const totalCount = Object.values(sessions)
+                  .filter(s => s.status !== "done")
+                  .reduce((sum, s) => sum + (s.count || 0), 0);
+                const totalPrice = Object.values(sessions)
+                  .filter(s => s.status !== "done")
+                  .reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+
+                await update(dbRef(db, `delivery_customers/${cust.uid || cust.id}`), {
+                  itemCount: totalCount,
+                  totalPrice: totalPrice,
+                  updatedAt: Date.now(),
+                });
+              }
+            }
+
+            // คำนวณยอดขาย/ยอดสินค้าในประวัติย้อนหลัง (history node) ใหม่
+            const pastStockSnap = await get(dbRef(db, `stock/${vid}`));
+            if (pastStockSnap.exists()) {
+              const stockData = pastStockSnap.val();
+              let totalSales = 0;
+              let totalItems = 0;
+              Object.values(stockData).forEach(order => {
+                if (order.owner && order.price) {
+                  totalSales += parseInt(order.price);
+                  totalItems++;
+                }
+              });
+              await update(dbRef(db, `history/${vid}`), {
+                totalSales,
+                totalItems
+              });
+            }
+          }
+
           Swal.fire({
             icon: 'success',
-            title: `ลบ #${num} แล้ว`,
+            title: `ลบ #${num} เรียบร้อย`,
             toast: true,
             position: 'top-end',
             timer: 1500,
             showConfirmButton: false,
           });
-          // เปิด popup ใหม่ด้วยข้อมูลอัปเดต
+
+          // เปิดป๊อปอัปขึ้นมาใหม่ด้วยข้อมูลที่อัปเดตแล้ว
           setTimeout(() => showOwnerItems(ownerName), 300);
         }
       };
+
       document.addEventListener('remove-owner-item', handler);
       // cleanup เมื่อปิด
       const swalEl = Swal.getPopup();
@@ -664,6 +812,7 @@ function showOwnerItems(ownerName) {
     },
   });
 }
+
 function getQueueLength(num) {
   const item = stockStore.stockData[num];
   return item && item.queue ? item.queue.length : 0;

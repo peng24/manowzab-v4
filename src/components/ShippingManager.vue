@@ -19,6 +19,10 @@
           <span class="sm-stat-num">{{ todayCount }}</span>
           <span class="sm-stat-label">ส่งวันนี้</span>
         </div>
+        <div class="sm-stat pack-tonight" v-if="packTonightCount > 0">
+          <span class="sm-stat-num">{{ packTonightCount }}</span>
+          <span class="sm-stat-label">📦 แพ็คคืนนี้</span>
+        </div>
         <div class="sm-stat warn">
           <span class="sm-stat-num">{{ soonCount }}</span>
           <span class="sm-stat-label">1-3 วัน</span>
@@ -82,7 +86,11 @@
             <tr
               v-for="(c, idx) in sortedCustomers"
               :key="c.id"
-              :class="{ 'row-urgent': getCountdown(c.deliveryDate).days <= 0 && c.deliveryDate, 'row-done': c.status === 'done' }"
+              :class="{
+                'row-urgent': getCountdown(c.deliveryDate).days <= 0 && c.deliveryDate,
+                'row-pack-tonight': isPackTonight(c),
+                'row-done': c.status === 'done'
+              }"
             >
               <td class="td-center">{{ idx + 1 }}</td>
               <td>
@@ -121,9 +129,14 @@
                 </div>
               </td>
               <td class="td-center">
-                <span class="countdown-badge" :class="'cd-' + getCountdown(c.deliveryDate).color">
-                  {{ getCountdown(c.deliveryDate).text }}
-                </span>
+                <div class="countdown-cell">
+                  <span class="countdown-badge" :class="'cd-' + getCountdown(c.deliveryDate).color">
+                    {{ getCountdown(c.deliveryDate).text }}
+                  </span>
+                  <span v-if="isPackTonight(c)" class="pack-badge">
+                    📦 แพ็คคืนนี้
+                  </span>
+                </div>
               </td>
               <td>
                 <input
@@ -324,6 +337,10 @@ const todayCount = computed(() =>
   activeCustomers.value.filter((c) => getCountdown(c.deliveryDate).days === 0).length
 );
 
+const packTonightCount = computed(() =>
+  activeCustomers.value.filter((c) => isPackTonight(c)).length
+);
+
 const soonCount = computed(() =>
   activeCustomers.value.filter((c) => {
     const d = getCountdown(c.deliveryDate).days;
@@ -375,6 +392,14 @@ function getCountdown(deliveryDate) {
   if (diffDays === 1) return { text: "พรุ่งนี้", color: "orange", days: 1 };
   if (diffDays <= 3) return { text: `อีก ${diffDays} วัน`, color: "yellow", days: diffDays };
   return { text: `อีก ${diffDays} วัน`, color: "green", days: diffDays };
+}
+
+// Pack Tonight Logic — รายการที่ส่งพรุ่งนี้ ต้องแพ็คของคืนนี้
+function isPackTonight(customer) {
+  if (!customer.deliveryDate || customer.status === 'done') return false;
+  const countdown = getCountdown(customer.deliveryDate);
+  // ส่งพรุ่งนี้ (diffDays === 1) = ต้องแพ็คคืนนี้
+  return countdown.days === 1;
 }
 
 function getSessionBreakdown(customer) {
@@ -597,6 +622,11 @@ function deleteCustomer(id, name) {
 
 .sm-stat.urgent { border-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
 .sm-stat.warn { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+.sm-stat.pack-tonight {
+  border-color: #f97316;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(234, 88, 12, 0.06));
+  animation: pack-glow 2.5s ease-in-out infinite;
+}
 
 .sm-stat-num {
   display: block;
@@ -608,6 +638,7 @@ function deleteCustomer(id, name) {
 
 .sm-stat.urgent .sm-stat-num { color: #ef4444; }
 .sm-stat.warn .sm-stat-num { color: #f59e0b; }
+.sm-stat.pack-tonight .sm-stat-num { color: #fb923c; }
 .sm-stat-label { font-size: 0.7em; color: #888; margin-top: 2px; }
 
 /* Add Form */
@@ -649,6 +680,7 @@ function deleteCustomer(id, name) {
 .sm-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
 .td-center { text-align: center; }
 .row-urgent { background: rgba(239, 68, 68, 0.06) !important; }
+.row-pack-tonight { background: rgba(249, 115, 22, 0.06) !important; border-left: 3px solid #f97316; }
 .row-done { opacity: 0.45; }
 
 /* Auto Item Count */
@@ -734,6 +766,14 @@ function deleteCustomer(id, name) {
 .sm-edit-input:focus { border-color: #3b82f6; outline: none; background: #1e1e1e; }
 .sm-note { max-width: 130px; font-size: 0.85em; color: #aaa; }
 
+/* Countdown Cell (stacked layout for badge + pack indicator) */
+.countdown-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Countdown Badge */
 .countdown-badge {
   display: inline-block;
@@ -751,9 +791,36 @@ function deleteCustomer(id, name) {
 .cd-green { background: rgba(16, 185, 129, 0.12); color: #6ee7b7; }
 .cd-gray { background: rgba(107, 114, 128, 0.12); color: #9ca3af; }
 
+/* Pack Tonight Badge */
+.pack-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7em;
+  font-weight: 700;
+  color: #fdba74;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.25), rgba(234, 88, 12, 0.15));
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  white-space: nowrap;
+  animation: pack-pulse 2s ease-in-out infinite;
+  letter-spacing: 0.3px;
+}
+
 @keyframes pulse-urgent {
   0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
   50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+@keyframes pack-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.25); }
+  50% { box-shadow: 0 0 8px 2px rgba(249, 115, 22, 0.15); }
+}
+
+@keyframes pack-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.2); }
+  50% { box-shadow: 0 0 12px 3px rgba(249, 115, 22, 0.1); }
 }
 
 /* Action Buttons */

@@ -309,8 +309,8 @@ const deliveryStrip = computed(() => {
         urgency = 'today'; info = 'วันนี้!';
         tooltip = `${c.name}: ส่งวันนี้ (${c.itemCount || 0} ชิ้น)`;
       } else if (days === 1) {
-        urgency = 'soon'; info = 'พรุ่งนี้';
-        tooltip = `${c.name}: พรุ่งนี้ (${c.itemCount || 0} ชิ้น)`;
+        urgency = 'pack-tonight'; info = '📦 แพ็คคืนนี้';
+        tooltip = `${c.name}: ส่งพรุ่งนี้ • แพ็คคืนนี้ (${c.itemCount || 0} ชิ้น)`;
       } else if (days <= 3) {
         urgency = 'soon'; info = `อีก ${days} วัน`;
         tooltip = `${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;

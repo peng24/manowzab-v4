@@ -107,15 +107,22 @@ export function useHistory() {
      * Delete History
      * Removes from both 'history/' and 'chats/' nodes
      */
+    /**
+     * Delete History
+     * Removes all nodes associated with a videoId cleanly (no orphaned data)
+     */
     async function deleteHistory(videoId) {
         if (!videoId) return;
 
         try {
-            // 1. Remove from history node
-            await remove(child(dbRef(db, "history"), videoId));
-
-            // 2. Remove relevant chats (Clean up)
-            await remove(child(dbRef(db, "chats"), videoId));
+            await Promise.all([
+                remove(dbRef(db, `history/${videoId}`)),
+                remove(dbRef(db, `chats/${videoId}`)),
+                remove(dbRef(db, `stock/${videoId}`)),
+                remove(dbRef(db, `settings/${videoId}`)),
+                remove(dbRef(db, `voice_chats/${videoId}`)),
+                remove(dbRef(db, `shipping/${videoId}`))
+            ]);
 
             // Refresh list
             await fetchHistoryList();
@@ -123,6 +130,87 @@ export function useHistory() {
             console.error("❌ Delete History Error:", error);
             throw error;
         }
+    }
+
+    /**
+     * Get preview of history items older than 3 months (90 days)
+     * @returns {Promise<Object>} Preview details
+     */
+    async function getCleanupPreview() {
+        const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+        
+        // Ensure historyList is up to date
+        await fetchHistoryList();
+        
+        const totalLives = historyList.value.length;
+        const olderLives = historyList.value.filter(item => (item.timestamp || 0) < ninetyDaysAgo);
+        const olderLivesCount = olderLives.length;
+        
+        let totalBytes = 0;
+        
+        if (olderLivesCount > 0) {
+            // Fetch size details in parallel
+            const sizePromises = olderLives.map(async (item) => {
+                const vid = item.videoId;
+                let bytes = 0;
+                try {
+                    const [historySnap, chatsSnap, stockSnap, settingsSnap, voiceSnap, shippingSnap] = await Promise.all([
+                        get(dbRef(db, `history/${vid}`)),
+                        get(dbRef(db, `chats/${vid}`)),
+                        get(dbRef(db, `stock/${vid}`)),
+                        get(dbRef(db, `settings/${vid}`)),
+                        get(dbRef(db, `voice_chats/${vid}`)),
+                        get(dbRef(db, `shipping/${vid}`))
+                    ]);
+                    
+                    if (historySnap.exists()) bytes += JSON.stringify(historySnap.val()).length;
+                    if (chatsSnap.exists()) bytes += JSON.stringify(chatsSnap.val()).length;
+                    if (stockSnap.exists()) bytes += JSON.stringify(stockSnap.val()).length;
+                    if (settingsSnap.exists()) bytes += JSON.stringify(settingsSnap.val()).length;
+                    if (voiceSnap.exists()) bytes += JSON.stringify(voiceSnap.val()).length;
+                    if (shippingSnap.exists()) bytes += JSON.stringify(shippingSnap.val()).length;
+                } catch (err) {
+                    console.error(`Error estimating size for video ${vid}:`, err);
+                }
+                return bytes;
+            });
+            
+            const sizes = await Promise.all(sizePromises);
+            totalBytes = sizes.reduce((sum, size) => sum + size, 0);
+        }
+        
+        return {
+            totalLives,
+            olderLivesCount,
+            olderLives,
+            estimatedSizeInBytes: totalBytes
+        };
+    }
+
+    /**
+     * Delete multiple history sessions cleanly
+     * @param {Array<string>} videoIds 
+     */
+    async function deleteMultipleHistory(videoIds) {
+        if (!videoIds || !videoIds.length) return;
+        
+        const deletePromises = videoIds.map(async (videoId) => {
+            try {
+                await Promise.all([
+                    remove(dbRef(db, `history/${videoId}`)),
+                    remove(dbRef(db, `chats/${videoId}`)),
+                    remove(dbRef(db, `stock/${videoId}`)),
+                    remove(dbRef(db, `settings/${videoId}`)),
+                    remove(dbRef(db, `voice_chats/${videoId}`)),
+                    remove(dbRef(db, `shipping/${videoId}`))
+                ]);
+            } catch (err) {
+                console.error(`❌ Error deleting history for ${videoId}:`, err);
+            }
+        });
+        
+        await Promise.all(deletePromises);
+        await fetchHistoryList();
     }
 
     /**
@@ -174,6 +262,8 @@ export function useHistory() {
         fetchHistoryDetails,
         updateHistoryItem,
         deleteHistory,
+        getCleanupPreview, // ✅ Export
+        deleteMultipleHistory, // ✅ Export
         recalculateAllHistory // ✅ Export
     };
 }

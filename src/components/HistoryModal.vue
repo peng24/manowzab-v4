@@ -16,6 +16,9 @@
           <div class="sidebar-header">
             <span>รายการย้อนหลัง</span>
             <div class="flex gap-1">
+                 <button class="btn-icon-sm-danger" @click="openCleanupModal" title="ล้างประวัติย้อนหลังเกิน 3 เดือน">
+                   <i class="fa-solid fa-broom"></i>
+                 </button>
                  <button class="btn-icon-sm" @click="fixHistoryData" title="คำนวณยอดใหม่ (Fix Data)">
                    <i class="fa-solid fa-wrench"></i>
                  </button>
@@ -573,6 +576,120 @@ async function fixHistoryData() {
         Swal.fire("เสร็จสิ้น", "คำนวณยอดขายทั้งหมดใหม่เรียบร้อยแล้ว", "success");
     }
 }
+
+async function openCleanupModal() {
+  Swal.fire({
+    title: "กำลังประเมินขนาดข้อมูล...",
+    html: "ระบบกำลังคำนวณขนาดข้อมูลย้อนหลังเกิน 3 เดือน กรุณารอสักครู่",
+    allowOutsideClick: false,
+    didOpen: () => {
+      Swal.showLoading();
+    }
+  });
+
+  try {
+    const preview = await history.getCleanupPreview();
+    Swal.close();
+
+    if (preview.olderLivesCount === 0) {
+      Swal.fire({
+        title: "ไม่มีประวัติเก่า",
+        text: "ไม่พบข้อมูลประวัติย้อนหลังเกิน 3 เดือนให้ลบ",
+        icon: "info",
+        confirmButtonText: "ตกลง",
+        confirmButtonColor: "#3b82f6",
+        background: '#0f172a',
+        color: '#fff'
+      });
+      return;
+    }
+
+    // Format size
+    const sizeInMB = preview.estimatedSizeInBytes / (1024 * 1024);
+    const sizeText = sizeInMB >= 1 
+      ? `${sizeInMB.toFixed(2)} MB` 
+      : `${(preview.estimatedSizeInBytes / 1024).toFixed(2)} KB`;
+
+    // Format lives list for display
+    const livesListHtml = preview.olderLives.map(live => {
+      const dateStr = formatDate(live.timestamp);
+      return `<li style="text-align: left; padding: 6px 8px; border-bottom: 1px solid #334155; font-size: 0.9em; display: flex; justify-content: space-between;">
+        <span style="color: #cbd5e1;">${live.title || 'ไม่มีชื่อไลฟ์'}</span>
+        <span style="color: #f87171; font-weight: bold; font-family: monospace;">[${dateStr.split(' ')[0]}]</span>
+      </li>`;
+    }).slice(0, 8).join('') + (preview.olderLivesCount > 8 ? `<li style="text-align: center; padding-top: 8px; color: #94a3b8; font-style: italic;">...และอีก ${preview.olderLivesCount - 8} ไลฟ์</li>` : '');
+
+    const confirmHtml = `
+      <div style="font-size: 0.95rem; text-align: left; line-height: 1.5;">
+        <div style="background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 15px; color: #fca5a5;">
+          <strong>พบประวัติย้อนหลังทั้งหมด:</strong> ${preview.totalLives} ไลฟ์<br>
+          <strong>เกิน 3 เดือนย้อนหลัง:</strong> ${preview.olderLivesCount} ไลฟ์<br>
+          <strong>พื้นที่ฐานข้อมูลโดยประมาณที่จะได้รับคืน:</strong> <span style="font-weight: bold; color: #ef4444;">${sizeText}</span>
+        </div>
+        <div style="font-weight: bold; margin-bottom: 8px; color: #e2e8f0;">รายชื่อไลฟ์สดที่จะถูกลบ:</div>
+        <ul style="max-height: 150px; overflow-y: auto; padding-left: 0; margin: 0 0 15px 0; background: #0f172a; border-radius: 6px; border: 1px solid #334155; list-style-type: none;">
+          ${livesListHtml}
+        </ul>
+        <div style="color: #f87171; font-weight: bold; text-align: center;">
+          ⚠️ คำเตือน: ประวัติการขาย รายการจองสต็อก และแชทสดทั้งหมดของไลฟ์เหล่านี้จะถูกลบถาวร ไม่สามารถกู้คืนได้!
+        </div>
+      </div>
+    `;
+
+    const result = await Swal.fire({
+      title: "ล้างประวัติย้อนหลัง?",
+      html: confirmHtml,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#475569",
+      confirmButtonText: `ยืนยันการลบ ${preview.olderLivesCount} ไลฟ์`,
+      cancelButtonText: "ยกเลิก",
+      background: '#1e293b',
+      color: '#fff',
+      width: 500
+    });
+
+    if (result.isConfirmed) {
+      Swal.fire({
+        title: "กำลังลบข้อมูล...",
+        html: "กรุณารอระบบเคลียร์ข้อมูลสักครู่",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      const videoIdsToDelete = preview.olderLives.map(live => live.videoId);
+      await history.deleteMultipleHistory(videoIdsToDelete);
+      
+      // Clear selection if deleted
+      if (selectedId.value && videoIdsToDelete.includes(selectedId.value)) {
+        selectedId.value = null;
+        selectedItem.value = null;
+      }
+
+      Swal.fire({
+        title: "ลบสำเร็จแล้ว!",
+        text: `ทำการเคลียร์พื้นที่ฐานข้อมูลเรียบร้อย คืนพื้นที่ประมาณ ${sizeText}`,
+        icon: "success",
+        confirmButtonColor: "#10b981",
+        background: '#0f172a',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    console.error("Cleanup error:", error);
+    Swal.fire({
+      title: "เกิดข้อผิดพลาด",
+      text: "ไม่สามารถคำนวณหรือลบข้อมูลได้ในขณะนี้",
+      icon: "error",
+      confirmButtonColor: "#ef4444",
+      background: '#0f172a',
+      color: '#fff'
+    });
+  }
+}
 </script>
 
 <style scoped>
@@ -808,6 +925,8 @@ async function fixHistoryData() {
 .btn-warning:hover { background: #d97706; }
 .btn-icon-sm { background: transparent; border: none; color: #94a3b8; cursor: pointer; }
 .btn-icon-sm:hover { color: #fff; }
+.btn-icon-sm-danger { background: transparent; border: none; color: #f87171; cursor: pointer; transition: color 0.2s; }
+.btn-icon-sm-danger:hover { color: #f43f5e; }
 
 /* Action buttons in list view */
 .action-btns {
@@ -982,6 +1101,7 @@ async function fixHistoryData() {
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
 }
 

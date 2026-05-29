@@ -135,6 +135,9 @@
               ></i>
               {{ isSimulating ? "หยุดจำลอง" : "เริ่มจำลองแชท" }}
             </a>
+            <a :href="`${baseUrl}shipping/`" target="_blank" class="menu-shipping-page">
+              <i class="fa-solid fa-mobile-screen-button"></i> 📦 รายการจัดส่ง (มือถือ)
+            </a>
             <a href="https://peng24.github.io/manowzab-sales/" target="_blank" class="menu-sales">
               <i class="fa-solid fa-chart-line"></i> ยอดขาย
             </a>
@@ -225,6 +228,9 @@ const dropdownStyle = ref({});
 const noteEditorRef = ref(null); // ✅ Note Editor Ref
 let simIntervalId = null;
 const cleanupFns = [];
+
+// ✅ Base URL for linking to sub-pages
+const baseUrl = computed(() => import.meta.env.BASE_URL || '/');
 
 // ✅ Watcher: ซิงค์รหัส Video ID จาก Firebase (ถ้าเครื่องอื่นเปลี่ยน เครื่องนี้เปลี่ยนด้วย)
 watch(

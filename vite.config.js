@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from "node:url";
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
@@ -91,5 +92,14 @@ export default defineConfig({
 
   server: {
     host: true,
+  },
+
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        shipping: resolve(__dirname, 'shipping/index.html'),
+      },
+    },
   },
 });

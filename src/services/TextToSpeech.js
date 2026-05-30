@@ -294,8 +294,9 @@ export class TextToSpeech {
         // 🚨 CASE 2: API Error (403 Quota / 500)
         console.warn(`⚠️ Key ${i + 1} failed: ${error.message}`);
 
-        // If this was the last key, and all failed
-        if (i === keys.length - 1) {
+        // ✅ Fixed: Use count (loop iteration) instead of i (rotated index)
+        // When startIndex ≠ 0, i won't equal keys.length-1 on last iteration
+        if (count === keys.length - 1) {
           this.consecutiveGoogleFailures++;
           console.error(
             `❌ All Google Keys failed (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} consecutive fails).`,

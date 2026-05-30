@@ -214,7 +214,7 @@ export class YouTubeLiveChat {
           );
         });
 
-        data.items.forEach((item) => {
+        for (const item of data.items) {
           // 3. Deduplication: Check Message ID
           if (!this.seenIds.has(item.id)) {
             this.seenIds.add(item.id);
@@ -228,10 +228,17 @@ export class YouTubeLiveChat {
               }
             }
 
-            // Send to callback
-            if (this.onMessage) this.onMessage(item);
+            // ✅ Sequential: await each message before processing next
+            // Prevents race conditions in processingLocks and ensures TTS order
+            if (this.onMessage) {
+              try {
+                await this.onMessage(item);
+              } catch (e) {
+                console.error("❌ Message processing error:", e);
+              }
+            }
           }
-        });
+        }
       }
     } catch (error) {
       console.error("Network error fetching chat:", error);

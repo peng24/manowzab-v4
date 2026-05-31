@@ -88,12 +88,16 @@
             getStockItem(i).owner ? 'sold' : '',
             isNewOrder(i) ? 'new-order' : '',
             highlightedId === i ? 'highlight' : '',
+            cancelledItems.has(i) ? 'cancelled-blink' : '',
           ]"
           @click="openQueueModal(i)"
           :id="`stock-${i}`"
         >
           <div class="stock-num">{{ i }}</div>
-          <div :class="['stock-status', { empty: !getStockItem(i).owner }]">
+          <div v-if="cancelledItems.has(i) && !getStockItem(i).owner" class="stock-status cancelled-name">
+            ❌ {{ cancelledItems.get(i) }}
+          </div>
+          <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
             {{ getStockItem(i).owner || "ว่าง" }}
           </div>
           <div
@@ -259,6 +263,10 @@ const openShippingManager = inject("openShippingManager");
 const gridContainer = ref(null);
 const highlightedId = ref(null);
 const newOrders = ref(new Set());
+
+// ✅ Cancelled Items Blink Effect (15 seconds)
+const cancelledItems = ref(new Map());
+const cancelledTimers = {};
 
 // 📦 Delivery Strip State
 const deliveryCustomers = ref([]);
@@ -448,6 +456,8 @@ const percentColorClass = computed(() => {
 onUnmounted(() => {
   if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
   if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
+  // ✅ Cleanup cancelled item timers
+  Object.values(cancelledTimers).forEach(t => clearTimeout(t));
   cleanupFns.forEach(fn => {
     if (typeof fn === 'function') {
       fn();
@@ -914,19 +924,70 @@ function saveStockSize() {
   logger.log("✅ Stock size saved to Firebase:", newSize);
 }
 
+let lastVideoId = systemStore.currentVideoId;
+
 watch(
   () => stockStore.stockData,
   (newVal, oldVal) => {
+    // Clear cancelled state if stream changed or board was cleared
+    if (systemStore.currentVideoId !== lastVideoId) {
+      lastVideoId = systemStore.currentVideoId;
+      cancelledItems.value.clear();
+      Object.keys(cancelledTimers).forEach((key) => {
+        clearTimeout(cancelledTimers[key]);
+        delete cancelledTimers[key];
+      });
+      return;
+    }
+
+    if (!newVal || Object.keys(newVal).length === 0) {
+      cancelledItems.value.clear();
+      Object.keys(cancelledTimers).forEach((key) => {
+        clearTimeout(cancelledTimers[key]);
+        delete cancelledTimers[key];
+      });
+      return;
+    }
+
+    // ✅ Detect new orders
     Object.keys(newVal).forEach((key) => {
       const num = parseInt(key);
       const newItem = newVal[key];
       const oldItem = oldVal?.[key];
       if (newItem.owner && (!oldItem || !oldItem.owner)) {
+        // ถ้าเป็น order ใหม่ ให้เคลียร์ cancelled state ออก (กรณีคิวเลื่อนขึ้น)
+        if (cancelledItems.value.has(num)) {
+          clearTimeout(cancelledTimers[num]);
+          delete cancelledTimers[num];
+          cancelledItems.value.delete(num);
+        }
         newOrders.value.add(num);
         setTimeout(() => newOrders.value.delete(num), 15000);
         scrollToItem(num);
       }
     });
+
+    // ✅ Detect cancellations (owner disappeared)
+    if (oldVal) {
+      Object.keys(oldVal).forEach((key) => {
+        const num = parseInt(key);
+        const oldItem = oldVal[key];
+        const newItem = newVal[key];
+        // เฉพาะกรณี: เดิมมี owner แต่ตอนนี้ไม่มีแล้ว (ถูกยกเลิก)
+        if (oldItem?.owner && (!newItem || !newItem.owner)) {
+          const previousOwner = oldItem.owner;
+          // ตั้งค่า blink effect
+          cancelledItems.value.set(num, previousOwner);
+          // เคลียร์ timer เก่า (กันซ้ำ)
+          if (cancelledTimers[num]) clearTimeout(cancelledTimers[num]);
+          // ตั้ง timer 15 วินาที แล้วหายไป
+          cancelledTimers[num] = setTimeout(() => {
+            cancelledItems.value.delete(num);
+            delete cancelledTimers[num];
+          }, 15000);
+        }
+      });
+    }
   },
   { deep: true },
 );
@@ -1920,5 +1981,36 @@ watch(
 .owner-count-badge:hover {
   color: #93c5fd;
   text-decoration: underline;
+}
+
+/* ✅ Cancelled Item Blink Effect (15 seconds) */
+.stock-item.cancelled-blink {
+  animation: cancelBlink 1s ease-in-out infinite;
+  z-index: 3;
+}
+
+@keyframes cancelBlink {
+  0%, 100% {
+    border-color: #ef4444;
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.6);
+    background: rgba(239, 68, 68, 0.25);
+  }
+  50% {
+    border-color: #7f1d1d;
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.15);
+    background: rgba(239, 68, 68, 0.06);
+  }
+}
+
+.cancelled-name {
+  color: #fca5a5 !important;
+  font-weight: 600;
+  font-size: 0.85em !important;
+  animation: cancelTextPulse 1s ease-in-out infinite;
+}
+
+@keyframes cancelTextPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 </style>

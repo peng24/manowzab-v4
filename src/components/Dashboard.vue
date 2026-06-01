@@ -252,26 +252,62 @@ const userChatHistory = ref([]);
 const customerOrders = computed(() => {
   const orders = {};
 
+  // ✅ Helper: UID ที่เป็น proxy จะถูก group ด้วย owner name แทน
+  function isProxyUid(uid) {
+    return uid && (uid.startsWith("proxy-") || uid.startsWith("admin-proxy-") || uid.startsWith("multi-proxy-") || uid.startsWith("manual-"));
+  }
+
   Object.keys(stockStore.stockData).forEach((num) => {
     const item = stockStore.stockData[num];
     if (item?.uid) {
-      if (!orders[item.uid]) {
-        orders[item.uid] = {
+      // ✅ ใช้ owner name เป็น key สำหรับ proxy UIDs เพื่อรวมกลุ่มลูกค้าคนเดียวกัน
+      const groupKey = isProxyUid(item.uid) ? `name:${item.owner}` : item.uid;
+
+      if (!orders[groupKey]) {
+        orders[groupKey] = {
           name: item.owner,
-          uid: item.uid,
+          uid: isProxyUid(item.uid) ? groupKey : item.uid,
           items: [],
           totalPrice: 0,
         };
       }
 
       const price = item.price ? parseInt(item.price) : 0;
-      orders[item.uid].items.push({ num, price });
-      orders[item.uid].totalPrice += price;
+      orders[groupKey].items.push({ num, price });
+      orders[groupKey].totalPrice += price;
     }
   });
 
   return orders;
 });
+
+// ✅ Helper: ค้นหา shipping ready status — สำหรับ proxy key จะหาจากชื่อตรงกัน
+function isShippingReady(currentShipping, groupKey, name) {
+  // Direct match
+  if (currentShipping[groupKey]?.ready) return true;
+  // Proxy key → ค้นหาจาก uid ที่ตรงกับ delivery_customers
+  if (groupKey.startsWith("name:")) {
+    return Object.keys(currentShipping).some(key => {
+      return currentShipping[key]?.ready && 
+        Object.values(stockStore.stockData).some(item => 
+          item.uid === key && item.owner === name
+        );
+    });
+  }
+  return false;
+}
+
+// ✅ Helper: ค้นหา delivery_customers entry จากชื่อ (สำหรับ proxy group key)
+function findDeliveryCustomer(uid, name) {
+  // Direct match จาก key
+  const direct = deliveryCustomers.value[uid];
+  if (direct) return direct;
+  // Proxy key → หาจากชื่อ
+  if (uid.startsWith("name:")) {
+    return Object.values(deliveryCustomers.value).find(c => c.name === name && c.status !== "done") || null;
+  }
+  return null;
+}
 
 // Get ready customers (in shipping list)
 const shippingList = computed(() => {
@@ -279,7 +315,10 @@ const shippingList = computed(() => {
   const videoId = systemStore.currentVideoId;
 
   return Object.keys(customerOrders.value)
-    .filter((uid) => currentShipping[uid]?.ready)
+    .filter((uid) => {
+      const order = customerOrders.value[uid];
+      return isShippingReady(currentShipping, uid, order.name);
+    })
     .map((uid) => {
       const order = customerOrders.value[uid];
       const itemsText = order.items
@@ -288,7 +327,7 @@ const shippingList = computed(() => {
 
       // คำนวณจำนวนจองรวมจากวันอื่นๆ ที่ยังค้างส่งอยู่
       let bookingCount = order.items.length;
-      const delCust = deliveryCustomers.value[uid];
+      const delCust = findDeliveryCustomer(uid, order.name);
       if (delCust && delCust.status !== "done") {
         const sessions = delCust.sessions || {};
         let pastCount = 0;
@@ -317,12 +356,15 @@ const notReadyCustomers = computed(() => {
   const videoId = systemStore.currentVideoId;
 
   return Object.keys(customerOrders.value)
-    .filter((uid) => !currentShipping[uid]?.ready)
+    .filter((uid) => {
+      const order = customerOrders.value[uid];
+      return !isShippingReady(currentShipping, uid, order.name);
+    })
     .map((uid) => {
       const order = customerOrders.value[uid];
 
       let bookingCount = order.items.length;
-      const delCust = deliveryCustomers.value[uid];
+      const delCust = findDeliveryCustomer(uid, order.name);
       if (delCust && delCust.status !== "done") {
         const sessions = delCust.sessions || {};
         let pastCount = 0;
@@ -376,20 +418,27 @@ const percentageColorClass = computed(() => {
 async function addToShipping() {
   if (!selectedCustomer.value) return;
 
-  const uid = selectedCustomer.value;
-  const order = customerOrders.value[uid];
+  const groupKey = selectedCustomer.value;
+  const order = customerOrders.value[groupKey];
   const videoId = systemStore.currentVideoId;
-  const customerName = savedNames.value[uid]?.nick || order.name;
+
+  // ✅ Resolve shipping uid: proxy keys ใช้ชื่อจริงเป็น key
+  let shippingUid = groupKey;
+  if (isProxyGroupKey(groupKey)) {
+    shippingUid = await resolveDeliveryUid(groupKey, order.name);
+  }
+
+  const customerName = savedNames.value[shippingUid]?.nick || order.name;
 
   // 1. Mark ready in shipping (เดิม)
-  const path = `shipping/${videoId}/${uid}`;
+  const path = `shipping/${videoId}/${shippingUid}`;
   await update(dbRef(db, path), {
     ready: true,
     timestamp: Date.now(),
   });
 
-  // 2. AUTO-SYNC to delivery_customers/{uid}
-  await syncCustomerToDelivery(uid, customerName, order, videoId);
+  // 2. AUTO-SYNC to delivery_customers
+  await syncCustomerToDelivery(groupKey, customerName, order, videoId);
 
   Swal.fire({
     icon: "success",
@@ -401,8 +450,34 @@ async function addToShipping() {
   selectedCustomer.value = "";
 }
 
+// ✅ Helper: ตรวจว่า uid เป็น proxy group key หรือไม่
+function isProxyGroupKey(uid) {
+  return uid && uid.startsWith("name:");
+}
+
+// ✅ Helper: หา delivery_customers key จริง จากชื่อ (สำหรับ proxy)
+async function resolveDeliveryUid(uid, name) {
+  // ถ้าเป็น uid จริง (ไม่ใช่ proxy key) ใช้เลย
+  if (!isProxyGroupKey(uid)) return uid;
+  
+  // ค้นหา entry ที่มีชื่อตรงกันใน delivery_customers
+  const snapshot = await get(dbRef(db, "delivery_customers"));
+  const data = snapshot.val() || {};
+  const existingKey = Object.keys(data).find(key => {
+    return data[key].name === name && data[key].status !== "done";
+  });
+  
+  if (existingKey) return existingKey;
+  
+  // ไม่มี → สร้าง key ใหม่จากชื่อ (ป้องกัน Firebase path issues)
+  return "customer-" + Date.now() + "-" + Math.random().toString(36).substring(2, 5);
+}
+
 // ✅ Auto-sync ลูกค้าคนเดียว
 async function syncCustomerToDelivery(uid, name, order, videoId) {
+  // ✅ Resolve proxy group keys ให้เป็น key จริงก่อน sync
+  const deliveryUid = await resolveDeliveryUid(uid, name);
+
   const sessionData = {
     count: order.items.length,
     totalPrice: order.totalPrice,
@@ -410,7 +485,7 @@ async function syncCustomerToDelivery(uid, name, order, videoId) {
   };
 
   // Create/update customer base info
-  const customerRef = dbRef(db, `delivery_customers/${uid}`);
+  const customerRef = dbRef(db, `delivery_customers/${deliveryUid}`);
   const snap = await get(customerRef);
   const existing = snap.val();
 
@@ -432,10 +507,10 @@ async function syncCustomerToDelivery(uid, name, order, videoId) {
   }
 
   // Save session breakdown
-  await update(dbRef(db, `delivery_customers/${uid}/sessions/${videoId}`), sessionData);
+  await update(dbRef(db, `delivery_customers/${deliveryUid}/sessions/${videoId}`), sessionData);
 
   // Recalculate total itemCount
-  await recalcItemCount(uid);
+  await recalcItemCount(deliveryUid);
 }
 
 // ✅ คำนวณ itemCount ใหม่จาก sessions (กรองเฉพาะ session ที่ยังไม่จัดส่ง)

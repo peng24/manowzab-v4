@@ -317,10 +317,14 @@ export function useChatProcessor() {
     if (isCancel) {
       intent = "cancel";
       if (!targetId) {
-        // Call helper to search for most recent item
+        // ✅ Auto-resolve: ยกเลิกรายการล่าสุดของลูกค้า
         const recentId = stockStore.findMostRecentItemForUser(uid, displayName);
         if (recentId) {
           targetId = recentId;
+          method = method ? method + "+auto-latest" : "auto-cancel-latest";
+          logger.log(`🔄 Auto-resolved cancel → item ${recentId} for ${displayName} (uid: ${uid})`);
+        } else {
+          logger.log(`⚠️ Cancel without number: no bookings found for ${displayName} (uid: ${uid})`);
         }
       }
     }
@@ -614,6 +618,14 @@ export function useChatProcessor() {
           const result = await stockStore.processCancel(targetId, uid, displayName);
           if (result && result.success && (result.previousOwner || result.cancelledFromQueue)) {
             cancelSuccess = true;
+
+            // ✅ Toast: แจ้งยกเลิกสำเร็จ พร้อมระบุรหัส
+            const cancelledName = result.previousOwner || displayName;
+            const isAutoResolved = method && method.includes("auto-latest");
+            Toast.fire({
+              icon: "warning",
+              title: `❌ ยกเลิกรหัส ${targetId}${isAutoResolved ? " (ล่าสุด)" : ""} ของ ${cancelledName} แล้ว`,
+            });
           }
         }
       }

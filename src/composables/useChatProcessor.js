@@ -4,7 +4,15 @@ import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
 
 import { useAudio } from "./useAudio";
-import { ref as dbRef, onValue, set, update, push, get, onChildAdded } from "firebase/database";
+import {
+  ref as dbRef,
+  onValue,
+  set,
+  update,
+  push,
+  get,
+  onChildAdded,
+} from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref } from "vue";
 import { extractMessageRuns } from "../services/YouTubeLiveChat";
@@ -36,21 +44,26 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
 });
 
 // 🚀 Performance: Regex patterns at module level
-const multiBuyRegex = /^(?:F|f|cf|CF|รับ|เอา|เิา)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
+const multiBuyRegex =
+  /^(?:F|f|cf|CF|รับ|เอา|เิา)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
 const adminProxyNumFirstRegex = /^(\d+)\s+([ก-๛a-zA-Z].*)$/;
 const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z][^]*?)\s+(\d+)$/;
 const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม/;
-const questionRegex = /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์|ใหม|หรอ|ปะ|ยังไง/;
+const questionRegex =
+  /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์|ใหม|หรอ|ปะ|ยังไง/;
 const pureNumberRegex = /^\s*(\d+)\s*$/;
-const explicitBuyRegex = /(?:(?:F|f|cf|CF|รับ|เอา|เิา|รหัส|ระหัส|เบอร์)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(\d+))|(?:(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา|รหัส|ระหัส|เบอร์))/i;
-const numberWithPoliteRegex = /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
+const explicitBuyRegex =
+  /(?:(?:F|f|cf|CF|รับ|เอา|เิา|รหัส|ระหัส|เบอร์)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(\d+))|(?:(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา|รหัส|ระหัส|เบอร์))/i;
+const numberWithPoliteRegex =
+  /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
 const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 const customerNameNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,}?)\s+(\d+)$/;
-const cancelKeywordRegex = /cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า/i;
+const cancelKeywordRegex =
+  /cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า/i;
 const standalonePassRegex = /^(?:ขอ)?ผ่าน\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|เลย)*$/i;
 
 // 🛡️ Safety: Maximum item ID to prevent absurd stock expansion from spam/typos (e.g. "555555")
-const MAX_ITEM_ID = 999;
+const MAX_ITEM_ID = 100;
 
 // ✅ Thai Numeral → Arabic Digit Converter
 function thaiToArabic(text) {
@@ -80,8 +93,7 @@ export function useChatProcessor() {
   const systemStore = useSystemStore();
   const nicknameStore = useNicknameStore();
 
-  const { queueAudio, playSfx, resetVoice } =
-    useAudio();
+  const { queueAudio, playSfx, resetVoice } = useAudio();
 
   // extractMessageRuns is now imported from ../services/YouTubeLiveChat
 
@@ -101,7 +113,10 @@ export function useChatProcessor() {
     if (!msg) {
       // ถ้าไม่มี displayMessage → ลอง fallback จาก messageRuns (emoji-only etc.)
       const runs = extractMessageRuns(item);
-      const fallbackText = runs.map(r => r.text || '').join('').trim();
+      const fallbackText = runs
+        .map((r) => r.text || "")
+        .join("")
+        .trim();
       if (!fallbackText) return; // ไม่มีข้อความจริงๆ → ข้าม
     }
 
@@ -115,7 +130,8 @@ export function useChatProcessor() {
       "https://www.gstatic.com/youtube/img/creator/avatars/sample_avatar.png";
 
     // 🟢 ตรวจสอบว่าเป็น Voice Chat หรือไม่
-    const isVoiceChat = uid === "voice-chat-uid" || (uid && uid.includes("voice-chat"));
+    const isVoiceChat =
+      uid === "voice-chat-uid" || (uid && uid.includes("voice-chat"));
 
     // Check Nickname
     let displayName = realName;
@@ -133,7 +149,8 @@ export function useChatProcessor() {
 
     const isAdmin =
       isVoiceChat ||
-      /admin|แอดมิน/i.test(displayName) || /admin|แอดมิน/i.test(realName);
+      /admin|แอดมิน/i.test(displayName) ||
+      /admin|แอดมิน/i.test(realName);
 
     // ✅ Prepare TTS Message (Append instructions for new customers once)
     let ttsMessage = msg;
@@ -256,7 +273,9 @@ export function useChatProcessor() {
         queueAudio(
           "success",
           phoneticName,
-          isVoiceChat ? "" : `${ttsMessage} ... ทั้งหมด ${itemIds.length} รายการ`,
+          isVoiceChat
+            ? ""
+            : `${ttsMessage} ... ทั้งหมด ${itemIds.length} รายการ`,
         );
 
         // Exit early - don't process further
@@ -269,7 +288,9 @@ export function useChatProcessor() {
 
     {
       // 1. Check cancel with number patterns (keyword first)
-      const matchWithNum = normalizedMsg.match(/(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)/i);
+      const matchWithNum = normalizedMsg.match(
+        /(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)/i,
+      );
       if (matchWithNum && parseInt(matchWithNum[1]) <= MAX_ITEM_ID) {
         isCancel = true;
         targetId = parseInt(matchWithNum[1]);
@@ -278,7 +299,9 @@ export function useChatProcessor() {
 
       // 2. Check number first patterns
       if (!isCancel) {
-        const matchNumFirst = normalizedMsg.match(/(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i);
+        const matchNumFirst = normalizedMsg.match(
+          /(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i,
+        );
         if (matchNumFirst && parseInt(matchNumFirst[1]) <= MAX_ITEM_ID) {
           isCancel = true;
           targetId = parseInt(matchNumFirst[1]);
@@ -301,9 +324,13 @@ export function useChatProcessor() {
         if (recentId) {
           targetId = recentId;
           method = method ? method + "+auto-latest" : "auto-cancel-latest";
-          logger.log(`🔄 Auto-resolved cancel → item ${recentId} for ${displayName} (uid: ${uid})`);
+          logger.log(
+            `🔄 Auto-resolved cancel → item ${recentId} for ${displayName} (uid: ${uid})`,
+          );
         } else {
-          logger.log(`⚠️ Cancel without number: no bookings found for ${displayName} (uid: ${uid})`);
+          logger.log(
+            `⚠️ Cancel without number: no bookings found for ${displayName} (uid: ${uid})`,
+          );
         }
       }
     }
@@ -321,8 +348,12 @@ export function useChatProcessor() {
       let isAutoShip = false;
 
       const shipNowMatch = normalizedMsg.match(/ส่งเลย|ส่งวันนี้/);
-      const shipTmrMatch = normalizedMsg.match(/ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/);
-      const shipDateMatch = normalizedMsg.match(/ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/);
+      const shipTmrMatch = normalizedMsg.match(
+        /ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/,
+      );
+      const shipDateMatch = normalizedMsg.match(
+        /ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/,
+      );
 
       let matchedKeyword = null;
       if (shipNowMatch) matchedKeyword = shipNowMatch[0];
@@ -338,15 +369,19 @@ export function useChatProcessor() {
 
         if (cleanName.length > 0) {
           autoShipName = cleanName;
-          
-          let foundUid = Object.keys(savedNamesCache.value).find(k => {
-             const v = savedNamesCache.value[k];
-             const nick = typeof v === "object" ? v.nick : v;
-             return nick && nick.trim() === autoShipName;
+
+          let foundUid = Object.keys(savedNamesCache.value).find((k) => {
+            const v = savedNamesCache.value[k];
+            const nick = typeof v === "object" ? v.nick : v;
+            return nick && nick.trim() === autoShipName;
           });
-          
+
           if (!foundUid) {
-             foundUid = "manual-" + Date.now() + "-" + Math.random().toString(36).substring(2,5);
+            foundUid =
+              "manual-" +
+              Date.now() +
+              "-" +
+              Math.random().toString(36).substring(2, 5);
           }
           autoShipUid = foundUid;
         }
@@ -364,58 +399,83 @@ export function useChatProcessor() {
         autoShipDate = new Date();
         const day = parseInt(shipDateMatch[1]);
         autoShipDate.setDate(day);
-        
+
         const monthStr = shipDateMatch[2];
         if (monthStr) {
-          const mNamesShort = ["มค", "กพ", "มีค", "เมย", "พค", "มิย", "กค", "สค", "กย", "ตค", "พย", "ธค"];
-          const mNamesFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-          const cleanMonth = monthStr.replace(/\./g, '');
+          const mNamesShort = [
+            "มค",
+            "กพ",
+            "มีค",
+            "เมย",
+            "พค",
+            "มิย",
+            "กค",
+            "สค",
+            "กย",
+            "ตค",
+            "พย",
+            "ธค",
+          ];
+          const mNamesFull = [
+            "มกราคม",
+            "กุมภาพันธ์",
+            "มีนาคม",
+            "เมษายน",
+            "พฤษภาคม",
+            "มิถุนายน",
+            "กรกฎาคม",
+            "สิงหาคม",
+            "กันยายน",
+            "ตุลาคม",
+            "พฤศจิกายน",
+            "ธันวาคม",
+          ];
+          const cleanMonth = monthStr.replace(/\./g, "");
           let mIndex = mNamesShort.indexOf(cleanMonth);
           if (mIndex === -1) mIndex = mNamesFull.indexOf(cleanMonth);
           if (mIndex !== -1) {
             autoShipDate.setMonth(mIndex);
           }
         }
-        if (autoShipDate < new Date() && (new Date().getDate() - day) > 15) {
+        if (autoShipDate < new Date() && new Date().getDate() - day > 15) {
           autoShipDate.setMonth(autoShipDate.getMonth() + 1);
         }
       }
 
       if (isAutoShip) {
         const y = autoShipDate.getFullYear();
-        const m = String(autoShipDate.getMonth() + 1).padStart(2, '0');
-        const d = String(autoShipDate.getDate()).padStart(2, '0');
+        const m = String(autoShipDate.getMonth() + 1).padStart(2, "0");
+        const d = String(autoShipDate.getDate()).padStart(2, "0");
         const parsedDate = `${y}-${m}-${d}`;
 
         // ✅ DEDUP: Check if customer with same name already exists in delivery_customers
         let targetUid = autoShipUid;
         try {
-          const existingSnap = await get(dbRef(db, 'delivery_customers'));
+          const existingSnap = await get(dbRef(db, "delivery_customers"));
           const existingData = existingSnap.val() || {};
-          const existingEntry = Object.entries(existingData).find(([, val]) =>
-            val.name === autoShipName && val.status !== 'done'
+          const existingEntry = Object.entries(existingData).find(
+            ([, val]) => val.name === autoShipName && val.status !== "done",
           );
           if (existingEntry) {
             targetUid = existingEntry[0]; // Reuse existing key
           }
         } catch (e) {
-          logger.warn('Dedup check failed, proceeding with new entry:', e);
+          logger.warn("Dedup check failed, proceeding with new entry:", e);
         }
 
         update(dbRef(db, `delivery_customers/${targetUid}`), {
           name: autoShipName,
           deliveryDate: parsedDate,
           status: "pending",
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
         });
-        
+
         Toast.fire({
           icon: "success",
           title: `📦 เพิ่มรอบส่งให้ ${autoShipName} แล้ว`,
         });
       }
       // --- END AUTO SHIP LOGIC ---
-
     } else if (questionRegex.test(normalizedMsg)) {
       method = "question-skip";
     } else {
@@ -434,12 +494,18 @@ export function useChatProcessor() {
         ? normalizedMsg.match(adminProxyNameFirstRegex)
         : null;
 
-      if (matchAdminNameFirst && parseInt(matchAdminNameFirst[2]) <= MAX_ITEM_ID) {
+      if (
+        matchAdminNameFirst &&
+        parseInt(matchAdminNameFirst[2]) <= MAX_ITEM_ID
+      ) {
         intent = "buy";
         targetId = parseInt(matchAdminNameFirst[2]);
         forcedOwnerName = matchAdminNameFirst[1].trim();
         method = "admin-proxy-name-first";
-      } else if (matchAdminNumFirst && parseInt(matchAdminNumFirst[1]) <= MAX_ITEM_ID) {
+      } else if (
+        matchAdminNumFirst &&
+        parseInt(matchAdminNumFirst[1]) <= MAX_ITEM_ID
+      ) {
         intent = "buy";
         targetId = parseInt(matchAdminNumFirst[1]);
         forcedOwnerName = matchAdminNumFirst[2].trim();
@@ -448,7 +514,10 @@ export function useChatProcessor() {
         intent = "buy";
         targetId = parseInt(matchPure[1]);
         method = "regex-pure";
-      } else if (matchExplicit && parseInt(matchExplicit[1] || matchExplicit[2]) <= MAX_ITEM_ID) {
+      } else if (
+        matchExplicit &&
+        parseInt(matchExplicit[1] || matchExplicit[2]) <= MAX_ITEM_ID
+      ) {
         intent = "buy";
         targetId = parseInt(matchExplicit[1] || matchExplicit[2]);
         method = "regex-explicit";
@@ -460,7 +529,10 @@ export function useChatProcessor() {
         intent = "buy";
         targetId = parseInt(matchDash[2]);
         method = "regex-dash";
-      } else if (matchCustomerName && parseInt(matchCustomerName[2]) <= MAX_ITEM_ID) {
+      } else if (
+        matchCustomerName &&
+        parseInt(matchCustomerName[2]) <= MAX_ITEM_ID
+      ) {
         // Guard: ต้องไม่ใช่คำถาม/shipping keyword
         const nameOnly = matchCustomerName[1].trim();
         if (!questionRegex.test(nameOnly) && !shippingRegex.test(nameOnly)) {
@@ -558,7 +630,10 @@ export function useChatProcessor() {
         );
 
         // ✅ ยังอ่านข้อความแม้ซื้อซ้ำ/อยู่ในคิวแล้ว (เพิ่มเสียง error ให้รู้ว่าไม่อ่านข้าม)
-        if (result.action === "already_owned" || result.action === "already_queued") {
+        if (
+          result.action === "already_owned" ||
+          result.action === "already_queued"
+        ) {
           queueAudio("error", phoneticName, isVoiceChat ? "" : ttsMessage);
           return;
         }
@@ -586,16 +661,30 @@ export function useChatProcessor() {
 
       if (targetId && targetId > 0) {
         const currentItem = stockStore.stockData[targetId];
-        const isUserInQueue = currentItem && currentItem.queue && currentItem.queue.some(
-          q => (uid && q.uid === uid) || (displayName && q.owner === displayName)
-        );
-        const isUserOwner = currentItem && (
-          (uid && currentItem.uid === uid) || (displayName && currentItem.owner === displayName)
-        );
+        const isUserInQueue =
+          currentItem &&
+          currentItem.queue &&
+          currentItem.queue.some(
+            (q) =>
+              (uid && q.uid === uid) ||
+              (displayName && q.owner === displayName),
+          );
+        const isUserOwner =
+          currentItem &&
+          ((uid && currentItem.uid === uid) ||
+            (displayName && currentItem.owner === displayName));
 
         if (isAdmin || isUserOwner || isUserInQueue) {
-          const result = await stockStore.processCancel(targetId, uid, displayName);
-          if (result && result.success && (result.previousOwner || result.cancelledFromQueue)) {
+          const result = await stockStore.processCancel(
+            targetId,
+            uid,
+            displayName,
+          );
+          if (
+            result &&
+            result.success &&
+            (result.previousOwner || result.cancelledFromQueue)
+          ) {
             cancelSuccess = true;
 
             // ✅ Toast: แจ้งยกเลิกสำเร็จ พร้อมระบุรหัส
@@ -652,39 +741,45 @@ export function useChatProcessor() {
     if (!videoId || videoId === "demo") return null;
 
     const listenerInitTime = Date.now();
-    console.log(`🎙️ Initializing ManowPriceVoiceListener for video: ${videoId}`);
+    console.log(
+      `🎙️ Initializing ManowPriceVoiceListener for video: ${videoId}`,
+    );
     const voiceChatRef = dbRef(db, `voice_chats/${videoId}`);
 
-    return onChildAdded(voiceChatRef, (snapshot) => {
-      const val = snapshot.val();
-      if (!val) return;
+    return onChildAdded(
+      voiceChatRef,
+      (snapshot) => {
+        const val = snapshot.val();
+        if (!val) return;
 
-      const msgTime = val.timestamp || Date.now();
-      // Skip historical voice messages added before the listener initialized (with 5-second buffer)
-      if (msgTime < listenerInitTime - 5000) {
-        console.log("🎙️ Skipping historical voice chat:", val.text);
-        return;
-      }
-
-      console.log("🎙️ New Voice Chat Message Detected:", val);
-
-      const dataItem = {
-        id: snapshot.key,
-        snippet: {
-          displayMessage: val.text || val.snippet?.displayMessage || "",
-          publishedAt: val.timestamp || new Date().toISOString()
-        },
-        authorDetails: {
-          channelId: val.authorDetails?.channelId || "voice-chat-uid",
-          displayName: val.authorDetails?.displayName || "Voice Chat",
-          profileImageUrl: val.authorDetails?.profileImageUrl || ""
+        const msgTime = val.timestamp || Date.now();
+        // Skip historical voice messages added before the listener initialized (with 5-second buffer)
+        if (msgTime < listenerInitTime - 5000) {
+          console.log("🎙️ Skipping historical voice chat:", val.text);
+          return;
         }
-      };
 
-      processMessage(dataItem);
-    }, (error) => {
-      console.error("Voice Listener Error:", error);
-    });
+        console.log("🎙️ New Voice Chat Message Detected:", val);
+
+        const dataItem = {
+          id: snapshot.key,
+          snippet: {
+            displayMessage: val.text || val.snippet?.displayMessage || "",
+            publishedAt: val.timestamp || new Date().toISOString(),
+          },
+          authorDetails: {
+            channelId: val.authorDetails?.channelId || "voice-chat-uid",
+            displayName: val.authorDetails?.displayName || "Voice Chat",
+            profileImageUrl: val.authorDetails?.profileImageUrl || "",
+          },
+        };
+
+        processMessage(dataItem);
+      },
+      (error) => {
+        console.error("Voice Listener Error:", error);
+      },
+    );
   }
 
   return { processMessage, initManowPriceVoiceListener };

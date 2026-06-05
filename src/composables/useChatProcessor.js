@@ -49,6 +49,9 @@ const customerNameNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,}?)\s+(\d+)$/
 const cancelKeywordRegex = /cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า/i;
 const standalonePassRegex = /^(?:ขอ)?ผ่าน\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|เลย)*$/i;
 
+// 🛡️ Safety: Maximum item ID to prevent absurd stock expansion from spam/typos (e.g. "555555")
+const MAX_ITEM_ID = 999;
+
 // ✅ Thai Numeral → Arabic Digit Converter
 function thaiToArabic(text) {
   return text.replace(/[๐-๙]/g, (ch) => ch.charCodeAt(0) - 0x0e50);
@@ -173,11 +176,11 @@ export function useChatProcessor() {
       const numbersStr = matchMultiBuy[1]; // "26 38 74"
       const proxyName = matchMultiBuy[2] ? matchMultiBuy[2].trim() : null; // Optional client name
 
-      // Parse all IDs (Allow IDs > stockSize)
+      // Parse all IDs (Allow IDs > stockSize, but cap at MAX_ITEM_ID)
       const itemIds = numbersStr
         .split(/[\s,_]+/)
         .map((n) => parseInt(n))
-        .filter((n) => n > 0);
+        .filter((n) => n > 0 && n <= MAX_ITEM_ID);
 
       if (itemIds.length > 0) {
         // ✅ Auto-Expand Stock for Multi-Buy
@@ -267,7 +270,7 @@ export function useChatProcessor() {
     {
       // 1. Check cancel with number patterns (keyword first)
       const matchWithNum = normalizedMsg.match(/(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)/i);
-      if (matchWithNum) {
+      if (matchWithNum && parseInt(matchWithNum[1]) <= MAX_ITEM_ID) {
         isCancel = true;
         targetId = parseInt(matchWithNum[1]);
         method = "regex-cancel-with-num";
@@ -276,7 +279,7 @@ export function useChatProcessor() {
       // 2. Check number first patterns
       if (!isCancel) {
         const matchNumFirst = normalizedMsg.match(/(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i);
-        if (matchNumFirst) {
+        if (matchNumFirst && parseInt(matchNumFirst[1]) <= MAX_ITEM_ID) {
           isCancel = true;
           targetId = parseInt(matchNumFirst[1]);
           method = "regex-cancel-num-first";
@@ -431,33 +434,33 @@ export function useChatProcessor() {
         ? normalizedMsg.match(adminProxyNameFirstRegex)
         : null;
 
-      if (matchAdminNameFirst) {
+      if (matchAdminNameFirst && parseInt(matchAdminNameFirst[2]) <= MAX_ITEM_ID) {
         intent = "buy";
         targetId = parseInt(matchAdminNameFirst[2]);
         forcedOwnerName = matchAdminNameFirst[1].trim();
         method = "admin-proxy-name-first";
-      } else if (matchAdminNumFirst) {
+      } else if (matchAdminNumFirst && parseInt(matchAdminNumFirst[1]) <= MAX_ITEM_ID) {
         intent = "buy";
         targetId = parseInt(matchAdminNumFirst[1]);
         forcedOwnerName = matchAdminNumFirst[2].trim();
         method = "admin-proxy-num-first";
-      } else if (matchPure) {
+      } else if (matchPure && parseInt(matchPure[1]) <= MAX_ITEM_ID) {
         intent = "buy";
         targetId = parseInt(matchPure[1]);
         method = "regex-pure";
-      } else if (matchExplicit) {
+      } else if (matchExplicit && parseInt(matchExplicit[1] || matchExplicit[2]) <= MAX_ITEM_ID) {
         intent = "buy";
         targetId = parseInt(matchExplicit[1] || matchExplicit[2]);
         method = "regex-explicit";
-      } else if (matchPolite) {
+      } else if (matchPolite && parseInt(matchPolite[1]) <= MAX_ITEM_ID) {
         intent = "buy";
         targetId = parseInt(matchPolite[1]);
         method = "regex-polite";
-      } else if (matchDash) {
+      } else if (matchDash && parseInt(matchDash[2]) <= MAX_ITEM_ID) {
         intent = "buy";
         targetId = parseInt(matchDash[2]);
         method = "regex-dash";
-      } else if (matchCustomerName) {
+      } else if (matchCustomerName && parseInt(matchCustomerName[2]) <= MAX_ITEM_ID) {
         // Guard: ต้องไม่ใช่คำถาม/shipping keyword
         const nameOnly = matchCustomerName[1].trim();
         if (!questionRegex.test(nameOnly) && !shippingRegex.test(nameOnly)) {

@@ -341,6 +341,12 @@ export const useStockStore = defineStore("stock", () => {
    */
   function updateStockSize(newSize) {
     if (!systemStore.currentVideoId) return;
+    // 🛡️ Safety cap: prevent absurd stock expansion (e.g. customer types "555555")
+    const MAX_STOCK_SIZE = 999;
+    if (newSize > MAX_STOCK_SIZE) {
+      console.warn(`⚠️ Stock size ${newSize} exceeds max (${MAX_STOCK_SIZE}). Clamped.`);
+      newSize = MAX_STOCK_SIZE;
+    }
     const sizeRef = dbRef(
       db,
       `settings/${systemStore.currentVideoId}/stockSize`,

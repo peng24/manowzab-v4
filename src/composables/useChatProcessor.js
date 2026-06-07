@@ -22,7 +22,11 @@ import { logger } from "../utils/logger";
 
 // Saved names cache
 const savedNamesCache = ref({});
-onValue(dbRef(db, "nicknames"), (snapshot) => {
+let _nicknameListenerUnsub = null;
+
+// ✅ Initialize nickname cache (with HMR cleanup guard)
+if (_nicknameListenerUnsub) _nicknameListenerUnsub();
+_nicknameListenerUnsub = onValue(dbRef(db, "nicknames"), (snapshot) => {
   const data = snapshot.val() || {};
   savedNamesCache.value = data;
 
@@ -42,6 +46,16 @@ onValue(dbRef(db, "nicknames"), (snapshot) => {
     });
   }
 });
+
+// ✅ HMR Cleanup: Prevent duplicate Firebase listeners during development
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (_nicknameListenerUnsub) {
+      _nicknameListenerUnsub();
+      _nicknameListenerUnsub = null;
+    }
+  });
+}
 
 // 🚀 Performance: Regex patterns at module level
 const multiBuyRegex =
@@ -86,6 +100,7 @@ const Toast = Swal.mixin({
 // ✅ Concurrency Lock for Chat Processing
 const processingLocks = new Set();
 const warnedNewCustomers = new Set(); // Track new customers who have been read instructions
+let _lastVideoId = null; // ✅ Track current session for auto-clear
 
 export function useChatProcessor() {
   const stockStore = useStockStore();
@@ -106,6 +121,14 @@ export function useChatProcessor() {
   }
 
   async function processMessage(item) {
+    // ✅ Auto-clear session state when video changes
+    if (systemStore.currentVideoId !== _lastVideoId) {
+      _lastVideoId = systemStore.currentVideoId;
+      warnedNewCustomers.clear();
+      processingLocks.clear();
+      logger.log(`🔄 Session state cleared for new video: ${_lastVideoId}`);
+    }
+
     // 1. Validate Message
     if (!item.snippet || !item.authorDetails) return;
 
@@ -206,6 +229,7 @@ export function useChatProcessor() {
           const newSize = Math.ceil(maxId / 10) * 10;
           await stockStore.updateStockSize(newSize);
           logger.log(`📦 Auto-expanded stock to ${newSize} for multi-buy`);
+          Toast.fire({ icon: "info", title: `📦 ขยายรายการเป็น ${newSize} อัตโนมัติ` });
         }
         // Determine owner name and UID
         let ownerName = displayName;
@@ -579,6 +603,7 @@ export function useChatProcessor() {
         const newSize = Math.ceil(targetId / 10) * 10;
         await stockStore.updateStockSize(newSize);
         logger.log(`📦 Auto-expanded stock to ${newSize} for item ${targetId}`);
+        Toast.fire({ icon: "info", title: `📦 ขยายรายการเป็น ${newSize} อัตโนมัติ` });
       }
 
       // --- Buy Logic ---
@@ -686,6 +711,13 @@ export function useChatProcessor() {
             (result.previousOwner || result.cancelledFromQueue)
           ) {
             cancelSuccess = true;
+
+            // ✅ Audit Log: Track admin cancel actions
+            if (isAdmin && !isUserOwner && !isUserInQueue) {
+              logger.log(
+                `🛡️ ADMIN CANCEL: ${displayName} (uid: ${uid}) cancelled item #${targetId} of ${result.previousOwner || "queue member"} via ${method}`,
+              );
+            }
 
             // ✅ Toast: แจ้งยกเลิกสำเร็จ พร้อมระบุรหัส
             const cancelledName = result.previousOwner || displayName;

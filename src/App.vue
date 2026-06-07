@@ -86,7 +86,8 @@ const { awayTimer, closeAwayMode, initAwayListener } = useAwayMode();
 // ✅ Use Auto Cleanup Composable
 const { initAutoCleanup } = useAutoCleanup();
 
-
+// ✅ Enable Pull to Refresh for PWA (must be at setup scope for lifecycle hooks)
+usePullToRefresh();
 
 const showDashboard = ref(false);
 const showHistory = ref(false);
@@ -117,9 +118,6 @@ onMounted(async () => {
       console.error("❌ Auto-Login Failed:", e.message);
     }
   }
-
-  // ✅ Enable Pull to Refresh for PWA
-  usePullToRefresh();
 
   const cleanupFns = [];
 
@@ -247,11 +245,24 @@ onMounted(async () => {
   });
 });
 
-// ✅ Centralized Delivery Customer Sync Watcher
+// ✅ Centralized Delivery Customer Sync Watcher (Debounced for performance)
 let lastSessionCounts = {};
+let _deliverySyncVersion = 0;
 watch(
   [() => stockStore.stockData, () => systemStore.currentVideoId],
-  async ([newStockData, videoId]) => {
+  async () => {
+    const myVersion = ++_deliverySyncVersion;
+
+    // ✅ Debounce: wait 1s after last change to batch rapid stock updates
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // ✅ Skip if superseded by a newer invocation
+    if (myVersion !== _deliverySyncVersion) return;
+
+    // ✅ Read latest values after debounce
+    const newStockData = stockStore.stockData;
+    const videoId = systemStore.currentVideoId;
+
     if (!videoId || videoId === "demo") {
       lastSessionCounts = {};
       return;

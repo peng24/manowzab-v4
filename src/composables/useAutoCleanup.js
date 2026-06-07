@@ -63,11 +63,16 @@ export function useAutoCleanup() {
                 if (data.timestamp <= cutoffTimestamp) {
                     console.log(`🗑️ Deleting chat for: ${data.title || videoId} (${new Date(data.timestamp).toLocaleDateString()})`);
 
-                    // Delete only the chat node, keep history
-                    const chatRef = dbRef(db, `chats/${videoId}`);
-                    remove(chatRef)
-                        .then(() => console.log(`✅ Deleted chats/${videoId}`))
-                        .catch((err) => console.error(`❌ Failed to delete chats/${videoId}:`, err));
+                    // ✅ Delete all related nodes for old sessions (matching deleteHistory logic)
+                    Promise.all([
+                        remove(dbRef(db, `chats/${videoId}`)),
+                        remove(dbRef(db, `stock/${videoId}`)),
+                        remove(dbRef(db, `settings/${videoId}`)),
+                        remove(dbRef(db, `voice_chats/${videoId}`)),
+                        remove(dbRef(db, `shipping/${videoId}`)),
+                    ])
+                        .then(() => console.log(`✅ Cleaned up all data for ${videoId}`))
+                        .catch((err) => console.error(`❌ Failed to cleanup ${videoId}:`, err));
 
                     count++;
                 }

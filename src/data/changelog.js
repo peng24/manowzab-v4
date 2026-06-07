@@ -14,6 +14,24 @@
 export const changelog = [
   // ─── 4.36.x ───────────────────────────────────────────
   {
+    version: '4.36.3',
+    date: '2026-06-07',
+    changes: {
+      improved: [
+        'ป้องกัน Firebase Listener ซ้ำซ้อน (HMR Guard) — เพิ่มระบบ cleanup ป้องกัน listener ซ้ำขณะพัฒนา',
+        'ระบบล้างสถานะอัตโนมัติเมื่อเปลี่ยนไลฟ์ (Session Auto-Clear) — ล้าง warnedNewCustomers และ processingLocks เมื่อเปลี่ยนวิดีโอ',
+        'ลดภาระ Firebase Writes (Debounced Sync) — เพิ่ม debounce 1 วินาทีสำหรับ Delivery Customer Sync Watcher',
+        'ล้างข้อมูลเก่าอย่างหมดจด (Full Cleanup) — Auto Cleanup ลบทุก node ที่เกี่ยวข้อง (stock, settings, voice_chats, shipping) ไม่ใช่แค่ chats',
+        'รวม Constants ไว้ที่เดียว — ย้าย Away Mode Messages เข้ามารวมใน config/constants.js',
+        'ย้าย Pull-to-Refresh ไป Setup Scope — ให้ lifecycle hooks ทำงานถูกต้อง',
+      ],
+      added: [
+        'แจ้งเตือนขยายรายการอัตโนมัติ (Stock Expansion Toast) — แสดง Toast เมื่อรายการถูกขยายจากการจอง',
+        'บันทึกการยกเลิกโดยแอดมิน (Admin Cancel Audit) — Log ว่าแอดมินคนไหนยกเลิกรายการของใคร',
+      ],
+    },
+  },
+  {
     version: '4.36.2',
     date: '2026-06-07',
     changes: {

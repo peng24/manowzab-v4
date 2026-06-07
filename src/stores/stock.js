@@ -21,7 +21,7 @@ export const useStockStore = defineStore("stock", () => {
   const stockData = ref({});
 
   /** @type {import('vue').Ref<number>} Total number of stock items */
-  const stockSize = ref(parseInt(localStorage.getItem('lastStockSize')) || 50);
+  const stockSize = ref(parseInt(localStorage.getItem("lastStockSize")) || 50);
 
   /** @type {import('vue').Ref<Object>} Tracks which percentage milestones have been celebrated */
   const milestones = ref({ fifty: false, eighty: false, hundred: false });
@@ -43,7 +43,7 @@ export const useStockStore = defineStore("stock", () => {
 
     // ✅ Reset milestones when connecting to a new session
     milestones.value = { fifty: false, eighty: false, hundred: false };
-    
+
     const stockRef = dbRef(db, `stock/${videoId}`);
 
     let isInitialLoad = true;
@@ -107,7 +107,7 @@ export const useStockStore = defineStore("stock", () => {
       const val = snapshot.val();
       if (val) {
         stockSize.value = val;
-        localStorage.setItem('lastStockSize', val);
+        localStorage.setItem("lastStockSize", val);
       }
     });
 
@@ -209,9 +209,10 @@ export const useStockStore = defineStore("stock", () => {
         if (!currentData) return null; // Nothing to cancel
 
         // Check if the cancellation is for the owner
-        const isOwner = (!uid && !ownerName) ||
-                        (uid && currentData.uid === uid) ||
-                        (ownerName && currentData.owner === ownerName);
+        const isOwner =
+          (!uid && !ownerName) ||
+          (uid && currentData.uid === uid) ||
+          (ownerName && currentData.owner === ownerName);
 
         if (isOwner) {
           previousOwner = currentData.owner;
@@ -220,9 +221,9 @@ export const useStockStore = defineStore("stock", () => {
             // Promote next in queue
             const next = currentData.queue[0];
             const nextQ = currentData.queue.slice(1);
-            
+
             nextOwner = next.owner;
-            
+
             return {
               ...currentData,
               owner: next.owner,
@@ -253,7 +254,13 @@ export const useStockStore = defineStore("stock", () => {
         }
       });
 
-      return { success: true, previousOwner, nextOwner, cancelledFromQueue, error: null };
+      return {
+        success: true,
+        previousOwner,
+        nextOwner,
+        cancelledFromQueue,
+        error: null,
+      };
     } catch (e) {
       console.error("Cancel failed: ", e);
       return {
@@ -280,9 +287,12 @@ export const useStockStore = defineStore("stock", () => {
       if (isNaN(num)) return;
 
       // 1. Check if owner
-      const isOwner = (uid && item.uid === uid) || (displayName && item.owner === displayName);
+      const isOwner =
+        (uid && item.uid === uid) ||
+        (displayName && item.owner === displayName);
       if (isOwner) {
-        const itemTime = (item.time !== undefined && item.time !== null) ? item.time : -1;
+        const itemTime =
+          item.time !== undefined && item.time !== null ? item.time : -1;
         if (itemTime > maxTime) {
           maxTime = itemTime;
           mostRecentId = num;
@@ -297,9 +307,10 @@ export const useStockStore = defineStore("stock", () => {
       // 2. Check if in queue
       if (item.queue && item.queue.length > 0) {
         item.queue.forEach((q) => {
-          const isQueued = (uid && q.uid === uid) || (displayName && q.owner === displayName);
+          const isQueued =
+            (uid && q.uid === uid) || (displayName && q.owner === displayName);
           if (isQueued) {
-            const qTime = (q.time !== undefined && q.time !== null) ? q.time : -1;
+            const qTime = q.time !== undefined && q.time !== null ? q.time : -1;
             if (qTime > maxTime) {
               maxTime = qTime;
               mostRecentId = num;
@@ -342,9 +353,11 @@ export const useStockStore = defineStore("stock", () => {
   function updateStockSize(newSize) {
     if (!systemStore.currentVideoId) return;
     // 🛡️ Safety cap: prevent absurd stock expansion (e.g. customer types "555555")
-    const MAX_STOCK_SIZE = 999;
+    const MAX_STOCK_SIZE = 300;
     if (newSize > MAX_STOCK_SIZE) {
-      console.warn(`⚠️ Stock size ${newSize} exceeds max (${MAX_STOCK_SIZE}). Clamped.`);
+      console.warn(
+        `⚠️ Stock size ${newSize} exceeds max (${MAX_STOCK_SIZE}). Clamped.`,
+      );
       newSize = MAX_STOCK_SIZE;
     }
     const sizeRef = dbRef(
@@ -352,7 +365,7 @@ export const useStockStore = defineStore("stock", () => {
       `settings/${systemStore.currentVideoId}/stockSize`,
     );
     set(sizeRef, newSize);
-    localStorage.setItem('lastStockSize', newSize);
+    localStorage.setItem("lastStockSize", newSize);
   }
 
   /**

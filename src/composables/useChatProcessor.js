@@ -63,7 +63,7 @@ const cancelKeywordRegex =
 const standalonePassRegex = /^(?:ขอ)?ผ่าน\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|เลย)*$/i;
 
 // 🛡️ Safety: Maximum item ID to prevent absurd stock expansion from spam/typos (e.g. "555555")
-const MAX_ITEM_ID = 100;
+const MAX_ITEM_ID = 300;
 
 // ✅ Thai Numeral → Arabic Digit Converter
 function thaiToArabic(text) {

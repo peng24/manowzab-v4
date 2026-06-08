@@ -14,6 +14,19 @@
 export const changelog = [
   // ─── 4.36.x ───────────────────────────────────────────
   {
+    version: '4.36.4',
+    date: '2026-06-08',
+    changes: {
+      improved: [
+        'ย้าย API Keys ทั้งหมดไปใช้ .env (Security Fix) — Firebase, YouTube Data API (6 keys), Google Cloud TTS (2 keys) ไม่มี hardcode ในซอร์สโค้ดอีกต่อไป',
+        'เปลี่ยน throw Error เป็น console.error เมื่อไม่มี YouTube Keys — ป้องกันแอปแครชเมื่อยังไม่ได้ตั้งค่า .env',
+      ],
+      added: [
+        'อัปเดต .env.example พร้อมคำอธิบายภาษาไทย — ให้ทีมตั้งค่าได้ง่ายขึ้น',
+      ],
+    },
+  },
+  {
     version: '4.36.3',
     date: '2026-06-07',
     changes: {

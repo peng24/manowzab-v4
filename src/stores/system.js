@@ -15,8 +15,8 @@ export const useSystemStore = defineStore("system", () => {
   const isSoundOn = ref(true); // ✅ เปิด/ปิดเสียง
   const isHost = ref(false); // ✅ สถานะเครื่องแม่ข่าย (Host)
 
-  // ✅ Google Cloud TTS API Key - Load from .env only
-  const googleApiKey = ref("REMOVED_GOOGLE_TTS_API_KEY_1,REMOVED_GOOGLE_TTS_API_KEY_2");
+  // ✅ Google Cloud TTS API Key - Load from .env
+  const googleApiKey = ref(import.meta.env.VITE_GOOGLE_API_KEYS || "");
 
   const useOnlineTts = ref(true); // ✅ เปิด/ปิด Online TTS (Google Cloud) - Default ON
   const activeKeyIndex = ref(1); // ✅ Track which API key is currently active

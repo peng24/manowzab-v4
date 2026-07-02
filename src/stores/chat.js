@@ -170,12 +170,13 @@ export const useChatStore = defineStore("chat", () => {
 
   return {
     messages,
+    seenMessageIds, // ✅ Export seenMessageIds to check for duplicate processing
     fullChatLog,
     streamStartTime,
     addMessage,
     clearChat,
     downloadChatCSV,
     syncFromFirebase,
-    sendMessageToFirebase, // ✅ Export new action
+    sendMessageToFirebase,
   };
 });

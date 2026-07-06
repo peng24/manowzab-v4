@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:gh": "vite build --base=/manowzab-v4/",
     "preview": "vite preview",
-    "deploy": "npm run build:gh && gh-pages -d dist"
+    "deploy:gh": "npm run build:gh && gh-pages -d dist",
+    "deploy:vercel": "npm run build && npx vercel --prod",
+    "deploy": "npm run deploy:gh && npm run deploy:vercel"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",

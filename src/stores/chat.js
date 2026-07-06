@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, reactive } from "vue";
 import { ref as dbRef, onChildAdded, off, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
+import { useAudio } from "../composables/useAudio";
 
 export const useChatStore = defineStore("chat", () => {
   const messages = reactive([]); // ✅ เปลี่ยนเป็น reactive
@@ -126,13 +127,30 @@ export const useChatStore = defineStore("chat", () => {
 
     console.log(`🔥 Starting Firebase chat sync for: ${videoId}`);
 
+    const syncStartTime = Date.now();
+
     // Listen for new chat messages
     const listener = onChildAdded(chatRef, (snapshot) => {
       const messageData = snapshot.val();
       if (messageData) {
+        const isNew = !seenMessageIds.value[messageData.id];
+
         // Add message through the existing addMessage function
         // This handles deduplication and logging
         addMessage(messageData);
+
+        // ✅ Play audio for NEW messages in real-time across all connected devices
+        if (isNew && messageData.timestamp >= syncStartTime - 5000) {
+          const { queueAudio } = useAudio();
+          const isVoiceChat = messageData.uid === "voice-chat-uid" || (messageData.uid && messageData.uid.includes("voice-chat"));
+
+          let textToRead = messageData.ttsText !== undefined ? messageData.ttsText : (isVoiceChat ? "" : (messageData.text || ""));
+
+          // Ignore voice chats with no intent
+          if (!(isVoiceChat && !messageData.type)) {
+            queueAudio(messageData.sfxType, messageData.phoneticName, textToRead);
+          }
+        }
       }
     });
 

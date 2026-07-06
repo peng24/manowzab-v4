@@ -139,7 +139,7 @@ export function useChatProcessor() {
       return;
     }
 
-    const msg = item.snippet.displayMessage || "";
+    let msg = item.snippet.displayMessage || "";
     if (!msg) {
       // ถ้าไม่มี displayMessage → ลอง fallback จาก messageRuns (emoji-only etc.)
       const runs = extractMessageRuns(item);
@@ -148,6 +148,7 @@ export function useChatProcessor() {
         .join("")
         .trim();
       if (!fallbackText) return; // ไม่มีข้อความจริงๆ → ข้าม
+      msg = fallbackText;
     }
 
     // ✅ Normalize Thai numerals → Arabic digits for regex matching
@@ -236,7 +237,7 @@ export function useChatProcessor() {
           const newSize = Math.ceil(maxId / 10) * 10;
           await stockStore.updateStockSize(newSize);
           logger.log(`📦 Auto-expanded stock to ${newSize} for multi-buy`);
-          Toast.fire({ icon: "info", title: `📦 ขยายรายการเป็น ${newSize} อัตโนมัติ` });
+          Toast.fire({ icon: "info", title: `📦 ขยายรายการเป็น ${newSize} อัตโนมัติ`, toast: true });
         }
         // Determine owner name and UID
         let ownerName = displayName;
@@ -276,10 +277,10 @@ export function useChatProcessor() {
           }
         }
 
-        // ✅ Show Success Toast
         Toast.fire({
           icon: "success",
           title: `✅ ตัดรหัส ${itemIds.join(", ")} ให้ ${ownerName} แล้ว`,
+          toast: true,
         });
 
         // ✅ Push message to Firebase (Listener will update UI)
@@ -296,18 +297,13 @@ export function useChatProcessor() {
           color: stringToColor(uid),
           isAdmin,
           type: "buy",
+          sfxType: "success",
+          ttsText: isVoiceChat
+            ? ""
+            : `${ttsMessage} ... ทั้งหมด ${itemIds.length} รายการ`,
           detectionMethod: "multi-buy",
           timestamp: new Date(item.snippet.publishedAt).getTime(),
         });
-
-        // ✅ Queue SFX + TTS (non-blocking)
-        queueAudio(
-          "success",
-          phoneticName,
-          isVoiceChat
-            ? ""
-            : `${ttsMessage} ... ทั้งหมด ${itemIds.length} รายการ`,
-        );
 
         // Exit early - don't process further
         return;
@@ -511,6 +507,7 @@ export function useChatProcessor() {
         Toast.fire({
           icon: "success",
           title: `📦 เพิ่มรอบส่งให้ ${autoShipName} แล้ว`,
+          toast: true,
         });
       }
       // --- END AUTO SHIP LOGIC ---
@@ -597,23 +594,7 @@ export function useChatProcessor() {
       return;
     }
 
-    // 4. ✅ Push message to Firebase (Listener will update UI)
-    chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
-      id: item.id,
-      text: msg,
-      messageRuns: extractMessageRuns(item),
-      authorName: realName,
-      displayName,
-      phoneticName,
-      realName: realName,
-      uid: uid,
-      avatar,
-      color: stringToColor(uid),
-      isAdmin,
-      type: intent,
-      detectionMethod: method,
-      timestamp: new Date(item.snippet.publishedAt).getTime(),
-    });
+
 
     // 5. Process Order & Audio Logic (Updated with SFX)
     if (intent === "buy" && targetId > 0) {
@@ -622,7 +603,7 @@ export function useChatProcessor() {
         const newSize = Math.ceil(targetId / 10) * 10;
         await stockStore.updateStockSize(newSize);
         logger.log(`📦 Auto-expanded stock to ${newSize} for item ${targetId}`);
-        Toast.fire({ icon: "info", title: `📦 ขยายรายการเป็น ${newSize} อัตโนมัติ` });
+        Toast.fire({ icon: "info", title: `📦 ขยายรายการเป็น ${newSize} อัตโนมัติ`, toast: true });
       }
 
       // --- Buy Logic ---
@@ -655,13 +636,37 @@ export function useChatProcessor() {
         }
       }
 
+      const pushBuyMessage = (finalSfxType) => {
+        return chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+          id: item.id,
+          text: msg,
+          messageRuns: extractMessageRuns(item),
+          authorName: realName,
+          displayName,
+          phoneticName,
+          realName: realName,
+          uid: uid,
+          avatar,
+          color: stringToColor(uid),
+          isAdmin,
+          type: intent,
+          sfxType: finalSfxType,
+          ttsText: isVoiceChat ? "" : ttsMessage,
+          detectionMethod: method,
+          timestamp: new Date(item.snippet.publishedAt).getTime(),
+        });
+      };
+
+      let sfxType = "error";
+      let lockAcquired = false;
       try {
         if (processingLocks.has(targetId)) {
-          // ✅ ยังอ่านข้อความแม้ item กำลังถูกประมวลผล (เพิ่มเสียง error ให้รู้ว่าชนกัน)
-          queueAudio("error", phoneticName, isVoiceChat ? "" : ttsMessage);
+          sfxType = "error";
+          await pushBuyMessage(sfxType);
           return;
         }
         processingLocks.add(targetId);
+        lockAcquired = true;
 
         // ✅ Try to process order (auto-queues if item is taken)
         const result = await stockStore.processOrder(
@@ -673,18 +678,20 @@ export function useChatProcessor() {
           method,
         );
 
-        // ✅ ยังอ่านข้อความแม้ซื้อซ้ำ/อยู่ในคิวแล้ว (เพิ่มเสียง error ให้รู้ว่าไม่อ่านข้าม)
+        // ✅ ยังอ่านข้อความแม้ซื้อซ้ำ/อยู่ในคิวแล้ว
         if (
           result.action === "already_owned" ||
           result.action === "already_queued"
         ) {
-          queueAudio("error", phoneticName, isVoiceChat ? "" : ttsMessage);
+          sfxType = "error";
+          await pushBuyMessage(sfxType);
           return;
         }
 
         if (!result.success) {
           logger.warn("Order failed:", result.error);
-          queueAudio("error", phoneticName, isVoiceChat ? "" : ttsMessage);
+          sfxType = "error";
+          await pushBuyMessage(sfxType);
           return;
         }
 
@@ -692,12 +699,15 @@ export function useChatProcessor() {
         Toast.fire({
           icon: "success",
           title: `✅ ตัดรหัส ${targetId} ให้ ${ownerName} แล้ว`,
+          toast: true,
         });
 
-        // ✅ Queue SUCCESS SFX + TTS (non-blocking)
-        queueAudio("success", phoneticName, isVoiceChat ? "" : ttsMessage);
+        sfxType = "success";
+        await pushBuyMessage(sfxType);
       } finally {
-        processingLocks.delete(targetId);
+        if (lockAcquired) {
+          processingLocks.delete(targetId);
+        }
       }
     } else if (intent === "cancel") {
       // --- Cancel Logic ---
@@ -744,17 +754,31 @@ export function useChatProcessor() {
             Toast.fire({
               icon: "warning",
               title: `❌ ยกเลิกรหัส ${targetId}${isAutoResolved ? " (ล่าสุด)" : ""} ของ ${cancelledName} แล้ว`,
+              toast: true,
             });
           }
         }
       }
 
-      // ✅ Play correct sound based on cancel success (Requirement #2)
-      if (cancelSuccess) {
-        queueAudio("cancel", phoneticName, isVoiceChat ? "" : ttsMessage);
-      } else {
-        queueAudio(null, phoneticName, isVoiceChat ? "" : ttsMessage);
-      }
+      const sfxType = cancelSuccess ? "cancel" : null;
+      await chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+        id: item.id,
+        text: msg,
+        messageRuns: extractMessageRuns(item),
+        authorName: realName,
+        displayName,
+        phoneticName,
+        realName: realName,
+        uid: uid,
+        avatar,
+        color: stringToColor(uid),
+        isAdmin,
+        type: intent,
+        sfxType,
+        ttsText: isVoiceChat ? "" : ttsMessage,
+        detectionMethod: method,
+        timestamp: new Date(item.snippet.publishedAt).getTime(),
+      });
     } else {
       // --- Other Intents / General Chat ---
       if (intent === "shipping") {
@@ -779,12 +803,26 @@ export function useChatProcessor() {
             type: "user",
           });
         }
-
-        queueAudio(null, phoneticName, isVoiceChat ? "" : ttsMessage);
-      } else {
-        // Read EVERYTHING else
-        queueAudio(null, phoneticName, isVoiceChat ? "" : ttsMessage);
       }
+
+      await chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+        id: item.id,
+        text: msg,
+        messageRuns: extractMessageRuns(item),
+        authorName: realName,
+        displayName,
+        phoneticName,
+        realName: realName,
+        uid: uid,
+        avatar,
+        color: stringToColor(uid),
+        isAdmin,
+        type: intent,
+        sfxType: null,
+        ttsText: isVoiceChat ? "" : ttsMessage,
+        detectionMethod: method,
+        timestamp: new Date(item.snippet.publishedAt).getTime(),
+      });
     }
   }
 

@@ -12,7 +12,8 @@ Swal.fire = function (...args) {
     opts = { title: args[0], html: args[1], icon: args[2] };
     args = [opts];
   }
-  if (opts && typeof opts === "object" && !opts.toast) {
+  const isToast = opts && (opts.toast || (this && this.defaultParams && this.defaultParams.toast));
+  if (opts && typeof opts === "object" && !isToast) {
     if (opts.showCloseButton === undefined) opts.showCloseButton = true;
     if (opts.allowOutsideClick === undefined) opts.allowOutsideClick = true;
   }

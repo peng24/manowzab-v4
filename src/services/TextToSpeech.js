@@ -476,7 +476,14 @@ export class TextToSpeech {
    * @returns {Promise<void>}
    */
   speak(author, message) {
-    const sanitized = this.sanitize(message);
+    let sanitized = this.sanitize(message);
+
+    // ✅ If message had content but got sanitized to empty (e.g. emoji-only),
+    // read it as "ส่งสติกเกอร์" (sent sticker) so it's not silent.
+    if (!sanitized && message && message.trim().length > 0) {
+      sanitized = "ส่งสติกเกอร์";
+    }
+
     if (!sanitized) return Promise.resolve();
 
     // Combine author and message

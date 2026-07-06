@@ -82,8 +82,6 @@ export default defineConfig({
     }),
   ],
 
-  base: "/manowzab-v4/",
-
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

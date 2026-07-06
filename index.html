@@ -2,6 +2,16 @@
 <html lang="th">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Force unregister service worker once to clear the PWA caching loop
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+    </script>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="mask-icon" href="/masked-icon.svg" color="#3b82f6" />

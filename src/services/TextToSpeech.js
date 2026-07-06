@@ -12,7 +12,7 @@ export class TextToSpeech {
     this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     this.currentSource = null; // ✅ Track active AudioBufferSource
     this.stuckTimer = null; // ✅ Safety timer to detect stuck state
-    this.STUCK_TIMEOUT = 15000; // ✅ 15 seconds max per utterance
+    this.STUCK_TIMEOUT = 30000; // ✅ 30 seconds max per utterance
     this.consecutiveGoogleFailures = 0; // ✅ Track consecutive Google TTS failures
     this.MAX_CONSECUTIVE_FAILURES = 5; // ✅ Switch to Native permanently after N failures
     this.googleDisabledPermanently = false; // ✅ Flag for permanent Native mode
@@ -58,7 +58,10 @@ export class TextToSpeech {
     try {
       if (this.audioCtx.state === "suspended") {
         console.log("🔄 AudioContext suspended — attempting auto-resume...");
-        await this.audioCtx.resume();
+        await Promise.race([
+          this.audioCtx.resume(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Resume timeout")), 2000))
+        ]);
         console.log("✅ AudioContext resumed successfully");
       }
       return this.audioCtx.state === "running";
@@ -181,9 +184,9 @@ export class TextToSpeech {
       try {
         console.log(`🔑 Trying key ${i + 1}/${keys.length}...`);
 
-        // Create AbortController with 2-second timeout (fast fallback)
+        // Create AbortController with 5-second timeout (allow slow internet/large text)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         // Call Google Cloud TTS API
         const response = await fetch(
@@ -396,6 +399,18 @@ export class TextToSpeech {
         console.warn(
           `⚠️ TTS stuck for ${this.STUCK_TIMEOUT / 1000}s — auto-resetting queue`,
         );
+
+        // ✅ Actually stop the current playback to prevent overlap!
+        if (this.currentSource) {
+          try {
+            this.currentSource.onended = null;
+            this.currentSource.stop();
+            this.currentSource.disconnect();
+          } catch(e) {}
+          this.currentSource = null;
+        }
+        window.speechSynthesis.cancel();
+
         // ✅ Resolve pending Promise before moving on (prevents outer queue deadlock)
         if (this._currentOnComplete) {
           this._currentOnComplete();
@@ -474,8 +489,8 @@ export class TextToSpeech {
       // Process queue
       this.processQueue();
 
-      // Fallback timeout: ensure the Promise always resolves (max 20s)
-      setTimeout(() => resolve(), 20000);
+      // Fallback timeout: ensure the Promise always resolves (max 35s)
+      setTimeout(() => resolve(), 35000);
     });
   }
 

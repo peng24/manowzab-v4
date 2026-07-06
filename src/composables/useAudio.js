@@ -29,7 +29,10 @@ export function useAudio() {
         }
 
         if (audioCtx && audioCtx.state === "suspended") {
-          await audioCtx.resume();
+          await Promise.race([
+            audioCtx.resume(),
+            new Promise((resolve) => setTimeout(resolve, 2000))
+          ]).catch(() => console.warn("SFX AudioContext resume timeout"));
         }
         if (!audioCtx) {
           return;
@@ -136,7 +139,7 @@ export function useAudio() {
 
   // ✅ Unified Audio Queue Processor (SFX → TTS, sequential)
   // ✅ Fixed: Safety timeout + finally block to prevent deadlock on iPad
-  const QUEUE_SAFETY_TIMEOUT = 20000; // 20s max per item
+  const QUEUE_SAFETY_TIMEOUT = 35000; // 35s max per item
 
   async function processAudioQueue() {
     if (isAudioProcessing || audioQueue.length === 0) return;

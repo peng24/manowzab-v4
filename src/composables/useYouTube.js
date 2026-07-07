@@ -5,6 +5,7 @@ import { db } from "./useFirebase";
 import { YouTubeLiveChat } from "../services/YouTubeLiveChat";
 import { useAudio } from "./useAudio";
 import { CONSTANTS } from "../config/constants";
+import { logger } from "../utils/logger";
 
 const rawKeys = import.meta.env.VITE_YOUTUBE_API_KEYS || "";
 const API_KEYS = rawKeys
@@ -13,7 +14,7 @@ const API_KEYS = rawKeys
   .filter((k) => k);
 
 if (API_KEYS.length === 0) {
-  console.error("⚠️ Missing VITE_YOUTUBE_API_KEYS in .env — YouTube features disabled");
+  logger.error("Missing VITE_YOUTUBE_API_KEYS in .env — YouTube features disabled");
 }
 
 // ✅ Round-Robin: โหลด key index ล่าสุดจาก localStorage แล้วเริ่มจาก key ถัดไป
@@ -22,8 +23,8 @@ function getNextKeyIndex() {
   const lastIndex = parseInt(localStorage.getItem(STORAGE_KEY) || "0");
   const nextIndex = (lastIndex + 1) % API_KEYS.length;
   localStorage.setItem(STORAGE_KEY, String(nextIndex));
-  console.log(
-    `🔑 Round-Robin: เริ่มจาก Key #${nextIndex + 1}/${API_KEYS.length} (ครั้งก่อนใช้ #${lastIndex + 1})`,
+  logger.auth(
+    `Round-Robin: เริ่มจาก Key #${nextIndex + 1}/${API_KEYS.length} (ครั้งก่อนใช้ #${lastIndex + 1})`,
   );
   return nextIndex;
 }
@@ -115,8 +116,8 @@ export function useYouTube() {
    */
   async function connectVideo(videoId) {
     try {
-      console.log("🔌 Connecting to video:", videoId);
-      console.log("🚀 Direct Mode: Fetching YouTube API...");
+      logger.youtube("Connecting to video:", videoId);
+      logger.youtube("Direct Mode: Fetching YouTube API...");
 
       const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${videoId}`;
       const data = await smartFetch(url);
@@ -127,22 +128,22 @@ export function useYouTube() {
 
       const item = data.items[0];
       systemStore.liveTitle = item.snippet.title;
-      console.log("✅ Video title:", item.snippet.title);
+      logger.youtube("Video title:", item.snippet.title);
 
       // Save History to Firebase
       if (videoId && videoId !== "demo") {
         set(dbRef(db, `history/${videoId}`), {
           title: item.snippet.title,
           timestamp: Date.now(),
-        }).catch((error) => console.error("Error saving history:", error));
+        }).catch((error) => logger.error("Error saving history:", error));
 
         // Save active video title and finished status to Firebase system node
         set(dbRef(db, "system/activeVideoTitle"), item.snippet.title).catch(
-          (err) => console.error("Error setting activeVideoTitle:", err),
+          (err) => logger.error("Error setting activeVideoTitle:", err),
         );
         const isEnded = !!item.liveStreamingDetails?.actualEndTime;
         set(dbRef(db, "system/isLiveFinished"), isEnded).catch(
-          (err) => console.error("Error setting isLiveFinished:", err),
+          (err) => logger.error("Error setting isLiveFinished:", err),
         );
       }
 
@@ -161,7 +162,7 @@ export function useYouTube() {
       // Check for Live Chat ID
       if (item.liveStreamingDetails?.activeLiveChatId) {
         activeChatId.value = item.liveStreamingDetails.activeLiveChatId;
-        console.log("✅ Live Chat ID:", activeChatId.value);
+        logger.youtube("Live Chat ID:", activeChatId.value);
 
         // Dynamic parameters for Message Processor
         const { useChatProcessor } = await import("./useChatProcessor");
@@ -176,10 +177,7 @@ export function useYouTube() {
         chatService.liveChatId = activeChatId.value;
         chatService.startPolling(videoId, async (msg) => {
           // ✅ DEBUG: Log complete message structure from YouTube API
-          console.log(
-            "🔍🔍🔍 RAW YouTube API Message:",
-            JSON.stringify(msg, null, 2),
-          );
+          logger.debug("RAW YouTube API Message:", msg);
           if (processMessageFunc) await processMessageFunc(msg);
         });
 
@@ -199,11 +197,11 @@ export function useYouTube() {
 
         return true;
       } else {
-        console.warn("⚠️ No active live chat found");
+        logger.warn("No active live chat found");
         return false;
       }
     } catch (e) {
-      console.error("❌ Connect video error:", e);
+      logger.error("Connect video error:", e);
       systemStore.statusApi = "err";
       return false;
     }
@@ -226,11 +224,11 @@ export function useYouTube() {
 
         // Check if Stream Ended
         if (details.actualEndTime) {
-          console.log("🏁 Stream Finished:", details.actualEndTime);
+          logger.youtube("Stream Finished:", details.actualEndTime);
 
           // Update Firebase status
           set(dbRef(db, "system/isLiveFinished"), true).catch(
-            (err) => console.error("Error setting isLiveFinished on stream end:", err),
+            (err) => logger.error("Error setting isLiveFinished on stream end:", err),
           );
 
           if (viewerIntervalId.value) {
@@ -240,7 +238,7 @@ export function useYouTube() {
             queueAudio(null, "", "ไลฟ์จบแล้ว");
 
             const delaySec = CONSTANTS.YOUTUBE.DISCONNECT_DELAY_MS / 1000;
-            console.log(`⏳ Disconnecting in ${delaySec} seconds...`);
+            logger.youtube(`Disconnecting in ${delaySec} seconds...`);
             setTimeout(() => {
               if (systemStore.isConnected) {
                 queueAudio(null, "", "กำลังตัดการเชื่อมต่อครับ");
@@ -251,7 +249,7 @@ export function useYouTube() {
         }
       }
     } catch (e) {
-      console.error("❌ Viewer Count Error:", e);
+      logger.error("Viewer Count Error:", e);
     }
   }
 
@@ -259,7 +257,7 @@ export function useYouTube() {
    * Disconnects from YouTube, stops polling, and resets state.
    */
   function disconnect() {
-    console.log("🔌 Disconnecting...");
+    logger.youtube("Disconnecting...");
     systemStore.isConnected = false;
 
     chatService.stopPolling();
@@ -270,7 +268,7 @@ export function useYouTube() {
     }
 
     if (unsubVoiceListener) {
-      console.log("🎙️ Cleaning up voice listener...");
+      logger.youtube("Cleaning up voice listener...");
       unsubVoiceListener();
       unsubVoiceListener = null;
     }

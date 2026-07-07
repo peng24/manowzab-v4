@@ -3,6 +3,7 @@ import { ref, reactive } from "vue";
 import { ref as dbRef, onChildAdded, off, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useAudio } from "../composables/useAudio";
+import { logger } from "../utils/logger";
 
 export const useChatStore = defineStore("chat", () => {
   const messages = reactive([]); // ✅ เปลี่ยนเป็น reactive
@@ -16,14 +17,15 @@ export const useChatStore = defineStore("chat", () => {
 
   function addMessage(message) {
     if (seenMessageIds.value[message.id]) {
-      console.log("⚠️ Duplicate message:", message.id);
+      logger.warn("Duplicate message:", message.id);
       return;
     }
 
     seenMessageIds.value[message.id] = true;
     messages.push(message); // ✅ Push เข้า reactive array
 
-    console.log("✅ Message added, total:", messages.length);
+    const textSnippet = message.text ? (message.text.length > 30 ? message.text.substring(0, 30) + "..." : message.text) : "(empty)";
+    logger.chat(`Message added from ${message.authorName || "System"}: "${textSnippet}" (Total: ${messages.length})`);
 
     // Log for CSV
     fullChatLog.value.push({
@@ -63,7 +65,7 @@ export const useChatStore = defineStore("chat", () => {
     seenMessageIds.value = {}; // Clear deduplication cache
     fullChatLog.value = []; // ✅ Clear CSV Log
     streamStartTime.value = null; // ✅ Reset Timer
-    console.log("🗑️ Chat & Logs cleared completely");
+    logger.chat("Chat & Logs cleared completely");
   }
 
   function downloadChatCSV(videoId) {
@@ -102,13 +104,13 @@ export const useChatStore = defineStore("chat", () => {
    */
   function syncFromFirebase(videoId) {
     if (!videoId) {
-      console.warn("⚠️ No videoId provided for chat sync");
+      logger.warn("No videoId provided for chat sync");
       return;
     }
 
     // Clean up previous listener first
     if (currentChatListener) {
-      console.log(`🧹 Cleaning up old chat listener for ${currentVideoId}`);
+      logger.firebase(`Cleaning up old chat listener for ${currentVideoId}`);
       const oldRef = dbRef(db, `chats/${currentVideoId}`);
       off(oldRef, "child_added", currentChatListener);
       currentChatListener = null;
@@ -116,8 +118,8 @@ export const useChatStore = defineStore("chat", () => {
 
     // ✅ Auto-Clear if switching to a new video
     if (currentVideoId && currentVideoId !== videoId) {
-      console.log(
-        `🔄 Switching video from ${currentVideoId} to ${videoId}. Clearing chat...`,
+      logger.firebase(
+        `Switching video from ${currentVideoId} to ${videoId}. Clearing chat...`,
       );
       clearChat();
     }
@@ -125,7 +127,7 @@ export const useChatStore = defineStore("chat", () => {
     currentVideoId = videoId;
     const chatRef = dbRef(db, `chats/${videoId}`);
 
-    console.log(`🔥 Starting Firebase chat sync for: ${videoId}`);
+    logger.firebase(`Starting Firebase chat sync for: ${videoId}`);
 
     const syncStartTime = Date.now();
 
@@ -159,7 +161,7 @@ export const useChatStore = defineStore("chat", () => {
 
     // Return cleanup function
     return () => {
-      console.log(`🧹 Cleaning up chat listener for ${videoId}`);
+      logger.firebase(`Cleaning up chat listener for ${videoId}`);
       off(chatRef, "child_added", listener);
       currentChatListener = null;
     };
@@ -173,7 +175,7 @@ export const useChatStore = defineStore("chat", () => {
    */
   async function sendMessageToFirebase(videoId, messageData) {
     if (!videoId) {
-      console.warn("⚠️ Cannot send message: No videoId provided");
+      logger.warn("Cannot send message: No videoId provided");
       return;
     }
 
@@ -181,7 +183,7 @@ export const useChatStore = defineStore("chat", () => {
       const chatRef = dbRef(db, `chats/${videoId}`);
       await push(chatRef, messageData);
     } catch (error) {
-      console.error("❌ Error sending message to Firebase:", error);
+      logger.error("Error sending message to Firebase:", error);
       throw error;
     }
   }

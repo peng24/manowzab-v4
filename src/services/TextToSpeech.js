@@ -1,4 +1,5 @@
 import { useSystemStore } from "../stores/system";
+import { logger } from "../utils/logger";
 
 // ✅ Global Storage to Prevent Garbage Collection
 window.ttsActiveUtterances = [];
@@ -47,7 +48,7 @@ export class TextToSpeech {
       this.poller = null;
     }
 
-    console.log("🔍 Loaded " + this.voices.length + " voices.");
+    logger.tts("Loaded " + this.voices.length + " voices.");
   }
 
   /**
@@ -57,16 +58,16 @@ export class TextToSpeech {
   async ensureAudioContextReady() {
     try {
       if (this.audioCtx.state === "suspended") {
-        console.log("🔄 AudioContext suspended — attempting auto-resume...");
+        logger.tts("AudioContext suspended — attempting auto-resume...");
         await Promise.race([
           this.audioCtx.resume(),
           new Promise((_, reject) => setTimeout(() => reject(new Error("Resume timeout")), 2000))
         ]);
-        console.log("✅ AudioContext resumed successfully");
+        logger.tts("AudioContext resumed successfully");
       }
       return this.audioCtx.state === "running";
     } catch (e) {
-      console.warn("⚠️ AudioContext auto-resume failed:", e);
+      logger.warn("AudioContext auto-resume failed:", e);
       return false;
     }
   }
@@ -164,7 +165,7 @@ export class TextToSpeech {
 
     // Check if any keys exist
     if (keys.length === 0) {
-      console.warn("⚠️ No Google API Keys found, falling back to Native TTS");
+      logger.warn("No Google API Keys found, falling back to Native TTS");
       this.speakNative(text);
       return;
     }
@@ -173,8 +174,8 @@ export class TextToSpeech {
     const sanitized = this.sanitize(text);
     const safeText = sanitized.substring(0, 500); // Limit for API (Aligned with sanitize)
 
-    console.log(
-      `☁️ Google Cloud TTS: ${safeText.substring(0, 50)}... (${keys.length} keys available)`,
+    logger.tts(
+      `Google Cloud TTS: ${safeText.substring(0, 50)}... (${keys.length} keys available)`,
     );
 
     // Rotate keys sequentially, starting from the machine's assigned activeKeyIndex
@@ -185,7 +186,7 @@ export class TextToSpeech {
       const currentKey = keys[i];
 
       try {
-        console.log(`🔑 Trying key ${i + 1}/${keys.length}...`);
+        logger.tts(`Trying key ${i + 1}/${keys.length}...`);
 
         // Create AbortController with 5-second timeout (allow slow internet/large text)
         const controller = new AbortController();
@@ -236,7 +237,7 @@ export class TextToSpeech {
         // ✅ Ensure AudioContext is running (auto-resume for iPad idle)
         const isReady = await this.ensureAudioContextReady();
         if (!isReady) {
-          console.warn("⚠️ AudioContext not running after resume — falling back to Native");
+          logger.warn("AudioContext not running after resume — falling back to Native");
           this.consecutiveGoogleFailures++;
           this.speakNative(text);
           return;
@@ -275,10 +276,10 @@ export class TextToSpeech {
 
           // ✅ Reset failure counter on success
           this.consecutiveGoogleFailures = 0;
-          console.log(`✅ Google TTS success with key ${i + 1}`);
+          logger.success(`Google TTS success with key ${i + 1}`);
           return; // Success! Exit the function
         } catch (decodeErr) {
-          console.error("❌ Audio decode error:", decodeErr);
+          logger.error("Audio decode error:", decodeErr);
           this.clearStuckTimer();
           this.isSpeaking = false;
           this.speakNative(text);
@@ -289,8 +290,8 @@ export class TextToSpeech {
         // 🚨 CASE 1: Timeout (Internet Lag / iPad idle)
         if (error.name === "AbortError") {
           this.consecutiveGoogleFailures++;
-          console.warn(
-            `⏳ Key ${i + 1} timed out (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} fails). Fallback to Native.`,
+          logger.warn(
+            `Key ${i + 1} timed out (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} fails). Fallback to Native.`,
           );
           this._checkPermanentSwitch();
           this.speakNative(text);
@@ -298,14 +299,14 @@ export class TextToSpeech {
         }
 
         // 🚨 CASE 2: API Error (403 Quota / 500)
-        console.warn(`⚠️ Key ${i + 1} failed: ${error.message}`);
+        logger.warn(`Key ${i + 1} failed: ${error.message}`);
 
         // ✅ Fixed: Use count (loop iteration) instead of i (rotated index)
         // When startIndex ≠ 0, i won't equal keys.length-1 on last iteration
         if (count === keys.length - 1) {
           this.consecutiveGoogleFailures++;
-          console.error(
-            `❌ All Google Keys failed (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} consecutive fails).`,
+          logger.error(
+            `All Google Keys failed (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} consecutive fails).`,
           );
           this._checkPermanentSwitch();
           this.speakNative(text);
@@ -330,9 +331,8 @@ export class TextToSpeech {
         utterance.voice = voice;
       }
 
-      console.log(
-        "🎙️ Native TTS:",
-        text.substring(0, 50) + (text.length > 50 ? "..." : ""),
+      logger.tts(
+        `Native TTS: ${text.substring(0, 50) + (text.length > 50 ? "..." : "")}`,
       );
 
       // Push to global array to prevent garbage collection
@@ -363,7 +363,7 @@ export class TextToSpeech {
       utterance.onerror = (e) => {
         // Ignore "interrupted" error to reduce console noise during mode switching
         if (e.error === "interrupted") return;
-        console.error("❌ Native TTS Error:", e);
+        logger.error("Native TTS Error:", e);
         cleanupAndAdvance();
       };
 
@@ -371,7 +371,7 @@ export class TextToSpeech {
       window.speechSynthesis.speak(utterance);
     } catch (e) {
       // ✅ Catch-all: ensure queue never stalls on unexpected errors
-      console.error("❌ Native TTS setup failed:", e);
+      logger.error("Native TTS setup failed:", e);
       this.clearStuckTimer();
       if (this._currentOnComplete) {
         this._currentOnComplete();
@@ -399,8 +399,8 @@ export class TextToSpeech {
     this.clearStuckTimer();
     this.stuckTimer = setTimeout(() => {
       if (this.isSpeaking) {
-        console.warn(
-          `⚠️ TTS stuck for ${this.STUCK_TIMEOUT / 1000}s — auto-resetting queue`,
+        logger.warn(
+          `TTS stuck for ${this.STUCK_TIMEOUT / 1000}s — auto-resetting queue`,
         );
 
         // ✅ Actually stop the current playback to prevent overlap!
@@ -434,8 +434,8 @@ export class TextToSpeech {
       !this.googleDisabledPermanently
     ) {
       this.googleDisabledPermanently = true;
-      console.error(
-        `🔴 Google TTS failed ${this.consecutiveGoogleFailures} times consecutively — switching to Native TTS permanently for this session.`,
+      logger.error(
+        `Google TTS failed ${this.consecutiveGoogleFailures} times consecutively — switching to Native TTS permanently for this session.`,
       );
     }
   }
@@ -538,7 +538,7 @@ export class TextToSpeech {
     this.isSpeaking = false;
     window.ttsActiveUtterances = []; // Clear native utterances ref
 
-    console.log("🔄 TTS Reset (Clean)");
+    logger.tts("TTS Reset (Clean)");
   }
 }
 

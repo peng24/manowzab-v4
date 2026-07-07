@@ -4,6 +4,7 @@ import { db } from "./useFirebase";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "./useAudio";
 import { AWAY_START_MESSAGES, AWAY_END_MESSAGES } from "../constants";
+import { logger } from "../utils/logger";
 
 export function useAwayMode() {
     const systemStore = useSystemStore();
@@ -47,10 +48,10 @@ export function useAwayMode() {
             closedAt: Date.now(),
         })
             .then(() => {
-                console.log("✅ Away mode closed by user");
+                logger.away("Away mode closed by user");
             })
             .catch((err) => {
-                console.error("Error closing away mode:", err);
+                logger.error("Error closing away mode:", err);
             });
     }
 
@@ -62,7 +63,7 @@ export function useAwayMode() {
             const newState = val?.isAway || false;
             const prevState = systemStore.isAway;
 
-            console.log("🌙 Away mode changed:", { newState, prevState, data: val });
+            logger.away("Away mode changed:", { newState, prevState, data: val });
 
             if (newState && !prevState) {
                 systemStore.isAway = true;

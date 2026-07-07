@@ -1,3 +1,5 @@
+import { logger } from "../utils/logger";
+
 export class YouTubeLiveChat {
   constructor(apiKeys, initialKeyIndex = 0) {
     this.apiKeys = Array.isArray(apiKeys) ? apiKeys : [apiKeys];
@@ -36,7 +38,7 @@ export class YouTubeLiveChat {
   rotateKey() {
     const prevIndex = this.currentKeyIndex;
     this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
-    console.warn(`🔑 Rotating API Key: #${prevIndex + 1} → #${this.currentKeyIndex + 1} (of ${this.apiKeys.length})`);
+    logger.auth(`Rotating API Key: #${prevIndex + 1} → #${this.currentKeyIndex + 1} (of ${this.apiKeys.length})`);
 
     // ✅ Notify external listener to sync key index
     if (this.onKeyRotate) this.onKeyRotate(this.currentKeyIndex);
@@ -96,7 +98,7 @@ export class YouTubeLiveChat {
       this.onMessage = callback;
       this.loadChat();
     } catch (error) {
-      console.error("Failed to start polling:", error);
+      logger.error("Failed to start polling:", error);
       if (this.onError) this.onError(error);
       if (this.onStatusChange) this.onStatusChange("err");
     }
@@ -133,7 +135,7 @@ export class YouTubeLiveChat {
       const data = await response.json();
 
       if (data.error) {
-        console.error(
+        logger.error(
           "API Error during poll:",
           data.error.message,
           "Code:",
@@ -152,16 +154,15 @@ export class YouTubeLiveChat {
           this.loadChat(_rotationAttempts + 1);
           return;
         } else if (!shouldRotate) {
-          console.warn(
-            `⚠️ API Error ${errorCode}: Retrying without rotation...`,
+          logger.warn(
+            `API Error ${errorCode}: Retrying without rotation...`,
           );
         }
 
-        // ✅ Exponential backoff with retry limit
         this.retryCount++;
         if (this.retryCount > this.maxRetries) {
-          console.error(
-            `❌ Max retries (${this.maxRetries}) exceeded. Stopping polling.`,
+          logger.error(
+            `Max retries (${this.maxRetries}) exceeded. Polling stopped.`,
           );
           if (this.onError)
             this.onError(
@@ -177,8 +178,8 @@ export class YouTubeLiveChat {
           this.baseRetryDelay * Math.pow(2, this.retryCount - 1),
           this.maxRetryDelay,
         );
-        console.warn(
-          `⏳ Retry ${this.retryCount}/${this.maxRetries} in ${(backoffDelay / 1000).toFixed(0)}s...`,
+        logger.warn(
+          `Retry ${this.retryCount}/${this.maxRetries} in ${(backoffDelay / 1000).toFixed(0)}s...`,
         );
         this.timeoutId = setTimeout(() => this.loadChat(), backoffDelay);
         return;
@@ -186,7 +187,7 @@ export class YouTubeLiveChat {
 
       // ✅ Success — reset retry count and notify recovery
       if (this.retryCount > 0 || this.wasInErrorState) {
-        console.log(`✅ Polling recovered after ${this.retryCount} retries`);
+        logger.success(`Polling recovered after ${this.retryCount} retries`);
         if (this.onRecovery) this.onRecovery(this.retryCount);
       }
       this.retryCount = 0;
@@ -234,14 +235,14 @@ export class YouTubeLiveChat {
               try {
                 await this.onMessage(item);
               } catch (e) {
-                console.error("❌ Message processing error:", e);
+                logger.error("Message processing error:", e);
               }
             }
           }
         }
       }
     } catch (error) {
-      console.error("Network error fetching chat:", error);
+      logger.error("Network error fetching chat:", error);
       if (this.onError) this.onError(error);
       if (this.onStatusChange) this.onStatusChange("err");
       this.wasInErrorState = true;
@@ -249,8 +250,8 @@ export class YouTubeLiveChat {
       // ✅ Exponential backoff on network errors too
       this.retryCount++;
       if (this.retryCount > this.maxRetries) {
-        console.error(
-          `❌ Max retries (${this.maxRetries}) exceeded. Stopping polling.`,
+        logger.error(
+          `Max retries (${this.maxRetries}) exceeded. Stopping polling.`,
         );
         this.stopPolling();
         return;

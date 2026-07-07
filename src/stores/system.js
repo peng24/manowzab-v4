@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { ref as dbRef, onValue, get, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import pkg from "../../package.json";
+import { logger } from "../utils/logger";
 
 export const useSystemStore = defineStore("system", () => {
   // State
@@ -58,7 +59,7 @@ export const useSystemStore = defineStore("system", () => {
       if (currentHostId && currentHostId !== myDeviceId.value && isHost.value) {
         isHost.value = false;
         // แจ้งเตือน (Optional)
-        console.log("⚠️ Host role taken by another device:", currentHostId);
+        logger.warn("Host role taken by another device:", currentHostId);
       }
 
       // ถ้าเราเป็น Host อยู่แล้ว และค่าใน DB ตรงกัน -> ก็ OK (Keep Alive)
@@ -101,13 +102,13 @@ export const useSystemStore = defineStore("system", () => {
 
       if (activeKeyIndex.value !== selectedKey) {
         activeKeyIndex.value = selectedKey;
-        console.log(`🤖 Optimal TTS Key Assigned: Key #${selectedKey} (Usage: ${JSON.stringify(keyUsage)})`);
+        logger.tts(`Optimal TTS Key Assigned: Key #${selectedKey} (Usage: ${JSON.stringify(keyUsage)})`);
         updatePresenceTtsKey(); // Sync new key selection to Firebase
       } else {
-        console.log(`🤖 TTS Key remains #${selectedKey} (Usage: ${JSON.stringify(keyUsage)})`);
+        logger.tts(`TTS Key remains #${selectedKey} (Usage: ${JSON.stringify(keyUsage)})`);
       }
     } catch(e) {
-      console.warn("Failed to assign optimal TTS key", e);
+      logger.warn("Failed to assign optimal TTS key", e);
     }
   }
 

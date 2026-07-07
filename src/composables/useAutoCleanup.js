@@ -3,6 +3,7 @@ import { ref as dbRef, get, query, orderByChild, endAt, remove } from "firebase/
 import { db } from "../composables/useFirebase";
 import { useSystemStore } from "../stores/system";
 import { CONSTANTS } from "../config/constants";
+import { logger } from "../utils/logger";
 
 export function useAutoCleanup() {
     const systemStore = useSystemStore();
@@ -18,7 +19,7 @@ export function useAutoCleanup() {
         }
 
         // 2. Delay to avoid network contention at startup
-        console.debug(`⏳ Auto Cleanup: Waiting ${CONSTANTS.CLEANUP.STARTUP_DELAY_MS / 1000}s before check...`);
+        logger.debug(`Auto Cleanup: Waiting ${CONSTANTS.CLEANUP.STARTUP_DELAY_MS / 1000}s before check...`);
         const timerId = setTimeout(async () => {
             await performCleanup();
         }, CONSTANTS.CLEANUP.STARTUP_DELAY_MS);
@@ -31,14 +32,14 @@ export function useAutoCleanup() {
         isCleaning.value = true;
 
         try {
-            console.log("🧹 Auto Cleanup: Checking for old chats...");
+            logger.system("Auto Cleanup: Checking for old chats...");
 
             // 3. Calculate Cutoff Date
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - CONSTANTS.CLEANUP.HISTORY_RETENTION_DAYS);
             const cutoffTimestamp = cutoffDate.getTime();
 
-            console.log(`📅 Cutoff Date: ${cutoffDate.toLocaleDateString()} (${cutoffTimestamp})`);
+            logger.system(`Cutoff Date: ${cutoffDate.toLocaleDateString()} (${cutoffTimestamp})`);
 
             // 4. Query 'history' node for old videos
             const historyRef = dbRef(db, "history");
@@ -47,7 +48,7 @@ export function useAutoCleanup() {
             const snapshot = await get(oldHistoryQuery);
 
             if (!snapshot.exists()) {
-                console.log("✅ Auto Cleanup: No old history found.");
+                logger.system("Auto Cleanup: No old history found.");
                 return;
             }
 
@@ -61,7 +62,7 @@ export function useAutoCleanup() {
 
                 // Double check timestamp just in case
                 if (data.timestamp <= cutoffTimestamp) {
-                    console.log(`🗑️ Deleting chat for: ${data.title || videoId} (${new Date(data.timestamp).toLocaleDateString()})`);
+                    logger.system(`Deleting chat for: ${data.title || videoId} (${new Date(data.timestamp).toLocaleDateString()})`);
 
                     // ✅ Delete all related nodes for old sessions (matching deleteHistory logic)
                     Promise.all([
@@ -71,21 +72,21 @@ export function useAutoCleanup() {
                         remove(dbRef(db, `voice_chats/${videoId}`)),
                         remove(dbRef(db, `shipping/${videoId}`)),
                     ])
-                        .then(() => console.log(`✅ Cleaned up all data for ${videoId}`))
-                        .catch((err) => console.error(`❌ Failed to cleanup ${videoId}:`, err));
+                        .then(() => logger.success(`Cleaned up all data for ${videoId}`))
+                        .catch((err) => logger.error(`Failed to cleanup ${videoId}:`, err));
 
                     count++;
                 }
             });
 
             if (count > 0) {
-                console.log(`🎉 Auto Cleanup: Removed chat history for ${count} old videos.`);
+                logger.system(`Auto Cleanup: Removed chat history for ${count} old videos.`);
             } else {
-                console.log("✅ Auto Cleanup: No chats needed deletion.");
+                logger.system("Auto Cleanup: No chats needed deletion.");
             }
 
         } catch (error) {
-            console.error("❌ Auto Cleanup Error:", error);
+            logger.error("Auto Cleanup Error:", error);
         } finally {
             isCleaning.value = false;
         }

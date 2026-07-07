@@ -123,6 +123,9 @@ export class TextToSpeech {
     // Remove specific special chars that might annoy TTS (optional)
     cleanText = cleanText.replace(/[#*~_]/g, "");
 
+    // ✅ แก้ไขปัญหาการอ่านออกเสียงเพี้ยน (เช่น คำว่า "จอง" อ่านเป็น "จอ ออ งอ" โดยเปลี่ยนเป็น "จอร์ง" เพื่อให้ออกเสียง "จอง" ได้ถูกต้อง)
+    cleanText = cleanText.replace(/จอง/g, "จอร์ง");
+
     // Clean up double spaces
     cleanText = cleanText.replace(/\s+/g, " ").trim();
 

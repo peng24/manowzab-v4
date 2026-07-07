@@ -172,6 +172,7 @@ const chatStore = useChatStore();
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
 const { resetVoice, playSfx } = useAudio();
+let chatUnsubscribe = null;
 
 const chatViewport = ref(null);
 const showScrollButton = ref(false);
@@ -352,13 +353,18 @@ onMounted(() => {
 
   // ✅ Initialize Firebase Chat Sync
   if (systemStore.currentVideoId) {
-    const cleanup = chatStore.syncFromFirebase(systemStore.currentVideoId);
+    if (chatUnsubscribe) chatUnsubscribe();
+    chatUnsubscribe = chatStore.syncFromFirebase(systemStore.currentVideoId);
     console.log("✅ Chat sync initialized for:", systemStore.currentVideoId);
   }
 });
 
 onUnmounted(() => {
   clearAutoScrollTimer();
+  if (chatUnsubscribe) {
+    chatUnsubscribe();
+    chatUnsubscribe = null;
+  }
 });
 
 // ✅ Watch for Video ID changes to re-sync
@@ -369,7 +375,8 @@ watch(
       console.log(
         `🔄 Video ID changed from ${oldVideoId} to ${newVideoId}, re-syncing chat...`,
       );
-      chatStore.syncFromFirebase(newVideoId);
+      if (chatUnsubscribe) chatUnsubscribe();
+      chatUnsubscribe = chatStore.syncFromFirebase(newVideoId);
     }
   },
 );
@@ -507,7 +514,8 @@ async function refreshChat() {
   try {
     // Re-sync from Firebase
     if (systemStore.currentVideoId) {
-      await chatStore.syncFromFirebase(systemStore.currentVideoId);
+      if (chatUnsubscribe) chatUnsubscribe();
+      chatUnsubscribe = chatStore.syncFromFirebase(systemStore.currentVideoId);
     }
 
     // Scroll to bottom after refresh

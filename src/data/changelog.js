@@ -14,6 +14,18 @@
 export const changelog = [
   // ─── 4.37.x ───────────────────────────────────────────
   {
+    version: '4.37.2',
+    date: '2026-07-07',
+    changes: {
+      fixed: [
+        'แก้ไข Firebase Chat Listener ซ้ำซ้อนและปัญหารายการแชทโหลดเบิ้ลเมื่อกดรีเฟรชหรือสลับวิดีโอ (Duplicate listener cleanup fix)',
+        'แก้ไขหน่วยความจำรั่วไหล (Memory Leak) ใน ChatPanel โดยปิด/เคลียร์ Chat Sync Listener อย่างถูกต้องเมื่อ unmount หรือสลับเซสชั่น',
+        'ย้ายและปรับปรุง activeOscillators ในระบบเสียง useAudio เป็น Module-level Singleton เพื่อแชร์สถานะเสียงเอฟเฟกต์ทั่วทุกคอมโพเนนต์และแก้ปัญหาเสียงซ้อนกัน',
+        'แก้ไขข้อพึงระวังใน Vue 3 (Asynchronous lifecycle registration warning) ใน App.vue ย้ายการประกาศ cleanupFns และ onUnmounted ไปยัง setup scope เพื่อให้ฟังก์ชันการเคลียร์หน่วยความจำทำความสะอาดครอบคลุมทุกจุดอย่างปลอดภัย',
+      ],
+    },
+  },
+  {
     version: '4.37.1',
     date: '2026-07-07',
     changes: {

@@ -106,20 +106,20 @@ export const useChatStore = defineStore("chat", () => {
       return;
     }
 
+    // Clean up previous listener first
+    if (currentChatListener) {
+      console.log(`🧹 Cleaning up old chat listener for ${currentVideoId}`);
+      const oldRef = dbRef(db, `chats/${currentVideoId}`);
+      off(oldRef, "child_added", currentChatListener);
+      currentChatListener = null;
+    }
+
     // ✅ Auto-Clear if switching to a new video
     if (currentVideoId && currentVideoId !== videoId) {
       console.log(
         `🔄 Switching video from ${currentVideoId} to ${videoId}. Clearing chat...`,
       );
       clearChat();
-    }
-
-    // Clean up previous listener if switching videos
-    if (currentChatListener && currentVideoId !== videoId) {
-      console.log(`🧹 Cleaning up old chat listener for ${currentVideoId}`);
-      const oldRef = dbRef(db, `chats/${currentVideoId}`);
-      off(oldRef, "child_added", currentChatListener);
-      currentChatListener = null;
     }
 
     currentVideoId = videoId;

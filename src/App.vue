@@ -95,6 +95,9 @@ const showShippingManager = ref(false);
 const showPhoneticManager = ref(false);
 const showManowPricePreview = ref(false);
 
+// ✅ Top-level cleanup array for reliable lifecycle management (Vue 3 safe)
+const cleanupFns = [];
+
 // Provide functions for child components
 provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
@@ -118,8 +121,6 @@ onMounted(async () => {
       console.error("❌ Auto-Login Failed:", e.message);
     }
   }
-
-  const cleanupFns = [];
 
   // ✅ Initialize Listeners (Capture cleanup functions)
   const unsubNick = nicknameStore.initNicknameListener();
@@ -237,12 +238,12 @@ onMounted(async () => {
   cleanupFns.push(unsubIsLiveFinished);
 
   // ✅ stockSize listener is already handled inside connectToStock()
+});
 
-  // ✅ Register Cleanup
-  onUnmounted(() => {
-    console.log("♻️ Cleaning up App.vue listeners...");
-    cleanupFns.forEach((fn) => fn && fn());
-  });
+// ✅ Register Cleanup at top level (Vue 3 safe)
+onUnmounted(() => {
+  console.log("♻️ Cleaning up App.vue listeners...");
+  cleanupFns.forEach((fn) => fn && fn());
 });
 
 // ✅ Centralized Delivery Customer Sync Watcher (Debounced for performance)

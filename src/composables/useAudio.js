@@ -8,13 +8,11 @@ const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 // ✅ Global Unified Audio Queue (persists across re-renders)
 const audioQueue = [];
 let isAudioProcessing = false;
+let activeOscillators = []; // ✅ Shared globally across all useAudio instances
 
 export function useAudio() {
   const systemStore = useSystemStore();
   const isSpeaking = ref(false); // Reactive wrapper for UI if needed
-
-
-  let activeOscillators = [];
 
   /**
    * Play sound effect without blocking TTS

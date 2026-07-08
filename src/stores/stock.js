@@ -154,6 +154,7 @@ export const useStockStore = defineStore("stock", () => {
             queue: [],
             source: method,
             price: price || null,
+            backdated: systemStore.isLiveFinished ? true : null,
           };
         } else if (!currentData.owner) {
           // Claim empty item
@@ -164,6 +165,9 @@ export const useStockStore = defineStore("stock", () => {
           currentData.source = method;
           if (price) currentData.price = price;
           if (!currentData.queue) currentData.queue = [];
+          if (systemStore.isLiveFinished) {
+            currentData.backdated = true;
+          }
           return currentData;
         } else {
           // Add to queue if occupied
@@ -177,7 +181,12 @@ export const useStockStore = defineStore("stock", () => {
             return; // Already in queue
           }
           action = "queued";
-          queue.push({ owner, uid, time: Date.now() });
+          queue.push({
+            owner,
+            uid,
+            time: Date.now(),
+            backdated: systemStore.isLiveFinished ? true : null,
+          });
           currentData.queue = queue;
           return currentData;
         }
@@ -231,6 +240,7 @@ export const useStockStore = defineStore("stock", () => {
               time: Date.now(),
               queue: nextQ,
               source: "queue",
+              backdated: next.backdated || null,
             };
           } else {
             // No one in queue, delete the item

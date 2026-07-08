@@ -106,6 +106,13 @@
             :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
             @click.stop="showOwnerItems(getStockItem(i).owner)"
           >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
+          <div
+            v-if="getStockItem(i).owner && getStockItem(i).backdated"
+            class="backdated-time"
+            :title="`จองย้อนหลัง: ${formatTime(getStockItem(i).time)}`"
+          >
+            🕒 {{ formatTime(getStockItem(i).time) }}
+          </div>
           <div v-if="getStockItem(i).price" class="stock-price">
             {{ getStockItem(i).price }} บาท
           </div>
@@ -214,6 +221,16 @@
                         <span v-html="highlightMatch(suggestion, person.owner)"></span>
                       </div>
                     </div>
+                  </div>
+                  <!-- 🕒 เวลาจอง / จองย้อนหลัง -->
+                  <div
+                    v-if="person.time"
+                    class="queue-item-time"
+                    :class="{ 'backdated': person.backdated }"
+                    :title="person.backdated ? `จองย้อนหลังเมื่อ ${formatTime(person.time)}` : `จองเมื่อ ${formatTime(person.time)}`"
+                  >
+                    <span>{{ person.backdated ? '🕒' : '📅' }}</span>
+                    <span>{{ formatTime(person.time) }}</span>
                   </div>
                 </div>
                 <div class="queue-actions">
@@ -1010,6 +1027,7 @@ function openQueueModal(num) {
       uid: item.uid || "manual",
       time: item.time,
       source: item.source,
+      backdated: item.backdated || null,
     });
   }
   if (item.queue) {
@@ -1071,6 +1089,7 @@ function manualReserve() {
     uid: "manual-" + Date.now(),
     time: Date.now(),
     source: "manual",
+    backdated: systemStore.isLiveFinished ? true : null,
   });
   // Auto-focus the new input
   nextTick(() => {
@@ -1158,6 +1177,22 @@ async function saveQueueChanges(preventClose = false) {
   if (tempQueue.value.length > 0) {
     const first = tempQueue.value[0];
     const rest = tempQueue.value.slice(1);
+
+    // Determine if the owner booking is new or changed (and not a typo fix)
+    let isOwnerChanged = false;
+    if (!oldOwnerName && newOwnerName) {
+      isOwnerChanged = true;
+    } else if (oldOwnerName && newOwnerName && oldOwnerName !== newOwnerName) {
+      if (currentDbItem.uid !== first.uid) {
+        isOwnerChanged = true;
+      }
+    }
+
+    if (isOwnerChanged && systemStore.isLiveFinished) {
+      first.backdated = true;
+      first.time = Date.now();
+    }
+
     newData = {
       owner: first.owner,
       uid: first.uid,
@@ -1166,6 +1201,10 @@ async function saveQueueChanges(preventClose = false) {
       price: editingPrice.value > 0 ? editingPrice.value : null,
       queue: rest,
     };
+
+    if (first.backdated) {
+      newData.backdated = true;
+    }
   }
 
   // Logic Update: Smart TTS handling
@@ -1354,6 +1393,7 @@ watch(
         uid: incomingItem.uid || "unknown",
         time: incomingItem.time || Date.now(),
         source: incomingItem.source || "chat",
+        backdated: incomingItem.backdated || null,
       },
     ];
 
@@ -2012,5 +2052,41 @@ watch(
 @keyframes cancelTextPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+.backdated-time {
+  font-size: 0.7em;
+  color: #fb923c;
+  font-weight: 600;
+  margin-top: 2px;
+  background: rgba(251, 146, 60, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(251, 146, 60, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  letter-spacing: 0.2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.queue-item-time {
+  font-size: 0.72em;
+  color: #888;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-left: 4px;
+}
+
+.queue-item-time.backdated {
+  color: #fb923c;
+  background: rgba(251, 146, 60, 0.12);
+  border-color: rgba(251, 146, 60, 0.3);
 }
 </style>

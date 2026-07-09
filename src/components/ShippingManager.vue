@@ -582,8 +582,11 @@ function deleteCustomer(id, name) {
 
 <style scoped>
 .sm-content {
-  background: #121212;
-  border-radius: 12px;
+  background: rgba(18, 18, 18, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   max-width: 95%;
   width: 950px;
   max-height: 90vh;
@@ -591,6 +594,9 @@ function deleteCustomer(id, name) {
   display: flex;
   flex-direction: column;
   padding: 20px;
+  box-shadow: 
+    0 24px 80px rgba(0, 0, 0, 0.6), 
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 
 .sm-header {

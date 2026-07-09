@@ -105,6 +105,9 @@ body {
   border-bottom: 1px solid var(--border-color);
   position: relative;
   z-index: 101;
+  /* Premium horizontal scroll fade indicator */
+  mask-image: linear-gradient(to right, black 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 92%, transparent 100%);
 }
 
 .header-controls::-webkit-scrollbar {
@@ -185,28 +188,32 @@ body {
 .status-cluster {
   display: flex;
   gap: 8px;
-  padding: 5px 10px;
-  background: #1a1a1a;
-  border-radius: 6px;
+  padding: 5px 12px;
+  background: rgba(26, 26, 26, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 8px;
   align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .status-item {
   font-size: 1.1em;
   color: #666;
   /* Default Grey */
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: help;
   display: flex;
   align-items: center;
   gap: 4px;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .status-item.ok {
   color: var(--success);
   opacity: 1;
-  text-shadow: 0 0 5px rgba(0, 230, 118, 0.2);
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.6);
+  filter: drop-shadow(0 0 4px rgba(0, 230, 118, 0.4));
 }
 
 .status-item.err {
@@ -240,12 +247,14 @@ body {
   0%,
   100% {
     opacity: 1;
-    text-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
+    text-shadow: 0 0 10px rgba(255, 152, 0, 0.6);
+    filter: drop-shadow(0 0 6px rgba(255, 152, 0, 0.4));
   }
 
   50% {
     opacity: 0.6;
-    text-shadow: 0 0 15px rgba(255, 152, 0, 0.8);
+    text-shadow: 0 0 18px rgba(255, 152, 0, 0.85);
+    filter: drop-shadow(0 0 10px rgba(255, 152, 0, 0.6));
   }
 }
 
@@ -254,28 +263,33 @@ body {
   50%,
   100% {
     opacity: 1;
+    text-shadow: 0 0 10px rgba(255, 152, 0, 0.6);
   }
 
   25%,
   75% {
     opacity: 0.3;
+    text-shadow: none;
   }
 }
 
 @keyframes blinkRed {
   from {
     opacity: 1;
-    text-shadow: 0 0 5px var(--primary);
+    text-shadow: 0 0 10px var(--primary);
+    filter: drop-shadow(0 0 6px rgba(211, 47, 47, 0.6));
   }
 
   to {
-    opacity: 0.5;
+    opacity: 0.4;
     text-shadow: none;
+    filter: none;
   }
 }
 
 .key-indicator {
-  background: #333;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.9em;
@@ -372,11 +386,20 @@ body {
   font-size: 0.95em;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, box-shadow 0.2s ease;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.97);
 }
 
 .btn:disabled {
@@ -392,7 +415,6 @@ body {
 
 .btn-primary:hover:not(:disabled) {
   background: #00c864;
-  transform: translateY(-1px);
 }
 
 .btn-dark {
@@ -545,18 +567,18 @@ body {
   top: 100%;
   right: 0;
   z-index: 10000;
-  background: rgba(26, 27, 30, 0.85);
+  background: rgba(22, 22, 25, 0.72);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   min-width: 290px;
   max-height: 85vh;
   overflow-y: auto;
   box-shadow: 
-    0 15px 35px rgba(0, 0, 0, 0.5), 
+    0 24px 60px rgba(0, 0, 0, 0.6), 
     0 1px 0 rgba(255, 255, 255, 0.1) inset,
     0 0 0 1px rgba(255, 255, 255, 0.05);
   border-radius: 16px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   margin-top: 8px;
   padding: 10px;
   animation: dropdownSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -779,7 +801,7 @@ body {
   border-radius: 12px;
   font-size: 0.9em;
   cursor: pointer;
-  transition: 0.2s;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -787,8 +809,8 @@ body {
 }
 
 .badge-nick:hover {
-  transform: scale(1.05);
-  filter: brightness(1.2);
+  transform: scale(1.06) translateY(-0.5px);
+  filter: brightness(1.15) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .badge-nick.vip-admin {
@@ -871,7 +893,9 @@ body {
 }
 
 .queue-modal {
-  background: rgba(22, 22, 26, 0.92);
+  background: rgba(22, 22, 26, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   width: 520px;
   max-width: 92%;
   max-height: 90vh;
@@ -900,7 +924,7 @@ body {
 
 .queue-header {
   padding: 16px 20px;
-  background: rgba(30, 30, 34, 0.95);
+  background: rgba(30, 30, 34, 0.7);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   justify-content: space-between;
@@ -909,7 +933,7 @@ body {
 
 .queue-footer {
   padding: 14px 20px;
-  background: rgba(30, 30, 34, 0.95);
+  background: rgba(30, 30, 34, 0.7);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   justify-content: flex-end;
@@ -1250,15 +1274,20 @@ body {
 }
 
 .dashboard-content {
-  background: #121212;
-  border-radius: 8px;
+  background: rgba(18, 18, 18, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   max-width: 95%;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   padding: 20px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9);
+  box-shadow: 
+    0 24px 80px rgba(0, 0, 0, 0.6), 
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   animation: slideUp 0.3s ease-out;
 }
 
@@ -1607,15 +1636,19 @@ body {
 
 /* History Modal */
 .history-modal {
-  background: #1e1e1e;
+  background: rgba(30, 30, 30, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   width: 90%;
   max-width: 800px;
   max-height: 85vh;
-  border-radius: 12px;
-  border: 1px solid #444;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+  box-shadow: 
+    0 24px 80px rgba(0, 0, 0, 0.6), 
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   position: relative;
   z-index: 9999;
 }

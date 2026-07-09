@@ -1818,26 +1818,27 @@ watch(
   /* overflow: hidden; Removed to show badge */
   min-height: 90px; /* Back to original height */
   z-index: 0;
-  transition:
-    transform 0.1s,
-    border-color 0.2s,
-    box-shadow 0.2s;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: 
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
 @media (hover: hover) {
   .stock-item:hover {
     border-color: #777;
     background: #333;
-    transform: translateY(-2px) scale(1.02);
+    transform: translateY(-3px) scale(1.03);
     z-index: 10;
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
   }
 }
 
 .stock-item:active {
-  transform: scale(0.96);
-  background: #333;
+  transform: scale(0.96) translateY(1px);
+  background: #252525;
 }
 .stock-item.sold {
   background: rgba(211, 47, 47, 0.15);

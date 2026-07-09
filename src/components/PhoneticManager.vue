@@ -492,8 +492,11 @@ onUnmounted(() => {
 
 <style scoped>
 .phonetic-modal {
-  background: rgba(18, 18, 22, 0.98);
+  background: rgba(18, 18, 22, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   width: 680px;
   max-width: 95%;
   max-height: 90vh;

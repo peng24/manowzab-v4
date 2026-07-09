@@ -106,10 +106,10 @@
       </button>
 
       <div class="dropdown" ref="dropdownRef">
-        <button class="btn btn-sim" @click.stop="toggleDropdown">
+        <button class="btn btn-sim" :class="{ active: showDropdown }" @click.stop="toggleDropdown">
           ⚡ Tools <i class="fa-solid fa-caret-down"></i>
         </button>
-
+ 
         <Teleport to="body">
           <div
             v-if="showDropdown"
@@ -117,42 +117,77 @@
             :style="dropdownStyle"
             @click.stop
           >
-            <a @click="downloadCSV" class="menu-csv">
-              <i class="fa-solid fa-file-csv"></i> บันทึกแชท (CSV)
-            </a>
-            <a @click="testVoice" class="menu-voice">
-              <i class="fa-solid fa-volume-high"></i> ทดสอบเสียง
-            </a>
-            <a @click="toggleFullScreen" class="menu-screen">
-              <i class="fa-solid fa-expand"></i> เต็มจอ
-            </a>
-            <a @click="toggleAwayMode" class="menu-away">
-              <i class="fa-solid fa-moon"></i> โหมดพาลูกนอน
-            </a>
-            <a @click="toggleSimulation" class="menu-sim">
-              <i
-                :class="isSimulating ? 'fa-solid fa-stop' : 'fa-solid fa-bolt'"
-              ></i>
-              {{ isSimulating ? "หยุดจำลอง" : "เริ่มจำลองแชท" }}
-            </a>
-            <a :href="`${baseUrl}shipping/`" target="_blank" class="menu-shipping-page">
-              <i class="fa-solid fa-mobile-screen-button"></i> 📦 รายการจัดส่ง (มือถือ)
-            </a>
-            <a href="https://peng24.github.io/manowzab-sales/" target="_blank" class="menu-sales">
-              <i class="fa-solid fa-chart-line"></i> ยอดขาย
-            </a>
-            <a @click="openNoteEditor" class="menu-note">
-              <i class="fa-solid fa-note-sticky"></i> จัดการ Note
-            </a>
-            <a @click="forceUpdate" class="menu-update">
-              <i class="fa-solid fa-rotate"></i> บังคับอัปเดต
-            </a>
-            <a @click="openPhoneticMgr" class="menu-phonetic">
-              <i class="fa-solid fa-volume-high"></i> จัดการคำอ่าน (TTS)
-            </a>
-            <a @click="openPreview" class="menu-preview">
-              <i class="fa-solid fa-tv"></i> สตรีมสด (Preview)
-            </a>
+            <!-- กลุ่มที่ 1: แชท & ไลฟ์สตรีม -->
+            <div class="dropdown-group">
+              <div class="dropdown-group-title">
+                <i class="fa-solid fa-tower-broadcast"></i> แชท & ไลฟ์สตรีม
+              </div>
+              <a @click="toggleSimulation" class="menu-sim" :class="{ active: isSimulating }">
+                <i :class="isSimulating ? 'fa-solid fa-stop' : 'fa-solid fa-bolt'"></i>
+                <span>{{ isSimulating ? "หยุดจำลองแชท" : "เริ่มจำลองแชท" }}</span>
+              </a>
+              <a @click="openPreview" class="menu-preview">
+                <i class="fa-solid fa-tv"></i>
+                <span>สตรีมสด (Preview)</span>
+              </a>
+              <a @click="downloadCSV" class="menu-csv">
+                <i class="fa-solid fa-file-csv"></i>
+                <span>บันทึกแชท (CSV)</span>
+              </a>
+            </div>
+
+            <!-- กลุ่มที่ 2: เสียง & คำอ่าน -->
+            <div class="dropdown-group">
+              <div class="dropdown-group-title">
+                <i class="fa-solid fa-volume-high"></i> เสียง & คำอ่าน
+              </div>
+              <a @click="openPhoneticMgr" class="menu-phonetic">
+                <i class="fa-solid fa-microphone-lines"></i>
+                <span>จัดการคำอ่าน (TTS)</span>
+              </a>
+              <a @click="testVoice" class="menu-voice">
+                <i class="fa-solid fa-volume-high"></i>
+                <span>ทดสอบเสียง</span>
+              </a>
+              <a @click="toggleAwayMode" class="menu-away" :class="{ active: systemStore.isAway }">
+                <i class="fa-solid fa-moon"></i>
+                <span>{{ systemStore.isAway ? "ปิดโหมดพาลูกนอน" : "โหมดพาลูกนอน" }}</span>
+              </a>
+            </div>
+
+            <!-- กลุ่มที่ 3: ข้อมูล & จัดส่ง -->
+            <div class="dropdown-group">
+              <div class="dropdown-group-title">
+                <i class="fa-solid fa-chart-pie"></i> ข้อมูล & จัดส่ง
+              </div>
+              <a :href="`${baseUrl}shipping/`" target="_blank" class="menu-shipping-page">
+                <i class="fa-solid fa-truck-fast"></i>
+                <span>รายการจัดส่ง (มือถือ)</span>
+              </a>
+              <a href="https://peng24.github.io/manowzab-sales/" target="_blank" class="menu-sales">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>ยอดขาย</span>
+              </a>
+            </div>
+
+            <!-- กลุ่มที่ 4: ระบบ & ทั่วไป -->
+            <div class="dropdown-group">
+              <div class="dropdown-group-title">
+                <i class="fa-solid fa-gears"></i> ระบบ & ทั่วไป
+              </div>
+              <a @click="openNoteEditor" class="menu-note">
+                <i class="fa-solid fa-note-sticky"></i>
+                <span>จัดการ Note</span>
+              </a>
+              <a @click="toggleFullScreen" class="menu-screen">
+                <i class="fa-solid fa-expand"></i>
+                <span>เต็มจอ</span>
+              </a>
+              <a @click="forceUpdate" class="menu-update">
+                <i class="fa-solid fa-rotate"></i>
+                <span>บังคับอัปเดต</span>
+              </a>
+            </div>
           </div>
         </Teleport>
       </div>

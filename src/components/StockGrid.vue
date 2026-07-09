@@ -79,48 +79,55 @@
       @touchmove="handleTouchMove"
       @touchend="handleTouchEnd"
     >
-      <TransitionGroup name="stock-list">
-        <div
-          v-for="i in stockStore.stockSize"
-          :key="i"
-          :class="[
-            'stock-item',
-            getStockItem(i).owner ? 'sold' : '',
-            isNewOrder(i) ? 'new-order' : '',
-            highlightedId === i ? 'highlight' : '',
-            cancelledItems.has(i) ? 'cancelled-blink' : '',
-          ]"
-          @click="openQueueModal(i)"
-          :id="`stock-${i}`"
-        >
-          <div class="stock-num">{{ i }}</div>
-          <div v-if="cancelledItems.has(i) && !getStockItem(i).owner" class="stock-status cancelled-name">
-            ❌ {{ cancelledItems.get(i) }}
-          </div>
-          <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
-            {{ getStockItem(i).owner || "ว่าง" }}
-          </div>
-          <div
-            v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
-            class="owner-count-badge"
-            :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
-            @click.stop="showOwnerItems(getStockItem(i).owner)"
-          >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
-          <div
-            v-if="getStockItem(i).owner && getStockItem(i).backdated"
-            class="backdated-time"
-            :title="`จองย้อนหลัง: ${formatTime(getStockItem(i).time)}`"
-          >
-            🕒 {{ formatTime(getStockItem(i).time) }}
-          </div>
-          <div v-if="getStockItem(i).price" class="stock-price">
-            {{ getStockItem(i).price }} บาท
-          </div>
-          <div v-if="getQueueLength(i) > 0" class="queue-badge">
-            +{{ getQueueLength(i) }}
-          </div>
+      <div
+        v-for="i in stockStore.stockSize"
+        :key="i"
+        v-memo="[
+          getStockItem(i).owner,
+          getStockItem(i).price,
+          getOwnerCount(getStockItem(i).owner, getStockItem(i).uid),
+          getQueueLength(i),
+          highlightedId === i,
+          cancelledItems.has(i),
+          newOrders.has(i)
+        ]"
+        :class="[
+          'stock-item',
+          getStockItem(i).owner ? 'sold' : '',
+          isNewOrder(i) ? 'new-order' : '',
+          highlightedId === i ? 'highlight' : '',
+          cancelledItems.has(i) ? 'cancelled-blink' : '',
+        ]"
+        @click="openQueueModal(i)"
+        :id="`stock-${i}`"
+      >
+        <div class="stock-num">{{ i }}</div>
+        <div v-if="cancelledItems.has(i) && !getStockItem(i).owner" class="stock-status cancelled-name">
+          ❌ {{ cancelledItems.get(i) }}
         </div>
-      </TransitionGroup>
+        <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
+          {{ getStockItem(i).owner || "ว่าง" }}
+        </div>
+        <div
+          v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
+          class="owner-count-badge"
+          :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
+          @click.stop="showOwnerItems(getStockItem(i).owner)"
+        >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
+        <div
+          v-if="getStockItem(i).owner && getStockItem(i).backdated"
+          class="backdated-time"
+          :title="`จองย้อนหลัง: ${formatTime(getStockItem(i).time)}`"
+        >
+          🕒 {{ formatTime(getStockItem(i).time) }}
+        </div>
+        <div v-if="getStockItem(i).price" class="stock-price">
+          {{ getStockItem(i).price }} บาท
+        </div>
+        <div v-if="getQueueLength(i) > 0" class="queue-badge">
+          +{{ getQueueLength(i) }}
+        </div>
+      </div>
     </div>
 
     <Teleport to="body">
@@ -348,6 +355,38 @@ const deliveryStrip = computed(() => {
     .sort((a, b) => a.days - b.days);
 });
 
+// ✅ Precomputed map of reservation counts for O(1) grid lookups
+const deliveryCountsMap = computed(() => {
+  const counts = {};
+
+  // 1. Initialize with today's counts
+  Object.keys(ownerItemCounts.value).forEach((owner) => {
+    counts[owner] = ownerItemCounts.value[owner] || 0;
+  });
+
+  // 2. Add past counts from deliveryCustomers
+  deliveryCustomers.value.forEach((cust) => {
+    if (!cust.sessions) return;
+    const videoId = systemStore.currentVideoId;
+    let pastCount = 0;
+
+    Object.keys(cust.sessions).forEach((vid) => {
+      if (vid !== videoId) {
+        const session = cust.sessions[vid];
+        if (session && session.status !== "done") {
+          pastCount += session.count || 0;
+        }
+      }
+    });
+
+    const total = (ownerItemCounts.value[cust.name] || 0) + pastCount;
+    if (cust.uid) counts[cust.uid] = total;
+    if (cust.name) counts[cust.name] = total;
+  });
+
+  return counts;
+});
+
 onMounted(() => {
   // 📦 Listen delivery_customers for badge count + strip
   const unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
@@ -529,26 +568,13 @@ const ownerItemCounts = computed(() => {
 
 // 👗 ดึงข้อมูลยอดจองสะสมจาก Database (ทุกรอบส่งที่ยังไม่จัดส่ง) + รวมของรอบปัจจุบันด้วย
 function getOwnerCount(ownerName, uid = null) {
-  const todayCount = ownerItemCounts.value[ownerName] || 0;
-  const cust = deliveryCustomers.value.find(
-    (c) => (uid && c.uid === uid) || c.name === ownerName
-  );
-  if (cust) {
-    const videoId = systemStore.currentVideoId;
-    let pastCount = 0;
-    if (cust.sessions) {
-      Object.keys(cust.sessions).forEach((vid) => {
-        if (vid !== videoId) {
-          const session = cust.sessions[vid];
-          if (session && session.status !== "done") {
-            pastCount += session.count || 0;
-          }
-        }
-      });
-    }
-    return todayCount + pastCount;
+  if (uid && deliveryCountsMap.value[uid] !== undefined) {
+    return deliveryCountsMap.value[uid];
   }
-  return todayCount;
+  if (ownerName && deliveryCountsMap.value[ownerName] !== undefined) {
+    return deliveryCountsMap.value[ownerName];
+  }
+  return ownerItemCounts.value[ownerName] || 0;
 }
 
 // ฟังก์ชันสกัดเอาเฉพาะวันที่จากชื่อไลฟ์สดที่ยาวๆ

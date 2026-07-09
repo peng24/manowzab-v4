@@ -22,6 +22,7 @@ import { logger } from "../utils/logger";
 
 // Saved names cache
 const savedNamesCache = ref({});
+const nameToUidMap = ref({});
 let _nicknameListenerUnsub = null;
 
 // ✅ Initialize nickname cache (with HMR cleanup guard)
@@ -29,6 +30,17 @@ if (_nicknameListenerUnsub) _nicknameListenerUnsub();
 _nicknameListenerUnsub = onValue(dbRef(db, "nicknames"), (snapshot) => {
   const data = snapshot.val() || {};
   savedNamesCache.value = data;
+
+  // Build nameToUidMap reverse lookup map (nickname -> uid)
+  const map = {};
+  Object.keys(data).forEach((uid) => {
+    const entry = data[uid];
+    const nick = typeof entry === "object" ? entry.nick : entry;
+    if (nick) {
+      map[nick.trim().toLowerCase()] = uid;
+    }
+  });
+  nameToUidMap.value = map;
 
   // ✅ Reactive Update: อัปเดตชื่อในแชทเก่าทันที
   const chatStore = useChatStore();
@@ -406,11 +418,7 @@ export function useChatProcessor() {
         if (cleanName.length > 0) {
           autoShipName = cleanName;
 
-          let foundUid = Object.keys(savedNamesCache.value).find((k) => {
-            const v = savedNamesCache.value[k];
-            const nick = typeof v === "object" ? v.nick : v;
-            return nick && nick.trim() === autoShipName;
-          });
+          let foundUid = nameToUidMap.value[autoShipName.toLowerCase()];
 
           if (!foundUid) {
             foundUid =

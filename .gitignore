@@ -11,10 +11,18 @@ lerna-debug.log*
 node_modules/
 .npm
 
+# Package Manager Lockfiles (Only track package-lock.json for npm)
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
 # Production / Build
 dist/
 dist-ssr/
 *.local
+
+# Vite / Dev Server
+.vite/
 
 # Environment Variables
 .env
@@ -26,6 +34,9 @@ tmp/
 temp/
 tmp_*
 *.csv
+*.bak
+*.tmp
+*~
 
 # AI Agents / Tools
 .agent/
@@ -44,11 +55,14 @@ tmp_*
 *.njsproj
 *.sln
 *.sw?
+.eslintcache
+.stylelintcache
+.prettiercache
 
 # System Files
 .DS_Store
-Thumbs.db
-Desktop.ini
+[Dd]esktop.ini
+[Tt]humbs.db
 ehthumbs.db
 ehthumbs_vista.db
 
@@ -64,4 +78,5 @@ coverage/
 *.lcov
 .nyc_output/
 
+# Deployment
 .vercel

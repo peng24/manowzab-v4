@@ -14,6 +14,24 @@
 export const changelog = [
   // ─── 4.40.x ───────────────────────────────────────────
   {
+    version: '4.40.3',
+    date: '2026-07-09',
+    changes: {
+      improved: [
+        'ปรับปรุงโครงสร้าง .gitignore — เพิ่มการละเว้นไฟล์แคชของ Vite (.vite/), ไฟล์ Lock ของแพ็กเกจเจอร์อื่นๆ (yarn.lock, pnpm-lock, bun.lock), ไฟล์แคชของ Linter/Formatter, และไฟล์สำรองหรือไฟล์ชั่วคราวทั่วไปให้ครอบคลุมและเป็นระเบียบยิ่งขึ้น',
+      ],
+    },
+  },
+  {
+    version: '4.40.2',
+    date: '2026-07-09',
+    changes: {
+      improved: [
+        'ปรับปรุงดีไซน์ Icon และ Branding เป็นสไตล์ Modern Minimal — ปรับปรุงรูปภาพไอคอนแอพ (favicon.ico, apple-touch-icon, pwa icons) ให้เรียบหรูและทันสมัยยิ่งขึ้น พร้อมอัปเดตไฟล์เวกเตอร์ต้นฉบับ (manowzab.svg และ masked-icon.svg) ด้วยเส้นทางแบบเรขาคณิตที่สะอาดตาและชุดสี Gradient สะท้อนแสงสีเขียวมะนาวไล่ไปหาฟ้า',
+      ],
+    },
+  },
+  {
     version: '4.40.1',
     date: '2026-07-08',
     changes: {

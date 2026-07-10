@@ -3,12 +3,15 @@ import { ref as dbRef, onValue, set } from "firebase/database";
 import { db } from "./useFirebase";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "./useAudio";
-import { AWAY_START_MESSAGES, AWAY_END_MESSAGES } from "../constants";
+import { AWAY_END_MESSAGES } from "../constants";
 import { logger } from "../utils/logger";
+
+let activeAwayUnsubscribe = null;
+let localIsAwayState = false;
 
 export function useAwayMode() {
     const systemStore = useSystemStore();
-    const { queueAudio } = useAudio();
+    const { queueAudio, resetVoice } = useAudio();
 
     const awayTimer = ref("00:00");
     let awayInterval = null;
@@ -56,16 +59,24 @@ export function useAwayMode() {
     }
 
     function initAwayListener() {
+        if (activeAwayUnsubscribe) {
+            try {
+                activeAwayUnsubscribe();
+            } catch (e) {}
+            activeAwayUnsubscribe = null;
+        }
+
         const awayRef = dbRef(db, "system/awayMode");
 
         const unsubscribe = onValue(awayRef, (snap) => {
             const val = snap.val();
             const newState = val?.isAway || false;
-            const prevState = systemStore.isAway;
+            const prevState = localIsAwayState;
 
             logger.away("Away mode changed:", { newState, prevState, data: val });
 
             if (newState && !prevState) {
+                localIsAwayState = true;
                 systemStore.isAway = true;
                 awayStartTime = val?.startTime || Date.now();
 
@@ -74,9 +85,11 @@ export function useAwayMode() {
                     awayInterval = setInterval(updateAwayTimer, 1000);
                 }
 
-                const startMessage = getRandomMessage(AWAY_START_MESSAGES);
-                queueAudio(null, "", startMessage);
+                queueAudio("sleep", "", "");
             } else if (!newState && prevState) {
+                localIsAwayState = false;
+                resetVoice(); // Clean up current speech and audio queue
+
                 systemStore.isAway = false;
 
                 if (awayInterval) {
@@ -90,6 +103,7 @@ export function useAwayMode() {
             }
         });
 
+        activeAwayUnsubscribe = unsubscribe;
         return unsubscribe; // Return unsubscribe function if needed
     }
 

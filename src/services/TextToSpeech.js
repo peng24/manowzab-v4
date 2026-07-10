@@ -449,6 +449,12 @@ export class TextToSpeech {
       return;
     }
 
+    // Guard against native SpeechSynthesis overlapping by checking if it's currently speaking
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+      setTimeout(() => this.processQueue(), 100);
+      return;
+    }
+
     this.isSpeaking = true;
     const item = this.queue.shift();
     const text = typeof item === "string" ? item : item.text;

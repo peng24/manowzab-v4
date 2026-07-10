@@ -10,6 +10,36 @@ const audioQueue = [];
 let isAudioProcessing = false;
 let activeOscillators = []; // ✅ Shared globally across all useAudio instances
 
+let sleepAudioBuffer = null;
+let activeSleepSources = [];
+let activeHtmlAudios = [];
+
+async function preloadSleepAudio() {
+  try {
+    if (!audioCtx) return;
+    const response = await fetch("/PP_SP_sleep.wav");
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const arrayBuffer = await response.arrayBuffer();
+    sleepAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    console.log("💤 Sleep mode audio preloaded successfully!");
+  } catch (err) {
+    console.warn("⚠️ Failed to preload sleep mode audio:", err);
+  }
+}
+
+// Start preloading immediately in the background
+preloadSleepAudio();
+
+async function waitForSpeechToFinish() {
+  const maxWait = 10000; // 10s max wait
+  const start = Date.now();
+  while (window.speechSynthesis && window.speechSynthesis.speaking && (Date.now() - start < maxWait)) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+
+
 export function useAudio() {
   const systemStore = useSystemStore();
   const isSpeaking = ref(false); // Reactive wrapper for UI if needed
@@ -104,10 +134,80 @@ export function useAudio() {
           osc.stop(now + 0.15);
 
           activeOscillators.push(osc);
+        } else if (type === "sleep") {
+          await playSleepSound();
         }
       } catch (err) {
         console.warn("⚠️ SFX Playback skipped:", err);
       } finally {
+        resolve();
+      }
+    });
+  }
+
+  function playSleepSound() {
+    return new Promise(async (resolve) => {
+      try {
+        // Wait for native speech synthesis to finish before playing the sleep chime
+        await waitForSpeechToFinish();
+
+        if (audioCtx && audioCtx.state === "suspended") {
+          await Promise.race([
+            audioCtx.resume(),
+            new Promise((resolve) => setTimeout(resolve, 2000))
+          ]).catch(() => console.warn("Sleep AudioContext resume timeout"));
+        }
+
+        if (!audioCtx) {
+          resolve();
+          return;
+        }
+
+        if (sleepAudioBuffer) {
+          const source = audioCtx.createBufferSource();
+          source.buffer = sleepAudioBuffer;
+          
+          const gainNode = audioCtx.createGain();
+          gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+          
+          source.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          
+          activeSleepSources.push(source);
+          
+          source.onended = () => {
+            const idx = activeSleepSources.indexOf(source);
+            if (idx > -1) activeSleepSources.splice(idx, 1);
+            resolve();
+          };
+          
+          source.start(0);
+        } else {
+          // Fallback using HTMLAudioElement if buffer is not loaded
+          const audio = new Audio("/PP_SP_sleep.wav");
+          audio.volume = 0.5;
+          
+          activeHtmlAudios.push(audio);
+          
+          audio.onended = () => {
+            const idx = activeHtmlAudios.indexOf(audio);
+            if (idx > -1) activeHtmlAudios.splice(idx, 1);
+            resolve();
+          };
+          
+          audio.onerror = () => {
+            const idx = activeHtmlAudios.indexOf(audio);
+            if (idx > -1) activeHtmlAudios.splice(idx, 1);
+            resolve();
+          };
+          
+          await audio.play().catch((e) => {
+            console.warn("Sleep audio autoplay blocked:", e);
+            resolve();
+          });
+        }
+      } catch (err) {
+        console.warn("⚠️ Sleep sound playback failed:", err);
         resolve();
       }
     });
@@ -127,6 +227,24 @@ export function useAudio() {
       }
     });
     activeOscillators = [];
+
+    // Stop active sleep sources
+    activeSleepSources.forEach((src) => {
+      try {
+        src.stop();
+        src.disconnect();
+      } catch (e) {}
+    });
+    activeSleepSources = [];
+
+    // Stop active html audios
+    activeHtmlAudios.forEach((audio) => {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (e) {}
+    });
+    activeHtmlAudios = [];
 
     // 3. Reset the TTS service (stops current speech and clears TTS queue)
     ttsService.reset();

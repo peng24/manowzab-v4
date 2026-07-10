@@ -51,6 +51,7 @@ import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Aut
 
 import { usePullToRefresh } from "./composables/usePullToRefresh"; // ✅ Import Pull to Refresh
 import { ttsService } from "./services/TextToSpeech"; // ✅ Import TTS Service
+import { useAudio } from "./composables/useAudio"; // ✅ Import useAudio
 import Header from "./components/Header.vue";
 import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
@@ -75,7 +76,8 @@ watch(
       console.log(
         "🔇 Sound turned OFF - Silencing immediately (App Singleton).",
       );
-      ttsService.reset();
+      const { resetVoice } = useAudio();
+      resetVoice();
     }
   },
 );

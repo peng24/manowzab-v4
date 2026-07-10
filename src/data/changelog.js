@@ -14,6 +14,15 @@
 export const changelog = [
   // ─── 4.44.x ───────────────────────────────────────────
   {
+    version: '4.44.5',
+    date: '2026-07-10',
+    changes: {
+      fixed: [
+        'แก้ไขปัญหาเสียงกล่อมนอน PP_SP_sleep.wav โหลดไม่ผ่านบน GitHub Pages — เปลี่ยนเส้นทางการดึงไฟล์เสียงดนตรีให้คำนวณแบบ Base-relative สัมพัทธ์ตาม `import.meta.env.BASE_URL` ของ Vite เพื่อรองรับการ Deploy ทั้งแบบ root domain และแบบ subdirectory (เช่น /manowzab-v4/) ป้องกันปัญหา HTTP 404'
+      ]
+    }
+  },
+  {
     version: '4.44.4',
     date: '2026-07-10',
     changes: {

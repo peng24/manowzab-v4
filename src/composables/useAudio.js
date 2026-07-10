@@ -14,10 +14,16 @@ let sleepAudioBuffer = null;
 let activeSleepSources = [];
 let activeHtmlAudios = [];
 
+function getSleepAudioPath() {
+  const base = import.meta.env.BASE_URL || "/";
+  return `${base.endsWith("/") ? base : base + "/"}PP_SP_sleep.wav`;
+}
+
 async function preloadSleepAudio() {
   try {
     if (!audioCtx) return;
-    const response = await fetch("/PP_SP_sleep.wav");
+    const audioPath = getSleepAudioPath();
+    const response = await fetch(audioPath);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const arrayBuffer = await response.arrayBuffer();
     sleepAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
@@ -184,7 +190,7 @@ export function useAudio() {
           source.start(0);
         } else {
           // Fallback using HTMLAudioElement if buffer is not loaded
-          const audio = new Audio("/PP_SP_sleep.wav");
+          const audio = new Audio(getSleepAudioPath());
           audio.volume = 0.5;
           
           activeHtmlAudios.push(audio);

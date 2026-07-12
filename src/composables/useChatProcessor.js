@@ -196,8 +196,13 @@ export function useChatProcessor() {
       // Dynamic regex matching
       const regex1 = new RegExp(`(?:${codePattern})\\s*(\\d+)\\s*(?:${pricePattern})?\\s*(\\d+)\\s*(?:${unitPattern})?`, 'i');
       const regex2 = new RegExp(`(\\d+)\\s*(?:${pricePattern})\\s*(\\d+)\\s*(?:${unitPattern})?`, 'i');
+      const regex3 = new RegExp(`(?:${codePattern})?\\s*(\\d+)\\s*[-/]\\s*(\\d+)`, 'i');
+      const regex4 = new RegExp(`(?:${codePattern})?\\s*(\\d+)\\.(\\d+)\\s*(?:${unitPattern})?`, 'i');
 
-      const match = normalizedMsg.match(regex1) || normalizedMsg.match(regex2);
+      const match = normalizedMsg.match(regex1) || 
+                    normalizedMsg.match(regex2) || 
+                    normalizedMsg.match(regex3) || 
+                    normalizedMsg.match(regex4);
       if (match) {
         const itemId = parseInt(match[1]);
         const priceVal = parseInt(match[2]);

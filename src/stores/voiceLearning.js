@@ -6,9 +6,9 @@ import { useSystemStore } from "./system";
 import Swal from "sweetalert2";
 import { logger } from "../utils/logger";
 
-const DEFAULT_CODE_KEYWORDS = ["รหัส", "ไอดี", "รหัสที่", "เบอร์"];
-const DEFAULT_PRICE_KEYWORDS = ["ราคา", "ขาย", "ตั้งราคา", "คู่ละ", "ตัวละ", "ผืนละ", "ชิ้นละ", "ชุดละ"];
-const DEFAULT_UNIT_KEYWORDS = ["บาท"];
+const DEFAULT_CODE_KEYWORDS = ["รหัส", "ไอดี", "รหัสที่", "เบอร์", "เบอร์ที่", "เลข", "เลขที่", "รายการที่", "รายการ", "ลายการที่", "ลายการ", "ลายกาน", "ในการนี่", "ในกาน", "ตัวที่", "แบบที่", "ชิ้นที่", "ชุดที่", "คู่ที่"];
+const DEFAULT_PRICE_KEYWORDS = ["ราคา", "ขาย", "ตั้งราคา", "คู่ละ", "ตัวละ", "ผืนละ", "ชิ้นละ", "ชุดละ", "ละ", "อยู่ที่", "เหลือ", "ลดเหลือ", "เอาไป", "จัดโปร", "บาท", "บาด", "ละคา", "ละกา", "ลดา", "าคา"];
+const DEFAULT_UNIT_KEYWORDS = ["บาท", "บาด", "บ"];
 
 export const useVoiceLearningStore = defineStore("voiceLearning", () => {
   const systemStore = useSystemStore();
@@ -28,10 +28,26 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
     onValue(patternsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        if (data.codeKeywords) codeKeywords.value = data.codeKeywords;
-        if (data.priceKeywords) priceKeywords.value = data.priceKeywords;
-        if (data.unitKeywords) unitKeywords.value = data.unitKeywords;
+        // Automatically merge new system defaults if they are missing
+        const mergedCode = Array.from(new Set([...DEFAULT_CODE_KEYWORDS, ...(data.codeKeywords || [])]));
+        const mergedPrice = Array.from(new Set([...DEFAULT_PRICE_KEYWORDS, ...(data.priceKeywords || [])]));
+        const mergedUnit = Array.from(new Set([...DEFAULT_UNIT_KEYWORDS, ...(data.unitKeywords || [])]));
+        
+        codeKeywords.value = mergedCode;
+        priceKeywords.value = mergedPrice;
+        unitKeywords.value = mergedUnit;
         candidates.value = data.candidates || {};
+        
+        // Update Firebase if we expanded the keywords
+        if (mergedCode.length > (data.codeKeywords || []).length || 
+            mergedPrice.length > (data.priceKeywords || []).length ||
+            mergedUnit.length > (data.unitKeywords || []).length) {
+          update(patternsRef, {
+            codeKeywords: mergedCode,
+            priceKeywords: mergedPrice,
+            unitKeywords: mergedUnit
+          }).catch((err) => logger.error("VoiceLearning: Failed to auto-merge expanded defaults:", err));
+        }
       } else {
         // Initialize defaults in Firebase
         set(patternsRef, {

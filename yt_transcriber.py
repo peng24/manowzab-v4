@@ -6,6 +6,17 @@ import threading
 import numpy as np
 from dotenv import load_dotenv
 import requests
+import socket
+
+# Port lock to prevent multiple concurrent instances from running
+try:
+    _lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # Bind to a local high port
+    _lock_socket.bind(('127.0.0.1', 28482))
+except OSError:
+    print("\n\033[93m⚠️  แจ้งเตือน: ตรวจพบว่ามีโปรแกรม yt_transcriber.py ทำงานอยู่แล้วในเครื่อง!\033[0m")
+    print("👉 ระบบปิดตัวโปรแกรมตัวนี้ลงอัตโนมัติเพื่อหลีกเลี่ยงการส่งคำถอดเสียงซ้ำซ้อน")
+    sys.exit(0)
 
 # Enable ANSI escape sequences on Windows command prompt natively
 os.system('')
@@ -61,8 +72,44 @@ if not FIREBASE_DB_URL:
     log_error("VITE_FIREBASE_DATABASE_URL is missing in .env")
     sys.exit(1)
 
+FIREBASE_API_KEY = os.getenv("VITE_FIREBASE_API_KEY")
+if not FIREBASE_API_KEY:
+    log_error("VITE_FIREBASE_API_KEY is missing in .env")
+    sys.exit(1)
+
 # Format database URL
 FIREBASE_DB_URL = FIREBASE_DB_URL.rstrip('/')
+
+# Token caching variables
+id_token = None
+token_expiry_time = 0
+
+def refresh_auth_token():
+    """Authenticate with Firebase Auth REST API anonymously to acquire ID Token."""
+    global id_token, token_expiry_time
+    log_info("Authenticating with Firebase Auth anonymously...")
+    auth_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={FIREBASE_API_KEY}"
+    try:
+        res = requests.post(auth_url, json={"returnSecureToken": True}, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            id_token = data.get("idToken")
+            expires_in = int(data.get("expiresIn", 3600))
+            token_expiry_time = time.time() + expires_in - 300 # refresh 5 mins early
+            log_success("Authenticated successfully with Firebase! 🔑")
+            return id_token
+        else:
+            log_error(f"Authentication failed: HTTP {res.status_code} - {res.text}")
+    except Exception as e:
+        log_error(f"Authentication exception: {e}")
+    return None
+
+def get_auth_token():
+    """Get active ID Token, refreshing if expired."""
+    global id_token, token_expiry_time
+    if not id_token or time.time() >= token_expiry_time:
+        refresh_auth_token()
+    return id_token
 
 # Try importing faster-whisper
 try:
@@ -124,7 +171,10 @@ def push_transcript_to_firebase(video_id, text):
     """Pushes a transcript segment to Firebase."""
     if not text:
         return
+    token = get_auth_token()
     url = f"{FIREBASE_DB_URL}/voice_chats/{video_id}.json"
+    if token:
+        url += f"?auth={token}"
     payload = {
         "text": text,
         "timestamp": int(time.time() * 1000),
@@ -172,8 +222,8 @@ def transcribe_live_stream(video_id, audio_url):
     chunk_bytes = chunk_length_sec * sample_rate * bytes_per_sample
 
     audio_buffer = np.array([], dtype=np.float32)
-    last_text = ""
-    silence_counter = 0
+    buffer_start_time = 0.0
+    last_pushed_end_time = 0.0
 
     try:
         while not stop_event.is_set():
@@ -187,10 +237,7 @@ def transcribe_live_stream(video_id, audio_url):
             audio_chunk = np.frombuffer(raw_data, dtype=np.int16).astype(np.float32) / 32768.0
             audio_buffer = np.append(audio_buffer, audio_chunk)
 
-            # Keep buffer size maximum to 20 seconds to prevent growing latency
-            max_buffer_samples = 20 * sample_rate
-            if len(audio_buffer) > max_buffer_samples:
-                audio_buffer = audio_buffer[-max_buffer_samples:]
+            buffer_len_sec = len(audio_buffer) / sample_rate
 
             # Run transcription on buffer
             # Use Thai language setting and VAD filter for high precision
@@ -204,29 +251,44 @@ def transcribe_live_stream(video_id, audio_url):
             
             segments = list(segments)
             if not segments:
+                # If buffer gets too long with no speech, truncate it to prevent bloat
+                if buffer_len_sec > 20.0:
+                    audio_buffer = audio_buffer[-int(5.0 * sample_rate):]
+                    buffer_start_time += (buffer_len_sec - 5.0)
                 continue
 
-            current_text = " ".join([seg.text.strip() for seg in segments]).strip()
+            # Identify completed segments
+            # A segment is considered finalized if it ends at least 2.5s before the buffer ends (speech pause)
+            # or if the buffer is getting close to full (18 seconds)
+            grace_period = 2.5
+            completed_segments = []
             
-            # Simple text diff to find new additions
-            if current_text and current_text != last_text:
-                new_text = current_text
-                # If the previous text is a prefix of current text, extract only the new suffix
-                if last_text and current_text.startswith(last_text):
-                    new_text = current_text[len(last_text):].strip()
-
-                if len(new_text) > 1:
-                    push_transcript_to_firebase(video_id, new_text)
-                    last_text = current_text
-                    silence_counter = 0
-            else:
-                silence_counter += 1
-
-            # If we detect prolonged silence (e.g., 3 chunks/12s of no new text), reset buffer to prevent drift
-            if silence_counter >= 3 and len(audio_buffer) > 0:
-                audio_buffer = np.array([], dtype=np.float32)
-                last_text = ""
-                silence_counter = 0
+            for seg in segments:
+                abs_start = buffer_start_time + seg.start
+                abs_end = buffer_start_time + seg.end
+                
+                is_finalized = seg.end < (buffer_len_sec - grace_period) or buffer_len_sec > 18.0
+                if is_finalized:
+                    if abs_end > last_pushed_end_time + 0.1:
+                        completed_segments.append(seg)
+            
+            if completed_segments:
+                for seg in completed_segments:
+                    text = seg.text.strip()
+                    if len(text) > 1:
+                        push_transcript_to_firebase(video_id, text)
+                    last_pushed_end_time = max(last_pushed_end_time, buffer_start_time + seg.end)
+                
+                # Discard completed audio to keep buffer small and fresh
+                last_completed_end_in_buffer = completed_segments[-1].end
+                samples_to_discard = int(last_completed_end_in_buffer * sample_rate)
+                
+                if samples_to_discard < len(audio_buffer):
+                    audio_buffer = audio_buffer[samples_to_discard:]
+                    buffer_start_time += last_completed_end_in_buffer
+                else:
+                    audio_buffer = np.array([], dtype=np.float32)
+                    buffer_start_time += buffer_len_sec
 
     except Exception as e:
         log_error(f"Exception in transcription loop: {e}")
@@ -243,10 +305,13 @@ def sync_active_video():
     global active_video_id, transcription_thread, stop_event
     log_info("Watching Firebase system/activeVideo for updates...")
     
-    url = f"{FIREBASE_DB_URL}/system/activeVideo.json"
-    
     while True:
         try:
+            token = get_auth_token()
+            url = f"{FIREBASE_DB_URL}/system/activeVideo.json"
+            if token:
+                url += f"?auth={token}"
+            
             res = requests.get(url, timeout=5)
             if res.status_code == 200:
                 vid = res.json()

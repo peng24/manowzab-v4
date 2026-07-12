@@ -3,10 +3,68 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
+import { spawn } from "node:child_process";
+
+// Keep active Python transcriber process reference
+let pythonProcess = null;
+
+// Custom Vite plugin to launch local transcriber script via Web HTTP API
+function transcriberPlugin() {
+  return {
+    name: "transcriber-api",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url === "/api/transcriber/start") {
+          res.setHeader("Content-Type", "application/json");
+          if (pythonProcess) {
+            res.end(JSON.stringify({ status: "running", message: "ตัวถอดเสียง Python กำลังทำงานอยู่ก่อนแล้ว" }));
+            return;
+          }
+
+          // Spawn python script in background
+          pythonProcess = spawn("python", ["yt_transcriber.py"], {
+            stdio: "inherit",
+            shell: true,
+          });
+
+          pythonProcess.on("close", (code) => {
+            console.log(`[Vite Server] Python transcriber process exited with code ${code}`);
+            pythonProcess = null;
+          });
+
+          res.end(JSON.stringify({ status: "running", message: "เปิดรันสคริปต์ yt_transcriber.py สำเร็จ" }));
+        } else if (req.url === "/api/transcriber/stop") {
+          res.setHeader("Content-Type", "application/json");
+          if (pythonProcess) {
+            if (process.platform === "win32") {
+              // Kill process tree on Windows to ensure ffmpeg shuts down cleanly
+              spawn("taskkill", ["/pid", pythonProcess.pid, "/f", "/t"]);
+            } else {
+              pythonProcess.kill("SIGINT");
+            }
+            pythonProcess = null;
+            res.end(JSON.stringify({ status: "idle", message: "ปิดการทำงานของตัวถอดเสียง Python แล้ว" }));
+          } else {
+            res.end(JSON.stringify({ status: "idle", message: "ตัวถอดเสียงไม่ได้เปิดทำงานอยู่" }));
+          }
+        } else if (req.url === "/api/transcriber/status") {
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({
+            status: pythonProcess ? "running" : "idle",
+            message: pythonProcess ? "ตัวถอดเสียง Python กำลังทำงาน" : "ตัวถอดเสียง Python ปิดอยู่"
+          }));
+        } else {
+          next();
+        }
+      });
+    },
+  };
+}
 
 export default defineConfig({
   plugins: [
     vue(),
+    transcriberPlugin(),
     VitePWA({
       registerType: "prompt", // Changed from autoUpdate to prompt to allow user control
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "masked-icon.svg"],
@@ -97,6 +155,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         shipping: resolve(__dirname, 'shipping/index.html'),
+        preview: resolve(__dirname, 'preview/index.html'),
       },
     },
   },

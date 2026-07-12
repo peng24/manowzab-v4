@@ -27,7 +27,6 @@
             <HistoryModal v-if="showHistory" @close="showHistory = false" />
             <ShippingManager v-if="showShippingManager" @close="showShippingManager = false" />
             <PhoneticManager v-if="showPhoneticManager" @close="showPhoneticManager = false" />
-            <ManowPricePreview v-if="showManowPricePreview" @close="showManowPricePreview = false" />
           </div>
           <NoteBanner />
         </div>
@@ -61,8 +60,8 @@ import ShippingManager from "./components/ShippingManager.vue";
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import PhoneticManager from "./components/PhoneticManager.vue"; // ✅ Import Phonetic Manager
-import ManowPricePreview from "./components/ManowPricePreview.vue";
 import { useVoiceLearningStore } from "./stores/voiceLearning";
+import { useChatProcessor } from "./composables/useChatProcessor";
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
@@ -97,7 +96,6 @@ const showDashboard = ref(false);
 const showHistory = ref(false);
 const showShippingManager = ref(false);
 const showPhoneticManager = ref(false);
-const showManowPricePreview = ref(false);
 
 // ✅ Top-level cleanup array for reliable lifecycle management (Vue 3 safe)
 const cleanupFns = [];
@@ -107,7 +105,38 @@ provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
 provide("openShippingManager", () => (showShippingManager.value = true));
 provide("openPhoneticManager", () => (showPhoneticManager.value = true));
-provide("openManowPricePreview", () => (showManowPricePreview.value = true));
+provide("openManowPricePreview", () => {
+  const width = 1200;
+  const height = 800;
+  const left = (window.screen.width - width) / 2;
+  const top = (window.screen.height - height) / 2;
+  const basePath = import.meta.env.BASE_URL || "/";
+  const url = `${basePath.replace(/\/$/, '')}/preview/`;
+  window.open(
+    url,
+    "ManowStreamPreview",
+    `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,status=no,resizable=yes`
+  );
+});
+
+// ✅ Active Price Detector Voice Listener Watcher
+const { initManowPriceVoiceListener } = useChatProcessor();
+let voiceListenerUnsub = null;
+
+watch(
+  () => [systemStore.currentVideoId, systemStore.isPriceDetector],
+  ([vid, isDetector]) => {
+    if (voiceListenerUnsub) {
+      voiceListenerUnsub();
+      voiceListenerUnsub = null;
+    }
+    if (isDetector && vid && vid !== "demo") {
+      console.log(`🎙️ [Active Price Detector] Starting voice listener for video: ${vid}`);
+      voiceListenerUnsub = initManowPriceVoiceListener(vid);
+    }
+  },
+  { immediate: true }
+);
 
 onMounted(async () => {
   console.log("🚀 App mounted");
@@ -252,6 +281,10 @@ onMounted(async () => {
 // ✅ Register Cleanup at top level (Vue 3 safe)
 onUnmounted(() => {
   console.log("♻️ Cleaning up App.vue listeners...");
+  if (voiceListenerUnsub) {
+    voiceListenerUnsub();
+    voiceListenerUnsub = null;
+  }
   cleanupFns.forEach((fn) => fn && fn());
 });
 

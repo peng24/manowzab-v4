@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-overlay" @click.self="$emit('close')">
+  <div :class="['dashboard-overlay', { 'standalone-window': isStandalone }]" @click.self="closePanel">
     <div class="preview-modal-container">
       
       <!-- HEADER -->
@@ -7,7 +7,7 @@
         <h2>
           <i class="fa-solid fa-microphone-lines animate-pulse"></i> ระบบจับเสียงและพรีวิวสตรีมสด (Live Voice & Video Panel)
         </h2>
-        <button class="btn-close" @click="$emit('close')">
+        <button class="btn-close" @click="closePanel">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
@@ -56,6 +56,17 @@
                 <input type="checkbox" v-model="isMuted" />
                 <span><i class="fa-solid" :class="isMuted ? 'fa-volume-xmark' : 'fa-volume-high'"></i> ปิดเสียงเริ่มต้น</span>
               </label>
+              <!-- Python Transcriber Launcher Button -->
+              <button 
+                class="btn btn-transcriber" 
+                :class="transcriberStatus" 
+                @click="toggleTranscriber"
+                :disabled="isTranscriberLoading"
+                title="สั่งรันสคริปต์ถอดเสียง Python เบื้องหลังโดยตรงผ่านเบราว์เซอร์"
+              >
+                <i class="fa-solid" :class="transcriberStatus === 'running' ? 'fa-microphone animate-pulse-green' : 'fa-play'"></i>
+                {{ transcriberStatus === 'running' ? 'สคริปต์ถอดเสียงทำงานอยู่' : 'รันสคริปต์ถอดเสียง (Python)' }}
+              </button>
             </div>
           </div>
         </div>
@@ -156,6 +167,18 @@ const systemStore = useSystemStore();
 const stockStore = useStockStore();
 const voiceLearningStore = useVoiceLearningStore();
 
+const isStandalone = computed(() => {
+  return window.location.pathname.includes("/preview");
+});
+
+function closePanel() {
+  if (isStandalone.value) {
+    window.close();
+  } else {
+    emit("close");
+  }
+}
+
 // Sync voice patterns
 voiceLearningStore.initVoicePatterns();
 
@@ -163,6 +186,69 @@ const liveUrl = ref("");
 const isLoading = ref(false);
 const isMuted = ref(true); // Default to muted
 const transcripts = ref([]);
+
+const transcriberStatus = ref("idle"); // 'idle', 'running', 'unsupported'
+const isTranscriberLoading = ref(false);
+
+async function checkTranscriberStatus() {
+  try {
+    const res = await fetch("/api/transcriber/status");
+    if (res.ok) {
+      const data = await res.json();
+      transcriberStatus.value = data.status;
+    } else {
+      transcriberStatus.value = "unsupported";
+    }
+  } catch (e) {
+    transcriberStatus.value = "unsupported";
+  }
+}
+
+async function toggleTranscriber() {
+  isTranscriberLoading.value = true;
+  try {
+    const action = transcriberStatus.value === "running" ? "stop" : "start";
+    const res = await fetch(`/api/transcriber/${action}`);
+    if (res.ok) {
+      const data = await res.json();
+      transcriberStatus.value = data.status;
+      
+      Swal.fire({
+        icon: data.status === "running" ? "success" : "info",
+        title: data.status === "running" ? "เริ่มโปรแกรมถอดเสียงสำเร็จ 🎙️" : "ปิดการถอดเสียงแล้ว",
+        text: data.message,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 4000
+      });
+    } else {
+      showTranscriberError();
+    }
+  } catch (e) {
+    showTranscriberError();
+  } finally {
+    isTranscriberLoading.value = false;
+  }
+}
+
+function showTranscriberError() {
+  Swal.fire({
+    icon: "warning",
+    title: "ไม่รองรับการสั่งรันจากระยะไกล",
+    text: "ปุ่มสั่งรันด่วนทำงานเฉพาะการใช้งานในโหมด Local Dev (npm run dev) เท่านั้น หากเว็บรันบนเซิร์ฟเวอร์ภายนอก กรุณารันคำสั่ง python yt_transcriber.py ด้วยตนเองในคอมพิวเตอร์ของคุณ",
+    confirmButtonText: "ตกลง"
+  });
+}
+
+// Watch active video changes to check transcriber status
+watch(
+  () => systemStore.currentVideoId,
+  () => {
+    checkTranscriberStatus();
+  },
+  { immediate: true }
+);
 
 let voiceUnsubscribe = null;
 
@@ -872,5 +958,63 @@ onUnmounted(() => {
 }
 .transcript-item.is-price .sender-name {
   color: #fbbf24;
+}
+
+/* Python Transcriber Launcher Styles */
+.btn-transcriber {
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  font-size: 0.85em;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  cursor: pointer;
+  font-family: "Kanit", sans-serif;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+}
+.btn-transcriber:hover:not(:disabled) {
+  color: #f1f5f9;
+  border-color: rgba(148, 163, 184, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+}
+.btn-transcriber.running {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18) 0%, rgba(16, 185, 129, 0.05) 100%);
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #4ade80;
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
+}
+.btn-transcriber.unsupported {
+  display: none; /* Hide if not running in local Vite server mode */
+}
+.animate-pulse-green {
+  animation: greenPulse 1.8s infinite ease-in-out;
+}
+@keyframes greenPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(34, 197, 94, 0.4)); }
+  50% { transform: scale(1.15); filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.7)); }
+}
+
+/* Standalone Window Layout Adaptations */
+.dashboard-overlay.standalone-window {
+  position: absolute;
+  background: var(--bg-panel, #0b0f19);
+  width: 100%;
+  height: 100%;
+  backdrop-filter: none;
+}
+.dashboard-overlay.standalone-window .preview-modal-container {
+  width: 100%;
+  max-width: 100%;
+  height: 100vh;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
 }
 </style>

@@ -15,6 +15,8 @@ export const useSystemStore = defineStore("system", () => {
   const isAway = ref(false); // สถานะโหมดพาลูกนอน
   const isSoundOn = ref(true); // ✅ เปิด/ปิดเสียง
   const isHost = ref(false); // ✅ สถานะเครื่องแม่ข่าย (Host)
+  const activePriceDetectorId = ref(""); // ✅ เครื่องที่ตรวจจับราคาปัจจุบัน
+  const isPriceDetector = ref(false); // ✅ เครื่องเราจับราคาอยู่หรือไม่
 
   // ✅ Google Cloud TTS API Key - Load from .env
   const googleApiKey = ref(import.meta.env.VITE_GOOGLE_API_KEYS || "");
@@ -65,6 +67,35 @@ export const useSystemStore = defineStore("system", () => {
       // ถ้าเราเป็น Host อยู่แล้ว และค่าใน DB ตรงกัน -> ก็ OK (Keep Alive)
       // ถ้าเราเพิ่งกดปุ่ม -> Logic ใน Header จะจัดการ set isHost = true เอง
     });
+  }
+
+  // ✅ Price Detector Listener (Take Over Logic)
+  function initPriceDetectorListener() {
+    const detectorRef = dbRef(db, "system/activePriceDetectorId");
+    return onValue(detectorRef, (snapshot) => {
+      const activeId = snapshot.val();
+      activePriceDetectorId.value = activeId || "";
+
+      // ถ้ามีเครื่องอื่นแย่งสิทธิ์จับราคาไปแล้ว -> เครื่องเราต้องปิด
+      if (activeId && activeId !== myDeviceId.value && isPriceDetector.value) {
+        isPriceDetector.value = false;
+        logger.warn("Price detector role taken by another device:", activeId);
+      }
+    });
+  }
+
+  // ✅ Take over or release price detector role
+  async function setPriceDetectorState(enabled) {
+    isPriceDetector.value = enabled;
+    const path = "system/activePriceDetectorId";
+    if (enabled) {
+      await update(dbRef(db), { [path]: myDeviceId.value });
+    } else {
+      const snapshot = await get(dbRef(db, path));
+      if (snapshot.val() === myDeviceId.value) {
+        await update(dbRef(db), { [path]: "" });
+      }
+    }
   }
 
   // ✅ Auto distribute TTS Keys across machines to balance quota
@@ -127,6 +158,8 @@ export const useSystemStore = defineStore("system", () => {
     isAway,
     isSoundOn, // ✅ Export
     isHost, // ✅ Export
+    activePriceDetectorId, // ✅ Export
+    isPriceDetector, // ✅ Export
     statusDb,
     statusApi,
     statusChat,
@@ -136,6 +169,8 @@ export const useSystemStore = defineStore("system", () => {
     version,
     setStatus,
     initHostListener, // ✅ Export
+    initPriceDetectorListener, // ✅ Export
+    setPriceDetectorState, // ✅ Export
     assignOptimalTtsKey, // ✅ Export
     updatePresenceTtsKey, // ✅ Export
     googleApiKey, // ✅ Export (from .env)

@@ -37,10 +37,26 @@
             <span v-if="systemStore.currentVideoId" class="current-id-badge">
               ID ไลฟ์สดปัจจุบัน: <code>{{ systemStore.currentVideoId }}</code>
             </span>
-            <label class="mute-toggle">
-              <input type="checkbox" v-model="isMuted" />
-              <span><i class="fa-solid" :class="isMuted ? 'fa-volume-xmark' : 'fa-volume-high'"></i> ปิดเสียงเริ่มต้น</span>
-            </label>
+            <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+              <label class="detector-toggle" :class="{ 'is-active': systemStore.isPriceDetector }">
+                <input 
+                  type="checkbox" 
+                  :checked="systemStore.isPriceDetector" 
+                  @change="togglePriceDetector" 
+                />
+                <span>
+                  <i class="fa-solid fa-brain" :class="{ 'animate-pulse': systemStore.isPriceDetector }"></i>
+                  {{ systemStore.isPriceDetector ? 'กำลังตรวจจับราคาสต็อกบนเครื่องนี้' : 'เปิดจับราคาสต็อกบนเครื่องนี้' }}
+                </span>
+              </label>
+              <span v-if="systemStore.activePriceDetectorId && !systemStore.isPriceDetector" class="other-active-badge">
+                (เครื่อง <code>{{ systemStore.activePriceDetectorId.substring(0, 10) }}...</code> ถือสิทธิ์)
+              </span>
+              <label class="mute-toggle">
+                <input type="checkbox" v-model="isMuted" />
+                <span><i class="fa-solid" :class="isMuted ? 'fa-volume-xmark' : 'fa-volume-high'"></i> ปิดเสียงเริ่มต้น</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -74,17 +90,36 @@
               <h3><i class="fa-solid fa-waveform-lines"></i> รายการเสียงพูดสดที่จับได้</h3>
               <span class="live-dot"><span class="dot"></span> Live Transcribing</span>
             </div>
+
+            <!-- Learned Vocabulary Section -->
+            <div class="learned-vocabulary-section" v-if="voiceLearningStore.priceKeywords.length > 0">
+              <div class="vocab-title">
+                <span>📚 คำสั่งตรวจราคาที่รู้จำได้:</span>
+                <button class="btn-reset-vocab" @click="voiceLearningStore.resetLearnedPatterns" title="รีเซ็ตคำสั่งเสียงและคำที่เรียนรู้">
+                  <i class="fa-solid fa-rotate-left"></i> รีเซ็ต
+                </button>
+              </div>
+              <div class="vocab-badges">
+                <span v-for="word in voiceLearningStore.priceKeywords" :key="word" class="vocab-badge">
+                  {{ word }}
+                </span>
+              </div>
+            </div>
+
             <div class="transcripts-container">
               <div class="transcripts-list">
                 <div 
                   v-for="t in transcripts" 
                   :key="t.id" 
                   class="transcript-item"
-                  :class="{ 'is-order': isOrderKeyword(t.text) }"
+                  :class="{ 
+                    'is-order': isOrderKeyword(t.text),
+                    'is-price': isPriceKeyword(t.text)
+                  }"
                 >
                   <div class="transcript-meta">
                     <span class="sender-name">
-                      <i class="fa-solid fa-microphone"></i> {{ t.displayName }}
+                      <i class="fa-solid" :class="isPriceKeyword(t.text) ? 'fa-tags animate-pulse' : 'fa-microphone'"></i> {{ t.displayName }}
                     </span>
                     <span class="timestamp">{{ formatTime(t.timestamp) }}</span>
                   </div>
@@ -111,6 +146,7 @@
 import { ref, computed, watch, onUnmounted } from "vue";
 import { useSystemStore } from "../stores/system";
 import { useStockStore } from "../stores/stock";
+import { useVoiceLearningStore } from "../stores/voiceLearning";
 import { ref as dbRef, set, onChildAdded, query, limitToLast } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
@@ -118,6 +154,10 @@ import Swal from "sweetalert2";
 const emit = defineEmits(["close"]);
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
+const voiceLearningStore = useVoiceLearningStore();
+
+// Sync voice patterns
+voiceLearningStore.initVoicePatterns();
 
 const liveUrl = ref("");
 const isLoading = ref(false);
@@ -125,6 +165,21 @@ const isMuted = ref(true); // Default to muted
 const transcripts = ref([]);
 
 let voiceUnsubscribe = null;
+
+// Toggle active price detector role
+async function togglePriceDetector(event) {
+  const checked = event.target.checked;
+  await systemStore.setPriceDetectorState(checked);
+}
+
+// Check if a voice transcript is a price setting command
+function isPriceKeyword(text) {
+  if (!text) return false;
+  const codePattern = voiceLearningStore.codeKeywords.join("|");
+  const pricePattern = voiceLearningStore.priceKeywords.join("|");
+  const regex = new RegExp(`(?:${codePattern})\\s*\\d+\\s*(?:${pricePattern})?\\s*\\d+`, 'i');
+  return regex.test(text);
+}
 
 // Extract YouTube Video ID from various URL formats
 function extractVideoId(input) {
@@ -674,5 +729,148 @@ onUnmounted(() => {
   .preview-modal-container {
     height: 92vh;
   }
+}
+
+/* Detector Switch Toggle Styles */
+.detector-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  padding: 8px 16px;
+  border-radius: 9999px; /* Pill design */
+  cursor: pointer;
+  user-select: none;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.85em;
+  font-weight: 500;
+  color: #94a3b8;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+}
+.detector-toggle:hover {
+  color: #f1f5f9;
+  border-color: rgba(148, 163, 184, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+}
+.detector-toggle.is-active {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.18) 0%, rgba(245, 158, 11, 0.05) 100%);
+  border-color: rgba(234, 179, 8, 0.5);
+  color: #fbbf24;
+  box-shadow: 0 0 15px rgba(234, 179, 8, 0.25);
+}
+.detector-toggle input {
+  display: none;
+}
+.detector-toggle i {
+  font-size: 1.05em;
+  transition: transform 0.3s ease;
+}
+.detector-toggle.is-active i {
+  animation: brainPulse 2s infinite ease-in-out;
+}
+@keyframes brainPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(234, 179, 8, 0.4)); }
+  50% { transform: scale(1.15); filter: drop-shadow(0 0 8px rgba(234, 179, 8, 0.7)); }
+}
+
+.other-active-badge {
+  font-size: 0.8em;
+  color: #64748b;
+  font-family: "Kanit", sans-serif;
+  animation: pulse 2s infinite;
+}
+.other-active-badge code {
+  background: rgba(30, 41, 59, 0.5);
+  padding: 3px 6px;
+  border-radius: 6px;
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+/* Learned Vocabulary Styles */
+.learned-vocabulary-section {
+  background: linear-gradient(to bottom, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.45));
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  padding: 14px 20px;
+  font-family: "Kanit", sans-serif;
+  backdrop-filter: blur(12px);
+}
+.vocab-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85em;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-bottom: 8px;
+  letter-spacing: 0.03em;
+}
+.btn-reset-vocab {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  padding: 3px 10px;
+  border-radius: 9999px;
+  color: #64748b;
+  font-size: 0.85em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+}
+.btn-reset-vocab:hover {
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.3);
+  background: rgba(244, 63, 94, 0.05);
+  transform: translateY(-0.5px);
+}
+.btn-reset-vocab i {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.btn-reset-vocab:hover i {
+  transform: rotate(-180deg);
+}
+
+.vocab-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.vocab-badge {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(245, 158, 11, 0.04) 100%);
+  border: 1px solid rgba(234, 179, 8, 0.22);
+  color: #fbbf24;
+  font-size: 0.78em;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-weight: 500;
+  transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  cursor: default;
+}
+.vocab-badge:hover {
+  transform: translateY(-2px);
+  border-color: rgba(234, 179, 8, 0.5);
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
+}
+
+/* Highlighted Price Transcripts */
+.transcript-item.is-price {
+  border-left: 4px solid #eab308;
+  background: linear-gradient(to right, rgba(234, 179, 8, 0.07) 0%, rgba(234, 179, 8, 0.02) 100%);
+  box-shadow: inset 1px 0 0 rgba(234, 179, 8, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+.transcript-item.is-price:hover {
+  background: linear-gradient(to right, rgba(234, 179, 8, 0.1) 0%, rgba(234, 179, 8, 0.04) 100%);
+  transform: translateX(3px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+.transcript-item.is-price .sender-name {
+  color: #fbbf24;
 }
 </style>

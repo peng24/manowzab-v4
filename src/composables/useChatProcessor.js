@@ -2,6 +2,7 @@ import { useStockStore } from "../stores/stock";
 import { useChatStore } from "../stores/chat";
 import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
+import { useVoiceLearningStore } from "../stores/voiceLearning";
 
 import { useAudio } from "./useAudio";
 import {
@@ -177,6 +178,55 @@ export function useChatProcessor() {
     // 🟢 ตรวจสอบว่าเป็น Voice Chat หรือไม่
     const isVoiceChat =
       uid === "voice-chat-uid" || (uid && uid.includes("voice-chat"));
+
+    if (isVoiceChat) {
+      if (!systemStore.isPriceDetector) {
+        logger.debug("Skipped processing voice message - this device is not the active price detector.");
+        return;
+      }
+
+      // Initialize voice learning store and dynamic pattern extraction
+      const voiceLearningStore = useVoiceLearningStore();
+      voiceLearningStore.initVoicePatterns();
+
+      const codePattern = voiceLearningStore.codeKeywords.join("|");
+      const pricePattern = voiceLearningStore.priceKeywords.join("|");
+      const unitPattern = voiceLearningStore.unitKeywords.join("|");
+
+      // Dynamic regex matching
+      const regex1 = new RegExp(`(?:${codePattern})\\s*(\\d+)\\s*(?:${pricePattern})?\\s*(\\d+)\\s*(?:${unitPattern})?`, 'i');
+      const regex2 = new RegExp(`(\\d+)\\s*(?:${pricePattern})\\s*(\\d+)\\s*(?:${unitPattern})?`, 'i');
+
+      const match = normalizedMsg.match(regex1) || normalizedMsg.match(regex2);
+      if (match) {
+        const itemId = parseInt(match[1]);
+        const priceVal = parseInt(match[2]);
+
+        if (itemId > 0 && itemId <= MAX_ITEM_ID && priceVal >= 0) {
+          // Update Stock Price (pass isAuto = true to bypass self-learning loop)
+          await stockStore.updateStockPrice(itemId, priceVal, true);
+          logger.success(`🎙️ Voice Price Detected: Item ${itemId} set to ฿${priceVal}`);
+
+          // Post a special price_update message to chat
+          chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+            id: item.id || `voice-price-${Date.now()}`,
+            text: msg,
+            authorName: "ระบบเสียงสด (AI)",
+            displayName: "ตั้งราคาอัตโนมัติ 💰",
+            realName: "เสียงพูดแม่ค้า",
+            uid: uid,
+            avatar: avatar,
+            isAdmin: true,
+            type: "price_update",
+            sfxType: "success",
+            ttsText: `รหัส ${itemId} ตั้งราคา ${priceVal} บาท`,
+            detectionMethod: "voice-price-extractor",
+            timestamp: new Date(item.snippet.publishedAt).getTime(),
+          });
+          return;
+        }
+      }
+    }
 
     // Check Nickname
     let displayName = realName;

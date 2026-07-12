@@ -62,11 +62,13 @@ import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Upda
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import PhoneticManager from "./components/PhoneticManager.vue"; // ✅ Import Phonetic Manager
 import ManowPricePreview from "./components/ManowPricePreview.vue";
+import { useVoiceLearningStore } from "./stores/voiceLearning";
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
 const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
+const voiceLearningStore = useVoiceLearningStore();
 
 // ✅ Global Watcher: Silence immediately when Sound is toggled OFF
 watch(
@@ -141,6 +143,11 @@ onMounted(async () => {
 
   const unsubHost = systemStore.initHostListener(); // ✅ Init Host Listener
   if (unsubHost) cleanupFns.push(unsubHost);
+
+  const unsubDetector = systemStore.initPriceDetectorListener(); // ✅ Init Price Detector Listener
+  if (unsubDetector) cleanupFns.push(unsubDetector);
+
+  voiceLearningStore.initVoicePatterns(); // ✅ Init Voice Patterns Self-Learning
 
   // ✅ Reset Connection State (Ensure YouTube starts disconnected)
   systemStore.isConnected = false;

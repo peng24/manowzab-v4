@@ -11,6 +11,7 @@ import {
 } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useSystemStore } from "./system";
+import { useVoiceLearningStore } from "./voiceLearning";
 
 /**
  * Stock Store
@@ -350,9 +351,14 @@ export const useStockStore = defineStore("stock", () => {
    * Updates only the price of a stock item.
    * @param {number} num
    * @param {number} price
+   * @param {boolean} [isAuto=false] - Whether this update was triggered by the auto voice detector
    */
-  function updateStockPrice(num, price) {
+  function updateStockPrice(num, price, isAuto = false) {
     const path = `stock/${systemStore.currentVideoId}/${num}/price`;
+    if (!isAuto) {
+      const voiceLearningStore = useVoiceLearningStore();
+      voiceLearningStore.triggerSelfLearning(num, price);
+    }
     return update(dbRef(db), { [path]: price });
   }
 
@@ -382,9 +388,15 @@ export const useStockStore = defineStore("stock", () => {
    * Updates generic item data (Price, Size, etc.).
    * @param {number} num - Item ID
    * @param {Object} newData - Data to update (e.g. { price: 100, size: "XL" })
+   * @param {boolean} [isAuto=false] - Whether this update was triggered by the auto voice detector
    */
-  async function updateItemData(num, newData) {
+  async function updateItemData(num, newData, isAuto = false) {
     if (!systemStore.currentVideoId) return;
+
+    if (newData && newData.price !== undefined && !isAuto) {
+      const voiceLearningStore = useVoiceLearningStore();
+      voiceLearningStore.triggerSelfLearning(num, newData.price);
+    }
 
     // 1. Update Stock Item
     await update(

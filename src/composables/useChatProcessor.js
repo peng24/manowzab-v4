@@ -70,35 +70,26 @@ if (import.meta.hot) {
   });
 }
 
-// 🚀 Performance: Regex patterns at module level
-const multiBuyRegex =
-  /^(?:F|f|cf|CF|รับ|เอา|เิา)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
-const adminProxyNumFirstRegex = /^(\d+)\s+([ก-๛a-zA-Z].*)$/;
-const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z][^]*?)\s+(\d+)$/;
-const shippingRegex =
-  /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม|รอบส่ง|พัสดุ|เลขพัสดุ|เช็คเลข|แจ้งโอน|ขนส่ง|เคอรี่|แฟลช|ไปรษณีย์|ค่าส่ง|โอนแล้ว|flash|kerry|j&t|jt/;
-const questionRegex =
-  /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|ไซส์|ใหม|หรอ|ปะ|ยังไง|อะไร|กี่|นิ้ว|เซน|เซนติเมตร|โล|กิโล|ชิ้น|ตัว|แพ็ค|แพค/;
-const pureNumberRegex = /^\s*(\d+)\s*$/;
-const fuzzyNumberRegex = /^\s*[,.\/;:]*\s*(\d+)\s*[,.\/;:]*\s*$/;
-const explicitBuyRegex =
-  /(?:(?:F|f|cf|CF|รับ|เอา|เิา|รหัส|ระหัส|เบอร์|ลอง|รายการที่|รายการ|ชุดที่|ชุด|จอง)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(\d+))|(?:(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา|รหัส|ระหัส|เบอร์|ลอง|รายการที่|รายการ|ชุดที่|ชุด|จอง))/i;
-const numberWithPoliteRegex =
-  /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
-const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
-const customerNameNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,}?)\s+(\d+)$/;
-const numAndDescRegex = /^(\d+)\s*([ก-๛a-zA-Z\s\(\)\[\]\-]+)$/;
-const cancelKeywordRegex =
-  /cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า/i;
-const standalonePassRegex = /^(?:ขอ)?ผ่าน\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|เลย)*$/i;
-
-// 🛡️ Safety: Maximum item ID to prevent absurd stock expansion from spam/typos (e.g. "555555")
-const MAX_ITEM_ID = 300;
-
-// ✅ Thai Numeral → Arabic Digit Converter
-function thaiToArabic(text) {
-  return text.replace(/[๐-๙]/g, (ch) => ch.charCodeAt(0) - 0x0e50);
-}
+import {
+  MAX_ITEM_ID,
+  multiBuyRegex,
+  adminProxyNumFirstRegex,
+  adminProxyNameFirstRegex,
+  shippingRegex,
+  questionRegex,
+  pureNumberRegex,
+  fuzzyNumberRegex,
+  explicitBuyRegex,
+  numberWithPoliteRegex,
+  dashBuyRegex,
+  customerNameNumRegex,
+  numAndDescRegex,
+  cancelKeywordRegex,
+  standalonePassRegex,
+  thaiToArabic,
+  stringToColor,
+  isAdminUser,
+} from "../utils/chatParserUtils";
 
 // ✅ Toast Notification Mixin
 const Toast = Swal.mixin({
@@ -127,14 +118,6 @@ export function useChatProcessor() {
   const { queueAudio, playSfx, resetVoice } = useAudio();
 
   // extractMessageRuns is now imported from ../services/YouTubeLiveChat
-
-  function stringToColor(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return `hsl(${Math.abs(hash) % 360}, 85%, 75%)`;
-  }
 
   async function processMessage(item) {
     // ✅ Auto-clear session state when video changes

@@ -12,6 +12,21 @@
  */
 
 export const changelog = [
+  // ─── 4.47.x ───────────────────────────────────────────
+  {
+    version: '4.47.0',
+    date: '2026-07-24',
+    changes: {
+      improved: [
+        'ปรับปรุงสถาปัตยกรรมระดับไฟล์ (Modular Architecture Refactoring) — แยก Sub-components เล็ก (StockItemCard.vue, QueueEditModal.vue, HistorySidebar.vue, HistoryStatsHeader.vue) ออกจากไฟล์ใหญ่ (StockGrid.vue, HistoryModal.vue) เพิ่มประสิทธิภาพการ Render UI และความง่ายในการดูแลรักษา',
+        'ย้ายและจัดกลุ่มฟังก์ชันวิเคราะห์แชทบริสุทธิ์ (Pure Chat Parser Utilities) — แยก chatParserUtils.js ปราศจาก Side-effects สำหรับการแปลงเลขไทย (๐-๙) และ Regex จอง/ยกเลิก/ถามสินค้า'
+      ],
+      added: [
+        'ระบบทดสอบอัตโนมัติ (Automated Unit Testing Suite with Vitest) — ติดตั้ง Vitest พร้อมชุดทดสอบครอบคลุม Regex การจองสินค้า เลขไทย และการทำงานของ Pinia Stock Store ด้วย setActivePinia()',
+        'ระบบสำรองข้อมูลเมื่อเน็ตหลุด (Offline Resilience & Action Queue) — เพิ่ม useOfflineQueue.js บันทึกการทำรายการลง LocalStorage พร้อม sequenceId และ timestamp เพื่อป้องกันข้อมูลขัดแย้งขณะเน็ตหลุด'
+      ]
+    }
+  },
   // ─── 4.46.x ───────────────────────────────────────────
   {
     version: '4.46.0',

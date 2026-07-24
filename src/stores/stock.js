@@ -408,6 +408,7 @@ export const useStockStore = defineStore("stock", () => {
   return {
     stockData,
     stockSize,
+    milestones,
     connectToStock,
     processOrder,
     processCancel,

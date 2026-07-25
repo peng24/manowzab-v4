@@ -155,6 +155,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         shipping: resolve(__dirname, 'shipping/index.html'),
+        history: resolve(__dirname, 'history/index.html'),
       },
     },
   },

@@ -5,9 +5,14 @@
       <!-- HEADER -->
       <div class="modal-header">
         <h2><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการขาย (History)</h2>
-        <button class="btn-close" @click="$emit('close')">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <a :href="`${baseUrl}history/`" target="_blank" class="btn btn-sm btn-outline" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); text-decoration: none; font-size: 0.85em;">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดหน้าแยก
+          </a>
+          <button class="btn-close" @click="$emit('close')">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
       </div>
 
       <div class="modal-body">
@@ -403,6 +408,7 @@ import Swal from "sweetalert2";
 
 const emit = defineEmits(["close"]);
 const history = useHistory();
+const baseUrl = import.meta.env.BASE_URL || "/";
 
 const selectedId = ref(null);
 const selectedItem = ref(null);

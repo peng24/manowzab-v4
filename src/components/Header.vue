@@ -163,6 +163,10 @@
                 <i class="fa-solid fa-truck-fast"></i>
                 <span>รายการจัดส่ง (มือถือ)</span>
               </a>
+              <a :href="`${baseUrl}history/`" target="_blank" class="menu-history-page">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>ประวัติการขาย (แยกหน้า)</span>
+              </a>
               <a href="https://peng24.github.io/manowzab-sales/" target="_blank" class="menu-sales">
                 <i class="fa-solid fa-chart-line"></i>
                 <span>ยอดขาย</span>

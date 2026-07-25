@@ -1670,28 +1670,47 @@ async function openCleanupModal() {
 }
 
 .sidebar-item {
-  padding: 15px;
-  border-bottom: 1px solid #334155;
+  padding: 12px 14px;
+  margin: 5px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
 }
 
-.sidebar-item:hover { background: #334155; }
-.sidebar-item.active { background: #2563eb; border-color: #2563eb; }
+.sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateX(2px);
+}
+
+.sidebar-item.active {
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.18) 0%, rgba(0, 200, 83, 0.06) 100%);
+  border: 1.5px solid #00e676;
+  box-shadow: 0 4px 15px rgba(0, 230, 118, 0.2);
+}
 
 .item-title {
   color: #f1f5f9;
-  font-weight: 500;
+  font-weight: 600;
   margin-bottom: 4px;
   white-space: nowrap; 
   overflow: hidden; 
   text-overflow: ellipsis; 
 }
 .item-date { color: #94a3b8; font-size: 0.85em; }
-.item-meta { margin-top: 5px; color: #10b981; font-size: 0.9em; font-weight: bold; }
+.item-meta {
+  margin-top: 5px;
+  color: #ffd700;
+  font-size: 0.95em;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
 
-.sidebar-item.active .item-date,
-.sidebar-item.active .item-meta { color: #cbd5e1; }
+.sidebar-item.active .item-title { color: #ffffff; }
+.sidebar-item.active .item-date { color: #a7f3d0; }
+.sidebar-item.active .item-meta { color: #ffd700; }
 
 /* Main Content */
 .main-content {
@@ -2076,17 +2095,25 @@ async function openCleanupModal() {
 }
 
 .grid-item.sold {
-    background: rgba(16, 185, 129, 0.15);
-    border-color: #10b981;
+    background: linear-gradient(145deg, rgba(220, 38, 38, 0.22) 0%, rgba(139, 0, 0, 0.4) 100%);
+    border: 2px solid #ef4444;
+    box-shadow: 0 4px 15px rgba(220, 38, 38, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .item-num {
     position: absolute;
     top: 4px;
-    left: 8px;
-    font-size: 1.25em;
-    font-weight: bold;
-    color: #64748b;
+    left: 4px;
+    font-size: 1.1em;
+    font-weight: 800;
+    font-family: var(--font-main);
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 1px 6px;
+    border-radius: 6px;
+    line-height: 1;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
 .item-status {

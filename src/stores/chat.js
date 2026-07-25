@@ -4,6 +4,7 @@ import { ref as dbRef, onChildAdded, off, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useAudio } from "../composables/useAudio";
 import { logger } from "../utils/logger";
+import { useNicknameStore } from "./nickname";
 
 export const useChatStore = defineStore("chat", () => {
   const messages = reactive([]); // ✅ เปลี่ยนเป็น reactive
@@ -19,6 +20,20 @@ export const useChatStore = defineStore("chat", () => {
     if (seenMessageIds.value[message.id]) {
       logger.warn("Duplicate message:", message.id);
       return;
+    }
+
+    // ✅ Resolve current nickname dynamically from nicknameStore
+    try {
+      const nicknameStore = useNicknameStore();
+      const resolved = nicknameStore.getNickname(
+        message.uid,
+        message.realName || message.authorName || message.displayName
+      );
+      if (resolved) {
+        message.displayName = resolved;
+      }
+    } catch (e) {
+      // Store not ready
     }
 
     seenMessageIds.value[message.id] = true;

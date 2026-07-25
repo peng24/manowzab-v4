@@ -244,10 +244,14 @@ function formatTime(timestamp) {
 
 // ✅ Edit Nickname Logic
 async function editNickname(chat) {
+  const targetUid = chat.uid || chat.realName || chat.authorName;
+  const realNameStr = chat.realName || chat.authorName || chat.displayName;
+  if (!targetUid) return;
+
   const { value: newNick } = await Swal.fire({
     title: "แก้ไขชื่อเล่น",
     input: "text",
-    inputLabel: `ชื่อจริง: ${chat.realName}`,
+    inputLabel: `ชื่อจริง: ${realNameStr}`,
     inputValue: chat.displayName,
     showCancelButton: true,
     confirmButtonText: "บันทึก",
@@ -255,15 +259,31 @@ async function editNickname(chat) {
   });
 
   if (newNick && newNick.trim() !== "") {
+    const trimmedNick = newNick.trim();
     const updates = {};
-    updates[`nicknames/${chat.uid}`] = {
-      nick: newNick.trim(),
-      realName: chat.realName,
+    updates[`nicknames/${targetUid}`] = {
+      nick: trimmedNick,
+      realName: realNameStr,
       updatedAt: Date.now(),
     };
+    if (chat.uid && chat.realName && chat.uid !== chat.realName) {
+      updates[`nicknames/${chat.realName}`] = {
+        nick: trimmedNick,
+        realName: realNameStr,
+        updatedAt: Date.now(),
+      };
+    }
 
     update(dbRef(db), updates)
       .then(() => {
+        // ✅ Instant update across all messages in local chatStore memory
+        if (chatStore.messages) {
+          chatStore.messages.forEach((m) => {
+            if (m.uid === chat.uid || m.realName === realNameStr || m.authorName === realNameStr) {
+              m.displayName = trimmedNick;
+            }
+          });
+        }
         Swal.fire({
           icon: "success",
           title: "บันทึกแล้ว",

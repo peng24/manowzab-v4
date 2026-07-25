@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "../utils/logger";
+import { useChatStore } from "./chat";
 
 export const useNicknameStore = defineStore("nickname", () => {
   const nicknames = ref({});
@@ -20,16 +21,33 @@ export const useNicknameStore = defineStore("nickname", () => {
       const data = snapshot.val() || {};
       nicknames.value = data;
       logger.debug("📝 Nicknames updated:", Object.keys(data).length);
+
+      // ✅ Update chatStore messages in real-time when nicknames change
+      try {
+        const chatStore = useChatStore();
+        if (chatStore.messages && chatStore.messages.length > 0) {
+          chatStore.messages.forEach((msg) => {
+            const resolved = getNickname(msg.uid, msg.realName || msg.authorName);
+            if (resolved && msg.displayName !== resolved) {
+              msg.displayName = resolved;
+            }
+          });
+        }
+      } catch (e) {
+        // Store not ready yet
+      }
     });
   }
 
   // 👁️ สำหรับแสดงผลบนจอ (เอาชื่อสั้นๆ เดิมๆ)
   function getNickname(uid, realName) {
-    // ไม่ต้องมี Hardcode ตรงนี้แล้ว
-    if (nicknames.value[uid]) {
-      return typeof nicknames.value[uid] === "object"
-        ? nicknames.value[uid].nick
-        : nicknames.value[uid];
+    if (uid && nicknames.value[uid]) {
+      const entry = nicknames.value[uid];
+      return typeof entry === "object" ? entry.nick : entry;
+    }
+    if (realName && nicknames.value[realName]) {
+      const entry = nicknames.value[realName];
+      return typeof entry === "object" ? entry.nick : entry;
     }
     return realName;
   }

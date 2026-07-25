@@ -1069,7 +1069,7 @@ function scrollToItem(num) {
         highlightedId.value = num;
         setTimeout(() => {
           if (highlightedId.value === num) highlightedId.value = null;
-        }, 3000);
+        }, 10000);
       }
     });
   });

@@ -1,79 +1,81 @@
 <template>
-  <div v-if="showEditor" class="note-editor-overlay" @click.self="closeEditor">
-    <div class="note-editor-modal">
-      <div class="note-editor-header">
-        <h3><i class="fa-solid fa-note-sticky"></i> จัดการ Note</h3>
-        <button class="btn-close-editor" @click="closeEditor">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <!-- Create Note Form -->
-      <div class="note-form">
-        <textarea
-          v-model="newNoteText"
-          class="note-textarea"
-          placeholder="พิมพ์ข้อความ Note..."
-          rows="3"
-          maxlength="200"
-        ></textarea>
-        <div class="note-form-row">
-          <div class="color-picker-row">
-            <span class="color-label">สี:</span>
-            <div class="color-palette">
-              <button
-                v-for="color in colorPalette"
-                :key="color"
-                class="color-swatch"
-                :class="{ active: selectedColor === color }"
-                :style="{ background: color }"
-                @click="selectedColor = color"
-                :title="color"
-              ></button>
-            </div>
-          </div>
-          <button
-            class="btn btn-create-note"
-            @click="createNote"
-            :disabled="!newNoteText.trim()"
-          >
-            <i class="fa-solid fa-plus"></i> สร้าง Note
+  <Teleport to="body">
+    <div v-if="showEditor" class="note-editor-overlay" @click.self="closeEditor">
+      <div class="note-editor-modal">
+        <div class="note-editor-header">
+          <h3><i class="fa-solid fa-note-sticky"></i> จัดการ Note</h3>
+          <button class="btn-close-editor" @click="closeEditor">
+            <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
-      </div>
 
-      <!-- Active Notes List -->
-      <div class="note-list-section">
-        <h4 class="note-list-title">📋 Note ที่แสดงอยู่</h4>
-        <div v-if="activeNotes.length === 0" class="note-empty">
-          ยังไม่มี Note
+        <!-- Create Note Form -->
+        <div class="note-form">
+          <textarea
+            v-model="newNoteText"
+            class="note-textarea"
+            placeholder="พิมพ์ข้อความ Note..."
+            rows="3"
+            maxlength="200"
+          ></textarea>
+          <div class="note-form-row">
+            <div class="color-picker-row">
+              <span class="color-label">สี:</span>
+              <div class="color-palette">
+                <button
+                  v-for="color in colorPalette"
+                  :key="color"
+                  class="color-swatch"
+                  :class="{ active: selectedColor === color }"
+                  :style="{ background: color }"
+                  @click="selectedColor = color"
+                  :title="color"
+                ></button>
+              </div>
+            </div>
+            <button
+              class="btn btn-create-note"
+              @click="createNote"
+              :disabled="!newNoteText.trim()"
+            >
+              <i class="fa-solid fa-plus"></i> สร้าง Note
+            </button>
+          </div>
         </div>
-        <div v-for="note in activeNotes" :key="note.id" class="note-list-item">
-          <span
-            class="note-list-dot"
-            :style="{ background: note.color || '#3b82f6' }"
-          ></span>
-          <span class="note-list-text">{{ note.text }}</span>
-          <div class="note-list-actions">
-            <button
-              class="note-list-btn note-list-deactivate"
-              @click="deactivateNote(note.id)"
-              title="ปิด Note"
-            >
-              <i class="fa-solid fa-eye-slash"></i>
-            </button>
-            <button
-              class="note-list-btn note-list-delete"
-              @click="deleteNote(note.id)"
-              title="ลบ Note"
-            >
-              <i class="fa-solid fa-trash"></i>
-            </button>
+
+        <!-- Active Notes List -->
+        <div class="note-list-section">
+          <h4 class="note-list-title">📋 Note ที่แสดงอยู่</h4>
+          <div v-if="activeNotes.length === 0" class="note-empty">
+            ยังไม่มี Note
+          </div>
+          <div v-for="note in activeNotes" :key="note.id" class="note-list-item">
+            <span
+              class="note-list-dot"
+              :style="{ background: note.color || '#3b82f6' }"
+            ></span>
+            <span class="note-list-text">{{ note.text }}</span>
+            <div class="note-list-actions">
+              <button
+                class="note-list-btn note-list-deactivate"
+                @click="deactivateNote(note.id)"
+                title="ปิด Note"
+              >
+                <i class="fa-solid fa-eye-slash"></i>
+              </button>
+              <button
+                class="note-list-btn note-list-delete"
+                @click="deleteNote(note.id)"
+                title="ลบ Note"
+              >
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -202,7 +204,7 @@ onUnmounted(() => {
 });
 
 // Expose open for parent
-defineExpose({ openEditor });
+defineExpose({ openEditor, open: openEditor, closeEditor, close: closeEditor });
 </script>
 
 <style scoped>

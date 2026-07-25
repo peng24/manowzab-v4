@@ -12,6 +12,7 @@ import {
 import { db } from "../composables/useFirebase";
 import { useSystemStore } from "./system";
 import { useVoiceLearningStore } from "./voiceLearning";
+import { syncDeliveryCustomerForOwner } from "../utils/deliverySync";
 
 /**
  * Stock Store
@@ -193,6 +194,13 @@ export const useStockStore = defineStore("stock", () => {
         }
       });
 
+      // ✅ Auto-sync customer to delivery_customers
+      if (action === "claimed") {
+        syncDeliveryCustomerForOwner(owner, uid, systemStore.currentVideoId).catch((e) =>
+          console.warn("Auto sync delivery error:", e)
+        );
+      }
+
       return { success: true, action, error: null };
     } catch (e) {
       console.error("Transaction failed: ", e);
@@ -264,6 +272,18 @@ export const useStockStore = defineStore("stock", () => {
           return currentData;
         }
       });
+
+      // ✅ Auto-sync delivery_customers for previous owner and promoted next owner
+      if (previousOwner) {
+        syncDeliveryCustomerForOwner(previousOwner, uid, systemStore.currentVideoId).catch((e) =>
+          console.warn("Auto sync delivery error on cancel:", e)
+        );
+      }
+      if (nextOwner) {
+        syncDeliveryCustomerForOwner(nextOwner, null, systemStore.currentVideoId).catch((e) =>
+          console.warn("Auto sync delivery error on promote:", e)
+        );
+      }
 
       return {
         success: true,

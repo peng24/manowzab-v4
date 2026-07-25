@@ -126,10 +126,6 @@
                 <i :class="isSimulating ? 'fa-solid fa-stop' : 'fa-solid fa-bolt'"></i>
                 <span>{{ isSimulating ? "หยุดจำลองแชท" : "เริ่มจำลองแชท" }}</span>
               </a>
-              <a @click="openPreview" class="menu-preview">
-                <i class="fa-solid fa-tv"></i>
-                <span>สตรีมสด (Preview)</span>
-              </a>
               <a @click="downloadCSV" class="menu-csv">
                 <i class="fa-solid fa-file-csv"></i>
                 <span>บันทึกแชท (CSV)</span>
@@ -218,7 +214,7 @@
 </template>
 
 <script setup>
-import { ref, inject, computed, onMounted, onBeforeUnmount, watch } from "vue"; // ✅ เพิ่ม watch
+import { ref, inject, provide, computed, onMounted, onBeforeUnmount, watch } from "vue"; // ✅ เพิ่ม watch
 import { useSystemStore } from "../stores/system";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
@@ -255,7 +251,6 @@ const openDashboard = inject("openDashboard");
 const openHistory = inject("openHistory");
 const openShippingManager = inject("openShippingManager");
 const openPhoneticManager = inject("openPhoneticManager");
-const openManowPricePreview = inject("openManowPricePreview");
 
 const videoId = ref("");
 const showDropdown = ref(false);
@@ -594,18 +589,21 @@ async function toggleSimulation() {
 
 function openNoteEditor() {
   if (noteEditorRef.value) {
-    noteEditorRef.value.openEditor();
+    if (typeof noteEditorRef.value.openEditor === "function") {
+      noteEditorRef.value.openEditor();
+    } else if (typeof noteEditorRef.value.open === "function") {
+      noteEditorRef.value.open();
+    }
+  } else {
+    logger.warn("noteEditorRef is null");
   }
   showDropdown.value = false;
 }
 
+provide("openNoteEditor", openNoteEditor);
+
 function openPhoneticMgr() {
   if (openPhoneticManager) openPhoneticManager();
-  showDropdown.value = false;
-}
-
-function openPreview() {
-  if (openManowPricePreview) openManowPricePreview();
   showDropdown.value = false;
 }
 

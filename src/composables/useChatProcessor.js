@@ -20,6 +20,7 @@ import { extractMessageRuns } from "../services/YouTubeLiveChat";
 import Swal from "sweetalert2";
 import { watch } from "vue";
 import { logger } from "../utils/logger";
+import { resolveDeliveryUid } from "../utils/deliverySync";
 
 // Saved names cache
 const savedNamesCache = ref({});
@@ -531,19 +532,7 @@ export function useChatProcessor() {
         const parsedDate = `${y}-${m}-${d}`;
 
         // ✅ DEDUP: Check if customer with same name already exists in delivery_customers
-        let targetUid = autoShipUid;
-        try {
-          const existingSnap = await get(dbRef(db, "delivery_customers"));
-          const existingData = existingSnap.val() || {};
-          const existingEntry = Object.entries(existingData).find(
-            ([, val]) => val.name === autoShipName && val.status !== "done",
-          );
-          if (existingEntry) {
-            targetUid = existingEntry[0]; // Reuse existing key
-          }
-        } catch (e) {
-          logger.warn("Dedup check failed, proceeding with new entry:", e);
-        }
+        let targetUid = await resolveDeliveryUid(autoShipUid, autoShipName);
 
         update(dbRef(db, `delivery_customers/${targetUid}`), {
           name: autoShipName,

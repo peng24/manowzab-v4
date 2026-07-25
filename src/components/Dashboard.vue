@@ -231,6 +231,7 @@ import { useChatStore } from "../stores/chat";
 import { ref as dbRef, onValue, update, push, get } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
+import { resolveDeliveryUid, recalcItemCount, normalizeCustomerName } from "../utils/deliverySync";
 
 const emit = defineEmits(["close"]);
 
@@ -455,24 +456,6 @@ function isProxyGroupKey(uid) {
   return uid && uid.startsWith("name:");
 }
 
-// ✅ Helper: หา delivery_customers key จริง จากชื่อ (สำหรับ proxy)
-async function resolveDeliveryUid(uid, name) {
-  // ถ้าเป็น uid จริง (ไม่ใช่ proxy key) ใช้เลย
-  if (!isProxyGroupKey(uid)) return uid;
-  
-  // ค้นหา entry ที่มีชื่อตรงกันใน delivery_customers
-  const snapshot = await get(dbRef(db, "delivery_customers"));
-  const data = snapshot.val() || {};
-  const existingKey = Object.keys(data).find(key => {
-    return data[key].name === name && data[key].status !== "done";
-  });
-  
-  if (existingKey) return existingKey;
-  
-  // ไม่มี → สร้าง key ใหม่จากชื่อ (ป้องกัน Firebase path issues)
-  return "customer-" + Date.now() + "-" + Math.random().toString(36).substring(2, 5);
-}
-
 // ✅ Auto-sync ลูกค้าคนเดียว
 async function syncCustomerToDelivery(uid, name, order, videoId) {
   // ✅ Resolve proxy group keys ให้เป็น key จริงก่อน sync
@@ -492,7 +475,7 @@ async function syncCustomerToDelivery(uid, name, order, videoId) {
   if (!existing) {
     // New customer
     await update(customerRef, {
-      name,
+      name: name ? name.trim() : "",
       deliveryDate: null,
       note: "",
       status: "pending",
@@ -501,7 +484,7 @@ async function syncCustomerToDelivery(uid, name, order, videoId) {
     });
   } else {
     // Existing — update name + timestamp, keep status if not done
-    const updates = { name, updatedAt: Date.now() };
+    const updates = { name: name ? name.trim() : existing.name, updatedAt: Date.now() };
     if (existing.status === "done") updates.status = "pending";
     await update(customerRef, updates);
   }
@@ -511,23 +494,6 @@ async function syncCustomerToDelivery(uid, name, order, videoId) {
 
   // Recalculate total itemCount
   await recalcItemCount(deliveryUid);
-}
-
-// ✅ คำนวณ itemCount ใหม่จาก sessions (กรองเฉพาะ session ที่ยังไม่จัดส่ง)
-async function recalcItemCount(uid) {
-  const sessionsSnap = await get(dbRef(db, `delivery_customers/${uid}/sessions`));
-  const sessions = sessionsSnap.val() || {};
-  const totalCount = Object.values(sessions)
-    .filter(s => s.status !== "done")
-    .reduce((sum, s) => sum + (s.count || 0), 0);
-  const totalPrice = Object.values(sessions)
-    .filter(s => s.status !== "done")
-    .reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-  await update(dbRef(db, `delivery_customers/${uid}`), {
-    itemCount: totalCount,
-    totalPrice: totalPrice,
-    updatedAt: Date.now(),
-  });
 }
 
 // ✅ Sync ทั้งรายการ shipping list ไป delivery_customers

@@ -1806,10 +1806,6 @@ body {
   background: linear-gradient(135deg, #0284c7, #0369a1);
 }
 
-.menu-preview i {
-  background: linear-gradient(135deg, #6366f1, #4338ca);
-}
-
 /* Active breathing glow states for simulation and away mode */
 .menu-sim.active {
   background: rgba(245, 158, 11, 0.15) !important;

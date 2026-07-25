@@ -105,19 +105,6 @@ provide("openDashboard", () => (showDashboard.value = true));
 provide("openHistory", () => (showHistory.value = true));
 provide("openShippingManager", () => (showShippingManager.value = true));
 provide("openPhoneticManager", () => (showPhoneticManager.value = true));
-provide("openManowPricePreview", () => {
-  const width = 1200;
-  const height = 800;
-  const left = (window.screen.width - width) / 2;
-  const top = (window.screen.height - height) / 2;
-  const basePath = import.meta.env.BASE_URL || "/";
-  const url = `${basePath.replace(/\/$/, '')}/preview/`;
-  window.open(
-    url,
-    "ManowStreamPreview",
-    `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,status=no,resizable=yes`
-  );
-});
 
 // ✅ Active Price Detector Voice Listener Watcher
 const { initManowPriceVoiceListener } = useChatProcessor();

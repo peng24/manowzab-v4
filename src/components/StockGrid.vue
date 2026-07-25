@@ -349,7 +349,7 @@ const todayDeliveryCount = computed(() => {
 
 const deliveryStrip = computed(() => {
   return deliveryCustomers.value
-    .filter((c) => c.status !== 'done')
+    .filter((c) => c.status !== 'done' && !!c.deliveryDate)
     .map((c) => {
       const days = getDeliveryDays(c.deliveryDate);
       let urgency, info, tooltip;

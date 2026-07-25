@@ -434,18 +434,21 @@ export function useChatProcessor() {
       let autoShipUid = uid;
       let isAutoShip = false;
 
-      const shipNowMatch = normalizedMsg.match(/ส่งเลย|ส่งวันนี้/);
       const shipTmrMatch = normalizedMsg.match(
         /ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/,
       );
       const shipDateMatch = normalizedMsg.match(
         /ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/,
       );
+      const shipNowMatch = normalizedMsg.match(
+        /ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])ส่ง(?:$|[^\u0E00-\u0E7F\w])/,
+      );
 
       let matchedKeyword = null;
-      if (shipNowMatch) matchedKeyword = shipNowMatch[0];
-      else if (shipTmrMatch) matchedKeyword = shipTmrMatch[0];
+      if (shipTmrMatch) matchedKeyword = shipTmrMatch[0];
       else if (shipDateMatch) matchedKeyword = shipDateMatch[0];
+      else if (shipNowMatch) matchedKeyword = shipNowMatch[0];
+      else matchedKeyword = "ส่ง";
 
       if (isAdmin && matchedKeyword) {
         // Clean Name Logic (same robust fallback used in chat buying)
@@ -470,10 +473,7 @@ export function useChatProcessor() {
         }
       }
 
-      if (shipNowMatch) {
-        isAutoShip = true;
-        autoShipDate = new Date();
-      } else if (shipTmrMatch) {
+      if (shipTmrMatch) {
         isAutoShip = true;
         autoShipDate = new Date();
         autoShipDate.setDate(autoShipDate.getDate() + 1);
@@ -523,6 +523,10 @@ export function useChatProcessor() {
         if (autoShipDate < new Date() && new Date().getDate() - day > 15) {
           autoShipDate.setMonth(autoShipDate.getMonth() + 1);
         }
+      } else {
+        // Default to Today for "ส่ง", "ส่งเลย", "โอนแล้ว", or any matching shipping intent
+        isAutoShip = true;
+        autoShipDate = new Date();
       }
 
       if (isAutoShip) {

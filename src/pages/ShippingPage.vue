@@ -213,7 +213,7 @@ const newDate = ref("");
 const showDone = ref(false);
 const showAddForm = ref(false);
 const searchQuery = ref("");
-const activeFilter = ref("all");
+const activeFilter = ref("requested");
 const isRefreshing = ref(false);
 const cleanupFns = [];
 
@@ -246,6 +246,16 @@ function formatThaiDate(dateStr) {
   const month = thaiMonths[d.getMonth()];
   const year = (d.getFullYear() + 543) % 100;
   return `${day} ${month} ${year}`;
+}
+
+function formatToDDMMYYYY(dateStr) {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  return dateStr;
 }
 
 function parseDDMMYYYY(str) {
@@ -298,6 +308,18 @@ const activeCustomers = computed(() =>
   allCustomers.value.filter((c) => c.status !== "done")
 );
 
+const shippingRequestedCustomers = computed(() =>
+  allCustomers.value.filter(
+    (c) => c.status !== "done" && c.deliveryDate && c.deliveryDate.trim() !== ""
+  )
+);
+
+const unassignedCustomers = computed(() =>
+  allCustomers.value.filter(
+    (c) => c.status !== "done" && (!c.deliveryDate || c.deliveryDate.trim() === "")
+  )
+);
+
 const customers = computed(() => {
   if (showDone.value) return allCustomers.value;
   return activeCustomers.value;
@@ -316,42 +338,46 @@ const sortedCustomers = computed(() => {
 const filteredCustomers = computed(() => {
   let list = sortedCustomers.value;
 
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.trim().toLowerCase();
-    list = list.filter(c => c.name && c.name.toLowerCase().includes(q));
-  }
-
-  if (activeFilter.value === 'urgent') {
+  if (activeFilter.value === 'requested') {
+    list = list.filter(c => c.status !== 'done' && c.deliveryDate && c.deliveryDate.trim() !== "");
+  } else if (activeFilter.value === 'unassigned') {
+    list = list.filter(c => c.status !== 'done' && (!c.deliveryDate || c.deliveryDate.trim() === ""));
+  } else if (activeFilter.value === 'urgent') {
     list = list.filter(c => {
       const d = getCountdown(c.deliveryDate).days;
-      return d <= 1 && c.status !== 'done';
+      return d <= 1 && c.status !== 'done' && c.deliveryDate;
     });
   } else if (activeFilter.value === 'normal') {
     list = list.filter(c => {
       const d = getCountdown(c.deliveryDate).days;
-      return d > 1 && c.status !== 'done';
+      return d > 1 && c.status !== 'done' && c.deliveryDate;
     });
   } else if (activeFilter.value === 'done') {
     list = list.filter(c => c.status === 'done');
+  }
+
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase();
+    list = list.filter(c => c.name && c.name.toLowerCase().includes(q));
   }
 
   return list;
 });
 
 const todayCount = computed(() =>
-  activeCustomers.value.filter((c) => getCountdown(c.deliveryDate).days === 0).length
+  shippingRequestedCustomers.value.filter((c) => getCountdown(c.deliveryDate).days === 0).length
 );
 
 const overdueCount = computed(() =>
-  activeCustomers.value.filter((c) => getCountdown(c.deliveryDate).days < 0).length
+  shippingRequestedCustomers.value.filter((c) => getCountdown(c.deliveryDate).days < 0).length
 );
 
 const packTonightCount = computed(() =>
-  activeCustomers.value.filter((c) => isPackTonight(c)).length
+  shippingRequestedCustomers.value.filter((c) => isPackTonight(c)).length
 );
 
 const soonCount = computed(() =>
-  activeCustomers.value.filter((c) => {
+  shippingRequestedCustomers.value.filter((c) => {
     const d = getCountdown(c.deliveryDate).days;
     return d > 0 && d <= 3;
   }).length
@@ -373,11 +399,13 @@ const uniqueCustomerNames = computed(() => {
 
 const filterTabs = computed(() => {
   const tabs = [
-    { key: 'all', label: 'ทั้งหมด', count: activeCustomers.value.length },
+    { key: 'requested', label: '📦 แจ้งส่งแล้ว', count: shippingRequestedCustomers.value.length },
+    { key: 'unassigned', label: '🛋️ ฝากสินค้า', count: unassignedCustomers.value.length },
+    { key: 'all', label: '🌐 ทั้งหมด', count: activeCustomers.value.length },
   ];
-  const urgentN = activeCustomers.value.filter(c => getCountdown(c.deliveryDate).days <= 1).length;
+  const urgentN = shippingRequestedCustomers.value.filter(c => getCountdown(c.deliveryDate).days <= 1).length;
   if (urgentN > 0) tabs.push({ key: 'urgent', label: '🔴 เร่ง', count: urgentN });
-  const normalN = activeCustomers.value.filter(c => getCountdown(c.deliveryDate).days > 1).length;
+  const normalN = shippingRequestedCustomers.value.filter(c => getCountdown(c.deliveryDate).days > 1).length;
   if (normalN > 0) tabs.push({ key: 'normal', label: 'ปกติ', count: normalN });
   if (doneCount.value > 0) tabs.push({ key: 'done', label: '✅', count: doneCount.value });
   return tabs;
@@ -423,7 +451,7 @@ function addManualCustomer() {
 
   let parsedDate = parseDDMMYYYY(newDate.value);
 
-  const shipNowMatch = name.match(/ส่งเลย|ส่งวันนี้/);
+  const shipNowMatch = name.match(/ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])ส่ง(?:$|[^\u0E00-\u0E7F\w])/);
   const shipTmrMatch = name.match(/ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/);
   const shipDateMatch = name.match(/ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/);
 

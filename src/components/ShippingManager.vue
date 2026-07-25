@@ -11,9 +11,9 @@
 
       <!-- Summary Stats -->
       <div class="sm-stats">
-        <div class="sm-stat">
-          <span class="sm-stat-num">{{ activeCustomers.length }}</span>
-          <span class="sm-stat-label">ทั้งหมด</span>
+        <div class="sm-stat" :class="{ active: viewMode === 'requested' }" @click="viewMode = 'requested'" style="cursor: pointer;">
+          <span class="sm-stat-num">{{ shippingRequestedCustomers.length }}</span>
+          <span class="sm-stat-label">รอจัดส่ง</span>
         </div>
         <div class="sm-stat urgent">
           <span class="sm-stat-num">{{ todayCount }}</span>
@@ -26,6 +26,10 @@
         <div class="sm-stat warn">
           <span class="sm-stat-num">{{ soonCount }}</span>
           <span class="sm-stat-label">1-3 วัน</span>
+        </div>
+        <div class="sm-stat unassigned" :class="{ active: viewMode === 'unassigned' }" v-if="unassignedCustomers.length > 0" @click="viewMode = 'unassigned'" style="cursor: pointer;">
+          <span class="sm-stat-num">{{ unassignedCustomers.length }}</span>
+          <span class="sm-stat-label">ฝากสินค้า</span>
         </div>
         <div class="sm-stat">
           <span class="sm-stat-num">{{ totalItemCount }}</span>
@@ -63,6 +67,31 @@
         </button>
       </div>
 
+      <!-- Filter Mode Tabs -->
+      <div class="sm-filter-tabs">
+        <button 
+          class="sm-tab-btn" 
+          :class="{ active: viewMode === 'requested' }" 
+          @click="viewMode = 'requested'"
+        >
+          📦 เฉพาะคนที่แจ้งส่ง ({{ shippingRequestedCustomers.length }})
+        </button>
+        <button 
+          class="sm-tab-btn" 
+          :class="{ active: viewMode === 'unassigned' }" 
+          @click="viewMode = 'unassigned'"
+        >
+          🛋️ ฝากสินค้า / ยังไม่ระบุวันส่ง ({{ unassignedCustomers.length }})
+        </button>
+        <button 
+          class="sm-tab-btn" 
+          :class="{ active: viewMode === 'all' }" 
+          @click="viewMode = 'all'"
+        >
+          🌐 ทั้งหมด ({{ activeCustomers.length }})
+        </button>
+      </div>
+
       <!-- Customer List -->
       <div class="sm-table-wrap">
         <table class="sm-table">
@@ -79,8 +108,16 @@
           </thead>
           <tbody>
             <tr v-if="sortedCustomers.length === 0">
-              <td colspan="7" style="text-align: center; color: #666; padding: 30px;">
-                ยังไม่มีรายการจัดส่ง — เพิ่มลูกค้าจาก Dashboard หรือเพิ่มด้วยมือ
+              <td colspan="7" style="text-align: center; color: #888; padding: 30px;">
+                <span v-if="viewMode === 'requested'">
+                  📭 ยังไม่มีรายการลูกค้าที่แจ้งวันจัดส่ง — เพิ่มวันส่งจากรายการฝากสินค้า หรือเพิ่มลูกค้าด้วยมือ
+                </span>
+                <span v-else-if="viewMode === 'unassigned'">
+                  🎉 ไม่มีรายการลูกค้าที่ฝากสินค้า (ยังไม่ระบุวันส่ง)
+                </span>
+                <span v-else>
+                  ยังไม่มีรายการจัดส่ง — เพิ่มลูกค้าจาก Dashboard หรือเพิ่มด้วยมือ
+                </span>
               </td>
             </tr>
             <tr
@@ -174,8 +211,10 @@
 
         <!-- 📱 Mobile Card View (for portrait smartphones) -->
         <div class="sm-mobile-cards">
-          <div v-if="sortedCustomers.length === 0" style="text-align: center; color: #666; padding: 20px;">
-            ยังไม่มีรายการจัดส่ง
+          <div v-if="sortedCustomers.length === 0" style="text-align: center; color: #888; padding: 20px;">
+            <span v-if="viewMode === 'requested'">📭 ยังไม่มีรายการลูกค้าที่แจ้งวันจัดส่ง</span>
+            <span v-else-if="viewMode === 'unassigned'">🎉 ไม่มีรายการลูกค้าที่ฝากสินค้า</span>
+            <span v-else>ยังไม่มีรายการจัดส่ง</span>
           </div>
           <div
             v-for="(c, idx) in sortedCustomers"
@@ -253,6 +292,7 @@ const allCustomers = ref([]);
 const newName = ref("");
 const newDate = ref("");
 const showDone = ref(false);
+const viewMode = ref("requested"); // 'requested' | 'unassigned' | 'all'
 const cleanupFns = [];
 
 const newDateFormatted = computed({
@@ -368,9 +408,33 @@ const activeCustomers = computed(() =>
   allCustomers.value.filter((c) => c.status !== "done")
 );
 
+const shippingRequestedCustomers = computed(() =>
+  allCustomers.value.filter(
+    (c) => c.status !== "done" && c.deliveryDate && c.deliveryDate.trim() !== ""
+  )
+);
+
+const unassignedCustomers = computed(() =>
+  allCustomers.value.filter(
+    (c) => c.status !== "done" && (!c.deliveryDate || c.deliveryDate.trim() === "")
+  )
+);
+
 const customers = computed(() => {
-  if (showDone.value) return allCustomers.value;
-  return activeCustomers.value;
+  let base = [];
+  if (viewMode.value === "requested") {
+    base = shippingRequestedCustomers.value;
+  } else if (viewMode.value === "unassigned") {
+    base = unassignedCustomers.value;
+  } else {
+    base = activeCustomers.value;
+  }
+
+  if (showDone.value) {
+    const doneList = allCustomers.value.filter((c) => c.status === "done");
+    return [...base, ...doneList];
+  }
+  return base;
 });
 
 const sortedCustomers = computed(() => {
@@ -384,22 +448,22 @@ const sortedCustomers = computed(() => {
 });
 
 const todayCount = computed(() =>
-  activeCustomers.value.filter((c) => getCountdown(c.deliveryDate).days === 0).length
+  shippingRequestedCustomers.value.filter((c) => getCountdown(c.deliveryDate).days === 0).length
 );
 
 const packTonightCount = computed(() =>
-  activeCustomers.value.filter((c) => isPackTonight(c)).length
+  shippingRequestedCustomers.value.filter((c) => isPackTonight(c)).length
 );
 
 const soonCount = computed(() =>
-  activeCustomers.value.filter((c) => {
+  shippingRequestedCustomers.value.filter((c) => {
     const d = getCountdown(c.deliveryDate).days;
     return d > 0 && d <= 3;
   }).length
 );
 
 const totalItemCount = computed(() =>
-  activeCustomers.value.reduce((sum, c) => sum + (c.itemCount || 0), 0)
+  customers.value.reduce((sum, c) => sum + (c.itemCount || 0), 0)
 );
 
 const doneCount = computed(() =>
@@ -467,7 +531,7 @@ function addManualCustomer() {
   let parsedDate = parseDDMMYYYY(newDate.value);
 
   // --- Apply Chat-Like Logic ---
-  const shipNowMatch = name.match(/ส่งเลย|ส่งวันนี้/);
+  const shipNowMatch = name.match(/ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])ส่ง(?:$|[^\u0E00-\u0E7F\w])/);
   const shipTmrMatch = name.match(/ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/);
   const shipDateMatch = name.match(/ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/);
 
@@ -678,10 +742,15 @@ function deleteCustomer(id, name) {
 
 .sm-stat.urgent { border-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
 .sm-stat.warn { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+.sm-stat.unassigned { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.08); }
+.sm-stat.unassigned .sm-stat-num { color: #a78bfa; }
 .sm-stat.pack-tonight {
   border-color: #f97316;
   background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(234, 88, 12, 0.06));
   animation: pack-glow 2.5s ease-in-out infinite;
+}
+.sm-stat.active {
+  box-shadow: 0 0 0 2px #3b82f6;
 }
 
 .sm-stat-num {
@@ -696,6 +765,41 @@ function deleteCustomer(id, name) {
 .sm-stat.warn .sm-stat-num { color: #f59e0b; }
 .sm-stat.pack-tonight .sm-stat-num { color: #fb923c; }
 .sm-stat-label { font-size: 0.7em; color: #888; margin-top: 2px; }
+
+/* Filter Tabs */
+.sm-filter-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0 10px;
+}
+
+.sm-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #aaa;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.85em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.sm-tab-btn:hover {
+  background: #282828;
+  color: #fff;
+  border-color: #555;
+}
+
+.sm-tab-btn.active {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: #3b82f6;
+  color: #60a5fa;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+}
 
 /* Add Form */
 .sm-add-form { display: flex; gap: 10px; padding: 12px 0; align-items: center; }

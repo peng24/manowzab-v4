@@ -122,6 +122,10 @@ description: Mandatory verification checklist after every code change
 | 10.6 | Delivery Strip (Header) | `src/components/Header.vue` | แถบรายชื่อลูกค้า real-time บน header (pills สี overdue/today/soon/later) |
 | 10.7 | Countdown + Thai Date | `src/components/ShippingManager.vue` | นับถอยหลัง (เลย/วันนี้/พรุ่งนี้/อีก X วัน) + วันที่ไทย (24 มี.ค. 69) |
 | 10.8 | Mark Done + Reset | `src/components/ShippingManager.vue` | เสร็จ → status=done, itemCount=0, sessions=null + สะสม totalBookings |
+| 10.9 | กรองเฉพาะคนที่แจ้งส่ง (Requested Delivery Filter) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue` | แสดงเฉพาะคนที่ระบุวันจัดส่งแล้วเป็นค่าเริ่มต้น (`deliveryDate !== null`) |
+| 10.10 | แท็บสลับดู "ฝากสินค้า" (Unassigned Filter) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue` | สลับดูคนที่ฝากสินค้า (ยังไม่ระบุวันส่ง) และดูทั้งหมดได้อย่างถูกต้อง |
+| 10.11 | Delivery Strip Filter | `src/components/StockGrid.vue` | กรองแสดงเฉพาะลูกค้าที่มีวันจัดส่งแล้ว (`!!c.deliveryDate`) |
+| 10.12 | ตรวจจับแชทแจ้งส่ง ("ส่ง", "ส่งเลย", ฯลฯ) | `src/composables/useChatProcessor.js` | เมื่อลูกค้าพิมพ์ "ส่ง", "ส่งเลย", "ส่งครับ", "ส่งค่ะ" ฯลฯ ให้ตั้งวันส่งเป็นวันนี้อัตโนมัติ |
 
 ---
 

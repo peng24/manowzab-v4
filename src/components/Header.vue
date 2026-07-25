@@ -6,18 +6,21 @@
           :class="['status-item', systemStore.statusDb]"
           :title="getStatusTitle('db')"
         >
+          <span :class="['status-led', systemStore.statusDb]"></span>
           <i class="fa-solid fa-database"></i>
         </span>
         <span
           :class="['status-item', systemStore.statusApi]"
           :title="getStatusTitle('api')"
         >
+          <span :class="['status-led', systemStore.statusApi]"></span>
           <i class="fa-brands fa-youtube"></i>
         </span>
         <span
           :class="['status-item', systemStore.statusChat]"
           :title="getStatusTitle('chat')"
         >
+          <span :class="['status-led', systemStore.statusChat]"></span>
           <i class="fa-solid fa-comments"></i>
         </span>
         <span
@@ -36,34 +39,34 @@
         </span>
       </div>
 
-      <button class="btn btn-dark" @click="openHistory">🕒</button>
+      <button class="btn btn-dark" @click="openHistory" title="ประวัติการจอง">🕒 ประวัติ</button>
 
-
-
-
-
-
-      <input
-        type="text"
-        v-model="videoId"
-        class="input-id"
-        placeholder="Video ID"
-        @keyup.enter="toggleConnection"
-      />
-
-      <button
-        :class="['btn', systemStore.isConnected ? 'btn-dark' : 'btn-primary']"
-        @click="toggleConnection"
-        :disabled="isConnecting"
-      >
-        {{
-          systemStore.isConnected
-            ? "DISCONNECT"
-            : isConnecting
-              ? "..."
-              : "CONNECT"
-        }}
-      </button>
+      <!-- Hero Connect Container -->
+      <div :class="['hero-connect-container', { connected: systemStore.isConnected }]">
+        <i class="fa-brands fa-youtube" style="color: #ff0000; margin-right: 6px; font-size: 1.1em;"></i>
+        <input
+          type="text"
+          v-model="videoId"
+          class="input-id"
+          placeholder="YouTube Video ID"
+          @keyup.enter="toggleConnection"
+          style="border: none; background: transparent; outline: none; padding: 4px;"
+        />
+        <button
+          :class="['btn', systemStore.isConnected ? 'btn-dark' : 'btn-primary']"
+          @click="toggleConnection"
+          :disabled="isConnecting"
+          style="margin-left: 4px;"
+        >
+          {{
+            systemStore.isConnected
+              ? "DISCONNECT"
+              : isConnecting
+                ? "..."
+                : "CONNECT"
+          }}
+        </button>
+      </div>
 
       <!-- TTS Toggle - Vibrant Blue Gradient (Fixed) -->
       <button

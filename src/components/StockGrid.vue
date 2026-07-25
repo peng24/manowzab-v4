@@ -28,7 +28,7 @@
           <span class="motivational-badge" :key="motivationalText">{{ motivationalText }}</span>
         </div>
 
-        <!-- 📦 Delivery Strip (moved from Header) -->
+        <!-- 📦 Delivery Strip (moved right after sales stats) -->
         <div class="delivery-strip">
           <div
             class="shipping-mgr-icon"
@@ -45,12 +45,22 @@
               :key="c.id"
               class="ds-pill"
               :class="'ds-' + c.urgency"
-              :title="c.tooltip"
+              :title="c.tooltip + ' — คลิกเพื่อเปิดรายการจัดส่ง'"
+              @click="openShippingManager"
+              style="cursor: pointer;"
             >
               {{ c.name }}
               <span class="ds-info" v-if="c.info">{{ c.info }}</span>
             </span>
           </div>
+        </div>
+
+        <!-- 🏷️ Quick Filter Bar -->
+        <div class="quick-filter-container">
+          <button class="filter-chip" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">ทั้งหมด</button>
+          <button class="filter-chip" :class="{ active: activeFilter === 'sold' }" @click="activeFilter = 'sold'">ขายแล้ว 🛒</button>
+          <button class="filter-chip" :class="{ active: activeFilter === 'vacant' }" @click="activeFilter = 'vacant'">ยังว่าง ⚪</button>
+          <button class="filter-chip" :class="{ active: activeFilter === 'queue' }" @click="activeFilter = 'queue'">มีคิว ⏳</button>
         </div>
       </div>
 
@@ -82,6 +92,7 @@
       <div
         v-for="i in stockStore.stockSize"
         :key="i"
+        v-show="shouldShowItem(i)"
         v-memo="[
           getStockItem(i).owner,
           getStockItem(i).price,
@@ -89,7 +100,8 @@
           getQueueLength(i),
           highlightedId === i,
           cancelledItems.has(i),
-          newOrders.has(i)
+          newOrders.has(i),
+          activeFilter
         ]"
         :class="[
           'stock-item',
@@ -287,6 +299,16 @@ const openShippingManager = inject("openShippingManager");
 const gridContainer = ref(null);
 const highlightedId = ref(null);
 const newOrders = ref(new Set());
+const activeFilter = ref("all");
+
+function shouldShowItem(i) {
+  if (activeFilter.value === "all") return true;
+  const item = getStockItem(i);
+  if (activeFilter.value === "sold") return !!item.owner;
+  if (activeFilter.value === "vacant") return !item.owner;
+  if (activeFilter.value === "queue") return getQueueLength(i) > 0;
+  return true;
+}
 
 // ✅ Cancelled Items Blink Effect (15 seconds)
 const cancelledItems = ref(new Map());
@@ -1792,66 +1814,75 @@ watch(
   display: grid;
   grid-template-columns: repeat(
     auto-fill,
-    minmax(130px, 1fr)
-  ); /* Wider columns */
-  gap: 15px;
-  row-gap: 20px;
-  padding: 20px;
-  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    minmax(125px, 1fr)
+  );
+  gap: 12px;
+  align-content: start; /* ✅ Pack items neatly from top to bottom */
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
   overflow-y: auto;
   flex: 1;
 }
 
 .stock-item {
-  aspect-ratio: 1.4; /* Wider cards (Landscape) */
-  background: #2a2a2a;
-  border: 2px solid #444;
+  aspect-ratio: 1.35;
+  background: rgba(22, 26, 36, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center; /* ✅ Centered vertically */
-  gap: 0px; /* ✅ Spacing between elements */
+  justify-content: center;
   cursor: pointer;
   position: relative;
-  padding: 6px;
-  /* overflow: hidden; Removed to show badge */
-  min-height: 90px; /* Back to original height */
+  padding: 8px 6px;
+  min-height: 85px;
   z-index: 0;
-  transition: 
-    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-    border-color 0.25s ease,
-    background-color 0.25s ease,
-    box-shadow 0.25s ease;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 @media (hover: hover) {
   .stock-item:hover {
-    border-color: #777;
-    background: #333;
-    transform: translateY(-3px) scale(1.03);
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(30, 35, 48, 0.9);
+    transform: translateY(-2px) translateZ(0);
     z-index: 10;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .stock-item.sold:hover {
+    background: linear-gradient(145deg, rgba(239, 68, 68, 0.35) 0%, rgba(185, 28, 28, 0.55) 100%);
+    border-color: #f87171;
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
   }
 }
 
 .stock-item:active {
-  transform: scale(0.96) translateY(1px);
-  background: #252525;
+  transform: scale(0.97) translateZ(0);
 }
+
+/* 🛑 High-Visibility Red Theme for Sold Items */
 .stock-item.sold {
-  background: rgba(211, 47, 47, 0.15);
-  border-color: var(--primary);
+  background: linear-gradient(145deg, rgba(220, 38, 38, 0.22) 0%, rgba(139, 0, 0, 0.4) 100%);
+  border: 2px solid #ef4444;
+  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
+
 .stock-item.sold.new-order {
   animation: newOrderBlink 1s infinite;
   z-index: 2;
 }
+
 .stock-item.highlight {
   animation: highlightBox 1s ease-out;
   z-index: 5;
-  border-color: #ffeb3b !important;
+  border-color: #ffd700 !important;
 }
 
 @keyframes newOrderBlink {
@@ -1862,9 +1893,9 @@ watch(
     background-color: rgba(255, 215, 0, 0.3);
   }
   50% {
-    border-color: var(--primary);
+    border-color: #ef4444;
     box-shadow: none;
-    background-color: rgba(211, 47, 47, 0.15);
+    background-color: rgba(220, 38, 38, 0.22);
   }
 }
 @keyframes highlightBox {
@@ -1874,18 +1905,26 @@ watch(
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 10px rgba(211, 47, 47, 0.3);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
   }
 }
 
+/* 🔢 High-Visibility Item Number Badge */
 .stock-num {
-  font-size: 1.45em;
-  font-weight: bold;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: 1.15em;
+  font-weight: 800;
+  font-family: var(--font-main);
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 1px 7px;
+  border-radius: 6px;
   position: absolute;
-  top: 2px;
-  left: 6px;
+  top: 5px;
+  left: 5px;
   line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.3px;
 }
 
 .stock-price {
@@ -1895,24 +1934,12 @@ watch(
 }
 
 .stock-status {
-  font-size: 1.15em;
-  color: #00e676; /* Changed to Green Accent */
-  font-weight: 500;
+  font-size: 1em;
+  color: #ffffff;
+  font-weight: 600;
   text-align: center;
   width: 100%;
-}
-
-.stock-status.empty {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.stock-status {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 1.4em;
-
-  /* Multi-line truncation logic */
+  padding: 0 4px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -1920,8 +1947,14 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: normal;
-  line-height: 1.2;
-  margin-top: 0; /* ✅ Remove margin to allow true centering */
+  line-height: 1.25;
+  margin-top: 10px;
+}
+
+.stock-status.empty {
+  color: #64748b;
+  font-weight: 400;
+  font-size: 0.9em;
 }
 
 /* ... */
@@ -2011,43 +2044,47 @@ watch(
     min-height: 60px; /* Shorter height */
   }
 }
-/* ✅ Queue Badge (Red Circle) */
+/* ✅ Queue Badge (Glowing Amber Badge) */
 .queue-badge {
   position: absolute;
   top: -6px;
   right: -6px;
-  background: #d32f2f;
-  color: white;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
+  background: linear-gradient(135deg, #ffab00 0%, #ff6d00 100%);
+  color: #000;
+  border-radius: 12px;
+  padding: 1px 7px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85em;
-  font-weight: bold;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  font-size: 0.78em;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(255, 171, 0, 0.5);
   z-index: 20;
-  border: 2px solid #2a2a2a; /* Border matching card bg to make it pop */
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
 }
 
 /* 🛢 Owner Booking Count Badge (👗 N ตัว) */
 .owner-count-badge {
-  display: block;
-  font-size: 0.85em;
-  color: #60a5fa;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78em;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 2px 8px;
+  border-radius: 12px;
   font-weight: 600;
-  margin-top: 1px;
-  opacity: 0.9;
-  text-align: center;
+  margin-top: 4px;
   letter-spacing: 0.3px;
   cursor: pointer;
-  transition: color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .owner-count-badge:hover {
-  color: #93c5fd;
-  text-decoration: underline;
+  background: rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+  transform: translateY(-1px);
 }
 
 /* ✅ Cancelled Item Blink Effect (15 seconds) */

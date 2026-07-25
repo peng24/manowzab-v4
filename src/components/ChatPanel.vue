@@ -30,6 +30,14 @@
       </div>
     </div>
 
+    <!-- 🏷️ Chat Intent Filter Tabs -->
+    <div class="chat-intent-tabs">
+      <button class="chat-tab" :class="{ active: selectedChatTab === 'all' }" @click="selectedChatTab = 'all'">ทั้งหมด</button>
+      <button class="chat-tab tab-cf" :class="{ active: selectedChatTab === 'buy' }" @click="selectedChatTab = 'buy'">🛒 เฉพาะ CF</button>
+      <button class="chat-tab tab-cancel" :class="{ active: selectedChatTab === 'cancel' }" @click="selectedChatTab = 'cancel'">❌ ยกเลิก</button>
+      <button class="chat-tab tab-admin" :class="{ active: selectedChatTab === 'admin' }" @click="selectedChatTab = 'admin'">⚡ ระบบ/แอดมิน</button>
+    </div>
+
     <!-- ✅ Pull-to-Refresh Indicator -->
     <div
       class="pull-indicator"
@@ -61,7 +69,7 @@
 
       <TransitionGroup name="chat-list" tag="div" id="chat-list">
         <div
-          v-for="chat in visibleMessages"
+          v-for="chat in filteredVisibleMessages"
           :key="chat.id"
           :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type]"
         >
@@ -138,12 +146,10 @@
                 </template>
               </div>
 
-              <!-- Force Process Button -->
-              <div
-                class="force-process-btn"
-              >
-                <button @click="forceProcess(chat)" class="btn-mini">
-                  <i class="fa-solid fa-bolt"></i>
+              <!-- 🛒 Quick Action Key Button (on hover) -->
+              <div class="force-process-btn">
+                <button @click="forceProcess(chat)" class="btn-quick-key" title="คีย์ออเดอร์ด่วนสำหรับลูกค้ารายนี้">
+                  🛒 คีย์ด่วน
                 </button>
               </div>
             </div>
@@ -187,11 +193,23 @@ const pullThreshold = 80; // Minimum pull distance to trigger refresh
 let touchStartY = 0;
 let canPull = false;
 
+const selectedChatTab = ref("all");
+const showNewMsgPill = ref(false);
+
 // 🚀 Performance: Render based on displayLimit for pagination
 const visibleMessages = computed(() => {
   const total = chatStore.messages.length;
   const start = Math.max(0, total - displayLimit.value);
   return chatStore.messages.slice(start);
+});
+
+const filteredVisibleMessages = computed(() => {
+  const msgs = visibleMessages.value;
+  if (selectedChatTab.value === "all") return msgs;
+  if (selectedChatTab.value === "buy") return msgs.filter((m) => m.type === "buy");
+  if (selectedChatTab.value === "cancel") return msgs.filter((m) => m.type === "cancel");
+  if (selectedChatTab.value === "admin") return msgs.filter((m) => m.isAdmin || m.type === "shipping" || m.type === "question");
+  return msgs;
 });
 
 // ✅ Check if there are more messages to load
@@ -309,6 +327,7 @@ function scrollToBottom() {
     }, 100);
 
     showScrollButton.value = false;
+    showNewMsgPill.value = false;
     isUserScrolling = false;
     clearAutoScrollTimer();
   }
@@ -653,65 +672,117 @@ async function refreshChat() {
 .chat-row {
   display: flex;
   align-items: flex-start;
-  gap: 5px; /* ✅ Reduced gap */
-  padding: 8px 10px;
-  border-radius: 10px;
-  transition: background-color 0.2s;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+  position: relative;
 }
 
-/* ✅ Chat Row Backgrounds by Type */
+.chat-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 🛒 Neon Emerald Glass Card (Buy / CF) */
 .chat-row.buy {
-  background: rgba(16, 185, 129, 0.08);
-  border-left: 3px solid #10b981;
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.16) 0%, rgba(0, 200, 83, 0.06) 100%);
+  border: 1.5px solid rgba(0, 230, 118, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 230, 118, 0.14);
 }
 
+.chat-row.buy .chat-bubble {
+  background: rgba(0, 200, 83, 0.18);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 1.02em;
+}
+
+/* ❌ Coral Amber Glass Card (Cancel) */
 .chat-row.cancel {
-  background: rgba(244, 63, 94, 0.08);
-  border-left: 3px solid #f43f5e;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(185, 28, 28, 0.06) 100%);
+  border: 1.5px solid rgba(239, 68, 68, 0.4);
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.14);
 }
 
+.chat-row.cancel .chat-bubble {
+  background: rgba(185, 28, 28, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ffffff;
+}
+
+/* 📦 Shipping Message */
 .chat-row.shipping {
-  background: rgba(168, 85, 247, 0.08);
-  border-left: 3px solid #a855f7;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(126, 34, 206, 0.06) 100%);
+  border: 1.5px solid rgba(168, 85, 247, 0.4);
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.14);
 }
 
+.chat-row.shipping .chat-bubble {
+  background: rgba(126, 34, 206, 0.25);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  color: #ffffff;
+}
+
+/* 👑 Admin / Proxy Message */
 .chat-row.admin {
-  background: rgba(245, 158, 11, 0.06);
-  border-left: 3px solid #f59e0b;
+  background: linear-gradient(135deg, rgba(124, 77, 255, 0.18) 0%, rgba(81, 45, 168, 0.06) 100%);
+  border: 1.5px solid rgba(124, 77, 255, 0.4);
+  box-shadow: 0 4px 15px rgba(124, 77, 255, 0.14);
+}
+
+.chat-row.admin .chat-bubble {
+  background: rgba(81, 45, 168, 0.2);
+  border: 1px solid rgba(124, 77, 255, 0.3);
+  color: #ffffff;
 }
 
 /* ✅ TransitionGroup Animations */
 .chat-list-enter-active {
-  transition: all 0.4s ease-out;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .chat-list-leave-active {
-  transition: all 0.3s ease-in;
+  transition: all 0.2s ease-in;
 }
 
 .chat-list-enter-from {
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(15px);
 }
 
 .chat-list-leave-to {
   opacity: 0;
-  transform: translateX(-20px);
+  transform: translateX(-15px);
 }
 
 .avatar-container {
   flex-shrink: 0;
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
 }
 
 .avatar {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  border: 2px solid #334155;
+  border: 2px solid rgba(255, 255, 255, 0.15);
   object-fit: cover;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.chat-row.buy .avatar {
+  border-color: #00e676;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
+}
+
+.chat-row.admin .avatar {
+  border-color: #7c4dff;
+  box-shadow: 0 0 8px rgba(124, 77, 255, 0.4);
 }
 
 /* ✅ Avatar Fallback (Letter Avatar) */
@@ -719,18 +790,18 @@ async function refreshChat() {
   position: absolute;
   top: 0;
   left: 0;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  border: 2px solid #334155;
+  border: 2px solid rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #000;
   font-weight: bold;
-  font-size: 1.2em;
+  font-size: 1.1em;
   text-transform: uppercase;
-  pointer-events: none; /* Allow clicks to pass through */
+  pointer-events: none;
 }
 
 /* Hide fallback when image is visible */
@@ -745,49 +816,51 @@ async function refreshChat() {
 .chat-bubble-container {
   display: flex;
   flex-direction: column;
-  /* max-width removed to fill space */
-  flex: 1; /* ✅ Force full width */
+  flex: 1;
   min-width: 0;
 }
 
 .chat-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap; /* ✅ Allow wrapping nicely */
-  gap: 6px; /* ✅ Unified gap */
-  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 5px;
   font-size: 0.85em;
 }
 
 .chat-time {
-  color: #64748b;
-  font-size: 0.9em;
+  color: #94a3b8;
+  font-size: 0.88em;
+  font-family: monospace;
+  font-weight: 600;
 }
 
 .chat-name {
-  font-weight: bold;
-  color: #000; /* ✅ Black text for badge */
-  padding: 2px 8px; /* ✅ Badge padding */
-  border-radius: 12px; /* ✅ Rounded badge */
-  cursor: pointer; /* ✅ Clickable */
-  transition: transform 0.1s;
+  font-weight: 700;
+  color: #000;
+  padding: 2px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 .chat-name:hover {
   transform: scale(1.05);
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
 .real-name {
   color: #94a3b8;
-  font-size: 0.9em;
+  font-size: 0.88em;
 }
 
 .admin-badge {
-  background-color: #f59e0b; /* Gold background */
-  color: #000; /* Black text */
+  background-color: #7c4dff;
+  color: #fff;
   padding: 2px 8px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 0.75em;
   font-weight: bold;
   text-transform: uppercase;
@@ -795,14 +868,15 @@ async function refreshChat() {
 }
 
 .chat-bubble {
-  background-color: #1e293b; /* Bubble Color */
-  color: #f1f5f9;
+  background-color: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
   padding: 10px 14px;
-  border-radius: 0 12px 12px 12px; /* Rounded corners, flat top-left */
-  font-size: 0.95em;
-  line-height: 1.5;
+  border-radius: 4px 14px 14px 14px;
+  font-size: 0.98em;
+  line-height: 1.45;
   position: relative;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* ✅ Status Badges (Independent) */
@@ -810,26 +884,24 @@ async function refreshChat() {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 3px 10px;
   border-radius: 12px;
-  font-size: 0.85em;
-  font-weight: 700;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  font-size: 0.82em;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   white-space: nowrap;
 }
 
 .badge-buy {
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  background: #00e676;
+  color: #000;
+  box-shadow: 0 2px 8px rgba(0, 230, 118, 0.4);
 }
 
 .badge-cancel {
-  background: linear-gradient(135deg, #f43f5e, #e11d48);
+  background: #ef4444;
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.4);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
 }
 
 .badge-shipping {

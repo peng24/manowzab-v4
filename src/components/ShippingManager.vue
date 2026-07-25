@@ -171,6 +171,56 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- 📱 Mobile Card View (for portrait smartphones) -->
+        <div class="sm-mobile-cards">
+          <div v-if="sortedCustomers.length === 0" style="text-align: center; color: #666; padding: 20px;">
+            ยังไม่มีรายการจัดส่ง
+          </div>
+          <div
+            v-for="(c, idx) in sortedCustomers"
+            :key="c.id"
+            :class="[
+              'sm-card',
+              getCountdown(c.deliveryDate).days <= 0 && c.deliveryDate ? 'row-urgent' : '',
+              isPackTonight(c) ? 'row-pack-tonight' : '',
+              c.status === 'done' ? 'row-done' : ''
+            ]"
+          >
+            <div class="sm-card-header">
+              <div class="sm-card-name">#{{ idx + 1 }} {{ c.name }}</div>
+              <span class="countdown-badge" :class="'cd-' + getCountdown(c.deliveryDate).color">
+                {{ getCountdown(c.deliveryDate).text }}
+              </span>
+            </div>
+            <div class="sm-card-items">
+              📦 สินค้า: {{ c.itemCount || 0 }} ชิ้น
+              <span v-if="c.deliveryDate"> • ส่ง {{ formatThaiDate(c.deliveryDate) }}</span>
+            </div>
+            <div class="sm-card-footer">
+              <div style="font-size: 0.85em; color: #94a3b8;">{{ c.note || 'ไม่มีโน้ต' }}</div>
+              <div class="action-btns">
+                <button
+                  v-if="c.status !== 'done'"
+                  class="action-btn done-btn"
+                  @click="markDone(c)"
+                  title="เสร็จแล้ว"
+                >✅ เสร็จ</button>
+                <button
+                  v-else
+                  class="action-btn undo-btn"
+                  @click="undoDone(c)"
+                  title="ยังไม่เสร็จ"
+                >↩️ ย้อน</button>
+                <button
+                  class="action-btn del-btn"
+                  @click="deleteCustomer(c.id, c.name)"
+                  title="ลบ"
+                >🗑️</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Filter Toggle -->

@@ -1059,8 +1059,19 @@ watch(
 
 function scrollToItem(num) {
   nextTick(() => {
-    const el = document.getElementById(`stock-${num}`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (activeFilter.value === "vacant") {
+      activeFilter.value = "all";
+    }
+    nextTick(() => {
+      const el = document.getElementById(`stock-${num}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        highlightedId.value = num;
+        setTimeout(() => {
+          if (highlightedId.value === num) highlightedId.value = null;
+        }, 3000);
+      }
+    });
   });
 }
 

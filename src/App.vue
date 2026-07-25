@@ -263,11 +263,56 @@ onMounted(async () => {
   cleanupFns.push(unsubIsLiveFinished);
 
   // ✅ stockSize listener is already handled inside connectToStock()
+
+  // ⌨️ Global Keyboard Hotkeys
+  window.addEventListener("keydown", handleGlobalHotkeys);
 });
+
+function handleGlobalHotkeys(e) {
+  const activeEl = document.activeElement;
+  const isTyping = activeEl && (
+    activeEl.tagName === "INPUT" ||
+    activeEl.tagName === "TEXTAREA" ||
+    activeEl.isContentEditable
+  );
+
+  // 1. ESC: Close Modals
+  if (e.key === "Escape") {
+    if (showDashboard.value || showHistory.value || showShippingManager.value || showPhoneticManager.value) {
+      showDashboard.value = false;
+      showHistory.value = false;
+      showShippingManager.value = false;
+      showPhoneticManager.value = false;
+      e.preventDefault();
+      return;
+    }
+  }
+
+  if (isTyping) return;
+
+  // 2. Shift + M: Toggle Sound (Mute/Unmute)
+  if (e.shiftKey && (e.key === "M" || e.key === "m")) {
+    systemStore.toggleAudio();
+    e.preventDefault();
+    return;
+  }
+
+  // 3. Shift + F: Focus YouTube Video ID Input
+  if (e.shiftKey && (e.key === "F" || e.key === "f")) {
+    const ytInput = document.getElementById("yt-video-id-input");
+    if (ytInput) {
+      ytInput.focus();
+      ytInput.select();
+    }
+    e.preventDefault();
+    return;
+  }
+}
 
 // ✅ Register Cleanup at top level (Vue 3 safe)
 onUnmounted(() => {
   console.log("♻️ Cleaning up App.vue listeners...");
+  window.removeEventListener("keydown", handleGlobalHotkeys);
   if (voiceListenerUnsub) {
     voiceListenerUnsub();
     voiceListenerUnsub = null;

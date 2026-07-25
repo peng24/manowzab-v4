@@ -55,12 +55,17 @@
           </div>
         </div>
 
-        <!-- 🏷️ Quick Filter Bar -->
+        <!-- 🏷️ Quick Filter Dropdown -->
         <div class="quick-filter-container">
-          <button class="filter-chip" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">ทั้งหมด</button>
-          <button class="filter-chip" :class="{ active: activeFilter === 'sold' }" @click="activeFilter = 'sold'">ขายแล้ว 🛒</button>
-          <button class="filter-chip" :class="{ active: activeFilter === 'vacant' }" @click="activeFilter = 'vacant'">ยังว่าง ⚪</button>
-          <button class="filter-chip" :class="{ active: activeFilter === 'queue' }" @click="activeFilter = 'queue'">มีคิว ⏳</button>
+          <div class="quick-filter-dropdown-wrap">
+            <select v-model="activeFilter" class="quick-filter-select" :class="'qf-' + activeFilter">
+              <option value="all">🌐 ทั้งหมด</option>
+              <option value="sold">🛒 ขายแล้ว</option>
+              <option value="vacant">⚪ ยังว่าง</option>
+              <option value="queue">⏳ มีคิว</option>
+            </select>
+            <i class="fa-solid fa-chevron-down dropdown-arrow"></i>
+          </div>
         </div>
       </div>
 
@@ -2163,5 +2168,73 @@ watch(
   color: #fb923c;
   background: rgba(251, 146, 60, 0.12);
   border-color: rgba(251, 146, 60, 0.3);
+}
+
+/* Quick Filter Dropdown */
+.quick-filter-container {
+  display: flex;
+  align-items: center;
+}
+
+.quick-filter-dropdown-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.quick-filter-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(26, 32, 44, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 6px 32px 6px 14px;
+  font-weight: 700;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.88em;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.quick-filter-select.qf-all {
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+}
+
+.quick-filter-select.qf-sold {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+}
+
+.quick-filter-select.qf-vacant {
+  color: #e2e8f0;
+  border-color: rgba(226, 232, 240, 0.35);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
+}
+
+.quick-filter-select.qf-queue {
+  color: #c084fc;
+  border-color: rgba(192, 132, 252, 0.5);
+  box-shadow: 0 0 12px rgba(192, 132, 252, 0.25);
+}
+
+.quick-filter-select option {
+  background: #1e293b;
+  color: #fff;
+  font-weight: 600;
+  padding: 10px;
+}
+
+.quick-filter-dropdown-wrap .dropdown-arrow {
+  position: absolute;
+  right: 12px;
+  font-size: 0.75em;
+  color: #94a3b8;
+  pointer-events: none;
 }
 </style>

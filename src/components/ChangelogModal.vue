@@ -167,6 +167,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useSystemStore } from '../stores/system'
 import { changelog } from '../data/changelog'
+import { escapeHtml } from '../utils/dbUtils'
 
 const systemStore = useSystemStore()
 const currentVersion = computed(() => systemStore.version)
@@ -288,10 +289,12 @@ function getCategorySummary(entry) {
 }
 
 function highlightSearch(text) {
-  if (!searchQuery.value.trim()) return text
-  const q = searchQuery.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (!text) return ''
+  const safeText = escapeHtml(text)
+  if (!searchQuery.value.trim()) return safeText
+  const q = escapeHtml(searchQuery.value.trim()).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${q})`, 'gi')
-  return text.replace(regex, '<mark>$1</mark>')
+  return safeText.replace(regex, '<mark>$1</mark>')
 }
 
 // Keyboard support

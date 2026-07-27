@@ -49,11 +49,12 @@
 - `src/services/YouTubeLiveChat.js`: YouTube chat polling (exponential backoff, key rotation).
 - `src/composables/useYouTube.js`: YouTube connection (smartFetch, viewer count, disconnect).
 
-## 5. Version & Patch Notes
+## 5. Version & Patch Notes & Automated Release
 
 - Version is read from `package.json` → `src/stores/system.js`
-- Patch Notes are in `src/components/Header.vue` → `showChangelog()` function
+- Patch Notes are in `src/components/Header.vue` → `showChangelog()` function and `src/data/changelog.js`
 - Use the `/update` workflow to bump version and update Patch Notes after every change
+- **Release Trigger ("อัพเลย"):** When the user says **"อัพเลย"**, automatically execute the full pipeline: `/verify` → `/update` → Git Commit/Push → Deploy to GitHub Pages (`npm run deploy`).
 
 ## 6. ✅ Mandatory Verification Checklist (ต้องตรวจสอบทุกครั้งหลังแก้โค้ด)
 

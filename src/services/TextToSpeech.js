@@ -2,7 +2,9 @@ import { useSystemStore } from "../stores/system";
 import { logger } from "../utils/logger";
 
 // ✅ Global Storage to Prevent Garbage Collection
-window.ttsActiveUtterances = [];
+if (typeof window !== "undefined") {
+  window.ttsActiveUtterances = window.ttsActiveUtterances || [];
+}
 
 export class TextToSpeech {
   constructor() {
@@ -10,24 +12,31 @@ export class TextToSpeech {
     this.isSpeaking = false;
     this.voices = [];
     this.poller = null;
-    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (typeof window !== "undefined") {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.audioCtx = AudioCtx ? new AudioCtx() : null;
+    } else {
+      this.audioCtx = null;
+    }
     this.currentSource = null; // ✅ Track active AudioBufferSource
     this.stuckTimer = null; // ✅ Safety timer to detect stuck state
     this.STUCK_TIMEOUT = 30000; // ✅ 30 seconds max per utterance
     this.consecutiveGoogleFailures = 0; // ✅ Track consecutive Google TTS failures
     this.MAX_CONSECUTIVE_FAILURES = 5; // ✅ Switch to Native permanently after N failures
     this.googleDisabledPermanently = false; // ✅ Flag for permanent Native mode
+    this.speakingCheckRetries = 0; // ✅ Track retries when waiting for native speaking state
+    this.cachedBestVoice = null; // 🚀 O(1) Cached Thai Voice reference
 
     // Bind methods
     this.processQueue = this.processQueue.bind(this);
     this.loadVoices = this.loadVoices.bind(this);
 
     // Set up voice loading
-    window.speechSynthesis.onvoiceschanged = this.loadVoices;
-    this.loadVoices();
-
-    // Aggressive poller: Check every 500ms until voices load
-    this.poller = setInterval(this.loadVoices, 500);
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = this.loadVoices;
+      this.loadVoices();
+      this.poller = setInterval(this.loadVoices, 500);
+    }
   }
 
   /**
@@ -41,6 +50,20 @@ export class TextToSpeech {
     }
 
     this.voices = vs;
+
+    // 🚀 O(1) Pre-cache best Thai voice on load instead of scanning array 4 times per utterance
+    this.cachedBestVoice =
+      this.voices.find(
+        (v) =>
+          v.name.includes("Google") &&
+          (v.name.includes("Thai") || v.name.includes("ไทย")),
+      ) ||
+      this.voices.find(
+        (v) => v.name.includes("Premwadee") || v.name.includes("Pattara"),
+      ) ||
+      this.voices.find((v) => v.name.includes("Narisa")) ||
+      this.voices.find((v) => v.lang.startsWith("th")) ||
+      null;
 
     // Clear poller once voices are loaded
     if (this.poller) {
@@ -81,30 +104,7 @@ export class TextToSpeech {
       this.loadVoices();
       return null;
     }
-
-    // Priority 1: Google Thai
-    let voice = this.voices.find(
-      (v) =>
-        v.name.includes("Google") &&
-        (v.name.includes("Thai") || v.name.includes("ไทย")),
-    );
-    if (voice) return voice;
-
-    // Priority 2: Microsoft (Premwadee/Pattara)
-    voice = this.voices.find(
-      (v) => v.name.includes("Premwadee") || v.name.includes("Pattara"),
-    );
-    if (voice) return voice;
-
-    // Priority 3: Apple Narisa
-    voice = this.voices.find((v) => v.name.includes("Narisa"));
-    if (voice) return voice;
-
-    // Priority 4: Any Thai voice
-    voice = this.voices.find((v) => v.lang.startsWith("th"));
-    if (voice) return voice;
-
-    return null;
+    return this.cachedBestVoice;
   }
 
   /**
@@ -361,9 +361,11 @@ export class TextToSpeech {
 
       // Handle error
       utterance.onerror = (e) => {
-        // Ignore "interrupted" error to reduce console noise during mode switching
-        if (e.error === "interrupted") return;
-        logger.error("Native TTS Error:", e);
+        if (e.error !== "interrupted") {
+          logger.error("Native TTS Error:", e);
+        } else {
+          logger.warn("Native TTS interrupted");
+        }
         cleanupAndAdvance();
       };
 
@@ -451,9 +453,17 @@ export class TextToSpeech {
 
     // Guard against native SpeechSynthesis overlapping by checking if it's currently speaking
     if (window.speechSynthesis && window.speechSynthesis.speaking) {
-      setTimeout(() => this.processQueue(), 100);
-      return;
+      this.speakingCheckRetries = (this.speakingCheckRetries || 0) + 1;
+      if (this.speakingCheckRetries > 20) {
+        logger.warn("SpeechSynthesis stuck in speaking state for >2s — force cancelling");
+        window.speechSynthesis.cancel();
+        this.speakingCheckRetries = 0;
+      } else {
+        setTimeout(() => this.processQueue(), 100);
+        return;
+      }
     }
+    this.speakingCheckRetries = 0;
 
     this.isSpeaking = true;
     const item = this.queue.shift();

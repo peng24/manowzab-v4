@@ -437,14 +437,23 @@ const customers = computed(() => {
   return base;
 });
 
+// 🚀 Optimization: Pre-calculate countdown days once before sorting (O(N) instead of O(N log N) Date object instantiations)
 const sortedCustomers = computed(() => {
-  return [...customers.value].sort((a, b) => {
-    if (a.status === "done" && b.status !== "done") return 1;
-    if (a.status !== "done" && b.status === "done") return -1;
-    const ca = getCountdown(a.deliveryDate);
-    const cb = getCountdown(b.deliveryDate);
-    return ca.days - cb.days;
+  const list = customers.value;
+  if (!list || list.length === 0) return [];
+
+  const decorated = list.map((c) => ({
+    customer: c,
+    days: getCountdown(c.deliveryDate).days,
+    isDone: c.status === "done",
+  }));
+
+  decorated.sort((a, b) => {
+    if (a.isDone !== b.isDone) return a.isDone ? 1 : -1;
+    return a.days - b.days;
   });
+
+  return decorated.map((d) => d.customer);
 });
 
 const todayCount = computed(() =>

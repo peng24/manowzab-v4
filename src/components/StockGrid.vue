@@ -292,6 +292,7 @@ import { useSystemStore } from "../stores/system";
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, get, remove, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
+import { escapeHtml } from "../utils/dbUtils";
 import Swal from "sweetalert2";
 
 const DEBUG_MODE = false;
@@ -306,12 +307,24 @@ const highlightedId = ref(null);
 const newOrders = ref(new Set());
 const activeFilter = ref("all");
 
+// 🚀 Performance: Cache queue lengths map for O(1) template accesses
+const queueLengthsMap = computed(() => {
+  const map = {};
+  const data = stockStore.stockData;
+  if (data) {
+    Object.keys(data).forEach((id) => {
+      map[id] = data[id]?.queue?.length || 0;
+    });
+  }
+  return map;
+});
+
 function shouldShowItem(i) {
   if (activeFilter.value === "all") return true;
-  const item = getStockItem(i);
-  if (activeFilter.value === "sold") return !!item.owner;
-  if (activeFilter.value === "vacant") return !item.owner;
-  if (activeFilter.value === "queue") return getQueueLength(i) > 0;
+  const item = stockStore.stockData[i];
+  if (activeFilter.value === "sold") return !!(item && item.owner);
+  if (activeFilter.value === "vacant") return !(item && item.owner);
+  if (activeFilter.value === "queue") return (queueLengthsMap.value[i] || 0) > 0;
   return true;
 }
 
@@ -860,23 +873,21 @@ async function showOwnerItems(ownerName) {
               }
             }
 
-            // คำนวณยอดขายในประวัติใหม่
-            const pastStockSnap = await get(dbRef(db, `stock/${vid}`));
-            if (pastStockSnap.exists()) {
-              const stockData = pastStockSnap.val();
-              let totalSales = 0;
-              let totalItems = 0;
-              Object.values(stockData).forEach(order => {
-                if (order.owner && order.price) {
-                  totalSales += parseInt(order.price);
-                  totalItems++;
-                }
-              });
-              await update(dbRef(db, `history/${vid}`), {
-                totalSales,
-                totalItems
-              });
-            }
+            // คำนวณยอดขายในประวัติใหม่โดยใช้ allStock ที่ดึงมาแล้ว
+            let totalSales = 0;
+            let totalItems = 0;
+            Object.values(allStock).forEach(order => {
+              if (order.owner) {
+                totalItems++;
+                const p = parseInt(order.price, 10);
+                totalSales += isNaN(p) ? 0 : p;
+              }
+            });
+            await update(dbRef(db, `history/${vid}`), {
+              totalSales,
+              totalItems,
+              lastUpdated: Date.now()
+            });
 
             // ลบจากรายการ pastItems ท้องถิ่นเพื่ออัปเดต UI ทันที
             pastItems.value = pastItems.value.filter(i => !(i.num === num && i.videoId === vid));
@@ -951,8 +962,7 @@ async function showOwnerItems(ownerName) {
 }
 
 function getQueueLength(num) {
-  const item = stockStore.stockData[num];
-  return item && item.queue ? item.queue.length : 0;
+  return queueLengthsMap.value[num] || 0;
 }
 function getSourceIcon(source) {
   if (source === "ai") return "fa-solid fa-robot";
@@ -1222,11 +1232,14 @@ function handleAutocompleteKeydown(event, index) {
 }
 
 function highlightMatch(text, query) {
-  if (!query) return text;
+  if (!text) return "";
+  const safeText = escapeHtml(text);
+  if (!query) return safeText;
   const q = query.trim();
-  if (!q) return text;
-  const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
-  return text.replace(regex, '<span class="autocomplete-highlight">$1</span>');
+  if (!q) return safeText;
+  const safeQuery = escapeHtml(q);
+  const regex = new RegExp(`(${safeQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  return safeText.replace(regex, '<span class="autocomplete-highlight">$1</span>');
 }
 
 async function saveQueueChanges(preventClose = false) {

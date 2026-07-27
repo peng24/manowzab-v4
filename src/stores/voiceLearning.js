@@ -1,10 +1,11 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { ref as dbRef, onValue, set, update, get, query, limitToLast } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useSystemStore } from "./system";
 import Swal from "sweetalert2";
 import { logger } from "../utils/logger";
+import { sanitizeDbKey } from "../utils/dbUtils";
 
 const DEFAULT_CODE_KEYWORDS = ["รหัส", "ไอดี", "รหัสที่", "เบอร์", "เบอร์ที่", "เลข", "เลขที่", "รายการที่", "รายการ", "ลายการที่", "ลายการ", "ลายกาน", "ในการนี่", "ในกาน", "ตัวที่", "แบบที่", "ชิ้นที่", "ชุดที่", "คู่ที่"];
 const DEFAULT_PRICE_KEYWORDS = ["ราคา", "ขาย", "ตั้งราคา", "คู่ละ", "ตัวละ", "ผืนละ", "ชิ้นละ", "ชุดละ", "ละ", "อยู่ที่", "เหลือ", "ลดเหลือ", "เอาไป", "จัดโปร", "บาท", "บาด", "ละคา", "ละกา", "ลดา", "าคา"];
@@ -18,6 +19,15 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
   const unitKeywords = ref([...DEFAULT_UNIT_KEYWORDS]);
   const candidates = ref({});
   const isInitialized = ref(false);
+
+  // 🚀 Performance: O(1) Set lookup for known keywords
+  const allKnownKeywordsSet = computed(() => {
+    return new Set([
+      ...codeKeywords.value,
+      ...priceKeywords.value,
+      ...unitKeywords.value,
+    ]);
+  });
 
   // Initialize and sync voice patterns from Firebase
   function initVoicePatterns() {
@@ -89,12 +99,8 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
 
     if (!separator || separator.length < 2 || separator.length > 10) return false;
 
-    // Ignore if it's already a known keyword
-    if (
-      priceKeywords.value.includes(separator) ||
-      codeKeywords.value.includes(separator) ||
-      unitKeywords.value.includes(separator)
-    ) {
+    // Ignore if it's already a known keyword (O(1) Set lookup)
+    if (allKnownKeywordsSet.value.has(separator)) {
       return false;
     }
 
@@ -102,12 +108,13 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
     if (/^\d+$/.test(separator)) return false;
 
     // Increment candidate count in Firebase
-    const candidateRef = dbRef(db, `settings/voice_patterns/candidates/${separator}`);
+    const safeKey = sanitizeDbKey(separator);
+    const candidateRef = dbRef(db, `settings/voice_patterns/candidates/${safeKey}`);
     const snap = await get(candidateRef);
     const currentScore = snap.exists() ? snap.val() : 0;
     const newScore = currentScore + 1;
 
-    logger.system(`🎙️ Voice Learning: Candidate separator found: "${separator}" (Score: ${newScore}/2)`);
+    logger.system(`🎙️ Voice Learning: Candidate separator found: "${separator}" (Key: "${safeKey}", Score: ${newScore}/2)`);
 
     if (newScore >= 2) {
       // Promote to active price keywords!
@@ -115,7 +122,7 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
       
       await update(dbRef(db), {
         "settings/voice_patterns/priceKeywords": newPriceKeywords,
-        [`settings/voice_patterns/candidates/${separator}`]: null
+        [`settings/voice_patterns/candidates/${safeKey}`]: null
       });
 
       logger.success(`🎉 Voice Learning: Auto-learned new price keyword: "${separator}"!`);

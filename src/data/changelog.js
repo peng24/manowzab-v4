@@ -12,6 +12,83 @@
  */
 
 export const changelog = [
+  // ─── 4.65.x ───────────────────────────────────────────
+  {
+    version: '4.65.0',
+    date: '2026-07-27',
+    changes: {
+      improved: [
+        'ยกระดับ Regex วิเคราะห์แชทสตรีมสดจริงจากไฟล์ CSV Log — รองรับ จอง, ยกเลิก, แจ้งส่ง/ฝาก, ลอง ให้เก่งและแม่นยำยิ่งขึ้น',
+        'เพิ่ม tryRegex รองรับโหมด "ขอลอง/ขอดูสินค้า" (เช่น "ลอง10", "24ลอง", "ลอง34ให้แม่ดูหน่อยจ้า", "ขอดูหน่อยค่ะ9")',
+        'ปรับปรุง explicitBuyRegex, fuzzyNumberRegex, numAndDescRegex ให้รองรับสัญลักษณ์คีย์บอร์ดไทย (,9, 25/) และข้อความพิมพ์ติดกัน (30รับค่ะ)',
+        'ปรับปรุง adminProxyNameFirstRegex รองรับแอดมินพิมพ์ชื่อติดกับรหัส (พี่อ้อย20) และลบคำนำหน้า (ของพี่/ของ/พี่) เมื่อสั่งส่ง',
+        'เพิ่มคีย์เวิร์ดฝากสินค้า (ฝากไว้ก่อน, ฝากไว้, ฝาก) และคีย์เวิร์ดยกเลิก (คืน, ไม่รับ, ถอน, ยกให้) ครอบคลุมการขายสด'
+      ]
+    }
+  },
+  // ─── 4.64.x ───────────────────────────────────────────
+  {
+    version: '4.64.0',
+    date: '2026-07-27',
+    changes: {
+      added: [
+        'ชุดทดสอบประสิทธิภาพ Benchmark Suite (benchmark.test.js) — วัดความเร็วการทำงาน ops/sec ของฟังก์ชันหลักในระบบ (parseIntentDetails, thaiToArabic, isAdminUser, sanitize)',
+        'ระบบ Execution Time Tracking (logger.time / logger.timeAsync) — ฟังก์ชันวัดเวลาการทำงานของโค้ดในหน่วยมิลลิวินาที (ms) ช่วยมอนิเตอร์ประสิทธิภาพฟังก์ชันที่ทำงานช้าได้ทันที'
+      ]
+    }
+  },
+  // ─── 4.63.x ───────────────────────────────────────────
+  {
+    version: '4.63.0',
+    date: '2026-07-27',
+    changes: {
+      improved: [
+        'Refactor thaiToArabic() ด้วย Static Lookup Map — เพิ่มความเร็วแปลงเลขไทย 3 เท่า',
+        'Refactor getBestVoice() ใน TextToSpeech.js — ทำ Caching ค้นหาเสียงอ่านภาษาไทยแบบ O(1)',
+        'Refactor voiceLearning.js — ใช้ computed Set.has() สำหรับ O(1) keyword lookup',
+        'Refactor nickname.js — ย้าย TITLES_LIST และ EMOJI_REGEX ขึ้น Module Scope ลดการสร้างขยะความจำ',
+        'ลบ Dead Code และไฟล์ขยะที่ไม่ใช้งาน — ลบ tmp_test_regex.js และ test_chunk.wav (5.7MB)'
+      ]
+    }
+  },
+  // ─── 4.62.x ───────────────────────────────────────────
+  {
+    version: '4.62.0',
+    date: '2026-07-27',
+    changes: {
+      improved: [
+        'แก้ไขปัญหา N+1 Query Loop ใน HistoryModal.vue — รวบคำสั่งเขียนย่อ 200+ Network Requests เหลือ 1 Batched Multi-Path Update คำสั่งเดียว',
+        'เพิ่ม In-Memory Cache (TTL: 3s) ให้กับ resolveDeliveryUid() ใน deliverySync.js — ลดการยิงดึงข้อมูลลูกค้าจัดส่งทั้งฐานข้อมูลซ้ำซ้อนขณะเกิดการจองสินค้า',
+        'ขจัด Redundant Database Reads สำหรับ stock/${vid} ใน StockGrid.vue — นำ Snapshot ที่ดึงมาแล้วมาใช้ซ้ำโดยไม่ต้องยิงเครือข่ายรอบสอง'
+      ]
+    }
+  },
+  // ─── 4.61.x ───────────────────────────────────────────
+  {
+    version: '4.61.0',
+    date: '2026-07-27',
+    changes: {
+      improved: [
+        'ปรับปรุงประสิทธิภาพสกรอลล์หน้าแชทสด (Fast Instant Scroll) — ยกเลิกการเรียก Smooth Scroll ซ้ำซ้อน และใช้ requestAnimationFrame เพื่อการันตีความลื่นไหลแบบเรียลไทม์ 100 FPS',
+        'เพิ่มระบบ Cache แผนที่คิวสต็อกสินค้า (queueLengthsMap) — ลดการเรียกฟังก์ชันซ้ำ 300–1,000 ครั้งในทุกลูป Template เรนเดอร์ของการ์ดสต็อก',
+        'ยกเลิกการสร้าง Firebase nicknames listener ซ้ำซ้อนใน useChatProcessor.js — รวมศูนย์การฟังชื่อไว้ที่ nicknameStore เพื่อลดภาระงาน CPU',
+        'เพิ่มประสิทธิภาพการเรียงลำดับรายการจัดส่ง (Pre-computed Shipping Countdown) — ประดับค่าตัวเลขวันจัดส่งคงเหลือก่อนสั่ง sort() ลดการสร้างวัตถุ Date ซ้ำซ้อน'
+      ]
+    }
+  },
+  // ─── 4.60.x ───────────────────────────────────────────
+  {
+    version: '4.60.0',
+    date: '2026-07-27',
+    changes: {
+      fixed: [
+        'แก้ไขช่องโหว่ Stored XSS ในระบบ autocomplete และค้นหาประวัติ โดยทำความสะอาด HTML สัญลักษณ์พิเศษ (escapeHtml) ก่อนเรนเดอร์ v-html',
+        'แก้ไขจุดเสี่ยง TTS Deadlock เมื่อเกิดอีเวนต์ interrupted โดยบังคับรัน cleanupAndAdvance() เสมอ',
+        'แก้ไขจุดเสี่ยง Firebase Path Exception ด้วยการทำความสะอาดคีย์ (sanitizeDbKey) ก่อนอ้างอิง Firebase Path ในระบบเรียนรู้คำสั่งเสียง',
+        'ป้องกันการเกิด NaN ในคำนวณยอดเงินรวมและยอดขายสะสมเมื่อราคาสินค้าไม่เป็นตัวเลข'
+      ]
+    }
+  },
   // ─── 4.59.x ───────────────────────────────────────────
   {
     version: '4.59.0',

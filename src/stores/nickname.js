@@ -16,6 +16,10 @@ export const useNicknameStore = defineStore("nickname", () => {
     "จิราพร เต": "คุณจิราพร เตชาทวีวรรณ"
   };
 
+  // Module-scoped constants to prevent garbage creation on every getPhoneticName call
+  const TITLES_LIST = ["คุณ", "พี่", "น้อง", "เฮีย", "เจ๊", "ป้า", "น้า", "อา", "ลุง", "ตา", "ยาย", "แม่", "พ่อ", "ดร.", "หมอ", "ครู", "ซ้อ", "เสี่ย"];
+  const EMOJI_REGEX = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]|\uD83F[\uDC00-\uDFFF]|[\u2000-\u26FF])/g;
+
   function initNicknameListener() {
     return onValue(dbRef(db, "nicknames"), (snapshot) => {
       const data = snapshot.val() || {};
@@ -67,12 +71,10 @@ export const useNicknameStore = defineStore("nickname", () => {
     
     // 3. ป้องกัน Google Cloud TTS อ่านสะกดคำ (เช่น "ปอ" -> "ปอ ออ", "เอ" -> "ออ เอ")
     // โดยการบังคับเติมคำว่า "คุณ" นำหน้าชื่อที่ไม่มีคำนำหน้า เพื่อให้ AI มองว่าเป็นชื่อคน ไม่ใช่อักษรย่อ
-    const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]|\uD83F[\uDC00-\uDFFF]|[\u2000-\u26FF])/g;
-    nameToRead = nameToRead.replace(emojiRegex, "").trim();
+    nameToRead = nameToRead.replace(EMOJI_REGEX, "").trim();
 
     if (nameToRead) {
-      const titles = ["คุณ", "พี่", "น้อง", "เฮีย", "เจ๊", "ป้า", "น้า", "อา", "ลุง", "ตา", "ยาย", "แม่", "พ่อ", "ดร.", "หมอ", "ครู", "ซ้อ", "เสี่ย"];
-      const hasTitle = titles.some(t => nameToRead.startsWith(t));
+      const hasTitle = TITLES_LIST.some((t) => nameToRead.startsWith(t));
       
       if (!hasTitle) {
         nameToRead = "คุณ" + nameToRead;

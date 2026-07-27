@@ -59,7 +59,8 @@ export const useStockStore = defineStore("stock", () => {
 
         Object.values(val).forEach((item) => {
           if (item.owner && item.price) {
-            totalSales += parseInt(item.price);
+            const p = parseInt(item.price, 10);
+            totalSales += isNaN(p) ? 0 : p;
             totalItems++;
           } else if (item.owner) {
             // Count items that have an owner even if price is missing
@@ -374,6 +375,7 @@ export const useStockStore = defineStore("stock", () => {
    * @param {boolean} [isAuto=false] - Whether this update was triggered by the auto voice detector
    */
   function updateStockPrice(num, price, isAuto = false) {
+    if (!systemStore.currentVideoId) return Promise.resolve();
     const path = `stock/${systemStore.currentVideoId}/${num}/price`;
     if (!isAuto) {
       const voiceLearningStore = useVoiceLearningStore();

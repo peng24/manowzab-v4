@@ -28,6 +28,22 @@ export function normalizeCustomerName(name) {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+// 🚀 In-Memory Cache for delivery_customers snapshot (TTL: 3 seconds)
+let _deliveryCustomersCache = null;
+let _cacheTimestamp = 0;
+const CACHE_TTL = 3000;
+
+async function getCachedDeliveryCustomers() {
+  const now = Date.now();
+  if (_deliveryCustomersCache && now - _cacheTimestamp < CACHE_TTL) {
+    return _deliveryCustomersCache;
+  }
+  const snapshot = await get(dbRef(db, "delivery_customers"));
+  _deliveryCustomersCache = snapshot.val() || {};
+  _cacheTimestamp = now;
+  return _deliveryCustomersCache;
+}
+
 /**
  * Resolves or finds the canonical delivery_customers key for a customer.
  * Uses normalized name matching for active (non-done) customers.
@@ -39,23 +55,15 @@ export function normalizeCustomerName(name) {
 export async function resolveDeliveryUid(uid, name) {
   const normName = normalizeCustomerName(name);
 
-  // If valid non-proxy UID, check if direct key exists first
-  if (!isProxyUid(uid)) {
-    try {
-      const snap = await get(dbRef(db, `delivery_customers/${uid}`));
-      if (snap.exists()) {
-        return uid;
-      }
-    } catch (e) {
-      logger.warn("resolveDeliveryUid direct check error:", e);
-    }
-  }
-
-  // Find matching active (non-done) customer by normalized name
   try {
-    const snapshot = await get(dbRef(db, "delivery_customers"));
-    const data = snapshot.val() || {};
+    const data = await getCachedDeliveryCustomers();
 
+    // If valid non-proxy UID, check if direct key exists first
+    if (!isProxyUid(uid) && data[uid]) {
+      return uid;
+    }
+
+    // Find matching active (non-done) customer by normalized name
     const activeKey = Object.keys(data).find((key) => {
       const cust = data[key];
       return (
@@ -147,7 +155,8 @@ export async function syncDeliveryCustomerForOwner(
         normalizeCustomerName(item.owner) === normName
       ) {
         count += 1;
-        totalPrice += item.price ? parseInt(item.price) : 0;
+        const parsedPrice = parseInt(item.price, 10);
+        totalPrice += isNaN(parsedPrice) ? 0 : parsedPrice;
       }
     });
 

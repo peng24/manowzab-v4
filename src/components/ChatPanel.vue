@@ -196,7 +196,7 @@ let canPull = false;
 const selectedChatTab = ref("all");
 const showNewMsgPill = ref(false);
 
-// 🚀 Performance: Render based on displayLimit for pagination
+// 🚀 Performance: Single-pass Filter & Pagination to avoid intermediate array allocations
 const visibleMessages = computed(() => {
   const total = chatStore.messages.length;
   const start = Math.max(0, total - displayLimit.value);
@@ -204,12 +204,29 @@ const visibleMessages = computed(() => {
 });
 
 const filteredVisibleMessages = computed(() => {
-  const msgs = visibleMessages.value;
-  if (selectedChatTab.value === "all") return msgs;
-  if (selectedChatTab.value === "buy") return msgs.filter((m) => m.type === "buy");
-  if (selectedChatTab.value === "cancel") return msgs.filter((m) => m.type === "cancel");
-  if (selectedChatTab.value === "admin") return msgs.filter((m) => m.isAdmin || m.type === "shipping" || m.type === "question");
-  return msgs;
+  const allMsgs = chatStore.messages;
+  const total = allMsgs.length;
+  const tab = selectedChatTab.value;
+  const limit = displayLimit.value;
+
+  if (tab === "all") {
+    const start = Math.max(0, total - limit);
+    return allMsgs.slice(start);
+  }
+
+  // Filter backwards to get the latest matching limit messages
+  const result = [];
+  for (let i = total - 1; i >= 0 && result.length < limit; i--) {
+    const m = allMsgs[i];
+    if (
+      (tab === "buy" && m.type === "buy") ||
+      (tab === "cancel" && m.type === "cancel") ||
+      (tab === "admin" && (m.isAdmin || m.type === "shipping" || m.type === "question"))
+    ) {
+      result.unshift(m);
+    }
+  }
+  return result;
 });
 
 // ✅ Check if there are more messages to load
@@ -337,19 +354,28 @@ function handleScroll() {
   }
 }
 
-// เลื่อนลงล่างสุด
-function scrollToBottom() {
+// เลื่อนลงล่างสุด (Fast Instant Scroll for live chat stream)
+let scrollAnimFrame = null;
+function scrollToBottom(isSmooth = false) {
   const el = chatViewport.value;
-  if (el) {
-    // ✅ Add small timeout to ensure DOM is ready
-    setTimeout(() => {
-      el.scrollTo({ top: el.scrollHeight + 1000, behavior: "smooth" }); // Add extra offset
-    }, 100);
+  if (!el) return;
 
+  if (scrollAnimFrame) cancelAnimationFrame(scrollAnimFrame);
+
+  if (isSmooth) {
+    el.scrollTo({ top: el.scrollHeight + 1000, behavior: "smooth" });
     showScrollButton.value = false;
     showNewMsgPill.value = false;
     isUserScrolling = false;
     clearAutoScrollTimer();
+  } else {
+    scrollAnimFrame = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+      showScrollButton.value = false;
+      showNewMsgPill.value = false;
+      isUserScrolling = false;
+      clearAutoScrollTimer();
+    });
   }
 }
 
@@ -377,9 +403,9 @@ watch(
   () => chatStore.messages.length,
   async () => {
     await nextTick();
-    // ถ้า User ไม่ได้เลื่อนดูประวัติอยู่ ให้เลื่อนลงอัตโนมัติ
+    // ถ้า User ไม่ได้เลื่อนดูประวัติอยู่ ให้เลื่อนลงอัตโนมัติแบบ instant fast scroll
     if (!isUserScrolling) {
-      scrollToBottom();
+      scrollToBottom(false);
     } else {
       // ถ้าดูประวัติอยู่ ให้โชว์ปุ่มแจ้งเตือน
       showScrollButton.value = true;

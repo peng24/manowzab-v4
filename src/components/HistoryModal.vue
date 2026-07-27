@@ -404,6 +404,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { useHistory } from "../composables/useHistory";
 import { ref as dbRef, onValue, get, remove, update, runTransaction, set } from "firebase/database";
 import { db } from "../composables/useFirebase";
+import { escapeHtml } from "../utils/dbUtils";
 import Swal from "sweetalert2";
 
 const emit = defineEmits(["close"]);
@@ -801,11 +802,14 @@ function handleAutocompleteKeydown(event, index) {
 }
 
 function highlightMatch(text, query) {
-  if (!query) return text;
+  if (!text) return "";
+  const safeText = escapeHtml(text);
+  if (!query) return safeText;
   const q = query.trim();
-  if (!q) return text;
-  const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
-  return text.replace(regex, '<span class="autocomplete-highlight">$1</span>');
+  if (!q) return safeText;
+  const safeQuery = escapeHtml(q);
+  const regex = new RegExp(`(${safeQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  return safeText.replace(regex, '<span class="autocomplete-highlight">$1</span>');
 }
 
 // Queue modal edits
@@ -907,80 +911,83 @@ async function updateDeliveryAndHistoryTotals(videoId) {
   if (!videoId) return;
 
   try {
-    const deliveryCustSnap = await get(dbRef(db, "delivery_customers"));
-    const deliveryData = deliveryCustSnap.val() || {};
+    const [deliveryCustSnap, stockSnap] = await Promise.all([
+      get(dbRef(db, "delivery_customers")),
+      get(dbRef(db, `stock/${videoId}`))
+    ]);
 
-    const stockSnap = await get(dbRef(db, `stock/${videoId}`));
+    const deliveryData = deliveryCustSnap.val() || {};
     const allStock = stockSnap.val() || {};
 
     const sessionCounts = {};
-    Object.values(allStock).forEach(item => {
+    let totalSales = 0;
+    let totalItems = 0;
+
+    Object.values(allStock).forEach((item) => {
       if (item.owner) {
+        totalItems++;
+        const p = parseInt(item.price, 10);
+        const validPrice = isNaN(p) ? 0 : p;
+        totalSales += validPrice;
+
         const key = item.uid || item.owner;
         if (!sessionCounts[key]) {
           sessionCounts[key] = { count: 0, totalPrice: 0 };
         }
         sessionCounts[key].count++;
-        sessionCounts[key].totalPrice += item.price ? parseInt(item.price) : 0;
+        sessionCounts[key].totalPrice += validPrice;
       }
     });
 
-    const promises = Object.keys(deliveryData).map(async (custKey) => {
+    const multiPathUpdates = {};
+
+    Object.keys(deliveryData).forEach((custKey) => {
       const cust = deliveryData[custKey];
       const hasSession = cust.sessions && cust.sessions[videoId];
-      const matchKey = Object.keys(sessionCounts).find(k => k === cust.uid || k === cust.name);
-      
+      const matchKey = Object.keys(sessionCounts).find(
+        (k) => k === cust.uid || k === cust.name
+      );
+
+      const updatedSessions = { ...(cust.sessions || {}) };
+
       if (matchKey) {
         const stats = sessionCounts[matchKey];
-        const currentSessionStatus = hasSession ? (cust.sessions[videoId].status || "pending") : "pending";
-        
-        await update(dbRef(db, `delivery_customers/${custKey}/sessions/${videoId}`), {
+        const currentSessionStatus = hasSession
+          ? cust.sessions[videoId].status || "pending"
+          : "pending";
+
+        const newSession = {
           count: stats.count,
           totalPrice: stats.totalPrice,
-          status: currentSessionStatus
-        });
-      } else {
-        if (hasSession) {
-          await remove(dbRef(db, `delivery_customers/${custKey}/sessions/${videoId}`));
-        }
+          status: currentSessionStatus,
+        };
+        updatedSessions[videoId] = newSession;
+        multiPathUpdates[`delivery_customers/${custKey}/sessions/${videoId}`] = newSession;
+      } else if (hasSession) {
+        delete updatedSessions[videoId];
+        multiPathUpdates[`delivery_customers/${custKey}/sessions/${videoId}`] = null;
       }
 
-      const sessionsSnap = await get(dbRef(db, `delivery_customers/${custKey}/sessions`));
-      const sessions = sessionsSnap.val() || {};
-      
-      const totalCount = Object.values(sessions)
-        .filter(s => s.status !== "done")
-        .reduce((sum, s) => sum + (s.count || 0), 0);
-      const totalAmount = Object.values(sessions)
-        .filter(s => s.status !== "done")
-        .reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+      // Compute total itemCount & totalPrice in memory directly
+      const activeSessions = Object.values(updatedSessions).filter(
+        (s) => s && s.status !== "done"
+      );
+      const totalCount = activeSessions.reduce((sum, s) => sum + (s.count || 0), 0);
+      const totalAmount = activeSessions.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
 
-      await update(dbRef(db, `delivery_customers/${custKey}`), {
-        itemCount: totalCount,
-        totalPrice: totalAmount,
-        updatedAt: Date.now()
-      });
+      multiPathUpdates[`delivery_customers/${custKey}/itemCount`] = totalCount;
+      multiPathUpdates[`delivery_customers/${custKey}/totalPrice`] = totalAmount;
+      multiPathUpdates[`delivery_customers/${custKey}/updatedAt`] = Date.now();
     });
 
-    await Promise.all(promises);
+    multiPathUpdates[`history/${videoId}/totalSales`] = totalSales;
+    multiPathUpdates[`history/${videoId}/totalItems`] = totalItems;
+    multiPathUpdates[`history/${videoId}/lastUpdated`] = Date.now();
 
-    let totalSales = 0;
-    let totalItems = 0;
-    Object.values(allStock).forEach(order => {
-      if (order.owner) {
-        if (order.price) {
-          totalSales += parseInt(order.price);
-        }
-        totalItems++;
-      }
-    });
-
-    await update(dbRef(db, `history/${videoId}`), {
-      totalSales,
-      totalItems,
-      lastUpdated: Date.now()
-    });
-
+    // ⚡ Execute single batched write operation (1 Network Request instead of 200+)
+    if (Object.keys(multiPathUpdates).length > 0) {
+      await update(dbRef(db), multiPathUpdates);
+    }
   } catch (err) {
     console.error("Error in updateDeliveryAndHistoryTotals:", err);
   }

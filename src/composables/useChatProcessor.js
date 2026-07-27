@@ -22,19 +22,10 @@ import { watch } from "vue";
 import { logger } from "../utils/logger";
 import { resolveDeliveryUid } from "../utils/deliverySync";
 
-// Saved names cache
-const savedNamesCache = ref({});
-const nameToUidMap = ref({});
-let _nicknameListenerUnsub = null;
-
-// ✅ Initialize nickname cache (with HMR cleanup guard)
-if (_nicknameListenerUnsub) _nicknameListenerUnsub();
-_nicknameListenerUnsub = onValue(dbRef(db, "nicknames"), (snapshot) => {
-  const data = snapshot.val() || {};
-  savedNamesCache.value = data;
-
-  // Build nameToUidMap reverse lookup map (nickname -> uid)
+// 🚀 Performance: Reverse lookup helper (nickname -> uid) powered by Pinia nicknameStore
+function getNameToUidMap(nicknameStore) {
   const map = {};
+  const data = nicknameStore.nicknames || {};
   Object.keys(data).forEach((uid) => {
     const entry = data[uid];
     const nick = typeof entry === "object" ? entry.nick : entry;
@@ -42,33 +33,7 @@ _nicknameListenerUnsub = onValue(dbRef(db, "nicknames"), (snapshot) => {
       map[nick.trim().toLowerCase()] = uid;
     }
   });
-  nameToUidMap.value = map;
-
-  // ✅ Reactive Update: อัปเดตชื่อในแชทเก่าทันที
-  const chatStore = useChatStore();
-  if (chatStore.messages && chatStore.messages.length > 0) {
-    chatStore.messages.forEach((msg) => {
-      if (data[msg.uid]) {
-        const newNick =
-          typeof data[msg.uid] === "object"
-            ? data[msg.uid].nick
-            : data[msg.uid];
-        if (msg.displayName !== newNick) {
-          msg.displayName = newNick;
-        }
-      }
-    });
-  }
-});
-
-// ✅ HMR Cleanup: Prevent duplicate Firebase listeners during development
-if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    if (_nicknameListenerUnsub) {
-      _nicknameListenerUnsub();
-      _nicknameListenerUnsub = null;
-    }
-  });
+  return map;
 }
 
 import {
@@ -80,6 +45,7 @@ import {
   questionRegex,
   pureNumberRegex,
   fuzzyNumberRegex,
+  tryRegex,
   explicitBuyRegex,
   numberWithPoliteRegex,
   dashBuyRegex,
@@ -454,13 +420,15 @@ export function useChatProcessor() {
         // Clean Name Logic (same robust fallback used in chat buying)
         let cleanName = normalizedMsg
           .replace(matchedKeyword, "")
+          .replace(/^(?:ของพี่|ของ|พี่)\s*/, "")
           .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
           .trim();
 
         if (cleanName.length > 0) {
           autoShipName = cleanName;
 
-          let foundUid = nameToUidMap.value[autoShipName.toLowerCase()];
+          const nameToUidMap = getNameToUidMap(nicknameStore);
+          let foundUid = nameToUidMap[autoShipName.toLowerCase()];
 
           if (!foundUid) {
             foundUid =

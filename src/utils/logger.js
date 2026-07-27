@@ -158,5 +158,37 @@ export const logger = {
   auth: (...args) => printLog("auth", args),
   presence: (...args) => printLog("presence", args),
   away: (...args) => printLog("away", args),
-  success: (...args) => printLog("success", args)
+  success: (...args) => printLog("success", args),
+
+  /**
+   * Measure execution time of a synchronous function
+   * @param {string} label Name/ID of the operation
+   * @param {Function} fn Function to execute
+   * @returns {*} Return value of fn
+   */
+  time: (label, fn) => {
+    const start = performance.now();
+    try {
+      return fn();
+    } finally {
+      const duration = (performance.now() - start).toFixed(3);
+      printLog("debug", [`⏱️ [TimeTrack] ${label} took ${duration} ms`]);
+    }
+  },
+
+  /**
+   * Measure execution time of an asynchronous function
+   * @param {string} label Name/ID of the operation
+   * @param {Function} asyncFn Async function to execute
+   * @returns {Promise<*>} Result of asyncFn
+   */
+  timeAsync: async (label, asyncFn) => {
+    const start = performance.now();
+    try {
+      return await asyncFn();
+    } finally {
+      const duration = (performance.now() - start).toFixed(3);
+      printLog("debug", [`⏱️ [TimeTrack] ${label} took ${duration} ms`]);
+    }
+  }
 };

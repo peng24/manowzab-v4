@@ -150,6 +150,31 @@ description: Mandatory verification checklist after every code change
 |---|---|---|---|
 | 12.1 | Toast Configurations | `main.js`, `shipping-main.js` | Toast จาก `Swal.mixin` ต้องไม่มีการใส่ popup config (`allowOutsideClick` / `showCloseButton`) และ global wrapper ต้องเช็ค `this.defaultParams?.toast` ควบคู่ `opts.toast` เพื่อแยกแยะว่าเป็น toast |
 
+---
+
+## ⚡ 13. ประสิทธิภาพและการทดสอบ (Performance & Optimization Verification)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 13.1 | Batched History Recalculation | `src/components/HistoryModal.vue` | `updateDeliveryAndHistoryTotals` ต้องใช้ Batched Multi-Path Update (`update(dbRef(db), multiPathUpdates)`) ห้ามวนลูปยิง N+1 Queries |
+| 13.2 | Delivery Customer TTL Cache | `src/utils/deliverySync.js` | `resolveDeliveryUid` ต้องใช้ In-Memory Cache (TTL: 3s) เพื่อลดการยิงเครือข่ายดึงข้อมูลทั้งฐานข้อมูลเมื่อมีคำสั่งจองรัวๆ |
+| 13.3 | Fast Instant Chat Scroll | `src/components/ChatPanel.vue` | สกรอลล์แชทสดต้องใช้ `requestAnimationFrame` (`scrollTop = scrollHeight`) ห้ามสั่ง Smooth Scroll ซ้ำซ้อน เพื่อคงความเร็ว 100 FPS |
+| 13.4 | O(1) Stock Queue Map | `src/components/StockGrid.vue` | การเรนเดอร์ Stock Grid ต้องใช้ `queueLengthsMap` (computed) ห้ามเรียกฟังก์ชันสืบค้นคิวซ้ำในทุกลูป Template |
+| 13.5 | Fast Thai-to-Arabic Conversion | `src/utils/chatParserUtils.js` | `thaiToArabic` ต้องใช้ Static Lookup Map `THAI_TO_ARABIC_MAP` เพื่อความเร็วสูงสุดในการสืบค้นแบบ $O(1)$ |
+| 13.6 | Execution Time Tracking | `src/utils/logger.js` | `logger.time` และ `logger.timeAsync` ต้องสามารถวัดและแสดงเวลาการทำงานเป็นมิลลิวินาที (ms) ได้ถูกต้อง |
+| 13.7 | Benchmark Test Suite | `src/__tests__/benchmark.test.js` | ชุดทดสอบ Benchmark ops/sec ต้องรันและผ่านผ่านคำสั่ง `npm test` |
+
+---
+
+## 🛡️ 14. ความปลอดภัยและความคงทนของระบบ (Security & Crash Prevention Invariants)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 14.1 | XSS HTML Escaping | `src/utils/dbUtils.js`, `StockGrid.vue`, `HistoryModal.vue`, `ChangelogModal.vue` | ฟังก์ชันไฮไลท์คำค้นหา (`highlightMatch`, `highlightSearch`) ต้องใช้ `escapeHtml` ก่อนฉีด `v-html` เพื่อป้องกัน Stored XSS |
+| 14.2 | TTS Safety Timer & Cleanup | `src/services/TextToSpeech.js` | `utterance.onerror` ต้องเรียก `cleanupAndAdvance()` เสมอ และมี Retry limit (20 รอบ / 2s) ป้องกัน Native TTS ค้าง |
+| 14.3 | Firebase Key Sanitization | `src/utils/dbUtils.js`, `src/stores/voiceLearning.js` | ข้อความที่ถูกนำไปใช้เป็น Firebase DB Path Key ต้องผ่าน `sanitizeDbKey()` เพื่อป้องกัน Exception อักขระต้องห้าม |
+| 14.4 | Financial NaN Safeguard | `src/utils/deliverySync.js`, `src/stores/stock.js` | การคำนวณราคาต้องมี `isNaN()` Check เพื่อป้องกันค่า `NaN` รั่วไหลเข้าฐานข้อมูล |
+
 
 ## How to Verify
 

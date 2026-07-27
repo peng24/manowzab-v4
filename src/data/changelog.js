@@ -12,6 +12,16 @@
  */
 
 export const changelog = [
+  // ─── 4.59.x ───────────────────────────────────────────
+  {
+    version: '4.59.0',
+    date: '2026-07-27',
+    changes: {
+      removed: [
+        'ยกเลิกและถอดการใช้ Vercel Deployment — ลบการเชื่อมต่อโปรเจกต์บน Vercel และสคริปต์ deploy:vercel ออกทั้งหมด โดยคงเหลือเฉพาะการ Deploy ผ่าน GitHub Pages (npm run deploy)'
+      ]
+    }
+  },
   // ─── 4.58.x ───────────────────────────────────────────
   {
     version: '4.58.0',

@@ -1,7 +1,7 @@
 {
   "name": "manowzab-command-center",
   "private": true,
-  "version": "4.58.0",
+  "version": "4.59.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,8 +9,7 @@
     "build:gh": "vite build --base=/manowzab-v4/",
     "preview": "vite preview",
     "deploy:gh": "npm run build:gh && gh-pages -d dist",
-    "deploy:vercel": "npm run build && npx vercel --prod",
-    "deploy": "npm run deploy:gh && npm run deploy:vercel",
+    "deploy": "npm run deploy:gh",
     "test": "vitest run"
   },
   "dependencies": {

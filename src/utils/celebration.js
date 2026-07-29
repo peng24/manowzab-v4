@@ -7,6 +7,7 @@ let audioContext = null;
 // ✅ Preload the audio file into memory immediately when the app loads
 export async function preloadCelebrationAudio() {
   try {
+    if (typeof window === "undefined") return;
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
 

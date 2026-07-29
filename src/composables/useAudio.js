@@ -3,7 +3,11 @@ import { useSystemStore } from "../stores/system";
 import { ttsService } from "../services/TextToSpeech";
 
 // ✅ Global Singleton AudioContext (Shared across all components)
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const audioCtx =
+  typeof window !== "undefined" &&
+  (window.AudioContext || window.webkitAudioContext)
+    ? new (window.AudioContext || window.webkitAudioContext)()
+    : null;
 
 // ✅ Global Unified Audio Queue (persists across re-renders)
 const audioQueue = [];

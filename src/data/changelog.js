@@ -14,6 +14,15 @@
 export const changelog = [
   // ─── 4.65.x ───────────────────────────────────────────
   {
+    version: '4.65.2',
+    date: '2026-07-29',
+    changes: {
+      fixed: [
+        'สแกนและตรวจสอบตัวแปรค้างข้ามระบบ (Variable Reference Audit) — เพิ่ม window guards ใน useAudio.js และ celebration.js ป้องกัน ReferenceError ทั้งบน SSR และ Client Side'
+      ]
+    }
+  },
+  {
     version: '4.65.1',
     date: '2026-07-29',
     changes: {

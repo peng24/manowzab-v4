@@ -186,12 +186,9 @@ export function useChatProcessor() {
     // Check Nickname
     let displayName = realName;
     let isNewCustomer = isVoiceChat ? false : true;
-    if (!isVoiceChat && savedNamesCache.value[uid]) {
+    if (!isVoiceChat && nicknameStore.nicknames && nicknameStore.nicknames[uid]) {
       isNewCustomer = false;
-      displayName =
-        typeof savedNamesCache.value[uid] === "object"
-          ? savedNamesCache.value[uid].nick
-          : savedNamesCache.value[uid];
+      displayName = nicknameStore.getNickname(uid, realName);
     }
 
     // ✅ Get phonetic name for TTS (separate from display name)

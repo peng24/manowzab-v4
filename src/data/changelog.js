@@ -14,6 +14,15 @@
 export const changelog = [
   // ─── 4.65.x ───────────────────────────────────────────
   {
+    version: '4.65.1',
+    date: '2026-07-29',
+    changes: {
+      fixed: [
+        'แก้ไขบั๊ก ReferenceError: savedNamesCache is not defined ใน useChatProcessor.js — สลับไปใช้ nicknameStore.getNickname() แก้ปัญหาแชทสดไม่แสดงผล 100%'
+      ]
+    }
+  },
+  {
     version: '4.65.0',
     date: '2026-07-27',
     changes: {

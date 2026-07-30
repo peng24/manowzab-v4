@@ -61,4 +61,51 @@ describe("Stock Store", () => {
     stockStore.connectToStock("test_video_123");
     expect(stockStore.milestones).toEqual({ fifty: false, eighty: false, hundred: false });
   });
+
+  describe("findMostRecentItemForUser with 1-minute time limit", () => {
+    it("returns latest item if booked within 1 minute (60,000 ms)", () => {
+      const stockStore = useStockStore();
+      const now = 1000000;
+      stockStore.stockData = {
+        5: { owner: "Somchai", uid: "user-1", time: now - 30000 } // booked 30s ago
+      };
+
+      const result = stockStore.findMostRecentItemForUser("user-1", "Somchai", 60000, now);
+      expect(result).toBe(5);
+    });
+
+    it("returns null if latest booking was made more than 1 minute ago", () => {
+      const stockStore = useStockStore();
+      const now = 1000000;
+      stockStore.stockData = {
+        5: { owner: "Somchai", uid: "user-1", time: now - 70000 } // booked 70s ago (> 1 min)
+      };
+
+      const result = stockStore.findMostRecentItemForUser("user-1", "Somchai", 60000, now);
+      expect(result).toBeNull();
+    });
+
+    it("returns the recent item when user has older and newer bookings", () => {
+      const stockStore = useStockStore();
+      const now = 1000000;
+      stockStore.stockData = {
+        10: { owner: "Somchai", uid: "user-1", time: now - 120000 }, // 2 mins ago
+        15: { owner: "Somchai", uid: "user-1", time: now - 20000 }    // 20s ago
+      };
+
+      const result = stockStore.findMostRecentItemForUser("user-1", "Somchai", 60000, now);
+      expect(result).toBe(15);
+    });
+
+    it("returns recent item when user is in queue within 1 minute", () => {
+      const stockStore = useStockStore();
+      const now = 1000000;
+      stockStore.stockData = {
+        20: { owner: "OtherUser", uid: "user-2", queue: [{ owner: "Somchai", uid: "user-1", time: now - 45000 }] }
+      };
+
+      const result = stockStore.findMostRecentItemForUser("user-1", "Somchai", 60000, now);
+      expect(result).toBe(20);
+    });
+  });
 });

@@ -369,8 +369,16 @@ export function useChatProcessor() {
     if (isCancel) {
       intent = "cancel";
       if (!targetId) {
-        // ✅ Auto-resolve: ยกเลิกรายการล่าสุดของลูกค้า
-        const recentId = stockStore.findMostRecentItemForUser(uid, displayName);
+        // ✅ Auto-resolve: ยกเลิกรายการล่าสุดของลูกค้า (ต้องจองไปไม่เกิน 1 นาที / 60,000 ms)
+        const msgTimestamp = item.snippet?.publishedAt
+          ? new Date(item.snippet.publishedAt).getTime()
+          : Date.now();
+        const recentId = stockStore.findMostRecentItemForUser(
+          uid,
+          displayName,
+          60000, // 1 นาที
+          msgTimestamp
+        );
         if (recentId) {
           targetId = recentId;
           method = method ? method + "+auto-latest" : "auto-cancel-latest";
@@ -379,7 +387,7 @@ export function useChatProcessor() {
           );
         } else {
           logger.log(
-            `⚠️ Cancel without number: no bookings found for ${displayName} (uid: ${uid})`,
+            `⚠️ Cancel without number skipped: no booking within 1 minute found for ${displayName} (uid: ${uid})`,
           );
         }
       }

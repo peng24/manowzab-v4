@@ -309,14 +309,36 @@ export const useStockStore = defineStore("stock", () => {
    * Finds the most recent item number that the user (by uid or displayName)
    * has booked or is queued for.
    * Sorts by time descending, and defaults to item ID descending on collisions/missing values.
+   * If maxAgeMs is provided, only items booked within maxAgeMs (relative to referenceTime) are considered.
+   *
+   * @param {string|null} uid
+   * @param {string|null} displayName
+   * @param {number|null} [maxAgeMs=null] - Maximum age in milliseconds (e.g., 60000 for 1 min)
+   * @param {number} [referenceTime=Date.now()] - Reference timestamp to calculate age against
+   * @returns {number|null} Item ID or null if no valid item found
    */
-  function findMostRecentItemForUser(uid, displayName) {
+  function findMostRecentItemForUser(
+    uid,
+    displayName,
+    maxAgeMs = null,
+    referenceTime = Date.now(),
+  ) {
     let mostRecentId = null;
     let maxTime = -2; // Start lower than missing (-1) or 0
 
     Object.entries(stockData.value).forEach(([id, item]) => {
       const num = parseInt(id);
       if (isNaN(num)) return;
+
+      const isValidTime = (t) => {
+        if (maxAgeMs !== null) {
+          if (t === undefined || t === null || t <= 0) return false;
+          const age = referenceTime - t;
+          // Age must not exceed maxAgeMs (allow up to 10s future skew for local/server time differences)
+          if (age > maxAgeMs || age < -10000) return false;
+        }
+        return true;
+      };
 
       // 1. Check if owner
       const isOwner =
@@ -325,13 +347,15 @@ export const useStockStore = defineStore("stock", () => {
       if (isOwner) {
         const itemTime =
           item.time !== undefined && item.time !== null ? item.time : -1;
-        if (itemTime > maxTime) {
-          maxTime = itemTime;
-          mostRecentId = num;
-        } else if (itemTime === maxTime && maxTime !== -2) {
-          // Fallback: pick the higher item number
-          if (mostRecentId === null || num > mostRecentId) {
+        if (isValidTime(itemTime)) {
+          if (itemTime > maxTime) {
+            maxTime = itemTime;
             mostRecentId = num;
+          } else if (itemTime === maxTime && maxTime !== -2) {
+            // Fallback: pick the higher item number
+            if (mostRecentId === null || num > mostRecentId) {
+              mostRecentId = num;
+            }
           }
         }
       }
@@ -343,13 +367,15 @@ export const useStockStore = defineStore("stock", () => {
             (uid && q.uid === uid) || (displayName && q.owner === displayName);
           if (isQueued) {
             const qTime = q.time !== undefined && q.time !== null ? q.time : -1;
-            if (qTime > maxTime) {
-              maxTime = qTime;
-              mostRecentId = num;
-            } else if (qTime === maxTime && maxTime !== -2) {
-              // Fallback: pick the higher item number
-              if (mostRecentId === null || num > mostRecentId) {
+            if (isValidTime(qTime)) {
+              if (qTime > maxTime) {
+                maxTime = qTime;
                 mostRecentId = num;
+              } else if (qTime === maxTime && maxTime !== -2) {
+                // Fallback: pick the higher item number
+                if (mostRecentId === null || num > mostRecentId) {
+                  mostRecentId = num;
+                }
               }
             }
           }

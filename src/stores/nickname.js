@@ -3,7 +3,6 @@ import { ref } from "vue";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "../utils/logger";
-import { useChatStore } from "./chat";
 
 export const useNicknameStore = defineStore("nickname", () => {
   const nicknames = ref({});
@@ -25,21 +24,6 @@ export const useNicknameStore = defineStore("nickname", () => {
       const data = snapshot.val() || {};
       nicknames.value = data;
       logger.debug("📝 Nicknames updated:", Object.keys(data).length);
-
-      // ✅ Update chatStore messages in real-time when nicknames change
-      try {
-        const chatStore = useChatStore();
-        if (chatStore.messages && chatStore.messages.length > 0) {
-          chatStore.messages.forEach((msg) => {
-            const resolved = getNickname(msg.uid, msg.realName || msg.authorName);
-            if (resolved && msg.displayName !== resolved) {
-              msg.displayName = resolved;
-            }
-          });
-        }
-      } catch (e) {
-        // Store not ready yet
-      }
     });
   }
 

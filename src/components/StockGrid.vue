@@ -711,13 +711,13 @@ function updateOwnerItemsModal() {
   const itemsHtml = allItems.map((item) => {
     const priceText = item.price ? `${parseInt(item.price).toLocaleString()}` : '';
     const timeText = item.time ? formatTime(item.time) : '';
-    const removeDetail = `${item.num}|${item.videoId}`;
+    const removeDetail = escapeHtml(`${item.num}|${item.videoId}`);
 
     return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin:4px 0; background:linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius:10px; border:1px solid #2a2a4a; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#2a2a4a'">
       <div style="flex:1; min-width:0;">
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span style="background:linear-gradient(135deg, #0ea5e9, #2563eb); color:#fff; font-weight:700; padding:2px 10px; border-radius:20px; font-size:0.85em; white-space:nowrap;">#${item.num}</span>
-          <span style="background:rgba(255, 255, 255, 0.08); color:#cbd5e1; border:1px solid rgba(255, 255, 255, 0.15); font-weight:500; padding:2px 8px; border-radius:20px; font-size:0.8em; white-space:nowrap;">${item.title}</span>
+          <span style="background:rgba(255, 255, 255, 0.08); color:#cbd5e1; border:1px solid rgba(255, 255, 255, 0.15); font-weight:500; padding:2px 8px; border-radius:20px; font-size:0.8em; white-space:nowrap;">${escapeHtml(item.title)}</span>
           ${priceText ? `<span style="color:#fbbf24; font-weight:600; font-size:0.85em;">💰 ${priceText} ฿</span>` : ''}
         </div>
         ${timeText ? `<div style="font-size:0.7em; color:#6b7280; margin-top:4px; padding-left:2px;">📅 ${timeText}</div>` : ''}

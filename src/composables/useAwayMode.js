@@ -8,14 +8,13 @@ import { logger } from "../utils/logger";
 
 let activeAwayUnsubscribe = null;
 let localIsAwayState = false;
+let awayInterval = null;
+let awayStartTime = 0;
+const awayTimer = ref("00:00"); // ✅ Module scope — shared across all consumers (same as awayInterval)
 
 export function useAwayMode() {
     const systemStore = useSystemStore();
     const { queueAudio, resetVoice } = useAudio();
-
-    const awayTimer = ref("00:00");
-    let awayInterval = null;
-    let awayStartTime = 0;
 
     function getRandomMessage(messageArray) {
         return messageArray[Math.floor(Math.random() * messageArray.length)];

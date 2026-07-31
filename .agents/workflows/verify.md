@@ -41,6 +41,7 @@ description: Mandatory verification checklist after every code change
 | 3.5 | `updateStockSize(newSize)` | `src/stores/stock.js` | ขยาย/ย่อ grid + auto-expand เมื่อจองเกินจำนวน |
 | 3.6 | `updateItemData(num, newData)` | `src/stores/stock.js` | อัปเดตราคา/ไซส์ + sync Overlay |
 | 3.7 | `saveQueueChanges()` | `src/components/StockGrid.vue` | เวลายกเลิกจอง (ลบรายชื่อทิ้งทั้งหมด) หากมีการตั้งราคาไว้ ต้องเคลียร์ข้อมูลเจ้าของ/คิวเป็น null แต่ยังคงราคาไว้ (แก้บั๊กชื่อค้าง) |
+| 3.8 | Throttled History Sync | `src/stores/stock.js` | การบันทึกสถิติลง `history/${videoId}` ต้องใช้ Throttle (5s debounce) ป้องกันการยิง Firebase ถี่เกินไป |
 
 ---
 
@@ -64,10 +65,10 @@ description: Mandatory verification checklist after every code change
 
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
-| 5.1 | `syncFromFirebase(videoId)` | `src/stores/chat.js` | sync แชท real-time ข้ามอุปกรณ์ |
+| 5.1 | `syncFromFirebase(videoId)` | `src/stores/chat.js` | sync แชท real-time ข้ามอุปกรณ์ (ใช้ Firebase v9 Direct Unsubscribe Cleanup) |
 | 5.2 | `sendMessageToFirebase(videoId, data)` | `src/stores/chat.js` | ส่งข้อความเก็บ Firebase |
-| 5.3 | `addMessage(message)` | `src/stores/chat.js` | เพิ่มข้อความ UI + deduplication |
-| 5.4 | `downloadChatCSV(videoId)` | `src/stores/chat.js` | ดาวน์โหลดแชทเป็น CSV |
+| 5.3 | `addMessage(message)` | `src/stores/chat.js` | เพิ่มข้อความ UI + deduplication + UI Message Trimming (`MAX_MESSAGES=500`, `MAX_SEEN_IDS=2000`) ป้องกัน Memory Leak |
+| 5.4 | `downloadChatCSV(videoId)` | `src/stores/chat.js` | ดาวน์โหลดแชทเป็น CSV (ต้องไม่ถูกกระทบจาก UI trimming) |
 | 5.5 | `clearChat()` | `src/stores/chat.js` | ล้างแชท UI ทั้งหมด |
 
 ---
@@ -88,7 +89,7 @@ description: Mandatory verification checklist after every code change
 
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
-| 7.1 | `initAwayListener()` | `src/composables/useAwayMode.js` | sync สถานะพักข้ามอุปกรณ์ + อ่านข้อความประกาศ |
+| 7.1 | `initAwayListener()` | `src/composables/useAwayMode.js` | sync สถานะพักข้ามอุปกรณ์ + อ่านข้อความประกาศ (แชร์ `awayTimer` และ `awayInterval` ที่ Module Scope) |
 | 7.2 | `closeAwayMode()` | `src/composables/useAwayMode.js` | ปิดโหมดพัก |
 
 ---
@@ -144,11 +145,12 @@ description: Mandatory verification checklist after every code change
 
 ---
 
-## 🔔 12. ข้อกำหนดการเตือน (SweetAlert2 Invariant)
+## 🔔 12. ข้อกำหนดการเตือนและการจับ Error (SweetAlert2 & Error Invariants)
 
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
-| 12.1 | Toast Configurations | `main.js`, `shipping-main.js` | Toast จาก `Swal.mixin` ต้องไม่มีการใส่ popup config (`allowOutsideClick` / `showCloseButton`) และ global wrapper ต้องเช็ค `this.defaultParams?.toast` ควบคู่ `opts.toast` เพื่อแยกแยะว่าเป็น toast |
+| 12.1 | Toast Configurations | `main.js`, `shipping-main.js`, `history-main.js` | Toast จาก `Swal.mixin` ต้องไม่มีการใส่ popup config (`allowOutsideClick` / `showCloseButton`) และ global wrapper ต้องเช็ค `this.defaultParams?.toast` ควบคู่ `opts.toast` เพื่อแยกแยะว่าเป็น toast |
+| 12.2 | Multi-Entry Error Handlers | `main.js`, `shipping-main.js`, `history-main.js` | ทุก entry point ต้องลงทะเบียน `app.config.errorHandler = globalErrorHandler` และรับฟัง `unhandledrejection` |
 
 ---
 
@@ -163,6 +165,7 @@ description: Mandatory verification checklist after every code change
 | 13.5 | Fast Thai-to-Arabic Conversion | `src/utils/chatParserUtils.js` | `thaiToArabic` ต้องใช้ Static Lookup Map `THAI_TO_ARABIC_MAP` เพื่อความเร็วสูงสุดในการสืบค้นแบบ $O(1)$ |
 | 13.6 | Execution Time Tracking | `src/utils/logger.js` | `logger.time` และ `logger.timeAsync` ต้องสามารถวัดและแสดงเวลาการทำงานเป็นมิลลิวินาที (ms) ได้ถูกต้อง |
 | 13.7 | Benchmark Test Suite | `src/__tests__/benchmark.test.js` | ชุดทดสอบ Benchmark ops/sec ต้องรันและผ่านผ่านคำสั่ง `npm test` |
+| 13.8 | Throttled History DB Writes | `src/stores/stock.js` | การเขียนสถิติประวัติ ต้องใช้ Throttling 5 วินาที ลดภาระการเขียน Firebase Database ในช่วงพีค |
 
 ---
 
@@ -170,10 +173,12 @@ description: Mandatory verification checklist after every code change
 
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
-| 14.1 | XSS HTML Escaping | `src/utils/dbUtils.js`, `StockGrid.vue`, `HistoryModal.vue`, `ChangelogModal.vue` | ฟังก์ชันไฮไลท์คำค้นหา (`highlightMatch`, `highlightSearch`) ต้องใช้ `escapeHtml` ก่อนฉีด `v-html` เพื่อป้องกัน Stored XSS |
+| 14.1 | XSS HTML Escaping | `src/utils/dbUtils.js`, `StockGrid.vue`, `HistoryModal.vue`, `ChangelogModal.vue` | ฟังก์ชันไฮไลท์คำค้นหา (`highlightMatch`, `highlightSearch`) และ SweetAlert Modal HTML templates ต้องใช้ `escapeHtml` ก่อนฉีด `v-html` หรือ `html:` เพื่อป้องกัน Stored XSS |
 | 14.2 | TTS Safety Timer & Cleanup | `src/services/TextToSpeech.js` | `utterance.onerror` ต้องเรียก `cleanupAndAdvance()` เสมอ และมี Retry limit (20 รอบ / 2s) ป้องกัน Native TTS ค้าง |
 | 14.3 | Firebase Key Sanitization | `src/utils/dbUtils.js`, `src/stores/voiceLearning.js` | ข้อความที่ถูกนำไปใช้เป็น Firebase DB Path Key ต้องผ่าน `sanitizeDbKey()` เพื่อป้องกัน Exception อักขระต้องห้าม |
 | 14.4 | Financial NaN Safeguard | `src/utils/deliverySync.js`, `src/stores/stock.js` | การคำนวณราคาต้องมี `isNaN()` Check เพื่อป้องกันค่า `NaN` รั่วไหลเข้าฐานข้อมูล |
+| 14.5 | Firebase Atomic Transactions | `src/stores/voiceLearning.js`, `src/stores/system.js` | การอัปเดตคะแนนคำเรียนรู้เสียง และการแย่งชิงสิทธิ์ Price Detector ต้องใช้ `runTransaction` ป้องกัน Data Race Condition |
+| 14.6 | Offline Queue Lock | `src/composables/useOfflineQueue.js` | `flushQueue` ต้องมี `isFlushing` guard lock + `try/finally` ป้องกันการประมวลผลซ้ำคิวออฟไลน์พร้อมกัน |
 
 
 ## How to Verify

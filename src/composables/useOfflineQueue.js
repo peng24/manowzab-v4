@@ -5,6 +5,7 @@ const STORAGE_KEY = "manowzab_offline_queue_v1";
 const isOnline = ref(navigator.onLine);
 const pendingQueue = ref(loadQueue());
 let sequenceCounter = 0;
+let isFlushing = false;
 
 function loadQueue() {
   try {
@@ -75,24 +76,28 @@ export function useOfflineQueue() {
    * @param {Function} processor Async callback to process each item
    */
   async function flushQueue(processor) {
-    if (pendingQueue.value.length === 0 || !isOnline.value) return;
+    if (pendingQueue.value.length === 0 || !isOnline.value || isFlushing) return;
+    isFlushing = true;
+    try {
+      // Sort by sequenceId and timestamp to guarantee strictly ordered execution
+      pendingQueue.value.sort((a, b) => a.timestamp - b.timestamp || a.sequenceId - b.sequenceId);
 
-    // Sort by sequenceId and timestamp to guarantee strictly ordered execution
-    pendingQueue.value.sort((a, b) => a.timestamp - b.timestamp || a.sequenceId - b.sequenceId);
-
-    const queueCopy = [...pendingQueue.value];
-    for (const item of queueCopy) {
-      try {
-        if (processor) {
-          await processor(item);
+      const queueCopy = [...pendingQueue.value];
+      for (const item of queueCopy) {
+        try {
+          if (processor) {
+            await processor(item);
+          }
+          // Remove processed item
+          pendingQueue.value = pendingQueue.value.filter((i) => i.id !== item.id);
+          saveQueue(pendingQueue.value);
+        } catch (err) {
+          logger.error(`Error flushing offline item ${item.id}:`, err);
+          break; // Stop on first failure to prevent out-of-order processing
         }
-        // Remove processed item
-        pendingQueue.value = pendingQueue.value.filter((i) => i.id !== item.id);
-        saveQueue(pendingQueue.value);
-      } catch (err) {
-        logger.error(`Error flushing offline item ${item.id}:`, err);
-        break; // Stop on first failure to prevent out-of-order processing
       }
+    } finally {
+      isFlushing = false;
     }
   }
 

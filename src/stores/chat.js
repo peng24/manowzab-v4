@@ -1,12 +1,15 @@
 import { defineStore } from "pinia";
 import { ref, reactive } from "vue";
-import { ref as dbRef, onChildAdded, off, push } from "firebase/database";
+import { ref as dbRef, onChildAdded, push } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useAudio } from "../composables/useAudio";
 import { logger } from "../utils/logger";
 import { useNicknameStore } from "./nickname";
 
 export const useChatStore = defineStore("chat", () => {
+  const MAX_MESSAGES = 500;
+  const MAX_SEEN_IDS = 2000;
+
   const messages = reactive([]); // ✅ เปลี่ยนเป็น reactive
   const seenMessageIds = ref({});
   const fullChatLog = ref([]);
@@ -37,7 +40,20 @@ export const useChatStore = defineStore("chat", () => {
     }
 
     seenMessageIds.value[message.id] = true;
+
+    // ✅ Memory safety: trim seen IDs cache periodically
+    const seenKeys = Object.keys(seenMessageIds.value);
+    if (seenKeys.length > MAX_SEEN_IDS) {
+      const keysToRemove = seenKeys.slice(0, seenKeys.length - MAX_SEEN_IDS);
+      keysToRemove.forEach(key => delete seenMessageIds.value[key]);
+    }
+
     messages.push(message); // ✅ Push เข้า reactive array
+
+    // ✅ Memory safety: trim old messages to prevent unbounded growth during long streams
+    if (messages.length > MAX_MESSAGES) {
+      messages.splice(0, messages.length - MAX_MESSAGES);
+    }
 
     const textSnippet = message.text ? (message.text.length > 30 ? message.text.substring(0, 30) + "..." : message.text) : "(empty)";
     logger.chat(`Message added from ${message.authorName || "System"}: "${textSnippet}" (Total: ${messages.length})`);
@@ -126,8 +142,7 @@ export const useChatStore = defineStore("chat", () => {
     // Clean up previous listener first
     if (currentChatListener) {
       logger.firebase(`Cleaning up old chat listener for ${currentVideoId}`);
-      const oldRef = dbRef(db, `chats/${currentVideoId}`);
-      off(oldRef, "child_added", currentChatListener);
+      currentChatListener();
       currentChatListener = null;
     }
 
@@ -177,7 +192,7 @@ export const useChatStore = defineStore("chat", () => {
     // Return cleanup function
     return () => {
       logger.firebase(`Cleaning up chat listener for ${videoId}`);
-      off(chatRef, "child_added", listener);
+      listener();
       currentChatListener = null;
     };
   }

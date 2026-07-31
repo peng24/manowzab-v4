@@ -1,6 +1,8 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import HistoryPage from "./pages/HistoryPage.vue";
+import { globalErrorHandler } from "./utils/errorHandler";
+import { logger } from "./utils/logger";
 
 import Swal from "sweetalert2";
 
@@ -22,4 +24,11 @@ Swal.fire = function (...args) {
 
 const app = createApp(HistoryPage);
 app.use(createPinia());
+
+// ✅ Register Global Error Handler
+app.config.errorHandler = globalErrorHandler;
+
+window.addEventListener("unhandledrejection", (event) => {
+  logger.warn("Unhandled Promise Rejection (History):", event.reason);
+});
 app.mount("#history-app");

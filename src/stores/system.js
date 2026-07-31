@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { ref as dbRef, onValue, get, update } from "firebase/database";
+import { ref as dbRef, onValue, get, update, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import pkg from "../../package.json";
 import { logger } from "../utils/logger";
@@ -84,17 +84,20 @@ export const useSystemStore = defineStore("system", () => {
     });
   }
 
-  // ✅ Take over or release price detector role
+  // ✅ Take over or release price detector role (atomic)
   async function setPriceDetectorState(enabled) {
     isPriceDetector.value = enabled;
-    const path = "system/activePriceDetectorId";
+    const detectorRef = dbRef(db, "system/activePriceDetectorId");
     if (enabled) {
-      await update(dbRef(db), { [path]: myDeviceId.value });
+      await update(dbRef(db), { "system/activePriceDetectorId": myDeviceId.value });
     } else {
-      const snapshot = await get(dbRef(db, path));
-      if (snapshot.val() === myDeviceId.value) {
-        await update(dbRef(db), { [path]: "" });
-      }
+      // ✅ Use runTransaction to atomically check-and-clear
+      await runTransaction(detectorRef, (currentValue) => {
+        if (currentValue === myDeviceId.value) {
+          return ""; // Clear only if we own it
+        }
+        return; // Abort — someone else took over
+      });
     }
   }
 
@@ -131,13 +134,9 @@ export const useSystemStore = defineStore("system", () => {
          }
       }
 
-      if (activeKeyIndex.value !== selectedKey) {
-        activeKeyIndex.value = selectedKey;
-        logger.tts(`Optimal TTS Key Assigned: Key #${selectedKey} (Usage: ${JSON.stringify(keyUsage)})`);
-        updatePresenceTtsKey(); // Sync new key selection to Firebase
-      } else {
-        logger.tts(`TTS Key remains #${selectedKey} (Usage: ${JSON.stringify(keyUsage)})`);
-      }
+      activeKeyIndex.value = selectedKey;
+      logger.tts(`Optimal TTS Key Assigned: Key #${selectedKey} (Usage: ${JSON.stringify(keyUsage)})`);
+      updatePresenceTtsKey(); // ✅ Always sync key to Firebase presence (fixes initial boot)
     } catch(e) {
       logger.warn("Failed to assign optimal TTS key", e);
     }

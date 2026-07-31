@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { ref as dbRef, onValue, set, update, get, query, limitToLast } from "firebase/database";
+import { ref as dbRef, onValue, set, update, get, query, limitToLast, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useSystemStore } from "./system";
 import Swal from "sweetalert2";
@@ -107,19 +107,24 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
     // Ignore if it is just a number
     if (/^\d+$/.test(separator)) return false;
 
-    // Increment candidate count in Firebase
+    // Increment candidate count in Firebase (atomic)
     const safeKey = sanitizeDbKey(separator);
     const candidateRef = dbRef(db, `settings/voice_patterns/candidates/${safeKey}`);
-    const snap = await get(candidateRef);
-    const currentScore = snap.exists() ? snap.val() : 0;
-    const newScore = currentScore + 1;
 
-    logger.system(`🎙️ Voice Learning: Candidate separator found: "${separator}" (Key: "${safeKey}", Score: ${newScore}/2)`);
+    let promoted = false;
+    await runTransaction(candidateRef, (currentScore) => {
+      const newScore = (currentScore || 0) + 1;
+      logger.system(`🎙️ Voice Learning: Candidate separator found: "${separator}" (Key: "${safeKey}", Score: ${newScore}/2)`);
+      if (newScore >= 2) {
+        promoted = true;
+        return null; // Remove candidate (will be promoted)
+      }
+      return newScore;
+    });
 
-    if (newScore >= 2) {
+    if (promoted) {
       // Promote to active price keywords!
       const newPriceKeywords = [...priceKeywords.value, separator];
-      
       await update(dbRef(db), {
         "settings/voice_patterns/priceKeywords": newPriceKeywords,
         [`settings/voice_patterns/candidates/${safeKey}`]: null
@@ -135,8 +140,6 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
         showConfirmButton: false,
         timer: 4000
       });
-    } else {
-      await set(candidateRef, newScore);
     }
     return true;
   }

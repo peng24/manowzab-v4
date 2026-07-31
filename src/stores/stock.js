@@ -48,6 +48,9 @@ export const useStockStore = defineStore("stock", () => {
 
     const stockRef = dbRef(db, `stock/${videoId}`);
 
+    let historyWriteTimeout = null;
+    const HISTORY_WRITE_DELAY = 5000; // Throttle history writes to every 5 seconds
+
     let isInitialLoad = true;
     const unsubStock = onValue(stockRef, (snapshot) => {
       const val = snapshot.val() || {};
@@ -94,12 +97,16 @@ export const useStockStore = defineStore("stock", () => {
           if (percentage >= 100) milestones.value.hundred = true;
         }
 
-        const historyRef = dbRef(db, `history/${videoId}`);
-        update(historyRef, {
-          totalSales: totalSales,
-          totalItems: totalItems,
-          lastUpdated: Date.now(),
-        }).catch((err) => console.error("History Sync Error:", err));
+        // ✅ Throttle history writes to prevent excessive Firebase writes
+        if (historyWriteTimeout) clearTimeout(historyWriteTimeout);
+        historyWriteTimeout = setTimeout(() => {
+          const historyRef = dbRef(db, `history/${videoId}`);
+          update(historyRef, {
+            totalSales: totalSales,
+            totalItems: totalItems,
+            lastUpdated: Date.now(),
+          }).catch((err) => console.error("History Sync Error:", err));
+        }, HISTORY_WRITE_DELAY);
       }
 
       isInitialLoad = false;
@@ -117,6 +124,7 @@ export const useStockStore = defineStore("stock", () => {
     currentUnsubscribe = () => {
       unsubStock();
       unsubSize();
+      if (historyWriteTimeout) clearTimeout(historyWriteTimeout);
     };
 
     return currentUnsubscribe;

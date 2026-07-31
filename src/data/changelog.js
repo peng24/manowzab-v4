@@ -14,6 +14,27 @@
 export const changelog = [
   // ─── 4.65.x ───────────────────────────────────────────
   {
+    version: '4.65.4',
+    date: '2026-07-31',
+    changes: {
+      fixed: [
+        'แก้ไขบั๊ก Firebase v9 Listener Cleanup ใน chat.js โดยเปลี่ยนจากการใช้ off() เป็นการเรียก Unsubscribe Function โดยตรง',
+        'ป้องกัน Memory Leak ระหว่างสตรีมสด โดยจำกัดข้อความ UI แชทไม่เกิน 500 ข้อความ และ Deduplication Cache ไม่เกิน 2,000 รายการ',
+        'แก้ไขช่องโหว่ Stored XSS ใน StockGrid.vue ด้วยการ escapeHtml ข้อมูลชื่อลูกค้าและรหัสสินค้าใน SweetAlert2 HTML Templates',
+        'เพิ่มความเร็ว Nickname store โดยลบการวนลูปข้อความทั้งหมด O(N) ออกเมื่อมีการอัปเดตชื่อเล่น',
+        'แก้ไข Race Condition ใน voiceLearning.js และ system.js ด้วยการใช้ Firebase runTransaction สำหรับการอัปเดตคะแนนคำเรียนรู้และ Active Price Detector',
+        'แก้ไขปัญหาสถานะ Away Mode Timer Desync ข้ามคอมโพเนนต์ โดยย้าย awayTimer และ awayInterval ไปไว้ที่ Module Scope',
+        'ป้องกันการประมวลผล Offline Queue ซ้อนกันขณะส่งข้อมูล ด้วยระบบ isFlushing Re-entrancy Lock'
+      ],
+      improved: [
+        'เพิ่มประสิทธิภาพการเขียนข้อมูลสถิติประวัติลง Firebase stock.js ด้วย Throttling 5 วินาที ลดภาระ Network I/O ในช่วงพีค',
+        'เพิ่มการลงทะเบียน Global Error Handler และ unhandledrejection across ทุก Entry Points (main.js, shipping-main.js, history-main.js)',
+        'เพิ่ม SEO & Security Headers (<meta name="robots" content="noindex, nofollow">) และ <noscript> Fallback ใน index.html',
+        'อัปเดต workflow /verify ครอบคลุมกฎความคงทนและประสิทธิภาพใหม่ทั้ง 14 หมวดหมู่อย่างสมบูรณ์'
+      ]
+    }
+  },
+  {
     version: '4.65.3',
     date: '2026-07-30',
     changes: {

@@ -485,7 +485,10 @@ async function syncCustomerToDelivery(uid, name, order, videoId) {
   } else {
     // Existing — update name + timestamp, keep status if not done
     const updates = { name: name ? name.trim() : existing.name, updatedAt: Date.now() };
-    if (existing.status === "done") updates.status = "pending";
+    if (existing.status === "done") {
+      updates.status = "pending";
+      updates.deliveryDate = null; // ✅ Clear old delivery date so customer goes to "ฝากสินค้า" tab, not "แจ้งส่ง"
+    }
     await update(customerRef, updates);
   }
 

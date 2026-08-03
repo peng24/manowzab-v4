@@ -69,8 +69,6 @@ const stockStore = useStockStore();
 const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
 const voiceLearningStore = useVoiceLearningStore();
-const { disconnect: disconnectAiWs } = useAiWebSocket(); // ✅ Init Local AI WebSocket Receiver
-cleanupFns.push(disconnectAiWs);
 
 // ✅ Global Watcher: Silence immediately when Sound is toggled OFF
 watch(
@@ -102,6 +100,9 @@ const showPhoneticManager = ref(false);
 
 // ✅ Top-level cleanup array for reliable lifecycle management (Vue 3 safe)
 const cleanupFns = [];
+
+const { disconnect: disconnectAiWs } = useAiWebSocket(); // ✅ Init Local AI WebSocket Receiver
+if (disconnectAiWs) cleanupFns.push(disconnectAiWs);
 
 // Provide functions for child components
 provide("openDashboard", () => (showDashboard.value = true));

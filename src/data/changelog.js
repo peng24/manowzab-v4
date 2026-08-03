@@ -14,6 +14,15 @@
 export const changelog = [
   // ─── 4.67.x ───────────────────────────────────────────
   {
+    version: '4.67.1',
+    date: '2026-08-03',
+    changes: {
+      fixed: [
+        'แก้ไข ReferenceError ใน App.vue (Cannot access cleanupFns before initialization) เพื่อให้แอปพลิเคชันขึ้นระบบใหม่ได้อย่างราบรื่น'
+      ]
+    }
+  },
+  {
     version: '4.67.0',
     date: '2026-08-03',
     changes: {

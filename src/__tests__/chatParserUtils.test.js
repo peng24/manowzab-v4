@@ -4,8 +4,15 @@ import {
   stringToColor,
   isAdminUser,
   parseIntentDetails,
+  isDateMismatch,
   adminProxyNameFirstRegex,
   shippingRegex,
+  numberWithQuestionRegex,
+  negationGuardRegex,
+  tryRegex,
+  cancelKeywordRegex,
+  standalonePassRegex,
+  explicitBuyRegex,
 } from "../utils/chatParserUtils";
 
 describe("chatParserUtils", () => {
@@ -51,11 +58,18 @@ describe("chatParserUtils", () => {
       expect(parseIntentDetails("25/").type).toBe("SINGLE_BUY");
     });
 
-    it("parses explicit try requests from CSV (ลอง10, 24ลอง, ลอง34ให้แม่ดูหน่อยจ้า)", () => {
+    it("parses explicit try requests from CSV (ลอง10, 24ลอง, ลอง34ให้แม่ดูหน่อยจ้า, ไส่29ให้ดูหน่อยนาว)", () => {
       expect(parseIntentDetails("ลอง10")).toEqual({ type: "TRY_ITEM", itemId: 10, method: "try-keyword" });
       expect(parseIntentDetails("24ลอง")).toEqual({ type: "TRY_ITEM", itemId: 24, method: "try-keyword" });
       expect(parseIntentDetails("ลอง34ให้แม่ดูหน่อยจ้า")).toEqual({ type: "TRY_ITEM", itemId: 34, method: "try-keyword" });
       expect(parseIntentDetails("ขอดูหน่อยค่ะ9")).toEqual({ type: "TRY_ITEM", itemId: 9, method: "try-keyword" });
+      expect(parseIntentDetails("ไส่29ให้ดูหน่อยนาว")).toEqual({ type: "TRY_ITEM", itemId: 29, method: "try-keyword" });
+      expect(parseIntentDetails("มะระ ขอดูตัว13สีแดงเมื่อวานหน่อย")).toEqual({ type: "TRY_ITEM", itemId: 13, method: "try-keyword" });
+    });
+
+    it("does not treat 'ไม่ต้องลอง' as a try request", () => {
+      const res = parseIntentDetails("ไม่ต้องลองก็ได้");
+      expect(res.type).not.toBe("TRY_ITEM");
     });
 
     it("parses explicit buy keyword statements from CSV (รับ10, รับค่ะ9, 30รับค่ะ)", () => {
@@ -65,9 +79,26 @@ describe("chatParserUtils", () => {
     });
 
     it("parses multi-buy statements", () => {
-      const res = parseIntentDetails("จอง 1 3 5");
+      const liveAug3 = new Date("2026-08-03T20:00:00").getTime();
+      const res = parseIntentDetails("จอง 1 3 5", liveAug3);
       expect(res.type).toBe("MULTI_BUY");
       expect(res.itemIds).toEqual([1, 3, 5]);
+
+      const resSameDate = parseIntentDetails("มะระ เอา 19 13 10 วันที่ 3 ส.ค. 69", liveAug3);
+      expect(resSameDate.type).toBe("MULTI_BUY");
+      expect(resSameDate.itemIds).toEqual([19, 13, 10]);
+
+      const resDiffDate = parseIntentDetails("มะระ เอา 19 13 10 วันที่ 1 ส.ค. 69", liveAug3);
+      expect(resDiffDate.type).toBe("DATE_MISMATCH");
+    });
+
+    it("identifies date mismatches correctly with isDateMismatch()", () => {
+      const liveAug3 = new Date("2026-08-03T20:00:00").getTime();
+      expect(isDateMismatch("มะระ เอา 19 13 10 วันที่ 1 ส.ค. 69", liveAug3)).toBe(true);
+      expect(isDateMismatch("มะระ เอา 19 13 10 วันที่ 3 ส.ค. 69", liveAug3)).toBe(false);
+      expect(isDateMismatch("มะระ เอา 19 13 10", liveAug3)).toBe(false);
+      expect(isDateMismatch("26 38 74 วันที่ 5/8/69", liveAug3)).toBe(true);
+      expect(isDateMismatch("26 38 74 วันที่ 3/8/69", liveAug3)).toBe(false);
     });
 
     it("parses cancel requests from CSV", () => {
@@ -98,4 +129,151 @@ describe("chatParserUtils", () => {
       expect(match[2]).toBe("20");
     });
   });
+
+  // ==========================================
+  // 🆕 v4.66.0 Regex Improvements from CSV Log Analysis
+  // ==========================================
+
+  describe("🛡️ numberWithQuestionRegex Guard (v4.66.0)", () => {
+    it("catches number+question patterns that should NOT be booked", () => {
+      expect(numberWithQuestionRegex.test("32อกเท่าไร")).toBe(true);
+      expect(numberWithQuestionRegex.test("48ราคา")).toBe(true);
+      expect(numberWithQuestionRegex.test("29 อกเท่าไหร่คะ")).toBe(true);
+      expect(numberWithQuestionRegex.test("40 อกเท่าไรน้องนาว")).toBe(true);
+      expect(numberWithQuestionRegex.test("21อยู่มั๊ยนาว")).toBe(true);
+      expect(numberWithQuestionRegex.test("43เสื้ออะไรคะ")).toBe(true);
+    });
+
+    it("does NOT catch normal buy patterns", () => {
+      expect(numberWithQuestionRegex.test("32")).toBe(false);
+      expect(numberWithQuestionRegex.test("รับ32")).toBe(false);
+      expect(numberWithQuestionRegex.test("32รับค่ะ")).toBe(false);
+    });
+
+    it("parseIntentDetails returns QUESTION for number+question messages", () => {
+      expect(parseIntentDetails("32อกเท่าไร").type).toBe("QUESTION");
+      expect(parseIntentDetails("48ราคา").type).toBe("QUESTION");
+      expect(parseIntentDetails("21อยู่มั๊ยนาว").type).toBe("QUESTION");
+      expect(parseIntentDetails("43เสื้ออะไรคะ").type).toBe("QUESTION");
+    });
+  });
+
+  describe("🛡️ negationGuardRegex Guard (v4.66.0)", () => {
+    it("catches negation+number patterns that should NOT be booked", () => {
+      expect(negationGuardRegex.test("ไม่ใช่19")).toBe(true);
+      expect(negationGuardRegex.test("ไม่ใช่ 5")).toBe(true);
+    });
+
+    it("does NOT match non-negation patterns", () => {
+      expect(negationGuardRegex.test("ใช่19")).toBe(false);
+      expect(negationGuardRegex.test("19")).toBe(false);
+    });
+
+    it("parseIntentDetails returns NEGATION for ไม่ใช่+number", () => {
+      expect(parseIntentDetails("ไม่ใช่19").type).toBe("NEGATION");
+    });
+  });
+
+  describe("🔄 tryRegex Improvements (v4.66.0)", () => {
+    it("catches ลองโลด pattern from CSV", () => {
+      expect(tryRegex.test("ลองโลด15")).toBe(true);
+    });
+
+    it("catches ลอง...ให้...ดู pattern from CSV", () => {
+      expect(tryRegex.test("ลองให้พี่ดูหน่อย")).toBe(true);
+    });
+
+    it("parseIntentDetails recognizes ลองโลด as TRY", () => {
+      expect(parseIntentDetails("ลองโลด15").type).toBe("TRY_ITEM");
+      expect(parseIntentDetails("ลองโลด15").itemId).toBe(15);
+    });
+
+    it("still catches standard ลอง patterns", () => {
+      expect(tryRegex.test("5ลอง")).toBe(true);
+      expect(tryRegex.test("ลอง12")).toBe(true);
+      expect(tryRegex.test("ขอดูชัดๆ33")).toBe(true);
+    });
+  });
+
+  describe("❌ cancelKeywordRegex Improvements (v4.66.0)", () => {
+    it("catches ยกเลิกก่อบ (typo of ก่อน) from CSV", () => {
+      expect(cancelKeywordRegex.test("นาวยกเลิกก่อบ40")).toBe(true);
+    });
+
+    it("still catches standard cancel keywords", () => {
+      expect(cancelKeywordRegex.test("ยกเลิกก่อน")).toBe(true);
+      expect(cancelKeywordRegex.test("cc")).toBe(true);
+      expect(cancelKeywordRegex.test("ผ่าน")).toBe(true);
+    });
+  });
+
+  describe("🔄 standalonePassRegex + ผ่านโลด (v4.66.0)", () => {
+    it("matches ผ่านโลด as standalone pass (no item number)", () => {
+      expect(standalonePassRegex.test("ผ่านโลด")).toBe(true);
+    });
+
+    it("does NOT match ผ่านโลด37 as standalone pass (has item number)", () => {
+      expect(standalonePassRegex.test("ผ่านโลด37")).toBe(false);
+    });
+
+    it("still matches standard standalone pass patterns", () => {
+      expect(standalonePassRegex.test("ผ่าน")).toBe(true);
+      expect(standalonePassRegex.test("ขอผ่าน")).toBe(true);
+      expect(standalonePassRegex.test("ผ่านค่ะ")).toBe(true);
+    });
+  });
+
+  describe("🛒 explicitBuyRegex Improvements (v4.66.0)", () => {
+    it("catches โอเค+number pattern from CSV", () => {
+      expect(explicitBuyRegex.test("โอเค41ค่ะ")).toBe(true);
+    });
+
+    it("catches ok+number pattern", () => {
+      expect(explicitBuyRegex.test("ok41")).toBe(true);
+    });
+
+    it("catches ตกลง+number pattern", () => {
+      expect(explicitBuyRegex.test("ตกลง41")).toBe(true);
+    });
+
+    it("parseIntentDetails recognizes โอเค41ค่ะ as BUY", () => {
+      const res = parseIntentDetails("โอเค41ค่ะ");
+      expect(res.type).toBe("SINGLE_BUY");
+      expect(res.itemId).toBe(41);
+    });
+  });
+
+  describe("📋 Full CSV Real-World Regression Tests (v4.66.0)", () => {
+    it("correctly categorizes all critical real messages from 5 live streams", () => {
+      // Should be BUY
+      expect(parseIntentDetails("12").type).toBe("SINGLE_BUY");
+      expect(parseIntentDetails("รับค่ะ5").type).toBe("SINGLE_BUY");
+      expect(parseIntentDetails("48รับค่ะ").type).toBe("SINGLE_BUY");
+      expect(parseIntentDetails("รับ 4").type).toBe("SINGLE_BUY");
+
+      // Should be TRY (NOT buy)
+      expect(parseIntentDetails("5ลอง").type).toBe("TRY_ITEM");
+      expect(parseIntentDetails("ลอง12").type).toBe("TRY_ITEM");
+      expect(parseIntentDetails("30ลอง").type).toBe("TRY_ITEM");
+      expect(parseIntentDetails("ลอง47").type).toBe("TRY_ITEM");
+      expect(parseIntentDetails("ขอดู51").type).toBe("TRY_ITEM");
+      expect(parseIntentDetails("ลองโลด15").type).toBe("TRY_ITEM");
+
+      // Should be QUESTION (NOT buy) — critical false-positive prevention
+      expect(parseIntentDetails("32อกเท่าไร").type).toBe("QUESTION");
+      expect(parseIntentDetails("48ราคา").type).toBe("QUESTION");
+      expect(parseIntentDetails("43เสื้ออะไรคะ").type).toBe("QUESTION");
+      expect(parseIntentDetails("21อยู่มั๊ยนาว").type).toBe("QUESTION");
+
+      // Should be NEGATION (NOT buy)
+      expect(parseIntentDetails("ไม่ใช่19").type).toBe("NEGATION");
+
+      // Should be CANCEL
+      expect(parseIntentDetails("ยกเลิกก่อน").type).toBe("CANCEL_LATEST");
+      expect(parseIntentDetails("ผ่านโลด").type).toBe("CANCEL_LATEST");
+    });
+  });
 });
+
+
+

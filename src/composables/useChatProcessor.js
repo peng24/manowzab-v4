@@ -53,9 +53,12 @@ import {
   numAndDescRegex,
   cancelKeywordRegex,
   standalonePassRegex,
+  numberWithQuestionRegex,
+  negationGuardRegex,
   thaiToArabic,
   stringToColor,
   isAdminUser,
+  isDateMismatch,
 } from "../utils/chatParserUtils";
 
 // ✅ Toast Notification Mixin
@@ -234,11 +237,16 @@ export function useChatProcessor() {
     // --- Execution ---
 
     // 🔥 HIGHEST PRIORITY: Multi-Buy Logic (before all other checks)
-    // Handles "26 38 74" or "26 38 74 ClientName"
+    // Handles "26 38 74", "26 38 74 ClientName", or "มะระ เอา 19 13 10"
     const matchMultiBuy = normalizedMsg.match(multiBuyRegex);
     if (matchMultiBuy) {
-      const numbersStr = matchMultiBuy[1]; // "26 38 74"
-      const proxyName = matchMultiBuy[2] ? matchMultiBuy[2].trim() : null; // Optional client name
+      const numbersStr = matchMultiBuy[2] || matchMultiBuy[1]; // "26 38 74"
+      const proxyName =
+        matchMultiBuy[1] && matchMultiBuy[2]
+          ? matchMultiBuy[1].trim()
+          : matchMultiBuy[3]
+          ? matchMultiBuy[3].trim()
+          : null; // Optional client name (prefix or suffix)
 
       // Parse all IDs (Allow IDs > stockSize, but cap at MAX_ITEM_ID)
       const itemIds = numbersStr
@@ -247,6 +255,20 @@ export function useChatProcessor() {
         .filter((n) => n > 0 && n <= MAX_ITEM_ID);
 
       if (itemIds.length > 0) {
+        // ✅ Check Date Mismatch (If date specified in message does not match live date -> do nothing)
+        const msgTimestamp = item.snippet?.publishedAt
+          ? new Date(item.snippet.publishedAt).getTime()
+          : Date.now();
+        if (isDateMismatch(normalizedMsg, msgTimestamp)) {
+          logger.log(`🗓️ Skipping multi-buy: date in "${msg}" does not match live date`);
+          Toast.fire({
+            icon: "warning",
+            title: `🗓️ ข้ามการจอง: วันที่ในแชทไม่ตรงกับวันไลฟ์สด`,
+            toast: true,
+          });
+          return;
+        }
+
         // ✅ Auto-Expand Stock for Multi-Buy
         const maxId = Math.max(...itemIds);
         if (maxId > stockStore.stockSize) {
@@ -332,7 +354,7 @@ export function useChatProcessor() {
     {
       // 1. Check cancel with number patterns (keyword first)
       const matchWithNum = normalizedMsg.match(
-        /(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)/i,
+        /(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่านโลด|ผ่าน)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)/i,
       );
       if (matchWithNum && parseInt(matchWithNum[1]) <= MAX_ITEM_ID) {
         isCancel = true;
@@ -343,7 +365,7 @@ export function useChatProcessor() {
       // 2. Check number first patterns
       if (!isCancel) {
         const matchNumFirst = normalizedMsg.match(
-          /(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i,
+          /(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i,
         );
         if (matchNumFirst && parseInt(matchNumFirst[1]) <= MAX_ITEM_ID) {
           isCancel = true;
@@ -525,8 +547,8 @@ export function useChatProcessor() {
         });
       }
       // --- END AUTO SHIP LOGIC ---
-    } else if (questionRegex.test(normalizedMsg)) {
-      method = "question-skip";
+    } else if (questionRegex.test(normalizedMsg) || tryRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || negationGuardRegex.test(normalizedMsg)) {
+      method = questionRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) ? "question-skip" : negationGuardRegex.test(normalizedMsg) ? "negation-skip" : "try-skip";
     } else {
       // 🟢 Regex Matching
       const matchPure = normalizedMsg.match(pureNumberRegex);
@@ -629,6 +651,20 @@ export function useChatProcessor() {
 
     // 5. Process Order & Audio Logic (Updated with SFX)
     if (intent === "buy" && targetId > 0) {
+      // ✅ Check Date Mismatch (If date specified in message does not match live date -> do nothing)
+      const msgTimestamp = item.snippet?.publishedAt
+        ? new Date(item.snippet.publishedAt).getTime()
+        : Date.now();
+      if (isDateMismatch(normalizedMsg, msgTimestamp)) {
+        logger.log(`🗓️ Skipping single buy: date in "${msg}" does not match live date`);
+        Toast.fire({
+          icon: "warning",
+          title: `🗓️ ข้ามการจอง: วันที่ในแชทไม่ตรงกับวันไลฟ์สด`,
+          toast: true,
+        });
+        return;
+      }
+
       // ✅ Auto-Expand Stock for Single Buy
       if (targetId > stockStore.stockSize) {
         const newSize = Math.ceil(targetId / 10) * 10;

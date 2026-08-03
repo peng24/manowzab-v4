@@ -409,13 +409,21 @@ export const useStockStore = defineStore("stock", () => {
    * @param {boolean} [isAuto=false] - Whether this update was triggered by the auto voice detector
    */
   function updateStockPrice(num, price, isAuto = false) {
-    if (!systemStore.currentVideoId) return Promise.resolve();
-    const path = `stock/${systemStore.currentVideoId}/${num}/price`;
+    const targetVideoId = systemStore.currentVideoId || "demo";
+    const path = `stock/${targetVideoId}/${num}/price`;
     if (!isAuto) {
       const voiceLearningStore = useVoiceLearningStore();
       voiceLearningStore.triggerSelfLearning(num, price);
     }
-    return update(dbRef(db), { [path]: price });
+    // Update local state immediately for instant UI response
+    if (!stockData.value[num]) {
+      stockData.value[num] = {};
+    }
+    stockData.value[num].price = price;
+
+    return update(dbRef(db), { [path]: price }).catch((err) => {
+      console.warn(`[StockStore] Sync price to Firebase failed (${targetVideoId}/${num}):`, err);
+    });
   }
 
   /**

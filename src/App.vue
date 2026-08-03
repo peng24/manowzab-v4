@@ -62,12 +62,15 @@ import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import PhoneticManager from "./components/PhoneticManager.vue"; // ✅ Import Phonetic Manager
 import { useVoiceLearningStore } from "./stores/voiceLearning";
 import { useChatProcessor } from "./composables/useChatProcessor";
+import { useAiWebSocket } from "./composables/useAiWebSocket"; // ✅ Import AI WebSocket Listener
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
 const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
 const voiceLearningStore = useVoiceLearningStore();
+const { disconnect: disconnectAiWs } = useAiWebSocket(); // ✅ Init Local AI WebSocket Receiver
+cleanupFns.push(disconnectAiWs);
 
 // ✅ Global Watcher: Silence immediately when Sound is toggled OFF
 watch(

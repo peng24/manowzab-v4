@@ -31,12 +31,7 @@
       {{ item.owner || "ว่าง" }}
     </div>
 
-    <div
-      v-if="item.owner && ownerCount >= 1"
-      class="owner-count-badge"
-      :title="`${item.owner} จองทั้งหมด ${ownerCount} ชิ้น — คลิกเพื่อจัดการ`"
-      @click.stop="$emit('show-owner', item.owner)"
-    >👗 {{ ownerCount }} ตัว</div>
+
 
     <div
       v-if="item.owner && item.backdated"

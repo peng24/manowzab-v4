@@ -14,6 +14,15 @@
 export const changelog = [
   // ─── 4.67.x ───────────────────────────────────────────
   {
+    version: '4.67.3',
+    date: '2026-08-04',
+    changes: {
+      removed: [
+        'ซ่อนการแสดงผล Badge จำนวนตัว (👗 N ตัว) ใต้ชื่อลูกค้าบนการ์ดสินค้าทุกใบในหน้าหลัก (StockGrid / StockItemCard)'
+      ]
+    }
+  },
+  {
     version: '4.67.2',
     date: '2026-08-04',
     changes: {

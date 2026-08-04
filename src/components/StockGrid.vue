@@ -125,12 +125,7 @@
         <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
           {{ getStockItem(i).owner || "ว่าง" }}
         </div>
-        <div
-          v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
-          class="owner-count-badge"
-          :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
-          @click.stop="showOwnerItems(getStockItem(i).owner)"
-        >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
+
         <div
           v-if="getStockItem(i).owner && getStockItem(i).backdated"
           class="backdated-time"

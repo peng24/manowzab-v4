@@ -76,7 +76,7 @@
                       :key="customer.uid"
                       :value="customer.uid"
                     >
-                      {{ customer.name }} ({{ customer.itemCount }} รายการ)
+                      {{ customer.name }}
                     </option>
                   </select>
                   <button
@@ -114,13 +114,6 @@
                     @change="updateCustomerName(item.uid, item.editableName)"
                     placeholder="พิมพ์ชื่อแล้ว Enter"
                   />
-                  <span
-                    class="booking-badge"
-                    v-if="item.bookingCount > 0"
-                    :title="`จองได้ ${item.bookingCount} ตัว`"
-                  >
-                    👗 {{ item.bookingCount }} ตัว
-                  </span>
                 </div>
               </td>
               <td style="font-size: 0.9em">{{ item.itemsText }}</td>

@@ -20,8 +20,39 @@ export const numberWithPoliteRegex = /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ
 export const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 export const customerNameNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,}?)\s+(\d+)$/;
 export const numAndDescRegex = /^(\d+)\s*([ก-๛a-zA-Z\s\(\)\[\]\-]+)$/;
-export const cancelKeywordRegex = /cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่าน|คืน|ไม่รับ|ถอน|สละสิทธิ์|สละ/i;
+export const cancelKeywordRegex = /cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่าน|คืน|ไม่รับ|ถอน|สละสิทธิ์|สละ/i;
 export const standalonePassRegex = /^(?:ขอ)?ผ่าน\s*(?:โลด|ค่ะ|ครับ|จ้า|จ้ะ|นะ|เลย)*$/i;
+export const shipDayOfWeekRegex = /ส่ง(?:วัน)?\s*(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)/i;
+
+/**
+ * Calculates the Date object for the next occurrence of a Thai day of the week.
+ * @param {string} dayName - e.g. "อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัส", "พฤหัสบดี", "ศุกร์", "เสาร์"
+ * @param {Date} [referenceDate=new Date()] - Reference date
+ * @returns {Date|null}
+ */
+export function calcNextDayOfWeekDate(dayName, referenceDate = new Date()) {
+  if (!dayName) return null;
+  const dayMap = {
+    "อาทิตย์": 0,
+    "จันทร์": 1,
+    "อังคาร": 2,
+    "พุธ": 3,
+    "พฤหัส": 4,
+    "พฤหัสบดี": 4,
+    "ศุกร์": 5,
+    "เสาร์": 6,
+  };
+
+  const targetDay = dayMap[dayName.trim()];
+  if (targetDay === undefined) return null;
+
+  const currentDay = referenceDate.getDay();
+  const diff = (targetDay - currentDay + 7) % 7;
+
+  const resultDate = new Date(referenceDate);
+  resultDate.setDate(resultDate.getDate() + diff);
+  return resultDate;
+}
 
 // 🛡️ Guard: Number followed by question keyword → NOT a booking (e.g. "32อกเท่าไร", "48ราคา")
 export const numberWithQuestionRegex = /^\s*\d+\s*(?:อก|ราคา|เท่าไ(?:หร่|ร)|กี่บาท|อยู่(?:มั๊ย|ไหม|ม[ัั้]ย)|เสื้ออะไร|ตัวอะไร|เป็นแบบ|คือแบบ|แบบไหน|ผ้า|สี|เท่าไ)/i;

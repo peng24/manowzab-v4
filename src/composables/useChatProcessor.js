@@ -53,6 +53,8 @@ import {
   numAndDescRegex,
   cancelKeywordRegex,
   standalonePassRegex,
+  shipDayOfWeekRegex,
+  calcNextDayOfWeekDate,
   numberWithQuestionRegex,
   negationGuardRegex,
   thaiToArabic,
@@ -354,7 +356,7 @@ export function useChatProcessor() {
     {
       // 1. Check cancel with number patterns (keyword first)
       const matchWithNum = normalizedMsg.match(
-        /(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่านโลด|ผ่าน)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)/i,
+        /(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่านโลด|ผ่าน)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)/i,
       );
       if (matchWithNum && parseInt(matchWithNum[1]) <= MAX_ITEM_ID) {
         isCancel = true;
@@ -365,7 +367,7 @@ export function useChatProcessor() {
       // 2. Check number first patterns
       if (!isCancel) {
         const matchNumFirst = normalizedMsg.match(
-          /(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i,
+          /(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i,
         );
         if (matchNumFirst && parseInt(matchNumFirst[1]) <= MAX_ITEM_ID) {
           isCancel = true;
@@ -433,6 +435,7 @@ export function useChatProcessor() {
       const shipDateMatch = normalizedMsg.match(
         /ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/,
       );
+      const shipDayOfWeekMatch = normalizedMsg.match(shipDayOfWeekRegex);
       const shipNowMatch = normalizedMsg.match(
         /ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])ส่ง(?:$|[^\u0E00-\u0E7F\w])/,
       );
@@ -440,6 +443,7 @@ export function useChatProcessor() {
       let matchedKeyword = null;
       if (shipTmrMatch) matchedKeyword = shipTmrMatch[0];
       else if (shipDateMatch) matchedKeyword = shipDateMatch[0];
+      else if (shipDayOfWeekMatch) matchedKeyword = shipDayOfWeekMatch[0];
       else if (shipNowMatch) matchedKeyword = shipNowMatch[0];
       else matchedKeyword = "ส่ง";
 
@@ -472,6 +476,10 @@ export function useChatProcessor() {
         isAutoShip = true;
         autoShipDate = new Date();
         autoShipDate.setDate(autoShipDate.getDate() + 1);
+      } else if (shipDayOfWeekMatch) {
+        isAutoShip = true;
+        const dayName = shipDayOfWeekMatch[1];
+        autoShipDate = calcNextDayOfWeekDate(dayName);
       } else if (shipDateMatch) {
         isAutoShip = true;
         autoShipDate = new Date();
@@ -796,10 +804,12 @@ export function useChatProcessor() {
             (displayName && currentItem.owner === displayName));
 
         if (isAdmin || isUserOwner || isUserInQueue) {
+          const cancelUid = (isAdmin && !isUserOwner && !isUserInQueue) ? null : uid;
+          const cancelOwnerName = (isAdmin && !isUserOwner && !isUserInQueue) ? null : displayName;
           const result = await stockStore.processCancel(
             targetId,
-            uid,
-            displayName,
+            cancelUid,
+            cancelOwnerName,
           );
           if (
             result &&

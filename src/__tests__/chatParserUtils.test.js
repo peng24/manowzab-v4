@@ -13,6 +13,8 @@ import {
   cancelKeywordRegex,
   standalonePassRegex,
   explicitBuyRegex,
+  shipDayOfWeekRegex,
+  calcNextDayOfWeekDate,
 } from "../utils/chatParserUtils";
 
 describe("chatParserUtils", () => {
@@ -271,6 +273,40 @@ describe("chatParserUtils", () => {
       // Should be CANCEL
       expect(parseIntentDetails("ยกเลิกก่อน").type).toBe("CANCEL_LATEST");
       expect(parseIntentDetails("ผ่านโลด").type).toBe("CANCEL_LATEST");
+      expect(parseIntentDetails("ยกเลย 12").type).toBe("CANCEL_ITEM");
+      expect(parseIntentDetails("ยกเลย 12").itemId).toBe(12);
+      expect(parseIntentDetails("ยกเลย").type).toBe("CANCEL_LATEST");
+      expect(parseIntentDetails("ยกเลิกเลย 45").type).toBe("CANCEL_ITEM");
+    });
+  });
+
+  describe("📅 shipDayOfWeekRegex & calcNextDayOfWeekDate", () => {
+    it("matches shipping day of week keywords correctly", () => {
+      expect(shipDayOfWeekRegex.test("ส่งวันอาทิตย์")).toBe(true);
+      expect(shipDayOfWeekRegex.test("ส่งวันจันทร์ค่ะ")).toBe(true);
+      expect(shipDayOfWeekRegex.test("ส่งวันพฤหัสบดี")).toBe(true);
+      expect(shipDayOfWeekRegex.test("ส่ง อาทิตย์")).toBe(true);
+    });
+
+    it("calculates correct target date for coming day of week", () => {
+      // Mock reference date: Thursday, Aug 6, 2026 (Day 4)
+      const refDate = new Date(2026, 7, 6); // Note: month 7 is August (0-indexed)
+      expect(refDate.getDay()).toBe(4); // Thursday
+
+      // Sunday (Day 0) -> +3 days -> Aug 9
+      const sunDate = calcNextDayOfWeekDate("อาทิตย์", refDate);
+      expect(sunDate.getDate()).toBe(9);
+      expect(sunDate.getDay()).toBe(0);
+
+      // Monday (Day 1) -> +4 days -> Aug 10
+      const monDate = calcNextDayOfWeekDate("จันทร์", refDate);
+      expect(monDate.getDate()).toBe(10);
+      expect(monDate.getDay()).toBe(1);
+
+      // Thursday (Day 4) -> +0 days -> Aug 6 (today)
+      const thuDate = calcNextDayOfWeekDate("พฤหัส", refDate);
+      expect(thuDate.getDate()).toBe(6);
+      expect(thuDate.getDay()).toBe(4);
     });
   });
 });

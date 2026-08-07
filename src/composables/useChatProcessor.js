@@ -191,7 +191,7 @@ export function useChatProcessor() {
     // Check Nickname
     let displayName = realName;
     let isNewCustomer = isVoiceChat ? false : true;
-    if (!isVoiceChat && nicknameStore.nicknames && nicknameStore.nicknames[uid]) {
+    if (!isVoiceChat && nicknameStore.hasNickname(uid, realName)) {
       isNewCustomer = false;
       displayName = nicknameStore.getNickname(uid, realName);
     }

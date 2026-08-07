@@ -232,6 +232,7 @@ import { ref as dbRef, onValue, update, push, get } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import { resolveDeliveryUid, recalcItemCount, normalizeCustomerName } from "../utils/deliverySync";
+import { sanitizeDbKey } from "../utils/dbUtils";
 
 const emit = defineEmits(["close"]);
 
@@ -566,9 +567,10 @@ function removeFromShipping(uid) {
 }
 
 function updateCustomerName(uid, name) {
-  if (!name || !name.trim()) return;
+  if (!name || !name.trim() || !uid) return;
+  const safeUid = sanitizeDbKey(uid);
 
-  update(dbRef(db, `nicknames/${uid}`), { nick: name.trim() })
+  update(dbRef(db, `nicknames/${safeUid}`), { nick: name.trim() })
     .then(() => {
       console.log("✅ Updated nickname:", name);
     })

@@ -309,7 +309,18 @@ describe("chatParserUtils", () => {
       expect(thuDate.getDay()).toBe(4);
     });
   });
+
+  describe("sanitizeDbKey()", () => {
+    it("sanitizes invalid Firebase path characters like dots, slashes, hashes, brackets", () => {
+      const { sanitizeDbKey } = require("../utils/dbUtils");
+      expect(sanitizeDbKey("@Pang.g2556")).toBe("@Pang_g2556");
+      expect(sanitizeDbKey("user/name#123")).toBe("user_name_123");
+      expect(sanitizeDbKey("test[key]$val")).toBe("test_key__val");
+      expect(sanitizeDbKey(null)).toBe("invalid_key");
+    });
+  });
 });
+
 
 
 

@@ -14,6 +14,19 @@
 export const changelog = [
   // ─── 4.67.x ───────────────────────────────────────────
   {
+    version: '4.67.7',
+    date: '2026-08-07',
+    changes: {
+      fixed: [
+        'แก้ไขบั๊กบันทึกชื่อลูกค้า/คำอ่านไม่ได้เมื่อ Handle หรือ UID มีจุด (.) หรือตัวอักษรพิเศษ (เช่น @Pang.g2556)',
+        'ปรับปรุงการใช้ sanitizeDbKey ในการบันทึก ลบ และดึงข้อมูล nicknames ทั้งใน ChatPanel, Dashboard, PhoneticManager และ store',
+      ],
+      improved: [
+        'เพิ่มฟังก์ชัน hasNickname ใน nicknameStore และทดสอบยูนิตเทส sanitizeDbKey ครอบคลุมอักขระต้องห้าม Firebase Realtime Database 100%',
+      ],
+    },
+  },
+  {
     version: '4.67.6',
     date: '2026-08-07',
     changes: {

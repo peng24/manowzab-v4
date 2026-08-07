@@ -173,6 +173,7 @@ import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
+import { sanitizeDbKey } from "../utils/dbUtils";
 
 const chatStore = useChatStore();
 const stockStore = useStockStore();
@@ -277,18 +278,22 @@ async function editNickname(chat) {
 
   if (newNick && newNick.trim() !== "") {
     const trimmedNick = newNick.trim();
+    const safeTargetUid = sanitizeDbKey(targetUid);
     const updates = {};
-    updates[`nicknames/${targetUid}`] = {
+    updates[`nicknames/${safeTargetUid}`] = {
       nick: trimmedNick,
       realName: realNameStr,
       updatedAt: Date.now(),
     };
     if (chat.uid && chat.realName && chat.uid !== chat.realName) {
-      updates[`nicknames/${chat.realName}`] = {
-        nick: trimmedNick,
-        realName: realNameStr,
-        updatedAt: Date.now(),
-      };
+      const safeRealName = sanitizeDbKey(chat.realName);
+      if (safeRealName !== safeTargetUid) {
+        updates[`nicknames/${safeRealName}`] = {
+          nick: trimmedNick,
+          realName: realNameStr,
+          updatedAt: Date.now(),
+        };
+      }
     }
 
     update(dbRef(db), updates)

@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "../utils/logger";
+import { sanitizeDbKey } from "../utils/dbUtils";
 
 export const useNicknameStore = defineStore("nickname", () => {
   const nicknames = ref({});
@@ -27,10 +28,32 @@ export const useNicknameStore = defineStore("nickname", () => {
     });
   }
 
+  function hasNickname(uid, realName) {
+    const safeUid = uid ? sanitizeDbKey(uid) : null;
+    const safeRealName = realName ? sanitizeDbKey(realName) : null;
+    return !!(
+      (safeUid && nicknames.value[safeUid]) ||
+      (uid && nicknames.value[uid]) ||
+      (safeRealName && nicknames.value[safeRealName]) ||
+      (realName && nicknames.value[realName])
+    );
+  }
+
   // 👁️ สำหรับแสดงผลบนจอ (เอาชื่อสั้นๆ เดิมๆ)
   function getNickname(uid, realName) {
+    const safeUid = uid ? sanitizeDbKey(uid) : null;
+    const safeRealName = realName ? sanitizeDbKey(realName) : null;
+
+    if (safeUid && nicknames.value[safeUid]) {
+      const entry = nicknames.value[safeUid];
+      return typeof entry === "object" ? entry.nick : entry;
+    }
     if (uid && nicknames.value[uid]) {
       const entry = nicknames.value[uid];
+      return typeof entry === "object" ? entry.nick : entry;
+    }
+    if (safeRealName && nicknames.value[safeRealName]) {
+      const entry = nicknames.value[safeRealName];
       return typeof entry === "object" ? entry.nick : entry;
     }
     if (realName && nicknames.value[realName]) {
@@ -49,7 +72,10 @@ export const useNicknameStore = defineStore("nickname", () => {
 
     // 2. ถ้าไม่มีในรายการพิเศษ ค่อยไปดูใน Firebase
     let nameToRead = displayName;
-    if (nicknames.value[uid]?.phonetic) {
+    const safeUid = uid ? sanitizeDbKey(uid) : null;
+    if (safeUid && nicknames.value[safeUid]?.phonetic) {
+      nameToRead = nicknames.value[safeUid].phonetic;
+    } else if (uid && nicknames.value[uid]?.phonetic) {
       nameToRead = nicknames.value[uid].phonetic;
     }
     
@@ -71,6 +97,7 @@ export const useNicknameStore = defineStore("nickname", () => {
   return {
     nicknames,
     initNicknameListener,
+    hasNickname,
     getNickname,
     getPhoneticName,
   };

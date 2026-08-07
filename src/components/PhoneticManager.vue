@@ -212,6 +212,7 @@ import { ref as dbRef, onValue, update, remove } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ttsService } from "../services/TextToSpeech";
 import Swal from "sweetalert2";
+import { sanitizeDbKey } from "../utils/dbUtils";
 
 // ✅ รายการคำนำหน้า (เหมือนใน nickname store)
 const TITLE_PREFIXES = ["คุณ", "พี่", "น้อง", "เฮีย", "เจ๊", "ป้า", "น้า", "อา", "ลุง", "ตา", "ยาย", "แม่", "พ่อ", "ดร.", "หมอ", "ครู", "ซ้อ", "เสี่ย"];
@@ -320,8 +321,10 @@ function selectCustomer(customer) {
   activeSuggestionIndex.value = -1;
 
   // Check if phonetic already exists
-  if (nicknamesData.value[customer.uid]?.phonetic) {
-    formPhonetic.value = nicknamesData.value[customer.uid].phonetic;
+  const safeUid = sanitizeDbKey(customer.uid);
+  const existing = nicknamesData.value[safeUid] || nicknamesData.value[customer.uid];
+  if (existing?.phonetic) {
+    formPhonetic.value = existing.phonetic;
   }
 }
 
@@ -368,12 +371,13 @@ async function savePhonetic() {
   }
 
   const uid = formUid.value.trim();
+  const safeUid = sanitizeDbKey(uid);
   const nick = formNick.value.trim();
   const phonetic = formPhonetic.value.trim() || null; // ✅ ถ้าไม่กรอก ให้เป็น null
 
   try {
-    // ✅ ใช้ update เพื่อไม่ลบ key อื่นๆ ที่อาจมีอยู่ใน nicknames/${uid}
-    await update(dbRef(db, `nicknames/${uid}`), { nick, phonetic });
+    // ✅ ใช้ update เพื่อไม่ลบ key อื่นๆ ที่อาจมีอยู่ใน nicknames/${safeUid}
+    await update(dbRef(db, `nicknames/${safeUid}`), { nick, phonetic, realName: uid });
 
     Swal.fire({
       icon: "success",
@@ -425,7 +429,11 @@ function deleteItem(uid, name) {
   }).then(async (result) => {
     if (result.isConfirmed) {
       try {
-        await remove(dbRef(db, `nicknames/${uid}`));
+        const safeUid = sanitizeDbKey(uid);
+        await remove(dbRef(db, `nicknames/${safeUid}`));
+        if (safeUid !== uid) {
+          await remove(dbRef(db, `nicknames/${uid}`)).catch(() => {});
+        }
         Swal.fire({
           icon: "success",
           title: "ลบแล้ว!",

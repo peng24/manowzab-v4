@@ -31,7 +31,12 @@
       {{ item.owner || "ว่าง" }}
     </div>
 
-
+    <div
+      v-if="item.owner && ownerCount >= 1"
+      class="owner-count-badge"
+      :title="`${item.owner} จองทั้งหมด ${ownerCount} ชิ้น — คลิกเพื่อจัดการ`"
+      @click.stop="$emit('show-owner', item.owner)"
+    >👗 {{ ownerCount }} ตัว</div>
 
     <div
       v-if="item.owner && item.backdated"
@@ -41,9 +46,9 @@
       🕒 {{ formattedTime }}
     </div>
 
-    <div v-if="item.price" class="stock-price">
+    <!-- <div v-if="item.price" class="stock-price">
       {{ item.price }} บาท
-    </div>
+    </div> -->
 
     <div v-if="queueLength > 0" class="queue-badge">
       +{{ queueLength }}

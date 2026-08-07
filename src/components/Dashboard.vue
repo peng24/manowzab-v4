@@ -76,7 +76,7 @@
                       :key="customer.uid"
                       :value="customer.uid"
                     >
-                      {{ customer.name }}
+                      {{ customer.name }} ({{ customer.itemCount }} รายการ)
                     </option>
                   </select>
                   <button
@@ -114,6 +114,13 @@
                     @change="updateCustomerName(item.uid, item.editableName)"
                     placeholder="พิมพ์ชื่อแล้ว Enter"
                   />
+                  <span
+                    class="booking-badge"
+                    v-if="item.bookingCount > 0"
+                    :title="`จองได้ ${item.bookingCount} ตัว`"
+                  >
+                    👗 {{ item.bookingCount }} ตัว
+                  </span>
                 </div>
               </td>
               <td style="font-size: 0.9em">{{ item.itemsText }}</td>
@@ -291,14 +298,16 @@ function isShippingReady(currentShipping, groupKey, name) {
   return false;
 }
 
-// ✅ Helper: ค้นหา delivery_customers entry จากชื่อ (สำหรับ proxy group key)
+// ✅ Helper: ค้นหา delivery_customers entry จาก UID หรือชื่อแบบ normalize (เฉพาะรายการที่ยังค้างส่ง)
 function findDeliveryCustomer(uid, name) {
-  // Direct match จาก key
   const direct = deliveryCustomers.value[uid];
-  if (direct) return direct;
-  // Proxy key → หาจากชื่อ
-  if (uid.startsWith("name:")) {
-    return Object.values(deliveryCustomers.value).find(c => c.name === name && c.status !== "done") || null;
+  if (direct && direct.status !== "done") return direct;
+
+  const normName = normalizeCustomerName(name);
+  if (normName) {
+    return Object.values(deliveryCustomers.value).find(
+      c => c && c.status !== "done" && normalizeCustomerName(c.name) === normName
+    ) || null;
   }
   return null;
 }
@@ -327,7 +336,10 @@ const shippingList = computed(() => {
         let pastCount = 0;
         Object.keys(sessions).forEach((vid) => {
           if (vid !== videoId) {
-            pastCount += sessions[vid].count || 0;
+            const s = sessions[vid];
+            if (s && s.status !== "done") {
+              pastCount += s.count || 0;
+            }
           }
         });
         bookingCount += pastCount;
@@ -364,7 +376,10 @@ const notReadyCustomers = computed(() => {
         let pastCount = 0;
         Object.keys(sessions).forEach((vid) => {
           if (vid !== videoId) {
-            pastCount += sessions[vid].count || 0;
+            const s = sessions[vid];
+            if (s && s.status !== "done") {
+              pastCount += s.count || 0;
+            }
           }
         });
         bookingCount += pastCount;

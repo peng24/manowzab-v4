@@ -142,6 +142,9 @@ description: Mandatory verification checklist after every code change
 | 11.6 | Owner Count Badge `👗 N ตัว` | `src/components/StockGrid.vue` | แสดง 👗 N ตัว สีฟ้าหลังชื่อ owner ในตาราง StockGrid เมื่อมียอดจองสะสม >= 1 ชิ้น |
 | 11.7 | ยอดจองสะสมรวมทุกวัน (Badge Count Sync) | `src/components/StockGrid.vue` | `getOwnerCount()` ต้องรวมยอดจองวันนี้ (local) + อดีตที่ค้างส่ง (database) เสมอ |
 | 11.8 | แสดงรายละเอียดจองสะสมย้อนหลังและลบข้ามเซสชั่น | `src/components/StockGrid.vue` | `showOwnerItems()` ดึงรายการของวันนี้ + อดีตที่ยังไม่จัดส่ง (แสดงแค่วันที่สั้นๆ เช่น "26 พ.ค. 69") และลบออกจากอดีตพร้อมปรับลด itemCount/totalPrice ได้ถูกต้อง |
+| 11.9 | Normalized Name Grouping (`normalizeCustomerName`) | `src/utils/deliverySync.js`, `src/components/StockGrid.vue` | จับคู่และสะสมยอดจองตามชื่อที่ normalize แล้ว ทำให้จองเองและแอดมินจองแทน (`proxy-uid`) รวมยอดจองสะสมตรงกัน 100% |
+| 11.10 | Exclude Shipped Sessions (`status === "done"`) | `src/utils/deliverySync.js`, `src/components/StockGrid.vue`, `src/components/Dashboard.vue` | เมื่อกดส่งสินค้าเสร็จ (`status = "done"`) ยอดจองสะสมจากอดีตต้องถูกยกเว้น และรีเซ็ตยอดของลูกค้ารายนั้นเป็น 0 |
+| 11.11 | Real-time Modal/Stock Edit Auto-Sync | `src/stores/stock.js` | การแก้ไข/ล้างข้อมูลสต็อกผ่าน Modal (`updateItemData`, `clearAllStock`) ต้อง Auto-sync ไปยัง `delivery_customers` ทันที |
 
 ---
 

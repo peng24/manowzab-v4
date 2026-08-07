@@ -125,6 +125,12 @@
         <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
           {{ getStockItem(i).owner || "ว่าง" }}
         </div>
+        <div
+          v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
+          class="owner-count-badge"
+          :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
+          @click.stop="showOwnerItems(getStockItem(i).owner)"
+        >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
 
         <div
           v-if="getStockItem(i).owner && getStockItem(i).backdated"
@@ -133,9 +139,9 @@
         >
           🕒 {{ formatTime(getStockItem(i).time) }}
         </div>
-        <div v-if="getStockItem(i).price" class="stock-price">
+        <!-- <div v-if="getStockItem(i).price" class="stock-price">
           {{ getStockItem(i).price }} บาท
-        </div>
+        </div> -->
         <div v-if="getQueueLength(i) > 0" class="queue-badge">
           +{{ getQueueLength(i) }}
         </div>
@@ -288,6 +294,7 @@ import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, get, remove, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
+import { normalizeCustomerName } from "../utils/deliverySync";
 import Swal from "sweetalert2";
 
 const DEBUG_MODE = false;
@@ -391,32 +398,54 @@ const deliveryStrip = computed(() => {
 });
 
 // ✅ Precomputed map of reservation counts for O(1) grid lookups
+// ✅ Precomputed map of reservation counts for O(1) grid lookups
 const deliveryCountsMap = computed(() => {
   const counts = {};
 
-  // 1. Initialize with today's counts
-  Object.keys(ownerItemCounts.value).forEach((owner) => {
-    counts[owner] = ownerItemCounts.value[owner] || 0;
+  // 1. Map current live session counts by normalized owner name
+  const currentNormCounts = {};
+  Object.values(stockStore.stockData).forEach((item) => {
+    if (item?.owner) {
+      const norm = normalizeCustomerName(item.owner);
+      if (norm) {
+        currentNormCounts[norm] = (currentNormCounts[norm] || 0) + 1;
+      }
+    }
   });
 
-  // 2. Add past counts from deliveryCustomers
+  // 2. Add counts from deliveryCustomers (only active non-done customers)
+  const videoId = systemStore.currentVideoId;
+
   deliveryCustomers.value.forEach((cust) => {
-    if (!cust.sessions) return;
-    const videoId = systemStore.currentVideoId;
+    if (!cust || cust.status === "done" || !cust.name) return;
+    const norm = normalizeCustomerName(cust.name);
+    if (!norm) return;
+
     let pastCount = 0;
-
-    Object.keys(cust.sessions).forEach((vid) => {
-      if (vid !== videoId) {
-        const session = cust.sessions[vid];
-        if (session && session.status !== "done") {
-          pastCount += session.count || 0;
+    if (cust.sessions) {
+      Object.keys(cust.sessions).forEach((vid) => {
+        if (vid !== videoId) {
+          const session = cust.sessions[vid];
+          if (session && session.status !== "done") {
+            pastCount += session.count || 0;
+          }
         }
-      }
-    });
+      });
+    }
 
-    const total = (ownerItemCounts.value[cust.name] || 0) + pastCount;
+    const currentCount = currentNormCounts[norm] || 0;
+    const total = currentCount + pastCount;
+
+    counts[norm] = total;
     if (cust.uid) counts[cust.uid] = total;
     if (cust.name) counts[cust.name] = total;
+  });
+
+  // 3. For any owner in current live stock not in deliveryCustomers yet
+  Object.keys(currentNormCounts).forEach((norm) => {
+    if (counts[norm] === undefined) {
+      counts[norm] = currentNormCounts[norm];
+    }
   });
 
   return counts;
@@ -603,13 +632,18 @@ const ownerItemCounts = computed(() => {
 
 // 👗 ดึงข้อมูลยอดจองสะสมจาก Database (ทุกรอบส่งที่ยังไม่จัดส่ง) + รวมของรอบปัจจุบันด้วย
 function getOwnerCount(ownerName, uid = null) {
-  if (uid && deliveryCountsMap.value[uid] !== undefined) {
-    return deliveryCountsMap.value[uid];
+  const map = deliveryCountsMap.value || {};
+  if (uid && map[uid] !== undefined) {
+    return map[uid];
   }
-  if (ownerName && deliveryCountsMap.value[ownerName] !== undefined) {
-    return deliveryCountsMap.value[ownerName];
+  const norm = normalizeCustomerName(ownerName);
+  if (norm && map[norm] !== undefined) {
+    return map[norm];
   }
-  return ownerItemCounts.value[ownerName] || 0;
+  if (ownerName && map[ownerName] !== undefined) {
+    return map[ownerName];
+  }
+  return ownerItemCounts.value?.[ownerName] || 0;
 }
 
 // ฟังก์ชันสกัดเอาเฉพาะวันที่จากชื่อไลฟ์สดที่ยาวๆ

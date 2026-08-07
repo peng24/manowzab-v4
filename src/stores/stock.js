@@ -398,8 +398,22 @@ export const useStockStore = defineStore("stock", () => {
    * Clears all stock for the current video.
    */
   function clearAllStock() {
-    remove(dbRef(db, `stock/${systemStore.currentVideoId}`));
+    const videoId = systemStore.currentVideoId;
+    const affectedOwners = [];
+    Object.values(stockData.value).forEach((item) => {
+      if (item?.owner) affectedOwners.push({ owner: item.owner, uid: item.uid });
+    });
+
+    remove(dbRef(db, `stock/${videoId}`));
     milestones.value = { fifty: false, eighty: false, hundred: false }; // ✅ Reset milestones for the next round
+
+    if (videoId) {
+      affectedOwners.forEach(({ owner, uid }) => {
+        syncDeliveryCustomerForOwner(owner, uid, videoId).catch((e) =>
+          console.warn("Auto sync delivery error on clear all stock:", e)
+        );
+      });
+    }
   }
 
   /**
@@ -457,6 +471,9 @@ export const useStockStore = defineStore("stock", () => {
   async function updateItemData(num, newData, isAuto = false) {
     if (!systemStore.currentVideoId) return;
 
+    const oldOwner = stockData.value[num]?.owner;
+    const oldUid = stockData.value[num]?.uid;
+
     if (newData && newData.price !== undefined && !isAuto) {
       const voiceLearningStore = useVoiceLearningStore();
       voiceLearningStore.triggerSelfLearning(num, newData.price);
@@ -467,6 +484,18 @@ export const useStockStore = defineStore("stock", () => {
       dbRef(db, `stock/${systemStore.currentVideoId}/${num}`),
       newData,
     );
+
+    // 2. Auto-sync delivery_customers for previous owner and new owner
+    if (oldOwner) {
+      syncDeliveryCustomerForOwner(oldOwner, oldUid, systemStore.currentVideoId).catch((e) =>
+        console.warn("Auto sync delivery error on item edit:", e)
+      );
+    }
+    if (newData && newData.owner && newData.owner !== oldOwner) {
+      syncDeliveryCustomerForOwner(newData.owner, newData.uid, systemStore.currentVideoId).catch((e) =>
+        console.warn("Auto sync delivery error on item edit:", e)
+      );
+    }
   }
 
   return {

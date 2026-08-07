@@ -58,8 +58,8 @@ export async function resolveDeliveryUid(uid, name) {
   try {
     const data = await getCachedDeliveryCustomers();
 
-    // If valid non-proxy UID, check if direct key exists first
-    if (!isProxyUid(uid) && data[uid]) {
+    // If valid non-proxy UID, check if direct active key exists first
+    if (!isProxyUid(uid) && data[uid] && data[uid].status !== "done") {
       return uid;
     }
 

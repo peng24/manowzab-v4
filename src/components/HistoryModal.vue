@@ -405,6 +405,7 @@ import { useHistory } from "../composables/useHistory";
 import { ref as dbRef, onValue, get, remove, update, runTransaction, set } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
+import { normalizeCustomerName } from "../utils/deliverySync";
 import Swal from "sweetalert2";
 
 const emit = defineEmits(["close"]);
@@ -699,9 +700,10 @@ const ownerItemCounts = computed(() => {
 });
 
 function getOwnerCount(ownerName, uid = null) {
-  const currentCount = ownerItemCounts.value[ownerName] || 0;
+  const norm = normalizeCustomerName(ownerName);
+  const currentCount = ownerItemCounts.value[ownerName] || (norm ? ownerItemCounts.value[norm] : 0) || 0;
   const cust = deliveryCustomers.value.find(
-    (c) => (uid && c.uid === uid) || c.name === ownerName
+    (c) => c.status !== "done" && ((uid && c.uid === uid) || (norm && normalizeCustomerName(c.name) === norm) || c.name === ownerName)
   );
   if (cust) {
     let pastCount = 0;

@@ -62,7 +62,6 @@ import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import PhoneticManager from "./components/PhoneticManager.vue"; // ✅ Import Phonetic Manager
 import { useVoiceLearningStore } from "./stores/voiceLearning";
 import { useChatProcessor } from "./composables/useChatProcessor";
-import { useAiWebSocket } from "./composables/useAiWebSocket"; // ✅ Import AI WebSocket Listener
 
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
@@ -100,9 +99,6 @@ const showPhoneticManager = ref(false);
 
 // ✅ Top-level cleanup array for reliable lifecycle management (Vue 3 safe)
 const cleanupFns = [];
-
-const { disconnect: disconnectAiWs } = useAiWebSocket(); // ✅ Init Local AI WebSocket Receiver
-if (disconnectAiWs) cleanupFns.push(disconnectAiWs);
 
 // Provide functions for child components
 provide("openDashboard", () => (showDashboard.value = true));

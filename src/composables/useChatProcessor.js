@@ -42,6 +42,7 @@ import {
   adminProxyNumFirstRegex,
   adminProxyNameFirstRegex,
   shippingRegex,
+  holdRegex,
   questionRegex,
   pureNumberRegex,
   fuzzyNumberRegex,
@@ -526,8 +527,8 @@ export function useChatProcessor() {
         if (autoShipDate < new Date() && new Date().getDate() - day > 15) {
           autoShipDate.setMonth(autoShipDate.getMonth() + 1);
         }
-      } else {
-        // Default to Today for "ส่ง", "ส่งเลย", "โอนแล้ว", or any matching shipping intent
+      } else if ((shipNowMatch || /โอนแล้ว|แจ้งโอน|สลิป/.test(normalizedMsg)) && !holdRegex.test(normalizedMsg)) {
+        // Default to Today ONLY for explicit ship/transfer keywords AND NOT a hold request
         isAutoShip = true;
         autoShipDate = new Date();
       }

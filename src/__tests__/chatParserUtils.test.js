@@ -7,6 +7,7 @@ import {
   isDateMismatch,
   adminProxyNameFirstRegex,
   shippingRegex,
+  holdRegex,
   numberWithQuestionRegex,
   negationGuardRegex,
   tryRegex,
@@ -115,6 +116,15 @@ describe("chatParserUtils", () => {
       expect(parseIntentDetails("กนกวรรณ ส่งเลย").type).toBe("SHIPPING");
       expect(parseIntentDetails("ของพี่อ้อยส่งเลยค่ะ").type).toBe("SHIPPING");
       expect(parseIntentDetails("ฝากไว้ก่อนนะคับ").type).toBe("SHIPPING");
+    });
+
+    it("matches hold keywords using holdRegex (ฝากไว้ก่อน, ฝากไว้, ฝาก, ฝากของ, ยังไม่ส่ง)", () => {
+      expect(holdRegex.test("ฝากไว้ก่อนนะคับ")).toBe(true);
+      expect(holdRegex.test("ฝากไว้ค่ะ")).toBe(true);
+      expect(holdRegex.test("ฝากค่ะ")).toBe(true);
+      expect(holdRegex.test("ฝากของค่ะ")).toBe(true);
+      expect(holdRegex.test("ยังไม่ส่งนะคะ")).toBe(true);
+      expect(holdRegex.test("ส่งเลย")).toBe(false);
     });
 
     it("parses product questions", () => {

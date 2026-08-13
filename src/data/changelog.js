@@ -12,6 +12,30 @@
  */
 
 export const changelog = [
+  // ─── 4.68.x ───────────────────────────────────────────
+  {
+    version: '4.68.1',
+    date: '2026-08-13',
+    changes: {
+      fixed: [
+        'แก้ไขบั๊กเพิ่มรายการจัดส่งด้วยตนเองไม่ได้เมื่อลูกค้าในระบบไม่มีโน้ต (Error: update failed: values argument contains undefined in property note)',
+        'ปรับปรุงการกำหนดค่าเริ่มต้น note, itemCount และ createdAt ให้เป็นแบบ Safe Null/Undefined Fallback 100%',
+      ],
+    },
+  },
+  {
+    version: '4.68.0',
+    date: '2026-08-13',
+    changes: {
+      added: [
+        'เพิ่มระบบตรวจจับยอดผู้ติดตามใหม่ (Subscriber Tracking) บน YouTube Live',
+        'ระบบแจ้งเตือนแม่ค้าอัตโนมัติด้วย Popup Toast + เสียงพูด TTS: "ยินดีต้อนรับผู้ติดตามใหม่ค่ะ!" เมื่อมียอดซับเพิ่มขึ้น',
+      ],
+      improved: [
+        'ปรับแต่งการเรียกใช้ API เช็คยอดซับแบบประหยัด Quota (ใช้เพียง 1 Quota ทุกๆ 45 วินาที)',
+      ],
+    },
+  },
   // ─── 4.67.x ───────────────────────────────────────────
   {
     version: '4.67.9',

@@ -8,6 +8,7 @@ export const CONSTANTS = {
     // YouTube & Connection Configuration
     YOUTUBE: {
         VIEWER_POLL_INTERVAL_MS: 60000, // 1 minute (60 seconds) - Optimized for API quota
+        SUBSCRIBER_POLL_INTERVAL_MS: 45000, // 45 seconds - Subscriber count tracking
         DISCONNECT_DELAY_MS: 90000,     // 1.5 minutes (90 seconds)
     },
 

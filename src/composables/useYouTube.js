@@ -6,6 +6,7 @@ import { YouTubeLiveChat } from "../services/YouTubeLiveChat";
 import { useAudio } from "./useAudio";
 import { CONSTANTS } from "../config/constants";
 import { logger } from "../utils/logger";
+import Swal from "sweetalert2";
 
 const rawKeys = import.meta.env.VITE_YOUTUBE_API_KEYS || "";
 const API_KEYS = rawKeys
@@ -43,6 +44,7 @@ export function useYouTube() {
 
   const activeChatId = ref("");
   const viewerIntervalId = ref(null);
+  const subscriberIntervalId = ref(null);
 
 
   // ✅ เริ่มจาก key ถัดจากครั้งก่อน (Round-Robin)
@@ -184,6 +186,16 @@ export function useYouTube() {
           CONSTANTS.YOUTUBE.VIEWER_POLL_INTERVAL_MS,
         );
 
+        // Start Subscriber Count Tracking Loop
+        const channelId = item.snippet?.channelId;
+        if (channelId) {
+          updateSubscriberCount(channelId);
+          subscriberIntervalId.value = setInterval(
+            () => updateSubscriberCount(channelId),
+            CONSTANTS.YOUTUBE.SUBSCRIBER_POLL_INTERVAL_MS,
+          );
+        }
+
         // Voice Announcement
         queueAudio(
           null,
@@ -200,6 +212,51 @@ export function useYouTube() {
       logger.error("Connect video error:", e);
       systemStore.statusApi = "err";
       return false;
+    }
+  }
+
+  /**
+   * Polls Channel Subscriber Count and Triggers Voice + Toast Notification when count increases.
+   * @param {string} channelId
+   */
+  async function updateSubscriberCount(channelId) {
+    if (!channelId) return;
+    try {
+      const url = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}`;
+      const data = await smartFetch(url);
+      const stats = data.items?.[0]?.statistics;
+
+      if (stats && !stats.hiddenSubscriberCount && stats.subscriberCount) {
+        const newCount = parseInt(stats.subscriberCount, 10);
+        if (!isNaN(newCount) && newCount > 0) {
+          const prevCount = systemStore.subscriberCount;
+
+          // ✅ Trigger voice announcement + popup alert if sub count increases
+          if (prevCount > 0 && newCount > prevCount) {
+            const diff = newCount - prevCount;
+            logger.youtube(`🎉 New subscribers detected: +${diff} (total: ${newCount})`);
+
+            // 🔊 Voice Announcement
+            queueAudio("success", "", "ยินดีต้อนรับผู้ติดตามใหม่ค่ะ!");
+
+            // 🔔 Popup Alert (Toast)
+            Swal.fire({
+              toast: true,
+              position: "top-end",
+              icon: "success",
+              title: "🎉 มีผู้ติดตามใหม่!",
+              text: `ยินดีต้อนรับผู้ติดตามใหม่ค่ะ! (ยอดรวม ${newCount.toLocaleString()} คน)`,
+              showConfirmButton: false,
+              timer: 4000,
+              timerProgressBar: true,
+            });
+          }
+
+          systemStore.subscriberCount = newCount;
+        }
+      }
+    } catch (e) {
+      logger.error("Subscriber Count Error:", e);
     }
   }
 
@@ -261,6 +318,11 @@ export function useYouTube() {
     if (viewerIntervalId.value) {
       clearInterval(viewerIntervalId.value);
       viewerIntervalId.value = null;
+    }
+
+    if (subscriberIntervalId.value) {
+      clearInterval(subscriberIntervalId.value);
+      subscriberIntervalId.value = null;
     }
 
 

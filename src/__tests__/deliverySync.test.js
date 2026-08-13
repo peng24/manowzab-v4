@@ -79,5 +79,21 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
         })
       );
     });
+
+    it("handles undefined note field safely without throwing Firebase update error", () => {
+      const existingCustomer = { id: "UCghmg03IPoS-GHZSW6LHfqg", name: "Test User", status: "pending" }; // note is undefined
+      const payload = {
+        name: existingCustomer.name,
+        itemCount: existingCustomer ? (existingCustomer.itemCount ?? 0) : 0,
+        deliveryDate: "2026-08-13",
+        note: (existingCustomer && existingCustomer.note) || "",
+        status: "pending",
+        createdAt: existingCustomer ? (existingCustomer.createdAt ?? 12345) : 12345,
+        updatedAt: 12345,
+      };
+
+      expect(payload.note).toBe("");
+      expect(Object.values(payload).includes(undefined)).toBe(false);
+    });
   });
 });

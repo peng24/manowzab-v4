@@ -502,11 +502,11 @@ function addManualCustomer() {
 
   update(dbRef(db, `delivery_customers/${targetUid}`), {
     name,
-    itemCount: existingCustomer ? existingCustomer.itemCount : 0,
+    itemCount: existingCustomer ? (existingCustomer.itemCount ?? 0) : 0,
     deliveryDate: parsedDate,
-    note: existingCustomer ? existingCustomer.note : "",
+    note: (existingCustomer && existingCustomer.note) || "",
     status: "pending",
-    createdAt: existingCustomer ? existingCustomer.createdAt : Date.now(),
+    createdAt: existingCustomer ? (existingCustomer.createdAt ?? Date.now()) : Date.now(),
     updatedAt: Date.now(),
   }).then(() => {
     newName.value = "";
@@ -517,7 +517,7 @@ function addManualCustomer() {
 
 function updateField(id, field, value) {
   update(dbRef(db, `delivery_customers/${id}`), {
-    [field]: value,
+    [field]: value ?? "",
     updatedAt: Date.now(),
   });
 }

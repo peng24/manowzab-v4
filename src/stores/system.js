@@ -10,6 +10,7 @@ export const useSystemStore = defineStore("system", () => {
   const isConnected = ref(false);
   const currentVideoId = ref("");
   const viewerCount = ref(0);
+  const subscriberCount = ref(0); // ✅ ยอดผู้ติดตามช่อง YouTube
   const liveTitle = ref("รอกระแสข้อมูล...");
   const isLiveFinished = ref(false);
   const isAway = ref(false); // สถานะโหมดพาลูกนอน
@@ -152,6 +153,7 @@ export const useSystemStore = defineStore("system", () => {
     isConnected,
     currentVideoId,
     viewerCount,
+    subscriberCount, // ✅ Export
     liveTitle,
     isLiveFinished,
     isAway,

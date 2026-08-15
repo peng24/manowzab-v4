@@ -396,6 +396,7 @@ async function toggleConnection() {
     systemStore.statusChat = "idle"; // ✅ Changed from 'err' to 'idle'
     systemStore.statusApi = "idle"; // ✅ Reset API status too
     queueAudio(null, "", "หยุดการเชื่อมต่อ");
+    openLiveSummary();
     return;
   }
 

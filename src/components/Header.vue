@@ -159,6 +159,10 @@
               <div class="dropdown-group-title">
                 <i class="fa-solid fa-chart-pie"></i> ข้อมูล & จัดส่ง
               </div>
+              <a @click="openLiveSummary" class="menu-summary">
+                <i class="fa-solid fa-trophy" style="color: #f59e0b;"></i>
+                <span>สรุปผลการขายไลฟ์</span>
+              </a>
               <a :href="`${baseUrl}shipping/`" target="_blank" class="menu-shipping-page">
                 <i class="fa-solid fa-truck-fast"></i>
                 <span>รายการจัดส่ง (มือถือ)</span>
@@ -200,6 +204,9 @@
 
       <!-- ✅ Changelog Modal -->
       <ChangelogModal ref="changelogModalRef" />
+
+      <!-- ✅ Live Summary Modal -->
+      <LiveSummaryModal ref="liveSummaryModalRef" />
     </div>
 
     <div class="header-info">
@@ -210,8 +217,8 @@
         👁️ {{ systemStore.viewerCount.toLocaleString() }}
       </div>
       <div class="live-title">
-        <span v-if="systemStore.isLiveFinished" class="finished-badge">
-          🔴 ไลฟ์จบแล้ว
+        <span v-if="systemStore.isLiveFinished" class="finished-badge clickable" @click="openLiveSummary" title="คลิกเพื่อดูสรุปผลการขายประจำไลฟ์">
+          🔴 ไลฟ์จบแล้ว (ดูสรุป)
         </span>
         {{ systemStore.liveTitle }}
       </div>
@@ -232,6 +239,7 @@ import { db } from "../composables/useFirebase"; // เช็ค path ให้�
 import Swal from "sweetalert2";
 import NoteEditor from "./NoteEditor.vue"; // ✅ Import Note Editor
 import ChangelogModal from "./ChangelogModal.vue"; // ✅ Import Changelog Modal
+import LiveSummaryModal from "./LiveSummaryModal.vue"; // ✅ Import Live Summary Modal
 
 // Logger Configuration (คงเดิม)
 const DEBUG_MODE = false;
@@ -268,6 +276,7 @@ const dropdownRef = ref(null);
 const dropdownStyle = ref({});
 const noteEditorRef = ref(null); // ✅ Note Editor Ref
 const changelogModalRef = ref(null); // ✅ Changelog Modal Ref
+const liveSummaryModalRef = ref(null); // ✅ Live Summary Modal Ref
 let simIntervalId = null;
 const cleanupFns = [];
 
@@ -281,6 +290,17 @@ watch(
     if (newVal && newVal !== "demo" && newVal !== videoId.value) {
       videoId.value = newVal;
       logger.log("🔄 Synced Video ID:", newVal);
+    }
+  },
+);
+
+// ✅ Watcher: เปิด Modal สรุปผลการขายอัตโนมัติเมื่อจบไลฟ์
+watch(
+  () => systemStore.isLiveFinished,
+  (isFinished, oldVal) => {
+    if (isFinished && !oldVal) {
+      logger.log("🎉 Stream finished detected! Opening summary modal...");
+      openLiveSummary();
     }
   },
 );
@@ -650,6 +670,17 @@ function showChangelog() {
     changelogModalRef.value.open()
   }
 }
+
+function openLiveSummary() {
+  if (showDropdown.value) showDropdown.value = false;
+  if (liveSummaryModalRef.value) {
+    liveSummaryModalRef.value.open();
+  }
+}
+
+defineExpose({
+  openLiveSummary,
+});
 
 
 onMounted(() => {

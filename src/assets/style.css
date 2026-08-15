@@ -376,6 +376,19 @@ body {
   flex-shrink: 0;
 }
 
+.finished-badge.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.finished-badge.clickable:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
+}
+
 .version-badge {
   background: #333;
   padding: 4px 10px;

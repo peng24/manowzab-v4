@@ -1,6 +1,7 @@
 import { ref as dbRef, get, update, remove } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "./logger";
+import { isAdminUser } from "./chatParserUtils";
 
 /**
  * Checks if a UID is a temporary/proxy UID.
@@ -239,14 +240,18 @@ export async function getShippingRequestedCustomers(videoId = null) {
         cust.deliveryDate &&
         cust.deliveryDate.trim() !== ""
       ) {
-        const normName = normalizeCustomerName(cust.name);
-        if (normName && !requestedMap.has(normName)) {
-          requestedMap.set(normName, {
-            uid,
-            name: cust.name.trim(),
-            itemCount: cust.itemCount || 0,
-            deliveryDate: cust.deliveryDate,
-          });
+        const rawName = cust.name ? cust.name.trim() : "";
+        // 🚨 Exclude Admin accounts (Admin is the seller/operator, not a customer)
+        if (rawName && !isAdminUser(rawName)) {
+          const normName = normalizeCustomerName(rawName);
+          if (normName && !requestedMap.has(normName)) {
+            requestedMap.set(normName, {
+              uid,
+              name: rawName,
+              itemCount: cust.itemCount || 0,
+              deliveryDate: cust.deliveryDate,
+            });
+          }
         }
       }
     });
@@ -257,14 +262,17 @@ export async function getShippingRequestedCustomers(videoId = null) {
         if (shipInfo && shipInfo.ready) {
           const cust = delCustData[uid];
           const rawName = cust?.name || shipInfo.name;
-          const normName = normalizeCustomerName(rawName);
-          if (normName && !requestedMap.has(normName)) {
-            requestedMap.set(normName, {
-              uid,
-              name: rawName ? rawName.trim() : "ลูกค้า",
-              itemCount: cust?.itemCount || 0,
-              deliveryDate: cust?.deliveryDate || null,
-            });
+          // 🚨 Exclude Admin accounts
+          if (rawName && !isAdminUser(rawName)) {
+            const normName = normalizeCustomerName(rawName);
+            if (normName && !requestedMap.has(normName)) {
+              requestedMap.set(normName, {
+                uid,
+                name: rawName.trim(),
+                itemCount: cust?.itemCount || 0,
+                deliveryDate: cust?.deliveryDate || null,
+              });
+            }
           }
         }
       });

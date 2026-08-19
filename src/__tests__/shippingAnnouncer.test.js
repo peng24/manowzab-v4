@@ -128,6 +128,40 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
       expect(list.map((c) => c.name)).toContain("ปิ๊กกี้");
       expect(list.map((c) => c.name)).toContain("ก้อย");
     });
+
+    it("excludes Admin accounts and only returns real customers", async () => {
+      const { get } = await import("firebase/database");
+
+      get.mockImplementation((path) => {
+        if (path === "delivery_customers") {
+          return Promise.resolve({
+            val: () => ({
+              "admin-uid": {
+                name: "แอดมินมะนาว",
+                deliveryDate: "2026-08-19",
+                status: "pending",
+              },
+              "admin-uid-2": {
+                name: "Manowzab Admin",
+                deliveryDate: "2026-08-19",
+                status: "pending",
+              },
+              "cust-real": {
+                name: "พี่อ้อย",
+                deliveryDate: "2026-08-19",
+                status: "pending",
+              },
+            }),
+          });
+        }
+        return Promise.resolve({ val: () => ({}) });
+      });
+
+      const list = await getShippingRequestedCustomers("test-video-123");
+
+      expect(list.length).toBe(1);
+      expect(list[0].name).toBe("พี่อ้อย");
+    });
   });
 
   describe("announceShippingCustomers", () => {

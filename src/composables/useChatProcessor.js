@@ -456,7 +456,7 @@ export function useChatProcessor() {
           .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
           .trim();
 
-        if (cleanName.length > 0) {
+        if (cleanName.length > 0 && !isAdminUser(cleanName)) {
           autoShipName = cleanName;
 
           const nameToUidMap = getNameToUidMap(nicknameStore);
@@ -470,6 +470,10 @@ export function useChatProcessor() {
               Math.random().toString(36).substring(2, 5);
           }
           autoShipUid = foundUid;
+        } else {
+          // If Admin typed a shipping keyword without specifying a customer name,
+          // Admin is not a customer, so do NOT create autoShip for admin
+          autoShipName = "";
         }
       }
 
@@ -533,7 +537,7 @@ export function useChatProcessor() {
         autoShipDate = new Date();
       }
 
-      if (isAutoShip) {
+      if (isAutoShip && autoShipName && !isAdminUser(autoShipName)) {
         const y = autoShipDate.getFullYear();
         const m = String(autoShipDate.getMonth() + 1).padStart(2, "0");
         const d = String(autoShipDate.getDate()).padStart(2, "0");
@@ -703,7 +707,7 @@ export function useChatProcessor() {
           .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
           .trim();
 
-        if (cleanName.length > 0) {
+        if (cleanName.length > 0 && !isAdminUser(cleanName)) {
           ownerName = cleanName;
           ownerUid = "admin-proxy-" + Date.now();
         } else {
@@ -712,14 +716,21 @@ export function useChatProcessor() {
         }
       }
 
+      // ✅ For Admin Proxy: resolved phonetic name must be the CUSTOMER's name, not the Admin's name
+      const isProxyBooking = forcedOwnerName || (isAdmin && ownerName !== displayName);
+      const effectivePhoneticName =
+        isProxyBooking && ownerName
+          ? nicknameStore.getPhoneticName(ownerUid, ownerName)
+          : phoneticName;
+
       const pushBuyMessage = (finalSfxType) => {
         return chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
           id: item.id,
           text: msg,
           messageRuns: extractMessageRuns(item),
           authorName: realName,
-          displayName,
-          phoneticName,
+          displayName: isProxyBooking ? `${ownerName} (โดย ${displayName})` : displayName,
+          phoneticName: effectivePhoneticName,
           realName: realName,
           uid: uid,
           avatar,

@@ -173,6 +173,9 @@
                 <button class="btn btn-primary-gradient" @click="copySummaryText">
                   <i class="fa-solid fa-copy"></i> คัดลอกสรุปข้อความ ( Copy )
                 </button>
+                <button class="btn btn-tts-read" @click="handleAnnounceShipping" title="อ่านออกเสียงรายชื่อลูกค้าที่ให้จัดส่ง">
+                  <i class="fa-solid fa-volume-high"></i> อ่านรายชื่อจัดส่ง (TTS)
+                </button>
               </div>
 
               <div class="footer-right">
@@ -201,6 +204,7 @@ import { useSystemStore } from "../stores/system";
 import { useStockStore } from "../stores/stock";
 import { useChatStore } from "../stores/chat";
 import { triggerCelebration } from "../utils/celebration";
+import { announceShippingCustomers } from "../utils/deliverySync";
 import Swal from "sweetalert2";
 
 const isOpen = ref(false);
@@ -308,6 +312,18 @@ function handleOpenShipping() {
 function handleOpenHistory() {
   close();
   if (openHistory) openHistory();
+}
+
+async function handleAnnounceShipping() {
+  await announceShippingCustomers(systemStore.currentVideoId, { force: true });
+  Swal.fire({
+    toast: true,
+    position: "top-end",
+    icon: "info",
+    title: "กำลังอ่านรายชื่อลูกค้าที่ให้จัดส่ง 🔊",
+    showConfirmButton: false,
+    timer: 2500,
+  });
 }
 
 // Copy Text Summary for Line / FB Page (No prices)
@@ -803,6 +819,18 @@ defineExpose({
 
 .btn-primary-gradient:hover {
   background: linear-gradient(135deg, #0369a1, #075985);
+  transform: translateY(-1px);
+}
+
+.btn-tts-read {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: #ffffff;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+}
+
+.btn-tts-read:hover {
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
   transform: translateY(-1px);
 }
 

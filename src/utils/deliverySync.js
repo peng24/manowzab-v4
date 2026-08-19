@@ -208,3 +208,143 @@ export async function syncDeliveryCustomerForOwner(
     logger.error("syncDeliveryCustomerForOwner error:", e);
   }
 }
+
+// 🚀 Track last live finish announcement to prevent double announcements
+let _lastAnnouncedVideoId = null;
+let _lastAnnounceTimestamp = 0;
+
+/**
+ * Retrieves all customers who have requested delivery (active with deliveryDate or marked ready).
+ * @param {string|null} videoId - Optional video ID to cross-check current live shipping
+ * @returns {Promise<Array<{uid: string, name: string, itemCount: number, deliveryDate: string|null}>>}
+ */
+export async function getShippingRequestedCustomers(videoId = null) {
+  try {
+    const promises = [get(dbRef(db, "delivery_customers"))];
+    if (videoId && videoId !== "demo") {
+      promises.push(get(dbRef(db, `shipping/${videoId}`)));
+    }
+
+    const [delCustSnap, shippingSnap] = await Promise.all(promises);
+    const delCustData = delCustSnap ? delCustSnap.val() || {} : {};
+    const shippingData = shippingSnap ? shippingSnap.val() || {} : {};
+
+    const requestedMap = new Map(); // normName -> customer object
+
+    // 1. From delivery_customers: active (non-done) with deliveryDate set
+    Object.entries(delCustData).forEach(([uid, cust]) => {
+      if (
+        cust &&
+        cust.status !== "done" &&
+        cust.deliveryDate &&
+        cust.deliveryDate.trim() !== ""
+      ) {
+        const normName = normalizeCustomerName(cust.name);
+        if (normName && !requestedMap.has(normName)) {
+          requestedMap.set(normName, {
+            uid,
+            name: cust.name.trim(),
+            itemCount: cust.itemCount || 0,
+            deliveryDate: cust.deliveryDate,
+          });
+        }
+      }
+    });
+
+    // 2. From shipping/${videoId}: marked ready in current video session
+    if (shippingData) {
+      Object.entries(shippingData).forEach(([uid, shipInfo]) => {
+        if (shipInfo && shipInfo.ready) {
+          const cust = delCustData[uid];
+          const rawName = cust?.name || shipInfo.name;
+          const normName = normalizeCustomerName(rawName);
+          if (normName && !requestedMap.has(normName)) {
+            requestedMap.set(normName, {
+              uid,
+              name: rawName ? rawName.trim() : "ลูกค้า",
+              itemCount: cust?.itemCount || 0,
+              deliveryDate: cust?.deliveryDate || null,
+            });
+          }
+        }
+      });
+    }
+
+    return Array.from(requestedMap.values());
+  } catch (err) {
+    logger.error("getShippingRequestedCustomers error:", err);
+    return [];
+  }
+}
+
+/**
+ * Announces the list of customers requesting delivery with clear pauses between names.
+ * @param {string|null} videoId - Video ID of current stream
+ * @param {Object} options - { force: boolean }
+ */
+export async function announceShippingCustomers(videoId = null, options = {}) {
+  const { force = false } = options;
+  const now = Date.now();
+
+  const { useSystemStore } = await import("../stores/system");
+  const systemStore = useSystemStore();
+
+  const activeVid = videoId || systemStore.currentVideoId;
+
+  // Deduplication guard: don't repeat within 15s for the same video unless force=true
+  if (
+    !force &&
+    activeVid &&
+    _lastAnnouncedVideoId === activeVid &&
+    now - _lastAnnounceTimestamp < 15000
+  ) {
+    logger.tts("Skipping duplicate live finish shipping announcement for:", activeVid);
+    return;
+  }
+
+  _lastAnnouncedVideoId = activeVid;
+  _lastAnnounceTimestamp = now;
+
+  if (!systemStore.isSoundOn) return;
+
+  const { useAudio } = await import("../composables/useAudio");
+  const { useNicknameStore } = await import("../stores/nickname");
+
+  const { queueAudio } = useAudio();
+  const nicknameStore = useNicknameStore();
+
+  const customers = await getShippingRequestedCustomers(activeVid);
+
+  if (!customers || customers.length === 0) {
+    queueAudio(
+      null,
+      "",
+      "ไลฟ์จบแล้วค่ะ ยังไม่มีรายชื่อลูกค้าที่แจ้งจัดส่งค่ะ ขอบคุณค่ะ",
+      { delayAfter: 500 },
+    );
+    return;
+  }
+
+  // 1. Initial Opening Announcement
+  queueAudio(
+    "success",
+    "",
+    `ไลฟ์จบแล้วค่ะ ขอแจ้งรายชื่อลูกค้าที่ให้จัดส่ง มีทั้งหมด ${customers.length} ท่าน มีดังนี้ค่ะ`,
+    { delayAfter: 800 },
+  );
+
+  // 2. Read each customer name with clear 800ms spacing
+  customers.forEach((cust, index) => {
+    const phoneticName = nicknameStore.getPhoneticName(cust.uid, cust.name);
+    const msg = `คนที่ ${index + 1} ${phoneticName}`;
+    queueAudio(null, "", msg, { delayAfter: 800 });
+  });
+
+  // 3. Closing remark
+  queueAudio(
+    null,
+    "",
+    `รวมทั้งหมด ${customers.length} ท่าน ขอบคุณลูกค้าทุกท่านค่ะ`,
+    { delayAfter: 500 },
+  );
+}

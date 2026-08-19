@@ -290,6 +290,11 @@ export function useAudio() {
           ]);
         }
       }
+
+      // 3. Optional delay/pause after utterance (e.g. for reading list of names with clear spacing)
+      if (task.delayAfter && task.delayAfter > 0) {
+        await new Promise((resolve) => setTimeout(resolve, task.delayAfter));
+      }
     } catch (err) {
       console.error("Audio Queue Error:", err);
     } finally {
@@ -301,9 +306,10 @@ export function useAudio() {
   }
 
   // ✅ Unified Entry Point: queues SFX + TTS as a single sequential task
-  function queueAudio(sfxType, author, message) {
+  function queueAudio(sfxType, author, message, options = {}) {
     if (!systemStore.isSoundOn) return;
-    audioQueue.push({ sfxType, author, message });
+    const delayAfter = typeof options === "number" ? options : options?.delayAfter || 0;
+    audioQueue.push({ sfxType, author, message, delayAfter });
     processAudioQueue();
   }
 

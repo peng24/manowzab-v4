@@ -6,6 +6,7 @@ import { YouTubeLiveChat } from "../services/YouTubeLiveChat";
 import { useAudio } from "./useAudio";
 import { CONSTANTS } from "../config/constants";
 import { logger } from "../utils/logger";
+import { announceShippingCustomers } from "../utils/deliverySync";
 import Swal from "sweetalert2";
 
 const rawKeys = import.meta.env.VITE_YOUTUBE_API_KEYS || "";
@@ -288,7 +289,8 @@ export function useYouTube() {
             clearInterval(viewerIntervalId.value);
             viewerIntervalId.value = null;
 
-            queueAudio(null, "", "ไลฟ์จบแล้ว");
+            // 🔊 Read out names of customers who requested delivery with clear spacing
+            announceShippingCustomers(videoId);
 
             const delaySec = CONSTANTS.YOUTUBE.DISCONNECT_DELAY_MS / 1000;
             logger.youtube(`Disconnecting in ${delaySec} seconds...`);

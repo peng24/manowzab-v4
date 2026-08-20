@@ -9,7 +9,8 @@ export const CONSTANTS = {
     YOUTUBE: {
         VIEWER_POLL_INTERVAL_MS: 60000, // 1 minute (60 seconds) - Optimized for API quota
         SUBSCRIBER_POLL_INTERVAL_MS: 45000, // 45 seconds - Subscriber count tracking
-        DISCONNECT_DELAY_MS: 90000,     // 1.5 minutes (90 seconds)
+        ANNOUNCE_SHIPPING_DELAY_MS: 5000,   // 5 seconds - delay before announcing shipping list
+        DISCONNECT_DELAY_MS: 60000,         // 1 minute (60 seconds) - delay before disconnecting
     },
 
     // UI & System Limits

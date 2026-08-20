@@ -241,6 +241,7 @@ import NoteEditor from "./NoteEditor.vue"; // ✅ Import Note Editor
 import ChangelogModal from "./ChangelogModal.vue"; // ✅ Import Changelog Modal
 import LiveSummaryModal from "./LiveSummaryModal.vue"; // ✅ Import Live Summary Modal
 import { announceShippingCustomers } from "../utils/deliverySync";
+import { CONSTANTS } from "../config/constants";
 
 // Logger Configuration (คงเดิม)
 const DEBUG_MODE = false;
@@ -295,14 +296,16 @@ watch(
   },
 );
 
-// ✅ Watcher: เปิด Modal สรุปผลการขายอัตโนมัติเมื่อจบไลฟ์ และอ่านรายชื่อลูกค้าที่ให้จัดส่ง
+// ✅ Watcher: เปิด Modal สรุปผลการขายอัตโนมัติเมื่อจบไลฟ์ และอ่านรายชื่อลูกค้าที่ให้จัดส่ง (รอ 5s)
 watch(
   () => systemStore.isLiveFinished,
   (isFinished, oldVal) => {
     if (isFinished && !oldVal) {
       logger.log("🎉 Stream finished detected! Opening summary modal...");
       openLiveSummary();
-      announceShippingCustomers(systemStore.currentVideoId);
+      setTimeout(() => {
+        announceShippingCustomers(systemStore.currentVideoId);
+      }, CONSTANTS.YOUTUBE.ANNOUNCE_SHIPPING_DELAY_MS);
     }
   },
 );

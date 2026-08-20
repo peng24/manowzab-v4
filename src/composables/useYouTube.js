@@ -289,8 +289,10 @@ export function useYouTube() {
             clearInterval(viewerIntervalId.value);
             viewerIntervalId.value = null;
 
-            // 🔊 Read out names of customers who requested delivery with clear spacing
-            announceShippingCustomers(videoId);
+            // 🔊 Read out names of customers who requested delivery with 5s delay after stream ends
+            setTimeout(() => {
+              announceShippingCustomers(videoId);
+            }, CONSTANTS.YOUTUBE.ANNOUNCE_SHIPPING_DELAY_MS);
 
             const delaySec = CONSTANTS.YOUTUBE.DISCONNECT_DELAY_MS / 1000;
             logger.youtube(`Disconnecting in ${delaySec} seconds...`);

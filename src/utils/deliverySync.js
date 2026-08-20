@@ -214,71 +214,56 @@ export async function syncDeliveryCustomerForOwner(
 let _lastAnnouncedVideoId = null;
 let _lastAnnounceTimestamp = 0;
 
+function getCountdownDays(deliveryDate) {
+  if (!deliveryDate) return Infinity;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(deliveryDate);
+  if (isNaN(target.getTime())) return Infinity;
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+}
+
 /**
- * Retrieves all customers who have requested delivery (active with deliveryDate or marked ready).
- * @param {string|null} videoId - Optional video ID to cross-check current live shipping
- * @returns {Promise<Array<{uid: string, name: string, itemCount: number, deliveryDate: string|null}>>}
+ * Retrieves all customers who have requested delivery (active with deliveryDate in delivery_customers).
+ * Strictly mirrors the list displayed in Shipping Manager under "เฉพาะคนที่แจ้งส่ง".
+ * @returns {Promise<Array<{uid: string, name: string, itemCount: number, deliveryDate: string|null, days: number}>>}
  */
-export async function getShippingRequestedCustomers(videoId = null) {
+export async function getShippingRequestedCustomers() {
   try {
-    const promises = [get(dbRef(db, "delivery_customers"))];
-    if (videoId && videoId !== "demo") {
-      promises.push(get(dbRef(db, `shipping/${videoId}`)));
-    }
-
-    const [delCustSnap, shippingSnap] = await Promise.all(promises);
+    const delCustSnap = await get(dbRef(db, "delivery_customers"));
     const delCustData = delCustSnap ? delCustSnap.val() || {} : {};
-    const shippingData = shippingSnap ? shippingSnap.val() || {} : {};
 
-    const requestedMap = new Map(); // normName -> customer object
+    const requestedList = [];
 
-    // 1. From delivery_customers: active (non-done) with deliveryDate set
+    // Strictly read from delivery_customers: active (non-done) with deliveryDate set
+    // Exactly matches ShippingManager.vue "เฉพาะคนที่แจ้งส่ง"
     Object.entries(delCustData).forEach(([uid, cust]) => {
       if (
         cust &&
         cust.status !== "done" &&
         cust.deliveryDate &&
+        typeof cust.deliveryDate === "string" &&
         cust.deliveryDate.trim() !== ""
       ) {
         const rawName = cust.name ? cust.name.trim() : "";
         // 🚨 Exclude Admin accounts (Admin is the seller/operator, not a customer)
         if (rawName && !isAdminUser(rawName)) {
-          const normName = normalizeCustomerName(rawName);
-          if (normName && !requestedMap.has(normName)) {
-            requestedMap.set(normName, {
-              uid,
-              name: rawName,
-              itemCount: cust.itemCount || 0,
-              deliveryDate: cust.deliveryDate,
-            });
-          }
+          requestedList.push({
+            uid,
+            name: rawName,
+            itemCount: cust.itemCount || 0,
+            deliveryDate: cust.deliveryDate,
+            days: getCountdownDays(cust.deliveryDate),
+          });
         }
       }
     });
 
-    // 2. From shipping/${videoId}: marked ready in current video session
-    if (shippingData) {
-      Object.entries(shippingData).forEach(([uid, shipInfo]) => {
-        if (shipInfo && shipInfo.ready) {
-          const cust = delCustData[uid];
-          const rawName = cust?.name || shipInfo.name;
-          // 🚨 Exclude Admin accounts
-          if (rawName && !isAdminUser(rawName)) {
-            const normName = normalizeCustomerName(rawName);
-            if (normName && !requestedMap.has(normName)) {
-              requestedMap.set(normName, {
-                uid,
-                name: rawName.trim(),
-                itemCount: cust?.itemCount || 0,
-                deliveryDate: cust?.deliveryDate || null,
-              });
-            }
-          }
-        }
-      });
-    }
+    // Sort by countdown days ascending (identical to ShippingManager table order)
+    requestedList.sort((a, b) => a.days - b.days);
 
-    return Array.from(requestedMap.values());
+    return requestedList;
   } catch (err) {
     logger.error("getShippingRequestedCustomers error:", err);
     return [];

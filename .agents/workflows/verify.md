@@ -57,6 +57,8 @@ description: Mandatory verification checklist after every code change
 | 4.6 | TTS ต้องอ่านทุกข้อความ | `src/composables/useChatProcessor.js` | ต้องมี `queueAudio()` ก่อน early return ทุกจุดใน buy logic |
 | 4.7 | Cross-Device Audio Playback | `src/stores/chat.js`, `src/composables/useChatProcessor.js` | ห้ามเรียก `queueAudio()` ตรงๆ ใน `useChatProcessor.js` (ยกเว้นเสียงต้อนรับ) เสียงทั้งหมดต้องถูกทริกเกอร์ผ่าน Firebase sync listener ใน chat store และเล่นเฉพาะแชทใหม่ (`timestamp >= syncStartTime - 5000` และ `isNew`) |
 | 4.8 | Emoji and Run Fallback | `src/composables/useChatProcessor.js` | อ่านสติกเกอร์เป็น "ส่งสติกเกอร์" เมื่อ sanitizes เป็นค่าว่าง, fallback ไป `messageRuns` เมื่อ `displayMessage` ว่าง |
+| 4.9 | เว้นวรรคหน่วงเวลาในคิวเสียง (`delayAfter`) | `src/composables/useAudio.js` | คิวเสียง `queueAudio` รองรับ `options.delayAfter` (เช่น 800ms) เพื่อเว้นจังหวะอ่านชื่อลูกค้าแต่ละคนให้ชัดเจน ไม่รัวติดกัน |
+| 4.10 | ออกเสียงชื่อลูกค้าจริงเมื่อแอดมินจองแทน (Admin Proxy TTS) | `src/composables/useChatProcessor.js` | เมื่อแอดมินพิมพ์จองให้ลูกค้า เสียง TTS จะอ่านเป็นชื่อลูกค้าเท่านั้น ไม่นำชื่อแอดมินมาอ่าน |
 
 
 ---
@@ -127,6 +129,8 @@ description: Mandatory verification checklist after every code change
 | 10.10 | แท็บสลับดู "ฝากสินค้า" (Unassigned Filter) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue` | สลับดูคนที่ฝากสินค้า (ยังไม่ระบุวันส่ง) และดูทั้งหมดได้อย่างถูกต้อง |
 | 10.11 | Delivery Strip Filter | `src/components/StockGrid.vue` | กรองแสดงเฉพาะลูกค้าที่มีวันจัดส่งแล้ว (`!!c.deliveryDate`) |
 | 10.12 | ตรวจจับแชทแจ้งส่ง ("ส่ง", "ส่งเลย", ฯลฯ) | `src/composables/useChatProcessor.js` | เมื่อลูกค้าพิมพ์ "ส่ง", "ส่งเลย", "ส่งครับ", "ส่งค่ะ" ฯลฯ ให้ตั้งวันส่งเป็นวันนี้อัตโนมัติ |
+| 10.13 | ระบบอ่านรายชื่อจัดส่งเมื่อไลฟ์จบ (`announceShippingCustomers`, `getShippingRequestedCustomers`) | `src/utils/deliverySync.js`, `src/composables/useYouTube.js`, `src/components/Header.vue` | อ่านเฉพาะรายชื่อลูกค้าที่บันทึกใน `delivery_customers` ที่มีวันจัดส่ง (`deliveryDate`) และสถานะยังไม่เสร็จ (`status !== 'done'`) ตรงกับตารางหน้าจอ "เฉพาะคนที่แจ้งส่ง" 100% พร้อมเรียงลำดับตามวันส่ง และตัดชื่อแอดมินออก |
+| 10.14 | ปุ่มอ่านรายชื่อจัดส่ง TTS ซ้ำใน Live Summary Modal | `src/components/LiveSummaryModal.vue` | มีปุ่ม `🔊 อ่านรายชื่อจัดส่ง (TTS)` ในหน้าต่างสรุปผลการขาย ให้กดฟังรายชื่อลูกค้าที่ต้องส่งซ้ำได้ตลอดเวลา |
 
 ---
 

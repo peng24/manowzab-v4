@@ -88,13 +88,13 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
         return Promise.resolve({ val: () => ({}) });
       });
 
-      const list = await getShippingRequestedCustomers("test-video-123");
+      const list = await getShippingRequestedCustomers();
 
       expect(list.length).toBe(2);
       expect(list.map((c) => c.name)).toEqual(["ปิ๊กกี้", "สมศรี"]);
     });
 
-    it("merges customers marked ready in shipping/${videoId}", async () => {
+    it("sorts customers by delivery date identical to ShippingManager", async () => {
       const { get } = await import("firebase/database");
 
       get.mockImplementation((path) => {
@@ -102,19 +102,19 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
           return Promise.resolve({
             val: () => ({
               "cust-1": {
-                name: "ปิ๊กกี้",
+                name: "วันเพ็ญ ก้อนแก้ว",
+                deliveryDate: "2026-08-22",
+                status: "pending",
+              },
+              "cust-2": {
+                name: "ธิดารัตน์",
                 deliveryDate: "2026-08-19",
                 status: "pending",
               },
-            }),
-          });
-        }
-        if (path === "shipping/test-video-123") {
-          return Promise.resolve({
-            val: () => ({
-              "cust-extra": {
-                ready: true,
-                name: "ก้อย",
+              "cust-3": {
+                name: "เกษมศรี",
+                deliveryDate: "2026-08-20",
+                status: "pending",
               },
             }),
           });
@@ -122,11 +122,10 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
         return Promise.resolve({ val: () => ({}) });
       });
 
-      const list = await getShippingRequestedCustomers("test-video-123");
+      const list = await getShippingRequestedCustomers();
 
-      expect(list.length).toBe(2);
-      expect(list.map((c) => c.name)).toContain("ปิ๊กกี้");
-      expect(list.map((c) => c.name)).toContain("ก้อย");
+      expect(list.length).toBe(3);
+      expect(list.map((c) => c.name)).toEqual(["ธิดารัตน์", "เกษมศรี", "วันเพ็ญ ก้อนแก้ว"]);
     });
 
     it("excludes Admin accounts and only returns real customers", async () => {
@@ -157,7 +156,7 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
         return Promise.resolve({ val: () => ({}) });
       });
 
-      const list = await getShippingRequestedCustomers("test-video-123");
+      const list = await getShippingRequestedCustomers();
 
       expect(list.length).toBe(1);
       expect(list[0].name).toBe("พี่อ้อย");

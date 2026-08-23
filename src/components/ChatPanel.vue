@@ -266,6 +266,10 @@ async function editNickname(chat) {
   const realNameStr = chat.realName || chat.authorName || chat.displayName;
   if (!targetUid) return;
 
+  const el = chatViewport.value;
+  const savedScrollTop = el ? el.scrollTop : null;
+  const wasAtBottom = el ? (el.scrollHeight - el.scrollTop - el.clientHeight < 50) : false;
+
   const { value: newNick } = await Swal.fire({
     title: "แก้ไขชื่อเล่น",
     input: "text",
@@ -274,6 +278,8 @@ async function editNickname(chat) {
     showCancelButton: true,
     confirmButtonText: "บันทึก",
     cancelButtonText: "ยกเลิก",
+    heightAuto: false,
+    returnFocus: false,
   });
 
   if (newNick && newNick.trim() !== "") {
@@ -313,11 +319,29 @@ async function editNickname(chat) {
           position: "top-end",
           showConfirmButton: false,
           timer: 1500,
+          heightAuto: false,
+          returnFocus: false,
         });
+
+        if (el && savedScrollTop !== null) {
+          nextTick(() => {
+            if (wasAtBottom) {
+              scrollToBottom(false);
+            } else {
+              el.scrollTop = savedScrollTop;
+            }
+          });
+        }
       })
       .catch((err) => {
         console.error(err);
-        Swal.fire("Error", "บันทึกไม่สำเร็จ", "error");
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "บันทึกไม่สำเร็จ",
+          heightAuto: false,
+          returnFocus: false,
+        });
       });
   }
 }
@@ -451,20 +475,31 @@ watch(
   },
 );
 
-// ✅ Force Process Logic
+// ✅ Force Process Logic (🛒 คีย์ด่วน)
 async function forceProcess(chat) {
+  const el = chatViewport.value;
+  const savedScrollTop = el ? el.scrollTop : null;
+  const wasAtBottom = el ? (el.scrollHeight - el.scrollTop - el.clientHeight < 50) : false;
+
   const { value: formValues } = await Swal.fire({
     title: "บังคับตัดสต็อก",
     html:
-      `<input id="swal-input1" class="swal2-input" placeholder="รหัสสินค้า (เช่น 1)" value="">` +
+      `<input id="swal-input1" class="swal2-input" placeholder="รหัสสินค้า (เช่น 1)" value="" autofocus>` +
       `<input id="swal-input2" class="swal2-input" placeholder="ราคา (ไม่ใส่ก็ได้)" value="">`,
     focusConfirm: false,
     showCancelButton: true,
+    confirmButtonText: "บันทึก",
+    cancelButtonText: "ยกเลิก",
+    heightAuto: false,
+    returnFocus: false,
     preConfirm: () => {
-      return [
-        document.getElementById("swal-input1").value,
-        document.getElementById("swal-input2").value,
-      ];
+      const numVal = document.getElementById("swal-input1")?.value?.trim();
+      const priceVal = document.getElementById("swal-input2")?.value?.trim();
+      if (!numVal) {
+        Swal.showValidationMessage("กรุณาระบุรหัสสินค้า");
+        return false;
+      }
+      return [numVal, priceVal];
     },
   });
 
@@ -481,11 +516,28 @@ async function forceProcess(chat) {
       "manual",
     );
 
-    Swal.fire(
-      "เรียบร้อย",
-      `ตัดสต็อกเบอร์ ${num} ให้ ${chat.displayName} แล้ว`,
-      "success",
-    );
+    Swal.fire({
+      icon: "success",
+      title: `ตัดสต็อกเบอร์ ${num} ให้ ${chat.displayName} แล้ว`,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+      heightAuto: false,
+      returnFocus: false,
+    });
+  }
+
+  // ✅ รักษาตำแหน่ง Scroll เดิมของช่องแชท ไม่ให้เลื่อนขึ้นด้านบนสุดเอง
+  if (el && savedScrollTop !== null) {
+    nextTick(() => {
+      if (wasAtBottom) {
+        scrollToBottom(false);
+      } else {
+        el.scrollTop = savedScrollTop;
+      }
+    });
   }
 }
 

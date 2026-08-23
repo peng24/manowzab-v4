@@ -310,6 +310,20 @@ export function extractMessageRuns(item) {
     }
   }
 
+  // Super Sticker Support
+  if (item.snippet?.superStickerDetails) {
+    const altText = item.snippet.superStickerDetails.superStickerMetadata?.altText || 'ส่งสติกเกอร์';
+    return [{ text: altText }];
+  }
+
+  // Super Chat / Milestone Chat Support
+  if (item.snippet?.superChatDetails?.userComment) {
+    return [{ text: item.snippet.superChatDetails.userComment }];
+  }
+  if (item.snippet?.memberMilestoneChatDetails?.userComment) {
+    return [{ text: item.snippet.memberMilestoneChatDetails.userComment }];
+  }
+
   // Fallback to displayMessage
   return [{ text: item.snippet?.displayMessage || '' }];
 }

@@ -2394,3 +2394,13 @@ div:where(.swal2-container).swal2-noanimation:not(.swal2-top-end):not(.swal2-toa
   background: rgba(0, 0, 0, 0.6) !important;
 }
 
+/* Prevent SweetAlert2 from collapsing viewport height or resetting scroll in SPA */
+html.swal2-shown,
+body.swal2-shown,
+html.swal2-height-auto,
+body.swal2-height-auto {
+  height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+

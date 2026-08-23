@@ -112,14 +112,31 @@ export function useChatProcessor() {
 
     let msg = item.snippet.displayMessage || "";
     if (!msg) {
+      if (item.snippet.superStickerDetails) {
+        msg = item.snippet.superStickerDetails.superStickerMetadata?.altText || "ส่งสติกเกอร์";
+      } else if (item.snippet.superChatDetails?.userComment) {
+        msg = item.snippet.superChatDetails.userComment;
+      } else if (item.snippet.memberMilestoneChatDetails?.userComment) {
+        msg = item.snippet.memberMilestoneChatDetails.userComment;
+      }
+    }
+
+    if (!msg) {
       // ถ้าไม่มี displayMessage → ลอง fallback จาก messageRuns (emoji-only etc.)
       const runs = extractMessageRuns(item);
       const fallbackText = runs
         .map((r) => r.text || "")
         .join("")
         .trim();
-      if (!fallbackText) return; // ไม่มีข้อความจริงๆ → ข้าม
-      msg = fallbackText;
+      if (fallbackText) {
+        msg = fallbackText;
+      } else if (runs.some((r) => r.emoji || r.image)) {
+        msg = "ส่งสติกเกอร์";
+      } else if (item.snippet?.type === "superStickerEvent") {
+        msg = item.snippet?.superStickerDetails?.superStickerMetadata?.altText || "ส่งสติกเกอร์";
+      } else {
+        return; // ไม่มีข้อความจริงๆ → ข้าม
+      }
     }
 
     // ✅ Normalize Thai numerals → Arabic digits for regex matching
@@ -205,9 +222,10 @@ export function useChatProcessor() {
       /admin|แอดมิน/i.test(displayName) ||
       /admin|แอดมิน/i.test(realName);
 
-    // ✅ Prepare TTS Message (Append instructions for new customers once)
+    // ✅ Prepare TTS Message (Append instructions for new customers once, exclude pure greetings/stickers)
     let ttsMessage = msg;
-    if (isNewCustomer && !isAdmin && !warnedNewCustomers.has(uid)) {
+    const isGreetingOrSticker = /^(?:ทักทาย|ส่งสติกเกอร์|สวัสดี|ดีครับ|ดีค่ะ|hello|hi)$/i.test(msg.trim());
+    if (isNewCustomer && !isAdmin && !warnedNewCustomers.has(uid) && !isGreetingOrSticker) {
       warnedNewCustomers.add(uid);
       ttsMessage = `${msg} ... ลูกค้าใหม่ พิมพ์ชื่อ ตามด้วยรหัสเพื่อจอง ... ค่าส่ง โอน 40 ... ปลายทาง 50 ค่ะ`;
     }

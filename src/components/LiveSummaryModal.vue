@@ -173,8 +173,8 @@
                 <button class="btn btn-primary-gradient" @click="copySummaryText">
                   <i class="fa-solid fa-copy"></i> คัดลอกสรุปข้อความ ( Copy )
                 </button>
-                <button class="btn btn-tts-read" @click="handleAnnounceShipping" title="อ่านออกเสียงรายชื่อลูกค้าที่ให้จัดส่ง">
-                  <i class="fa-solid fa-volume-high"></i> อ่านรายชื่อจัดส่ง (TTS)
+                <button class="btn btn-tts-read" @click="handleAnnounceShipping" :title="`อ่านออกเสียงรายชื่อลูกค้าที่ให้จัดส่งรอบ${cycleLabel}`">
+                  <i class="fa-solid fa-volume-high"></i> อ่านรายชื่อจัดส่ง (รอบ{{ cycleLabel }})
                 </button>
               </div>
 
@@ -205,6 +205,7 @@ import { useStockStore } from "../stores/stock";
 import { useChatStore } from "../stores/chat";
 import { triggerCelebration } from "../utils/celebration";
 import { announceShippingCustomers } from "../utils/deliverySync";
+import { formatShippingCycleLabel } from "../utils/chatParserUtils";
 import Swal from "sweetalert2";
 
 const isOpen = ref(false);
@@ -212,6 +213,10 @@ const isOpen = ref(false);
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
 const chatStore = useChatStore();
+
+const cycleLabel = computed(() => {
+  return formatShippingCycleLabel(systemStore.shippingCycle);
+});
 
 const openShippingManager = inject("openShippingManager", null);
 const openHistory = inject("openHistory", null);
@@ -320,7 +325,7 @@ async function handleAnnounceShipping() {
     toast: true,
     position: "top-end",
     icon: "info",
-    title: "กำลังอ่านรายชื่อลูกค้าที่ให้จัดส่ง 🔊",
+    title: `กำลังอ่านรายชื่อจัดส่งรอบ ${cycleLabel.value} 🔊`,
     showConfirmButton: false,
     timer: 2500,
   });

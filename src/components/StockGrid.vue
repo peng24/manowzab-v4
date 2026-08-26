@@ -33,11 +33,11 @@
           <div
             class="shipping-mgr-icon"
             @click="openShippingManager"
-            title="รายการจัดส่ง"
+            :title="`รายการจัดส่งรอบนี้ (${cycleDeliveryCount} ท่าน) — คลิกเพื่อเปิด`"
             style="cursor: pointer;"
           >
             <span class="box-emoji">📦</span>
-            <span v-if="todayDeliveryCount > 0" class="delivery-badge">{{ todayDeliveryCount }}</span>
+            <span v-if="cycleDeliveryCount > 0" class="delivery-badge">{{ cycleDeliveryCount }}</span>
           </div>
           <div class="ds-scroll" v-if="deliveryStrip.length > 0">
             <span
@@ -295,6 +295,7 @@ import { ref as dbRef, onValue, get, remove, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
 import { normalizeCustomerName } from "../utils/deliverySync";
+import { resolveShippingCycleDate, formatDateToYYYYMMDD } from "../utils/chatParserUtils";
 import Swal from "sweetalert2";
 
 const DEBUG_MODE = false;
@@ -356,14 +357,12 @@ function getDeliveryDays(dateStr) {
   return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
 }
 
-const todayDeliveryCount = computed(() => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+const cycleDeliveryCount = computed(() => {
+  const targetDateObj = resolveShippingCycleDate(systemStore.shippingCycle || 'today');
+  const targetDateStr = formatDateToYYYYMMDD(targetDateObj);
   return deliveryCustomers.value.filter((c) => {
     if (c.status === 'done' || !c.deliveryDate) return false;
-    const target = new Date(c.deliveryDate);
-    target.setHours(0, 0, 0, 0);
-    return target.getTime() <= today.getTime();
+    return c.deliveryDate === targetDateStr;
   }).length;
 });
 

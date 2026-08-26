@@ -31,6 +31,7 @@ vi.mock("../composables/useAudio", () => ({
 const mockSystemStore = {
   currentVideoId: "test-video-123",
   isSoundOn: true,
+  shippingCycle: "2026-08-19",
 };
 vi.mock("../stores/system", () => ({
   useSystemStore: () => mockSystemStore,
@@ -48,10 +49,11 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
   beforeEach(() => {
     vi.clearAllMocks();
     mockSystemStore.isSoundOn = true;
+    mockSystemStore.shippingCycle = "2026-08-19";
   });
 
   describe("getShippingRequestedCustomers", () => {
-    it("returns active customers who have deliveryDate set", async () => {
+    it("returns active customers filtered strictly by the specified shipping cycle date", async () => {
       const { get } = await import("firebase/database");
 
       get.mockImplementation((path) => {
@@ -66,7 +68,7 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
               },
               "cust-2": {
                 name: "สมศรี",
-                deliveryDate: "2026-08-20",
+                deliveryDate: "2026-08-20", // Different date -> should NOT be included in 2026-08-19 cycle
                 status: "pending",
                 itemCount: 1,
               },
@@ -78,7 +80,7 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
               },
               "cust-4": {
                 name: "สายใจ",
-                deliveryDate: "2026-08-15",
+                deliveryDate: "2026-08-19",
                 status: "done", // ส่งเสร็จแล้ว -> ไม่ควรอ่าน
                 itemCount: 0,
               },
@@ -88,13 +90,14 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
         return Promise.resolve({ val: () => ({}) });
       });
 
-      const list = await getShippingRequestedCustomers();
+      // Target cycle: 2026-08-19
+      const list = await getShippingRequestedCustomers("2026-08-19");
 
-      expect(list.length).toBe(2);
-      expect(list.map((c) => c.name)).toEqual(["ปิ๊กกี้", "สมศรี"]);
+      expect(list.length).toBe(1);
+      expect(list.map((c) => c.name)).toEqual(["ปิ๊กกี้"]);
     });
 
-    it("sorts customers by delivery date identical to ShippingManager", async () => {
+    it("returns all active customers when cycle is 'all'", async () => {
       const { get } = await import("firebase/database");
 
       get.mockImplementation((path) => {
@@ -122,7 +125,7 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
         return Promise.resolve({ val: () => ({}) });
       });
 
-      const list = await getShippingRequestedCustomers();
+      const list = await getShippingRequestedCustomers("all");
 
       expect(list.length).toBe(3);
       expect(list.map((c) => c.name)).toEqual(["ธิดารัตน์", "เกษมศรี", "วันเพ็ญ ก้อนแก้ว"]);
@@ -156,7 +159,7 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
         return Promise.resolve({ val: () => ({}) });
       });
 
-      const list = await getShippingRequestedCustomers();
+      const list = await getShippingRequestedCustomers("2026-08-19");
 
       expect(list.length).toBe(1);
       expect(list[0].name).toBe("พี่อ้อย");
@@ -164,7 +167,7 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
   });
 
   describe("announceShippingCustomers", () => {
-    it("announces opening, each customer name with delayAfter: 800, and closing remark", async () => {
+    it("announces opening with cycle label, each customer name with delayAfter: 800, and closing remark", async () => {
       const { get } = await import("firebase/database");
 
       get.mockImplementation((path) => {
@@ -178,7 +181,12 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
               },
               "cust-2": {
                 name: "สมศรี",
-                deliveryDate: "2026-08-20",
+                deliveryDate: "2026-08-19",
+                status: "pending",
+              },
+              "cust-3": {
+                name: "สายใจ",
+                deliveryDate: "2026-08-25", // Other date
                 status: "pending",
               },
             }),
@@ -187,16 +195,18 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
         return Promise.resolve({ val: () => ({}) });
       });
 
+      mockSystemStore.shippingCycle = "2026-08-19";
+
       await announceShippingCustomers("new-video-999", { force: true });
 
       expect(mockQueueAudio).toHaveBeenCalledTimes(4);
 
-      // 1. Opening announcement with success chime and 800ms pause
+      // 1. Opening announcement with success chime, cycle label, and 800ms pause
       expect(mockQueueAudio).toHaveBeenNthCalledWith(
         1,
         "success",
         "",
-        "ไลฟ์จบแล้วค่ะ ขอแจ้งรายชื่อลูกค้าที่ให้จัดส่ง มีทั้งหมด 2 ท่าน มีดังนี้ค่ะ",
+        "ไลฟ์จบแล้วค่ะ ขอแจ้งรายชื่อลูกค้าที่ให้จัดส่งรอบวันพุธ (19 ส.ค.) มีทั้งหมด 2 ท่าน มีดังนี้ค่ะ",
         { delayAfter: 800 }
       );
 
@@ -228,7 +238,7 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
       );
     });
 
-    it("announces fallback message when no customers requested shipping", async () => {
+    it("announces fallback message when no customers requested shipping in current cycle", async () => {
       const { get } = await import("firebase/database");
 
       get.mockResolvedValue({ val: () => ({}) });
@@ -239,7 +249,7 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
       expect(mockQueueAudio).toHaveBeenCalledWith(
         null,
         "",
-        "ไลฟ์จบแล้วค่ะ ยังไม่มีรายชื่อลูกค้าที่แจ้งจัดส่งค่ะ ขอบคุณค่ะ",
+        "ไลฟ์จบแล้วค่ะ ยังไม่มีรายชื่อลูกค้าที่แจ้งจัดส่งรอบวันพุธ (19 ส.ค.)ค่ะ ขอบคุณค่ะ",
         { delayAfter: 500 }
       );
     });

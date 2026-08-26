@@ -225,19 +225,33 @@ function getCountdownDays(deliveryDate) {
 }
 
 /**
- * Retrieves all customers who have requested delivery (active with deliveryDate in delivery_customers).
- * Strictly mirrors the list displayed in Shipping Manager under "เฉพาะคนที่แจ้งส่ง".
+ * Retrieves all customers who have requested delivery for the specified shipping cycle (or active cycle).
+ * @param {string|null} targetCycle - Specific cycle (e.g. 'พฤหัส', 'today', '2026-08-27') or 'all'
  * @returns {Promise<Array<{uid: string, name: string, itemCount: number, deliveryDate: string|null, days: number}>>}
  */
-export async function getShippingRequestedCustomers() {
+export async function getShippingRequestedCustomers(targetCycle = null) {
   try {
+    const { resolveShippingCycleDate, formatDateToYYYYMMDD } = await import("./chatParserUtils");
+    const { useSystemStore } = await import("../stores/system");
+    const systemStore = useSystemStore();
+
+    let targetDateStr = null;
+    if (targetCycle && targetCycle !== "all") {
+      const cycleDate = resolveShippingCycleDate(targetCycle);
+      targetDateStr = formatDateToYYYYMMDD(cycleDate);
+    } else if (targetCycle !== "all") {
+      const cycleSetting = systemStore.shippingCycle || "today";
+      const cycleDate = resolveShippingCycleDate(cycleSetting);
+      targetDateStr = formatDateToYYYYMMDD(cycleDate);
+    }
+
     const delCustSnap = await get(dbRef(db, "delivery_customers"));
     const delCustData = delCustSnap ? delCustSnap.val() || {} : {};
 
     const requestedList = [];
 
     // Strictly read from delivery_customers: active (non-done) with deliveryDate set
-    // Exactly matches ShippingManager.vue "เฉพาะคนที่แจ้งส่ง"
+    // Filter strictly by targetDateStr for the current shipping cycle
     Object.entries(delCustData).forEach(([uid, cust]) => {
       if (
         cust &&
@@ -246,6 +260,10 @@ export async function getShippingRequestedCustomers() {
         typeof cust.deliveryDate === "string" &&
         cust.deliveryDate.trim() !== ""
       ) {
+        if (targetDateStr && cust.deliveryDate.trim() !== targetDateStr) {
+          return;
+        }
+
         const rawName = cust.name ? cust.name.trim() : "";
         // 🚨 Exclude Admin accounts (Admin is the seller/operator, not a customer)
         if (rawName && !isAdminUser(rawName)) {
@@ -271,12 +289,12 @@ export async function getShippingRequestedCustomers() {
 }
 
 /**
- * Announces the list of customers requesting delivery with clear pauses between names.
+ * Announces the list of customers requesting delivery for this shipping cycle with clear pauses between names.
  * @param {string|null} videoId - Video ID of current stream
- * @param {Object} options - { force: boolean }
+ * @param {Object} options - { force: boolean, cycle: string|null }
  */
 export async function announceShippingCustomers(videoId = null, options = {}) {
-  const { force = false } = options;
+  const { force = false, cycle = null } = options;
   const now = Date.now();
 
   const { useSystemStore } = await import("../stores/system");
@@ -302,17 +320,21 @@ export async function announceShippingCustomers(videoId = null, options = {}) {
 
   const { useAudio } = await import("../composables/useAudio");
   const { useNicknameStore } = await import("../stores/nickname");
+  const { formatShippingCycleLabel } = await import("./chatParserUtils");
 
   const { queueAudio } = useAudio();
   const nicknameStore = useNicknameStore();
 
-  const customers = await getShippingRequestedCustomers(activeVid);
+  const cycleSetting = cycle || systemStore.shippingCycle || "today";
+  const cycleLabel = formatShippingCycleLabel(cycleSetting);
+
+  const customers = await getShippingRequestedCustomers(cycleSetting);
 
   if (!customers || customers.length === 0) {
     queueAudio(
       null,
       "",
-      "ไลฟ์จบแล้วค่ะ ยังไม่มีรายชื่อลูกค้าที่แจ้งจัดส่งค่ะ ขอบคุณค่ะ",
+      `ไลฟ์จบแล้วค่ะ ยังไม่มีรายชื่อลูกค้าที่แจ้งจัดส่งรอบ${cycleLabel}ค่ะ ขอบคุณค่ะ`,
       { delayAfter: 500 },
     );
     return;
@@ -322,7 +344,7 @@ export async function announceShippingCustomers(videoId = null, options = {}) {
   queueAudio(
     "success",
     "",
-    `ไลฟ์จบแล้วค่ะ ขอแจ้งรายชื่อลูกค้าที่ให้จัดส่ง มีทั้งหมด ${customers.length} ท่าน มีดังนี้ค่ะ`,
+    `ไลฟ์จบแล้วค่ะ ขอแจ้งรายชื่อลูกค้าที่ให้จัดส่งรอบ${cycleLabel} มีทั้งหมด ${customers.length} ท่าน มีดังนี้ค่ะ`,
     { delayAfter: 800 },
   );
 

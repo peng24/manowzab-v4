@@ -39,7 +39,15 @@
         </span>
       </div>
 
-      <button class="btn btn-dark" @click="openHistory" title="ประวัติการจอง">🕒 ประวัติ</button>
+      <!-- 🚚 Shipping Cycle Badge Button (Replaces History button) -->
+      <button
+        class="btn btn-shipping-cycle"
+        @click="openShippingManager"
+        :title="`🚚 รอบจัดส่งหลัก: ${shippingCycleLabel} (คลิกเพื่อเปิดรายการจัดส่ง)`"
+      >
+        <i class="fa-solid fa-truck-fast"></i>
+        <span>{{ shippingCycleLabel }}</span>
+      </button>
 
       <!-- Hero Connect Container -->
       <div :class="['hero-connect-container', { connected: systemStore.isConnected }]">
@@ -159,6 +167,10 @@
               <div class="dropdown-group-title">
                 <i class="fa-solid fa-chart-pie"></i> ข้อมูล & จัดส่ง
               </div>
+              <a @click="handleOpenHistory" class="menu-history">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>ประวัติการจอง</span>
+              </a>
               <a @click="openLiveSummary" class="menu-summary">
                 <i class="fa-solid fa-trophy" style="color: #f59e0b;"></i>
                 <span>สรุปผลการขายไลฟ์</span>
@@ -242,6 +254,7 @@ import ChangelogModal from "./ChangelogModal.vue"; // ✅ Import Changelog Modal
 import LiveSummaryModal from "./LiveSummaryModal.vue"; // ✅ Import Live Summary Modal
 import { announceShippingCustomers } from "../utils/deliverySync";
 import { CONSTANTS } from "../config/constants";
+import { formatShippingCycleLabel } from "../utils/chatParserUtils";
 
 // Logger Configuration (คงเดิม)
 const DEBUG_MODE = false;
@@ -268,6 +281,15 @@ const openDashboard = inject("openDashboard");
 const openHistory = inject("openHistory");
 const openShippingManager = inject("openShippingManager");
 const openPhoneticManager = inject("openPhoneticManager");
+
+const shippingCycleLabel = computed(() => {
+  return formatShippingCycleLabel(systemStore.shippingCycle);
+});
+
+function handleOpenHistory() {
+  if (openHistory) openHistory();
+  showDropdown.value = false;
+}
 
 const videoId = ref("");
 const showDropdown = ref(false);

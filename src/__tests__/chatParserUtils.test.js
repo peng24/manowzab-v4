@@ -16,6 +16,9 @@ import {
   explicitBuyRegex,
   shipDayOfWeekRegex,
   calcNextDayOfWeekDate,
+  resolveShippingCycleDate,
+  formatDateToYYYYMMDD,
+  formatShippingCycleLabel,
 } from "../utils/chatParserUtils";
 
 describe("chatParserUtils", () => {
@@ -317,6 +320,59 @@ describe("chatParserUtils", () => {
       const thuDate = calcNextDayOfWeekDate("พฤหัส", refDate);
       expect(thuDate.getDate()).toBe(6);
       expect(thuDate.getDay()).toBe(4);
+    });
+  });
+
+  describe("🚚 Shipping Cycle (รอบจัดส่ง) Utilities", () => {
+    // Reference Date: Wednesday, Aug 5, 2026 (Day 3)
+    const refWed = new Date(2026, 7, 5); // Wed Aug 5, 2026
+
+    it("resolves 'today', 'วันนี้', and empty cycle setting to reference date", () => {
+      const d1 = resolveShippingCycleDate("today", refWed);
+      expect(formatDateToYYYYMMDD(d1)).toBe("2026-08-05");
+
+      const d2 = resolveShippingCycleDate("", refWed);
+      expect(formatDateToYYYYMMDD(d2)).toBe("2026-08-05");
+
+      const d3 = resolveShippingCycleDate("วันนี้", refWed);
+      expect(formatDateToYYYYMMDD(d3)).toBe("2026-08-05");
+    });
+
+    it("resolves 'tomorrow' / 'พรุ่งนี้' correctly", () => {
+      const d = resolveShippingCycleDate("tomorrow", refWed);
+      expect(formatDateToYYYYMMDD(d)).toBe("2026-08-06");
+
+      const dTh = resolveShippingCycleDate("พรุ่งนี้", refWed);
+      expect(formatDateToYYYYMMDD(dTh)).toBe("2026-08-06");
+    });
+
+    it("resolves specific day of week (e.g. Thursday / พฤหัส) to next occurrence", () => {
+      // From Wed Aug 5 -> Thursday is Aug 6
+      const dThu = resolveShippingCycleDate("พฤหัส", refWed);
+      expect(formatDateToYYYYMMDD(dThu)).toBe("2026-08-06");
+
+      const dThuPrefix = resolveShippingCycleDate("วันพฤหัสบดี", refWed);
+      expect(formatDateToYYYYMMDD(dThuPrefix)).toBe("2026-08-06");
+
+      // From Wed Aug 5 -> Saturday is Aug 8
+      const dSat = resolveShippingCycleDate("เสาร์", refWed);
+      expect(formatDateToYYYYMMDD(dSat)).toBe("2026-08-08");
+
+      // From Wed Aug 5 -> Tuesday is Aug 11 (+6 days)
+      const dTue = resolveShippingCycleDate("อังคาร", refWed);
+      expect(formatDateToYYYYMMDD(dTue)).toBe("2026-08-11");
+    });
+
+    it("resolves specific YYYY-MM-DD date directly", () => {
+      const d = resolveShippingCycleDate("2026-09-15", refWed);
+      expect(formatDateToYYYYMMDD(d)).toBe("2026-09-15");
+    });
+
+    it("formats shipping cycle label correctly in Thai", () => {
+      expect(formatShippingCycleLabel("today", refWed)).toBe("ส่งวันนี้ (5 ส.ค.)");
+      expect(formatShippingCycleLabel("tomorrow", refWed)).toBe("ส่งพรุ่งนี้ (6 ส.ค.)");
+      expect(formatShippingCycleLabel("พฤหัส", refWed)).toBe("วันพฤหัสบดี (6 ส.ค.)");
+      expect(formatShippingCycleLabel("เสาร์", refWed)).toBe("วันเสาร์ (8 ส.ค.)");
     });
   });
 

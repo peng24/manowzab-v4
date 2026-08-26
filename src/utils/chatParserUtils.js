@@ -272,3 +272,83 @@ export function parseIntentDetails(text, liveTimestamp = Date.now()) {
 
   return { type: "UNKNOWN" };
 }
+
+/**
+ * Resolves a shipping cycle setting into a Date object.
+ * @param {string} cycleSetting - 'today', 'tomorrow', day of week (e.g. 'พฤหัส', 'thursday'), or 'YYYY-MM-DD'
+ * @param {Date} [referenceDate=new Date()]
+ * @returns {Date}
+ */
+export function resolveShippingCycleDate(cycleSetting, referenceDate = new Date()) {
+  if (!cycleSetting || cycleSetting === "today" || cycleSetting === "วันนี้") {
+    return new Date(referenceDate);
+  }
+  if (cycleSetting === "tomorrow" || cycleSetting === "พรุ่งนี้") {
+    const d = new Date(referenceDate);
+    d.setDate(d.getDate() + 1);
+    return d;
+  }
+  // Specific YYYY-MM-DD date format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cycleSetting)) {
+    const parts = cycleSetting.split("-").map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  // Clean day of week string e.g. "วันพฤหัส" -> "พฤหัส"
+  const cleanDay = cycleSetting.replace(/^วัน/, "").trim();
+  const dayDate = calcNextDayOfWeekDate(cleanDay, referenceDate);
+  if (dayDate) {
+    return dayDate;
+  }
+  // English day fallback
+  const enDayMap = {
+    sunday: "อาทิตย์",
+    monday: "จันทร์",
+    tuesday: "อังคาร",
+    wednesday: "พุธ",
+    thursday: "พฤหัส",
+    friday: "ศุกร์",
+    saturday: "เสาร์",
+  };
+  if (enDayMap[cycleSetting.toLowerCase()]) {
+    return calcNextDayOfWeekDate(enDayMap[cycleSetting.toLowerCase()], referenceDate);
+  }
+  return new Date(referenceDate);
+}
+
+/**
+ * Formats a Date object to YYYY-MM-DD string
+ * @param {Date} d
+ * @returns {string}
+ */
+export function formatDateToYYYYMMDD(d) {
+  if (!d || isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Returns a human-friendly Thai label for the shipping cycle (e.g. "วันพฤหัสบดี (28 ส.ค.)")
+ * @param {string} cycleSetting
+ * @param {Date} [referenceDate=new Date()]
+ * @returns {string}
+ */
+export function formatShippingCycleLabel(cycleSetting, referenceDate = new Date()) {
+  const dateObj = resolveShippingCycleDate(cycleSetting, referenceDate);
+  const thaiMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  const thaiDays = ["วันอาทิตย์", "วันจันทร์", "วันอังคาร", "วันพุธ", "วันพฤหัสบดี", "วันศุกร์", "วันเสาร์"];
+  
+  const dayName = thaiDays[dateObj.getDay()];
+  const dayNum = dateObj.getDate();
+  const monthName = thaiMonths[dateObj.getMonth()];
+
+  if (!cycleSetting || cycleSetting === "today" || cycleSetting === "วันนี้") {
+    return `ส่งวันนี้ (${dayNum} ${monthName})`;
+  }
+  if (cycleSetting === "tomorrow" || cycleSetting === "พรุ่งนี้") {
+    return `ส่งพรุ่งนี้ (${dayNum} ${monthName})`;
+  }
+  return `${dayName} (${dayNum} ${monthName})`;
+}
+

@@ -44,6 +44,32 @@
       </div>
     </div>
 
+    <!-- ============ SHIPPING CYCLE SELECTOR ============ -->
+    <div class="sp-cycle-wrap">
+      <div class="sp-cycle-info">
+        <span class="sp-cycle-ico">🚚</span>
+        <span class="sp-cycle-title">รอบจัดส่งหลัก:</span>
+        <span class="sp-cycle-badge">{{ currentCycleLabel }}</span>
+      </div>
+      <div class="sp-cycle-select-wrap">
+        <select
+          class="sp-cycle-select"
+          :value="shippingCycle"
+          @change="onShippingCycleChange($event.target.value)"
+        >
+          <option value="today">📅 ส่งวันนี้</option>
+          <option value="tomorrow">⏭️ ส่งพรุ่งนี้</option>
+          <option value="จันทร์">วันจันทร์</option>
+          <option value="อังคาร">วันอังคาร</option>
+          <option value="พุธ">วันพุธ</option>
+          <option value="พฤหัส">วันพฤหัสบดี</option>
+          <option value="ศุกร์">วันศุกร์</option>
+          <option value="เสาร์">วันเสาร์</option>
+          <option value="อาทิตย์">วันอาทิตย์</option>
+        </select>
+      </div>
+    </div>
+
     <!-- ============ QUICK ADD (Collapsible) ============ -->
     <div class="sp-add-wrap">
       <button class="sp-add-toggle" @click="showAddForm = !showAddForm">
@@ -205,6 +231,13 @@ import { ref as dbRef, onValue, update, remove, runTransaction } from "firebase/
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import ThaiDatePicker from "../components/ThaiDatePicker.vue";
+import {
+  resolveShippingCycleDate,
+  formatDateToYYYYMMDD,
+  formatShippingCycleLabel,
+  shipDayOfWeekRegex,
+  calcNextDayOfWeekDate,
+} from "../utils/chatParserUtils";
 
 // ====== State ======
 const allCustomers = ref([]);
@@ -215,9 +248,28 @@ const showAddForm = ref(false);
 const searchQuery = ref("");
 const activeFilter = ref("requested");
 const isRefreshing = ref(false);
+const shippingCycle = ref("today");
 const cleanupFns = [];
 
+const currentCycleLabel = computed(() => {
+  return formatShippingCycleLabel(shippingCycle.value);
+});
+
+async function onShippingCycleChange(newCycle) {
+  shippingCycle.value = newCycle || "today";
+  await update(dbRef(db), { "settings/shippingCycle": newCycle || "today" });
+  Swal.fire({
+    icon: "success",
+    title: `🚚 ตั้งรอบจัดส่งหลักเป็น: ${formatShippingCycleLabel(newCycle)}`,
+    toast: true,
+    position: "top-end",
+    timer: 1800,
+    showConfirmButton: false,
+  });
+}
+
 const baseUrl = computed(() => import.meta.env.BASE_URL || '/');
+
 
 // ====== Date Formatting ======
 const thaiMonths = [
@@ -296,6 +348,12 @@ onMounted(() => {
     }));
   });
   cleanupFns.push(unsubListener);
+
+  const cycleRef = dbRef(db, "settings/shippingCycle");
+  const unsubCycle = onValue(cycleRef, (snapshot) => {
+    shippingCycle.value = snapshot.val() || "today";
+  });
+  cleanupFns.push(unsubCycle);
 });
 
 onUnmounted(() => {
@@ -453,12 +511,14 @@ function addManualCustomer() {
 
   const shipNowMatch = name.match(/ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])ส่ง(?:$|[^\u0E00-\u0E7F\w])/);
   const shipTmrMatch = name.match(/ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/);
+  const shipDayOfWeekMatch = name.match(shipDayOfWeekRegex);
   const shipDateMatch = name.match(/ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/);
 
   let matchedKeyword = null;
-  if (shipNowMatch) matchedKeyword = shipNowMatch[0];
-  else if (shipTmrMatch) matchedKeyword = shipTmrMatch[0];
+  if (shipTmrMatch) matchedKeyword = shipTmrMatch[0];
+  else if (shipDayOfWeekMatch) matchedKeyword = shipDayOfWeekMatch[0];
   else if (shipDateMatch) matchedKeyword = shipDateMatch[0];
+  else if (shipNowMatch) matchedKeyword = shipNowMatch[0];
 
   if (matchedKeyword) {
     let cleanName = name.replace(matchedKeyword, "").replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "").trim();
@@ -466,9 +526,12 @@ function addManualCustomer() {
 
     if (!newDate.value) {
       let autoShipDate = new Date();
-      if (shipNowMatch) { /* today */ }
-      else if (shipTmrMatch) { autoShipDate.setDate(autoShipDate.getDate() + 1); }
-      else if (shipDateMatch) {
+      if (shipTmrMatch) {
+        autoShipDate.setDate(autoShipDate.getDate() + 1);
+      } else if (shipDayOfWeekMatch) {
+        const dayName = shipDayOfWeekMatch[1];
+        autoShipDate = calcNextDayOfWeekDate(dayName);
+      } else if (shipDateMatch) {
         const day = parseInt(shipDateMatch[1]);
         autoShipDate.setDate(day);
         const monthStr = shipDateMatch[2];
@@ -483,17 +546,16 @@ function addManualCustomer() {
         if (autoShipDate < new Date() && (new Date().getDate() - day) > 15) {
           autoShipDate.setMonth(autoShipDate.getMonth() + 1);
         }
+      } else if (shipNowMatch) {
+        autoShipDate = resolveShippingCycleDate(shippingCycle.value);
       }
-      const y = autoShipDate.getFullYear();
-      const m = String(autoShipDate.getMonth() + 1).padStart(2, '0');
-      const d = String(autoShipDate.getDate()).padStart(2, '0');
-      parsedDate = `${y}-${m}-${d}`;
+      parsedDate = formatDateToYYYYMMDD(autoShipDate);
     }
   }
 
   if (!parsedDate) {
-    const today = new Date();
-    parsedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const cycleDate = resolveShippingCycleDate(shippingCycle.value);
+    parsedDate = formatDateToYYYYMMDD(cycleDate);
   }
 
   let targetUid = "manual-" + Date.now();
@@ -766,6 +828,74 @@ body {
 
 .sp-chip.active .sp-chip-n {
   background: rgba(99,102,241,0.25);
+}
+
+/* ======== SHIPPING CYCLE ======== */
+.sp-cycle-wrap {
+  margin: 4px 14px 6px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sp-cycle-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sp-cycle-ico {
+  font-size: 0.95em;
+  flex-shrink: 0;
+}
+
+.sp-cycle-title {
+  font-size: 0.75em;
+  color: #818cf8;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sp-cycle-badge {
+  font-size: 0.72em;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #c7d2fe;
+  padding: 1px 7px;
+  border-radius: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.sp-cycle-select-wrap {
+  flex-shrink: 0;
+}
+
+.sp-cycle-select {
+  background: #181824;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #fff;
+  padding: 3px 6px;
+  font-family: inherit;
+  font-size: 0.72em;
+  outline: none;
+  cursor: pointer;
+}
+
+.sp-cycle-select:focus {
+  border-color: #6366f1;
 }
 
 /* ======== QUICK ADD ======== */

@@ -24,6 +24,7 @@ export const useSystemStore = defineStore("system", () => {
 
   const useOnlineTts = ref(true); // ✅ เปิด/ปิด Online TTS (Google Cloud) - Default ON
   const activeKeyIndex = ref(1); // ✅ Track which API key is currently active
+  const shippingCycle = ref("today"); // ✅ รอบจัดส่งเริ่มต้น ('today' | 'tomorrow' | 'พฤหัส' etc. | 'YYYY-MM-DD')
 
   // Status Indicators (ok, warn, err, working)
   const statusDb = ref("err");
@@ -149,6 +150,24 @@ export const useSystemStore = defineStore("system", () => {
       update(myConnectionRef, { ttsKey: activeKeyIndex.value }).catch(()=> {});
   }
 
+  // ✅ Shipping Cycle Listener (Real-Time Sync)
+  function initShippingCycleListener() {
+    const cycleRef = dbRef(db, "settings/shippingCycle");
+    return onValue(cycleRef, (snapshot) => {
+      const val = snapshot.val();
+      shippingCycle.value = val || "today";
+      logger.log(`🚚 Shipping Cycle updated: ${shippingCycle.value}`);
+    });
+  }
+
+  // ✅ Set and Sync Shipping Cycle to Firebase
+  async function setShippingCycle(cycle) {
+    const val = cycle || "today";
+    shippingCycle.value = val;
+    await update(dbRef(db), { "settings/shippingCycle": val });
+    logger.success(`🚚 Shipping Cycle saved to Firebase: ${val}`);
+  }
+
   return {
     isConnected,
     currentVideoId,
@@ -177,5 +196,9 @@ export const useSystemStore = defineStore("system", () => {
     googleApiKey, // ✅ Export (from .env)
     useOnlineTts, // ✅ Export
     activeKeyIndex, // ✅ Export
+    shippingCycle, // ✅ Export
+    initShippingCycleListener, // ✅ Export
+    setShippingCycle, // ✅ Export
   };
 });
+

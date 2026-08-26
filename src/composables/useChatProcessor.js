@@ -56,6 +56,8 @@ import {
   standalonePassRegex,
   shipDayOfWeekRegex,
   calcNextDayOfWeekDate,
+  resolveShippingCycleDate,
+  formatDateToYYYYMMDD,
   numberWithQuestionRegex,
   negationGuardRegex,
   thaiToArabic,
@@ -550,9 +552,9 @@ export function useChatProcessor() {
           autoShipDate.setMonth(autoShipDate.getMonth() + 1);
         }
       } else if ((shipNowMatch || /โอนแล้ว|แจ้งโอน|สลิป/.test(normalizedMsg)) && !holdRegex.test(normalizedMsg)) {
-        // Default to Today ONLY for explicit ship/transfer keywords AND NOT a hold request
+        // Default to active Shipping Cycle (e.g. Thursday, Today, etc.) for explicit ship/transfer keywords AND NOT a hold request
         isAutoShip = true;
-        autoShipDate = new Date();
+        autoShipDate = resolveShippingCycleDate(systemStore.shippingCycle);
       }
 
       if (isAutoShip && autoShipName && !isAdminUser(autoShipName)) {

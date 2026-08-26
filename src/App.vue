@@ -163,7 +163,11 @@ onMounted(async () => {
   const unsubDetector = systemStore.initPriceDetectorListener(); // ✅ Init Price Detector Listener
   if (unsubDetector) cleanupFns.push(unsubDetector);
 
+  const unsubShippingCycle = systemStore.initShippingCycleListener(); // ✅ Init Shipping Cycle Listener
+  if (unsubShippingCycle) cleanupFns.push(unsubShippingCycle);
+
   voiceLearningStore.initVoicePatterns(); // ✅ Init Voice Patterns Self-Learning
+
 
   // ✅ Reset Connection State (Ensure YouTube starts disconnected)
   systemStore.isConnected = false;

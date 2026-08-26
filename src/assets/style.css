@@ -467,6 +467,25 @@ body {
   color: #888;
 }
 
+.btn-shipping-cycle {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(139, 92, 246, 0.22) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  color: #c7d2fe;
+  font-weight: 600;
+  font-size: 0.9em;
+  padding: 6px 12px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+}
+
+.btn-shipping-cycle:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.38) 0%, rgba(139, 92, 246, 0.38) 100%);
+  border-color: rgba(139, 92, 246, 0.8);
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.4);
+  transform: translateY(-1.5px);
+}
+
 .shipping-mgr-icon {
   position: relative;
   font-size: 2em;
@@ -1854,6 +1873,10 @@ body {
 
 .menu-shipping-page i {
   background: linear-gradient(135deg, #0284c7, #0369a1);
+}
+
+.menu-history i, .menu-history-page i {
+  background: linear-gradient(135deg, #a855f7, #7e22ce);
 }
 
 /* Active breathing glow states for simulation and away mode */

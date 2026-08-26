@@ -11,6 +11,12 @@
           <h1 class="sp-title">รายการจัดส่ง</h1>
         </div>
         <div class="sp-header-actions">
+          <button class="sp-header-act-btn print" @click="showShippingLabels = true" title="พิมพ์ใบปะหน้าพัสดุ">
+            <i class="fa-solid fa-print"></i> ปริ้นใบปะหน้า
+          </button>
+          <button class="sp-header-act-btn import" @click="showAddressImport = true" title="นำเข้าที่อยู่จาก Note / แชท">
+            <i class="fa-solid fa-file-import"></i> นำเข้าที่อยู่
+          </button>
           <button class="sp-icon-btn" @click="refreshData" title="รีเฟรช">
             <i class="fa-solid fa-arrows-rotate" :class="{ 'fa-spin': isRefreshing }"></i>
           </button>
@@ -180,7 +186,28 @@
             </span>
           </div>
 
-          <!-- Row 3: Note (compact) -->
+          <!-- Row 3: Address Indicator (Sleek & Subtle) -->
+          <div class="sp-row-addr">
+            <span
+              class="sp-addr-mini-pill"
+              :class="hasAddress(c) ? 'has' : 'none'"
+              @click="selectedCustomerForAddress = c"
+              :title="hasAddress(c) ? getCustomerAddressSummary(c) : 'กดเพื่อใส่ที่อยู่ลูกค้า'"
+            >
+              <i class="fa-solid fa-location-dot"></i>
+              <span>
+                <template v-if="hasAddress(c)">
+                  <span v-if="getCustomerAddressCount(c) > 1" class="multi-count">({{ getCustomerAddressCount(c) }} ที่อยู่) </span>
+                  {{ c.recipientName ? `ผู้รับ: ${c.recipientName}` : 'มีที่อยู่' }}
+                </template>
+                <template v-else>
+                  ยังไม่มีที่อยู่
+                </template>
+              </span>
+            </span>
+          </div>
+
+          <!-- Row 4: Note (compact) -->
           <div class="sp-row3" v-if="c.note || c.status !== 'done'">
             <input
               type="text"
@@ -229,6 +256,29 @@
         {{ activeCustomers.length }} รายการ · {{ totalItemCount }} ชิ้น
       </span>
     </div>
+
+    <!-- 🖨️ Shipping Label Print Modal -->
+    <ShippingLabelModal
+      v-if="showShippingLabels"
+      :customers="allCustomers"
+      :addressBook="addressBook"
+      @close="showShippingLabels = false"
+    />
+
+    <!-- 📥 Address Import Modal -->
+    <AddressImportModal
+      v-if="showAddressImport"
+      :customers="allCustomers"
+      @close="showAddressImport = false"
+    />
+
+    <!-- 📍 Multiple Address Manager Modal -->
+    <CustomerAddressModal
+      v-if="selectedCustomerForAddress"
+      :customer="selectedCustomerForAddress"
+      :addressBook="addressBook"
+      @close="selectedCustomerForAddress = null"
+    />
     </template>
   </div>
 </template>
@@ -241,6 +291,10 @@ import { ref as dbRef, onValue, update, remove, runTransaction } from "firebase/
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import ThaiDatePicker from "../components/ThaiDatePicker.vue";
+import ShippingLabelModal from "../components/ShippingLabelModal.vue";
+import AddressImportModal from "../components/AddressImportModal.vue";
+import CustomerAddressModal from "../components/CustomerAddressModal.vue";
+import { normalizeName } from "../utils/addressParser";
 import {
   resolveShippingCycleDate,
   formatDateToYYYYMMDD,
@@ -260,6 +314,10 @@ const searchQuery = ref("");
 const activeFilter = ref("requested");
 const isRefreshing = ref(false);
 const shippingCycle = ref("today");
+const showShippingLabels = ref(false);
+const showAddressImport = ref(false);
+const selectedCustomerForAddress = ref(null);
+const addressBook = ref({});
 const cleanupFns = [];
 
 async function handleLogout() {
@@ -385,6 +443,12 @@ onMounted(() => {
   });
   cleanupFns.push(unsubListener);
 
+  const addressBookRef = dbRef(db, "address_book");
+  const unsubAddressBook = onValue(addressBookRef, (snapshot) => {
+    addressBook.value = snapshot.val() || {};
+  });
+  cleanupFns.push(unsubAddressBook);
+
   const cycleRef = dbRef(db, "settings/shippingCycle");
   const unsubCycle = onValue(cycleRef, (snapshot) => {
     shippingCycle.value = snapshot.val() || "today";
@@ -396,6 +460,54 @@ onUnmounted(() => {
   cleanupFns.forEach(fn => { if (typeof fn === 'function') fn(); });
   cleanupFns.length = 0;
 });
+
+// ====== Address Helpers ======
+function getCustomerSavedAddresses(customer) {
+  if (!customer) return [];
+  const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  const inCust = customer.addresses;
+  const inBook = addressBook.value && addressBook.value[norm]?.addresses;
+  const list = inCust || inBook;
+  if (Array.isArray(list) && list.length > 0) return list;
+  if (hasAddress(customer)) return [getCustomerAddressInfo(customer)];
+  return [];
+}
+
+function getCustomerAddressCount(customer) {
+  return getCustomerSavedAddresses(customer).length;
+}
+
+function getCustomerAddressInfo(customer) {
+  if (customer.address && customer.address.trim()) {
+    return {
+      recipientName: customer.recipientName || "",
+      phone: customer.phone || "",
+      address: customer.address || "",
+      postalCode: customer.postalCode || "",
+    };
+  }
+  const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  if (addressBook.value && addressBook.value[norm]) {
+    return addressBook.value[norm];
+  }
+  return null;
+}
+
+function hasAddress(customer) {
+  const info = getCustomerAddressInfo(customer);
+  return !!(info && info.address && info.address.trim());
+}
+
+function getCustomerAddressSummary(customer) {
+  const info = getCustomerAddressInfo(customer);
+  if (!info || !info.address) return "";
+  const recipientPart = info.recipientName && info.recipientName !== customer.name ? `[ผู้รับ: ${info.recipientName}] ` : "";
+  return `${recipientPart}${info.phone ? info.phone + ' • ' : ''}${info.address}`;
+}
+
+function promptEditAddress(customer) {
+  selectedCustomerForAddress.value = customer;
+}
 
 // ====== Computed ======
 const activeCustomers = computed(() =>
@@ -1267,6 +1379,90 @@ body {
 .sp-item-anim-enter-from { opacity: 0; transform: translateY(-8px); }
 .sp-item-anim-leave-to { opacity: 0; transform: translateX(20px); }
 .sp-item-anim-move { transition: transform 0.25s ease; }
+
+/* ======== HEADER ACTION BUTTONS ======== */
+.sp-header-act-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.72em;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.sp-header-act-btn.print {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.sp-header-act-btn.print:hover {
+  background: #2563eb;
+}
+
+.sp-header-act-btn.import {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #93c5fd;
+}
+
+.sp-header-act-btn.import:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: #3b82f6;
+}
+
+/* ======== ADDRESS INDICATOR IN CARD ======== */
+.sp-row-addr {
+  margin-top: 3px;
+  margin-bottom: 2px;
+}
+
+.sp-addr-mini-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7em;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  line-height: 1.4;
+}
+
+.sp-addr-mini-pill.has {
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.sp-addr-mini-pill.has:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+}
+
+.sp-addr-mini-pill.none {
+  background: rgba(255, 255, 255, 0.03);
+  color: #71717a;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.sp-addr-mini-pill.none:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.multi-count {
+  font-weight: 700;
+  color: #60a5fa;
+  margin-right: 2px;
+}
 
 /* ======== TABLET+ ======== */
 @media (min-width: 600px) {

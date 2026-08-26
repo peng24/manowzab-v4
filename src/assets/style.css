@@ -1858,19 +1858,39 @@ body {
 }
 
 @media print {
+  /* Hide all background UI elements when printing */
   .header,
   .tools-bar,
   .btn,
-  .dropdown {
+  .dropdown,
+  .chat-panel,
+  .dashboard-container,
+  .main-layout,
+  .stock-section,
+  .note-banner,
+  .status-cluster,
+  .stat-card,
+  .sm-content,
+  .sp-toolbar,
+  .sp-list-container,
+  .sp-footer {
     display: none !important;
   }
 
-  .stock-grid {
-    display: block;
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 
-  .stock-item {
-    break-inside: avoid;
+  .dashboard-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
   }
 }
 

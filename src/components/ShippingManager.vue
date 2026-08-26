@@ -4,7 +4,13 @@
       <!-- Header -->
       <div class="sm-header">
         <div class="sm-title">📦 รายการจัดส่ง</div>
-        <div style="display: flex; gap: 8px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-primary sm-head-btn" @click="showShippingLabels = true" title="พิมพ์ใบปะหน้าพัสดุ">
+            <i class="fa-solid fa-print"></i> 🖨️ ปริ้นใบปะหน้า
+          </button>
+          <button class="btn btn-dark sm-head-btn" @click="showAddressImport = true" title="นำเข้าที่อยู่จาก Apple Note หรือแชท">
+            <i class="fa-solid fa-file-import"></i> 📥 นำเข้าที่อยู่
+          </button>
           <button class="btn btn-dark" @click="$emit('close')">ปิด</button>
         </div>
       </div>
@@ -168,6 +174,25 @@
                 <div class="lifetime-bookings" v-if="c.totalBookings > 0">
                   ลูกค้าประจำ • เคยสั่งรวม {{ c.totalBookings }} ชิ้น
                 </div>
+                <div class="sm-addr-row">
+                  <span
+                    class="sm-addr-mini-pill"
+                    :class="hasAddress(c) ? 'has' : 'none'"
+                    @click="selectedCustomerForAddress = c"
+                    :title="hasAddress(c) ? getCustomerAddressSummary(c) : 'คลิกเพื่อใส่ที่อยู่ลูกค้าคนนี้'"
+                  >
+                    <i class="fa-solid fa-location-dot"></i>
+                    <span class="pill-text">
+                      <template v-if="hasAddress(c)">
+                        <span v-if="getCustomerAddressCount(c) > 1" class="multi-count">({{ getCustomerAddressCount(c) }} ที่อยู่) </span>
+                        {{ c.recipientName ? `ผู้รับ: ${c.recipientName}` : 'มีที่อยู่' }}
+                      </template>
+                      <template v-else>
+                        ยังไม่มีที่อยู่
+                      </template>
+                    </span>
+                  </span>
+                </div>
               </td>
               <td class="td-center">
                 <span class="item-count-auto" :title="getSessionBreakdown(c)">
@@ -264,6 +289,14 @@
               📦 สินค้า: {{ c.itemCount || 0 }} ชิ้น
               <span v-if="c.deliveryDate"> • ส่ง {{ formatThaiDate(c.deliveryDate) }}</span>
             </div>
+            <div class="sm-card-addr">
+              <span v-if="hasAddress(c)" class="sm-addr-tag has" :title="getCustomerAddressSummary(c)">
+                📍 {{ getCustomerAddressSummary(c) }}
+              </span>
+              <span v-else class="sm-addr-tag none" @click="promptEditAddress(c)">
+                + ใส่ที่อยู่
+              </span>
+            </div>
             <div class="sm-card-footer">
               <div style="font-size: 0.85em; color: #94a3b8;">{{ c.note || 'ไม่มีโน้ต' }}</div>
               <div class="action-btns">
@@ -298,6 +331,29 @@
         </label>
       </div>
     </div>
+
+    <!-- 🖨️ Shipping Label Print Modal -->
+    <ShippingLabelModal
+      v-if="showShippingLabels"
+      :customers="allCustomers"
+      :addressBook="addressBook"
+      @close="showShippingLabels = false"
+    />
+
+    <!-- 📥 Address Import Modal -->
+    <AddressImportModal
+      v-if="showAddressImport"
+      :customers="allCustomers"
+      @close="showAddressImport = false"
+    />
+
+    <!-- 📍 Multiple Address Manager Modal -->
+    <CustomerAddressModal
+      v-if="selectedCustomerForAddress"
+      :customer="selectedCustomerForAddress"
+      :addressBook="addressBook"
+      @close="selectedCustomerForAddress = null"
+    />
   </div>
 </template>
 
@@ -309,6 +365,10 @@ import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import Swal from "sweetalert2";
 import ThaiDatePicker from "./ThaiDatePicker.vue";
+import ShippingLabelModal from "./ShippingLabelModal.vue";
+import AddressImportModal from "./AddressImportModal.vue";
+import CustomerAddressModal from "./CustomerAddressModal.vue";
+import { normalizeName, parseSingleAddress } from "../utils/addressParser";
 import {
   resolveShippingCycleDate,
   formatDateToYYYYMMDD,
@@ -328,6 +388,10 @@ const newName = ref("");
 const newDate = ref("");
 const showDone = ref(false);
 const viewMode = ref("requested"); // 'requested' | 'unassigned' | 'all'
+const showShippingLabels = ref(false);
+const showAddressImport = ref(false);
+const selectedCustomerForAddress = ref(null);
+const addressBook = ref({});
 const cleanupFns = [];
 
 const currentCycleLabel = computed(() => {
@@ -441,6 +505,12 @@ onMounted(() => {
   });
   cleanupFns.push(unsubListener);
 
+  const addressBookRef = dbRef(db, "address_book");
+  const unsubAddressBook = onValue(addressBookRef, (snapshot) => {
+    addressBook.value = snapshot.val() || {};
+  });
+  cleanupFns.push(unsubAddressBook);
+
   const unsubCycle = systemStore.initShippingCycleListener();
   if (unsubCycle) cleanupFns.push(unsubCycle);
 });
@@ -455,7 +525,53 @@ onUnmounted(() => {
   console.log("🧹 Memory Cleaned Up!");
 });
 
+// Address Helpers
+function getCustomerSavedAddresses(customer) {
+  if (!customer) return [];
+  const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  const inCust = customer.addresses;
+  const inBook = addressBook.value && addressBook.value[norm]?.addresses;
+  const list = inCust || inBook;
+  if (Array.isArray(list) && list.length > 0) return list;
+  if (hasAddress(customer)) return [getCustomerAddressInfo(customer)];
+  return [];
+}
 
+function getCustomerAddressCount(customer) {
+  return getCustomerSavedAddresses(customer).length;
+}
+
+function getCustomerAddressInfo(customer) {
+  if (customer.address && customer.address.trim()) {
+    return {
+      recipientName: customer.recipientName || "",
+      phone: customer.phone || "",
+      address: customer.address || "",
+      postalCode: customer.postalCode || "",
+    };
+  }
+  const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  if (addressBook.value && addressBook.value[norm]) {
+    return addressBook.value[norm];
+  }
+  return null;
+}
+
+function hasAddress(customer) {
+  const info = getCustomerAddressInfo(customer);
+  return !!(info && info.address && info.address.trim());
+}
+
+function getCustomerAddressSummary(customer) {
+  const info = getCustomerAddressInfo(customer);
+  if (!info || !info.address) return "";
+  const recipientPart = info.recipientName && info.recipientName !== customer.name ? `[ผู้รับ: ${info.recipientName}] ` : "";
+  return `${recipientPart}${info.phone ? info.phone + ' • ' : ''}${info.address}`;
+}
+
+function promptEditAddress(customer) {
+  selectedCustomerForAddress.value = customer;
+}
 
 // Computed
 const activeCustomers = computed(() =>
@@ -1143,6 +1259,66 @@ function deleteCustomer(id, name) {
 
 .sm-toggle input { accent-color: #3b82f6; }
 
+/* Header Action Buttons */
+.sm-head-btn {
+  padding: 6px 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Subtle Address Pill in Table & Card */
+.sm-addr-row, .sm-card-addr {
+  margin-top: 4px;
+}
+
+.sm-addr-mini-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72em;
+  font-weight: 500;
+  padding: 1px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  line-height: 1.4;
+}
+
+.sm-addr-mini-pill.has {
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.sm-addr-mini-pill.has:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+}
+
+.sm-addr-mini-pill.none {
+  background: rgba(255, 255, 255, 0.03);
+  color: #71717a;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.sm-addr-mini-pill.none:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.multi-count {
+  font-weight: 700;
+  color: #60a5fa;
+  margin-right: 2px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .sm-content { padding: 14px; }
@@ -1153,5 +1329,18 @@ function deleteCustomer(id, name) {
   .sm-date { max-width: unset; min-width: 100%; }
   .sm-table { font-size: 0.75em; }
   .sm-note { max-width: 100px; }
+  .sm-head-btn { font-size: 0.75em; padding: 4px 8px; }
+}
+
+/* Print Clean Setup */
+@media print {
+  .sm-content {
+    display: none !important;
+  }
+  .dashboard-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
 }
 </style>

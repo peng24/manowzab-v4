@@ -1,0 +1,260 @@
+import { thaiToArabic } from './chatParserUtils';
+
+/**
+ * Normalizes customer name for flexible matching (case-insensitive, trim whitespace)
+ * @param {string} name
+ * @returns {string}
+ */
+export function normalizeName(name) {
+  if (!name) return '';
+  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Formats a 10-digit or 9-digit Thai phone number with dashes (e.g. 081-234-5678)
+ * @param {string} phone
+ * @returns {string}
+ */
+export function formatPhoneNumber(phone) {
+  if (!phone) return '';
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('66') && cleaned.length >= 11) {
+    cleaned = '0' + cleaned.substring(2);
+  }
+  if (cleaned.length === 10) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  if (cleaned.length === 9) {
+    return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 5)}-${cleaned.slice(5)}`;
+  }
+  return phone.trim();
+}
+
+/**
+ * Extracts phone numbers from a block of text
+ * @param {string} text
+ * @returns {{ phone: string, cleanedText: string }}
+ */
+export function extractPhone(text) {
+  if (!text) return { phone: '', cleanedText: '' };
+
+  // Match 0xx-xxx-xxxx, 0xxxxxxxxx, +66xxxxxxxxx, 02-xxx-xxxx
+  const phoneRegex = /(?:(?:\+66|0)[-\s]?\d{1,2}[-\s]?\d{3}[-\s]?\d{4}|\b0[689]\d{8}\b|\b0[2-7]\d{7}\b)/;
+  const match = text.match(phoneRegex);
+
+  if (match) {
+    const rawPhone = match[0];
+    const phone = formatPhoneNumber(rawPhone);
+    // Remove the phone from text to avoid picking it up as address/name
+    const cleanedText = text.replace(rawPhone, '').replace(/\b(?:เบอร์(?:โทร)?|โทร|Tel|phone)[:\s-]*/i, '').trim();
+    return { phone, cleanedText };
+  }
+
+  return { phone: '', cleanedText: text };
+}
+
+/**
+ * Extracts 5-digit Thai postal code
+ * @param {string} text
+ * @returns {{ postalCode: string, cleanedText: string }}
+ */
+export function extractPostalCode(text) {
+  if (!text) return { postalCode: '', cleanedText: '' };
+
+  // 5-digit postal code (Thai postal codes are 10000 - 96000)
+  const zipRegex = /\b[1-9]\d{4}\b/;
+  const match = text.match(zipRegex);
+
+  if (match) {
+    return { postalCode: match[0], cleanedText: text };
+  }
+  return { postalCode: '', cleanedText: text };
+}
+
+/**
+ * Parses a single customer address block (multi-line or single-line)
+ * @param {string} rawBlock
+ * @returns {object} { name, phone, address, postalCode, fullAddress, rawText }
+ */
+export function parseSingleAddress(rawBlock) {
+  if (!rawBlock || !rawBlock.trim()) return null;
+
+  let text = thaiToArabic(rawBlock).trim();
+
+  // Strip leading list numbers like "1.", "1)", "1 - "
+  text = text.replace(/^\s*\d+[\.\)\-]\s*/, '');
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  let name = '';
+  let phone = '';
+  let address = '';
+  let postalCode = '';
+
+  // Extract phone first from full text
+  const phoneResult = extractPhone(text);
+  phone = phoneResult.phone;
+
+  // Extract postal code
+  const zipResult = extractPostalCode(text);
+  postalCode = zipResult.postalCode;
+
+  if (lines.length >= 2) {
+    // Multi-line format:
+    // Line 1 is usually Name (or "ชื่อ: ...", "ผู้รับ: ...")
+    let firstLine = lines[0];
+    firstLine = firstLine.replace(/^(?:ชื่อลูกค้า|ชื่อผู้รับ|ผู้รับ|ชื่อ|Name|Customer|To)\s*[:\-]\s*/i, '').trim();
+
+    // Check if first line contains phone
+    const firstLinePhone = extractPhone(firstLine);
+    if (firstLinePhone.phone && !phone) {
+      phone = firstLinePhone.phone;
+      firstLine = firstLinePhone.cleanedText;
+    } else if (firstLinePhone.phone) {
+      firstLine = firstLinePhone.cleanedText;
+    }
+
+    name = firstLine.trim();
+
+    // Remaining lines make up the address and potentially phone
+    const remainingLines = lines.slice(1);
+    const addressParts = [];
+
+    for (let line of remainingLines) {
+      let cleaned = line
+        .replace(/^(?:ที่อยู่|ที่อยู่จัดส่ง|ส่งที่|Address)[:\s-]*/i, '')
+        .replace(/^(?:เบอร์(?:โทร)?|โทร|Tel|Phone)[:\s-]*/i, '')
+        .trim();
+
+      // Check if this line is purely a phone number
+      const linePhone = extractPhone(cleaned);
+      if (linePhone.phone && !phone) {
+        phone = linePhone.phone;
+        cleaned = linePhone.cleanedText;
+      } else if (linePhone.phone && cleaned.replace(/\D/g, '').length >= 9) {
+        // Line was just phone number
+        cleaned = linePhone.cleanedText;
+      }
+
+      if (cleaned) {
+        addressParts.push(cleaned);
+      }
+    }
+
+    address = addressParts.join(' ');
+  } else {
+    // Single line format: "สมชาย ใจดี 0812345678 123/45 ถ.สุขุมวิท กทม 10110"
+    let singleLine = phoneResult.cleanedText;
+
+    // Detect Name at beginning (usually 1-3 words before house numbers / addresses)
+    // House number indicator regex: \d+\/\d+|\d+|หมู่|ม\.|บ้านเลขที่|ต\.|อ\.|จ\.
+    const addressStartMatch = singleLine.match(/(?:\s|^)(?:\d+\/\d+|\b\d+\b(?=\s*(?:หมู่|ม\.|ซอย|ซ\.|ถนน|ถ\.))|หมู่|ม\.|บ้านเลขที่|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|กทม)/i);
+
+    if (addressStartMatch && addressStartMatch.index > 0) {
+      name = singleLine.substring(0, addressStartMatch.index).replace(/^(?:ชื่อลูกค้า|ชื่อผู้รับ|ผู้รับ|ชื่อ|Name|Customer|To)\s*[:\-]\s*/i, '').trim();
+      address = singleLine.substring(addressStartMatch.index).replace(/^(?:ที่อยู่|ส่งที่|Address)\s*[:\-]\s*/i, '').trim();
+    } else {
+      // Fallback: take first 2 words as name
+      const words = singleLine.split(/\s+/);
+      if (words.length > 2) {
+        name = words.slice(0, 2).join(' ');
+        address = words.slice(2).join(' ');
+      } else {
+        name = words[0] || '';
+        address = words.slice(1).join(' ') || '';
+      }
+    }
+  }
+
+  // Clean up address
+  address = address.replace(/\s+/g, ' ').trim();
+  name = name.replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, '').trim();
+
+  const fullAddress = [name, phone, address].filter(Boolean).join('\n');
+
+  return {
+    name,
+    recipientName: name,
+    phone,
+    address,
+    postalCode,
+    fullAddress,
+    rawText: rawBlock.trim()
+  };
+}
+
+/**
+ * Splits raw pasted text from Apple Notes into individual address entries
+ * Handles:
+ * - Empty line separated blocks (\n\n)
+ * - Numbered items (1. 2. 3.)
+ * - Separator lines (---, ===, ***)
+ * - Continuous entries by phone number pattern
+ * @param {string} fullText
+ * @returns {Array<object>} List of parsed address objects
+ */
+export function parseMultipleAddresses(fullText) {
+  if (!fullText || !fullText.trim()) return [];
+
+  const normalized = thaiToArabic(fullText).trim();
+
+  // 1. First attempt: Split by double newlines or explicit divider lines
+  let rawBlocks = normalized
+    .split(/(?:\r?\n\s*){2,}|(?:\r?\n[-=_*#]{3,}\r?\n)/)
+    .map(b => b.trim())
+    .filter(Boolean);
+
+  // 2. If only 1 huge block was found, check if it contains numbered items (e.g. "1.", "2.")
+  if (rawBlocks.length === 1 && /^\s*\d+[\.\)]\s+/m.test(rawBlocks[0])) {
+    rawBlocks = rawBlocks[0]
+      .split(/(?=(?:^|\r?\n)\s*\d+[\.\)]\s+)/)
+      .map(b => b.trim())
+      .filter(Boolean);
+  }
+
+  // 3. If still only 1 block with multiple lines, check if it's multiple 3-line entries without empty lines
+  if (rawBlocks.length === 1) {
+    const lines = rawBlocks[0].split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    // If lines contain multiple phone numbers, chunk by phone numbers
+    const phoneIndices = [];
+    lines.forEach((l, idx) => {
+      if (extractPhone(l).phone) {
+        phoneIndices.push(idx);
+      }
+    });
+
+    if (phoneIndices.length > 1) {
+      const reconstructedBlocks = [];
+      let currentStartIndex = 0;
+
+      for (let i = 0; i < phoneIndices.length; i++) {
+        const phoneIdx = phoneIndices[i];
+        // Name is likely the line right before phone, or starting from previous end
+        const blockStart = (i === 0) ? 0 : Math.max(currentStartIndex, phoneIdx - 1);
+        const nextPhoneIdx = phoneIndices[i + 1];
+        const blockEnd = (nextPhoneIdx !== undefined) ? Math.max(blockStart + 1, nextPhoneIdx - 1) : lines.length;
+
+        const blockLines = lines.slice(blockStart, blockEnd);
+        if (blockLines.length > 0) {
+          reconstructedBlocks.push(blockLines.join('\n'));
+        }
+        currentStartIndex = blockEnd;
+      }
+
+      if (reconstructedBlocks.length > 1) {
+        rawBlocks = reconstructedBlocks;
+      }
+    }
+  }
+
+  // Parse each block
+  const results = [];
+  for (const block of rawBlocks) {
+    const parsed = parseSingleAddress(block);
+    if (parsed && (parsed.name || parsed.address || parsed.phone)) {
+      results.push(parsed);
+    }
+  }
+
+  return results;
+}

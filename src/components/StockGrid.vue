@@ -1744,14 +1744,17 @@ watch(
 
 .delivery-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  background: #ff4500;
+  top: -6px;
+  right: -6px;
+  background: linear-gradient(135deg, #0d9488, #0284c7);
   color: white;
-  font-size: 10px; /* Smaller badge */
-  font-weight: bold;
-  padding: 2px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 5px;
   border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  line-height: 1;
 }
 
 .ds-scroll {

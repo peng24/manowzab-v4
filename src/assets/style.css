@@ -467,23 +467,85 @@ body {
   color: #888;
 }
 
+/* ===== 🚚 SHIPPING CYCLE BUTTON (HEADER) ===== */
 .btn-shipping-cycle {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(139, 92, 246, 0.22) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.45);
-  color: #c7d2fe;
-  font-weight: 600;
-  font-size: 0.9em;
-  padding: 6px 12px;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(13, 148, 136, 0.22) 100%);
+  border: 1px solid rgba(45, 212, 191, 0.38);
+  color: #f1f5f9;
+  padding: 5px 12px 5px 6px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  user-select: none;
+  flex-shrink: 0;
+  backdrop-filter: blur(8px);
 }
 
 .btn-shipping-cycle:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.38) 0%, rgba(139, 92, 246, 0.38) 100%);
-  border-color: rgba(139, 92, 246, 0.8);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(13, 148, 136, 0.38) 100%);
+  border-color: rgba(45, 212, 191, 0.75);
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.32), 0 0 12px rgba(45, 212, 191, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px) scale(1.02);
   color: #ffffff;
-  box-shadow: 0 0 14px rgba(139, 92, 246, 0.4);
-  transform: translateY(-1.5px);
+}
+
+.btn-shipping-cycle:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.98);
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.2);
+}
+
+.cycle-icon-pill {
+  width: 26px;
+  height: 26px;
+  background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85em;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.35);
+  flex-shrink: 0;
+}
+
+.cycle-text-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.cycle-title-small {
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #2dd4bf;
+  text-transform: uppercase;
+}
+
+.cycle-date-main {
+  font-size: 0.94em;
+  font-weight: 700;
+  color: #f8fafc;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.cycle-arrow {
+  font-size: 0.7em;
+  color: #5eead4;
+  margin-left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.btn-shipping-cycle:hover .cycle-arrow {
+  transform: translateX(2px);
+  color: #2dd4bf;
 }
 
 .shipping-mgr-icon {

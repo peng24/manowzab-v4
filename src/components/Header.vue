@@ -45,8 +45,14 @@
         @click="openShippingManager"
         :title="`🚚 รอบจัดส่งหลัก: ${shippingCycleLabel} (คลิกเพื่อเปิดรายการจัดส่ง)`"
       >
-        <i class="fa-solid fa-truck-fast"></i>
-        <span>{{ shippingCycleLabel }}</span>
+        <span class="cycle-icon-pill">
+          <i class="fa-solid fa-truck-fast"></i>
+        </span>
+        <span class="cycle-text-content">
+          <span class="cycle-title-small">รอบจัดส่ง</span>
+          <span class="cycle-date-main">{{ shippingCycleLabel }}</span>
+        </span>
+        <i class="fa-solid fa-chevron-right cycle-arrow"></i>
       </button>
 
       <!-- Hero Connect Container -->

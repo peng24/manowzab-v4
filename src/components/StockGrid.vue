@@ -31,13 +31,13 @@
         <!-- 📦 Delivery Strip (moved right after sales stats) -->
         <div class="delivery-strip">
           <div
-            class="shipping-mgr-icon"
+            class="shipping-mgr-btn"
             @click="openShippingManager"
             :title="`รายการจัดส่งรอบนี้ (${cycleDeliveryCount} ท่าน) — คลิกเพื่อเปิด`"
             style="cursor: pointer;"
           >
             <span class="box-emoji">📦</span>
-            <span v-if="cycleDeliveryCount > 0" class="delivery-badge">{{ cycleDeliveryCount }}</span>
+            <span v-if="cycleDeliveryCount > 0" class="delivery-count-text">{{ cycleDeliveryCount }}</span>
           </div>
           <div class="ds-scroll" v-if="deliveryStrip.length > 0">
             <span
@@ -1727,34 +1727,48 @@ watch(
   flex-shrink: 0;
 }
 
-.shipping-mgr-icon {
+.shipping-mgr-btn {
   position: relative;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 28px; /* Smaller size */
-  height: 28px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  gap: 5px;
+  height: 24px;
+  padding: 2px 8px 2px 6px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(13, 148, 136, 0.22) 100%);
+  border: 1px solid rgba(45, 212, 191, 0.38);
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.shipping-mgr-btn:hover {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(13, 148, 136, 0.35) 100%);
+  border-color: rgba(45, 212, 191, 0.6);
+  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.3);
+  transform: translateY(-1px) scale(1.04);
+}
+
+.shipping-mgr-btn:active {
+  transform: scale(0.96);
 }
 
 .box-emoji {
-  font-size: 14px; /* Smaller emoji */
+  font-size: 14px;
+  line-height: 1;
+  display: inline-block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
-.delivery-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  background: linear-gradient(135deg, #0d9488, #0284c7);
-  color: white;
-  font-size: 10px;
+.delivery-count-text {
+  color: #2dd4bf;
+  font-size: 0.85em;
   font-weight: 800;
-  padding: 2px 5px;
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.35);
   line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: 0.3px;
 }
 
 .ds-scroll {

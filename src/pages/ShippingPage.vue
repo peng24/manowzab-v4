@@ -1,20 +1,27 @@
 <template>
   <div class="sp-app">
-    <!-- ============ STICKY HEADER ============ -->
-    <header class="sp-header">
-      <div class="sp-header-left">
-        <span class="sp-logo">📦</span>
-        <h1 class="sp-title">รายการจัดส่ง</h1>
-      </div>
-      <div class="sp-header-actions">
-        <button class="sp-icon-btn" @click="refreshData" title="รีเฟรช">
-          <i class="fa-solid fa-arrows-rotate" :class="{ 'fa-spin': isRefreshing }"></i>
-        </button>
-        <a :href="baseUrl" class="sp-icon-btn" title="กลับ Command Center">
-          <i class="fa-solid fa-desktop"></i>
-        </a>
-      </div>
-    </header>
+    <!-- 🔒 High-Security Authentication Gate -->
+    <AuthGate v-if="!authStore.isAuthenticated" />
+
+    <template v-else>
+      <!-- ============ STICKY HEADER ============ -->
+      <header class="sp-header">
+        <div class="sp-header-left">
+          <span class="sp-logo">📦</span>
+          <h1 class="sp-title">รายการจัดส่ง</h1>
+        </div>
+        <div class="sp-header-actions">
+          <button class="sp-icon-btn" @click="refreshData" title="รีเฟรช">
+            <i class="fa-solid fa-arrows-rotate" :class="{ 'fa-spin': isRefreshing }"></i>
+          </button>
+          <a :href="baseUrl" class="sp-icon-btn" title="กลับ Command Center">
+            <i class="fa-solid fa-desktop"></i>
+          </a>
+          <button class="sp-icon-btn" @click="handleLogout" title="ออกจากระบบ" style="color: #f87171;">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          </button>
+        </div>
+      </header>
 
     <!-- ============ SEARCH (simple) ============ -->
     <div class="sp-toolbar">
@@ -222,11 +229,14 @@
         {{ activeCustomers.length }} รายการ · {{ totalItemCount }} ชิ้น
       </span>
     </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useAuthStore } from "../stores/auth";
+import AuthGate from "../components/AuthGate.vue";
 import { ref as dbRef, onValue, update, remove, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
@@ -240,6 +250,7 @@ import {
 } from "../utils/chatParserUtils";
 
 // ====== State ======
+const authStore = useAuthStore();
 const allCustomers = ref([]);
 const newName = ref("");
 const newDate = ref("");
@@ -250,6 +261,31 @@ const activeFilter = ref("requested");
 const isRefreshing = ref(false);
 const shippingCycle = ref("today");
 const cleanupFns = [];
+
+async function handleLogout() {
+  const res = await Swal.fire({
+    title: "ออกจากระบบ?",
+    text: "คุณต้องการออกจากระบบ ใช่หรือไม่",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "ออกจากระบบ",
+    cancelButtonText: "ยกเลิก",
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#334155",
+  });
+
+  if (res.isConfirmed) {
+    authStore.logout();
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "info",
+      title: "🚪 ออกจากระบบเรียบร้อยแล้ว",
+      showConfirmButton: false,
+      timer: 2000,
+    });
+  }
+}
 
 const currentCycleLabel = computed(() => {
   return formatShippingCycleLabel(shippingCycle.value);

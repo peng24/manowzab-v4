@@ -1,5 +1,10 @@
 <template>
   <div class="app-container">
+    <!-- 🔒 High-Security Authentication Gate -->
+    <AuthGate v-if="!authStore.isAuthenticated" />
+
+    <!-- Protected Application Views -->
+    <template v-else>
       <UpdatePrompt />
       <div class="app-layout">
         <div class="left-column">
@@ -32,11 +37,14 @@
         </div>
         <ChatPanel />
       </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, provide, watch } from "vue";
+import { useAuthStore } from "./stores/auth";
+import AuthGate from "./components/AuthGate.vue";
 import { useSystemStore } from "./stores/system";
 import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
@@ -63,6 +71,7 @@ import PhoneticManager from "./components/PhoneticManager.vue"; // ✅ Import Ph
 import { useVoiceLearningStore } from "./stores/voiceLearning";
 import { useChatProcessor } from "./composables/useChatProcessor";
 
+const authStore = useAuthStore();
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
 const chatStore = useChatStore();

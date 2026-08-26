@@ -1,43 +1,82 @@
 <template>
   <div class="history-page-layout">
-    <!-- TOP NAVIGATION BAR -->
-    <header class="page-nav-bar">
-      <div class="nav-brand">
-        <a :href="baseUrl" class="brand-link">
-          <i class="fa-solid fa-bolt brand-icon"></i>
-          <span class="brand-name">MANOWZAB</span>
-        </a>
-        <span class="nav-divider">/</span>
-        <span class="nav-title"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการขาย (History Page)</span>
-      </div>
+    <!-- 🔒 High-Security Authentication Gate -->
+    <AuthGate v-if="!authStore.isAuthenticated" />
 
-      <div class="nav-actions">
-        <a :href="baseUrl" class="nav-btn">
-          <i class="fa-solid fa-house"></i> หน้าหลักแดชบอร์ด
-        </a>
-        <a :href="`${baseUrl}shipping/`" class="nav-btn">
-          <i class="fa-solid fa-truck-fast"></i> รายการจัดส่ง
-        </a>
-      </div>
-    </header>
+    <template v-else>
+      <!-- TOP NAVIGATION BAR -->
+      <header class="page-nav-bar">
+        <div class="nav-brand">
+          <a :href="baseUrl" class="brand-link">
+            <i class="fa-solid fa-bolt brand-icon"></i>
+            <span class="brand-name">MANOWZAB</span>
+          </a>
+          <span class="nav-divider">/</span>
+          <span class="nav-title"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการขาย (History Page)</span>
+        </div>
 
-    <!-- FULL PAGE HISTORY INTERFACE -->
-    <div class="history-page-body">
-      <HistoryModalContent />
-    </div>
+        <div class="nav-actions">
+          <a :href="baseUrl" class="nav-btn">
+            <i class="fa-solid fa-house"></i> หน้าหลักแดชบอร์ด
+          </a>
+          <a :href="`${baseUrl}shipping/`" class="nav-btn">
+            <i class="fa-solid fa-truck-fast"></i> รายการจัดส่ง
+          </a>
+          <button class="nav-btn" @click="handleLogout" style="color: #f87171; cursor: pointer;">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i> ออกจากระบบ
+          </button>
+        </div>
+      </header>
+
+      <!-- FULL PAGE HISTORY INTERFACE -->
+      <div class="history-page-body">
+        <HistoryModalContent />
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { onMounted } from "vue";
+import { useAuthStore } from "../stores/auth";
+import AuthGate from "../components/AuthGate.vue";
 import { useNicknameStore } from "../stores/nickname";
 import HistoryModalContent from "../components/HistoryModal.vue";
+import Swal from "sweetalert2";
 
 const baseUrl = import.meta.env.BASE_URL || "/";
+const authStore = useAuthStore();
 const nicknameStore = useNicknameStore();
 
+async function handleLogout() {
+  const res = await Swal.fire({
+    title: "ออกจากระบบ?",
+    text: "คุณต้องการออกจากระบบ ใช่หรือไม่",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "ออกจากระบบ",
+    cancelButtonText: "ยกเลิก",
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#334155",
+  });
+
+  if (res.isConfirmed) {
+    authStore.logout();
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "info",
+      title: "🚪 ออกจากระบบเรียบร้อยแล้ว",
+      showConfirmButton: false,
+      timer: 2000,
+    });
+  }
+}
+
 onMounted(() => {
-  nicknameStore.initNicknameListener();
+  if (authStore.isAuthenticated) {
+    nicknameStore.initNicknameListener();
+  }
 });
 </script>
 

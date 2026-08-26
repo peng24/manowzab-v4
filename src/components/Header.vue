@@ -212,6 +212,10 @@
                 <i class="fa-solid fa-rotate"></i>
                 <span>บังคับอัปเดต</span>
               </a>
+              <a @click="handleLogout" class="menu-logout" style="color: #f87171;">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                <span>ออกจากระบบ</span>
+              </a>
             </div>
           </div>
         </Teleport>
@@ -258,6 +262,7 @@ import Swal from "sweetalert2";
 import NoteEditor from "./NoteEditor.vue"; // ✅ Import Note Editor
 import ChangelogModal from "./ChangelogModal.vue"; // ✅ Import Changelog Modal
 import LiveSummaryModal from "./LiveSummaryModal.vue"; // ✅ Import Live Summary Modal
+import { useAuthStore } from "../stores/auth";
 import { announceShippingCustomers } from "../utils/deliverySync";
 import { CONSTANTS } from "../config/constants";
 import { formatShippingCycleLabel } from "../utils/chatParserUtils";
@@ -276,6 +281,7 @@ const logger = {
   },
 };
 
+const authStore = useAuthStore();
 const systemStore = useSystemStore();
 const chatStore = useChatStore();
 const stockStore = useStockStore();
@@ -712,8 +718,35 @@ function openLiveSummary() {
   }
 }
 
+async function handleLogout() {
+  showDropdown.value = false;
+  const res = await Swal.fire({
+    title: "ออกจากระบบ?",
+    text: "คุณต้องการออกจากระบบ Manowzab Command Center ใช่หรือไม่",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "ออกจากระบบ",
+    cancelButtonText: "ยกเลิก",
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#334155",
+  });
+
+  if (res.isConfirmed) {
+    authStore.logout();
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "info",
+      title: "🚪 ออกจากระบบเรียบร้อยแล้ว",
+      showConfirmButton: false,
+      timer: 2000,
+    });
+  }
+}
+
 defineExpose({
   openLiveSummary,
+  handleLogout,
 });
 
 

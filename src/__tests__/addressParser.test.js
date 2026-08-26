@@ -26,10 +26,14 @@ describe('Smart Address Parser Suite', () => {
   });
 
   describe('extractPhone', () => {
-    it('extracts phone number and removes it from text', () => {
-      const res = extractPhone('เบอร์ 081-234-5678 กรุณาส่งด่วน');
-      expect(res.phone).toBe('081-234-5678');
-      expect(res.cleanedText).toContain('กรุณาส่งด่วน');
+    it('extracts phone number with dots (095.155.5706)', () => {
+      const res = extractPhone('โทร. 095.155.5706 ส่งด่วน');
+      expect(res.phone).toBe('095-155-5706');
+    });
+
+    it('extracts phone number with Tel. prefix and dashes', () => {
+      const res = extractPhone('Tel. 081-999-8888');
+      expect(res.phone).toBe('081-999-8888');
     });
   });
 
@@ -37,6 +41,11 @@ describe('Smart Address Parser Suite', () => {
     it('extracts 5-digit zip code', () => {
       const res = extractPostalCode('อ.เมือง จ.เชียงใหม่ 50000');
       expect(res.postalCode).toBe('50000');
+    });
+
+    it('does not confuse fractional house numbers with zip codes', () => {
+      const res = extractPostalCode('บ้านเลขที่ 10123/45 ถ.พังงา ต.ตลาดใหญ่ อ.เมือง จ.ภูเก็ต 83000');
+      expect(res.postalCode).toBe('83000');
     });
   });
 
@@ -53,6 +62,27 @@ describe('Smart Address Parser Suite', () => {
       expect(result.address).toContain('123/45 หมู่ 6 ต.บ้านใหม่ อ.เมือง จ.เชียงใหม่ 50000');
     });
 
+    it('parses multi-line address without a recipient name (starts with house number)', () => {
+      const note = `36 ถ.พังงา ต.ตลาดใหญ่
+อ.เมือง จ.ภูเก็ต 83000
+โทร. 095-155-5706`;
+
+      const result = parseSingleAddress(note);
+      expect(result.name).toBe('');
+      expect(result.phone).toBe('095-155-5706');
+      expect(result.postalCode).toBe('83000');
+      expect(result.address).toContain('36 ถ.พังงา ต.ตลาดใหญ่ อ.เมือง จ.ภูเก็ต 83000');
+    });
+
+    it('parses single-line address starting directly with house number (no name)', () => {
+      const line = '191 หมู่ 3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000 โทร. 095-155-5706';
+      const result = parseSingleAddress(line);
+      expect(result.name).toBe('');
+      expect(result.phone).toBe('095-155-5706');
+      expect(result.postalCode).toBe('34000');
+      expect(result.address).toContain('191 หมู่ 3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000');
+    });
+
     it('parses format with label prefixes (ชื่อ:, เบอร์:, ที่อยู่:)', () => {
       const note = `ชื่อ: คุณกนกวรรณ ใจดี
 เบอร์: 0987654321
@@ -65,7 +95,7 @@ describe('Smart Address Parser Suite', () => {
       expect(result.address).toContain('45/6 ซอยสุขุมวิท 101/1 แขวงบางจาก เขตพระโขนง กทม 10260');
     });
 
-    it('parses single-line address format', () => {
+    it('parses single-line address format with name', () => {
       const line = 'สมชาย ใจงาม 0812345678 99/99 หมู่ 1 ถ.พหลโยธิน ต.คลองหนึ่ง อ.คลองหลวง จ.ปทุมธานี 12120';
       const result = parseSingleAddress(line);
       expect(result.name).toBe('สมชาย ใจงาม');

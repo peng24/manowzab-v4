@@ -290,7 +290,7 @@
               <span v-if="c.deliveryDate"> • ส่ง {{ formatThaiDate(c.deliveryDate) }}</span>
             </div>
             <div class="sm-card-addr">
-              <span v-if="hasAddress(c)" class="sm-addr-tag has" :title="getCustomerAddressSummary(c)">
+              <span v-if="hasAddress(c)" class="sm-addr-tag has" @click="promptEditAddress(c)" :title="getCustomerAddressSummary(c)">
                 📍 {{ getCustomerAddressSummary(c) }}
               </span>
               <span v-else class="sm-addr-tag none" @click="promptEditAddress(c)">

@@ -84,6 +84,35 @@
             </button>
           </div>
 
+          <!-- ⚡ Quick Paste / Auto-fill Box -->
+          <div class="cam-quick-paste-box">
+            <div class="cam-quick-header">
+              <div class="cam-quick-title">
+                <i class="fa-solid fa-wand-magic-sparkles text-warning"></i>
+                <span>วางข้อความที่อยู่ด่วน (แยกข้อมูลให้อัตโนมัติ):</span>
+              </div>
+              <span class="cam-quick-badge" v-if="pasteNotice">{{ pasteNotice }}</span>
+            </div>
+            <div class="cam-quick-input-wrap">
+              <textarea
+                v-model="quickPasteText"
+                @input="handleQuickPasteInput"
+                class="cam-input cam-quick-textarea"
+                rows="2"
+                placeholder="📋 วางที่อยู่ทั้งหมดที่นี่ (เช่น ก๊อปมาจากแชท / Note) ระบบจะแยก ชื่อผู้รับ, เบอร์โทร, ที่อยู่ ให้อัตโนมัติ..."
+              ></textarea>
+              <button
+                v-if="quickPasteText"
+                class="cam-quick-clear-btn"
+                @click="clearQuickPaste"
+                type="button"
+                title="ล้างข้อความ"
+              >
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+          </div>
+
           <div class="cam-form-grid">
             <div class="cam-form-group">
               <label>ป้ายกำกับที่อยู่ (เช่น บ้าน, ที่ทำงาน, สาขา 2):</label>
@@ -149,7 +178,7 @@
 import { ref, computed, onMounted } from "vue";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
-import { normalizeName } from "../utils/addressParser";
+import { normalizeName, parseSingleAddress } from "../utils/addressParser";
 import Swal from "sweetalert2";
 
 const props = defineProps({
@@ -167,6 +196,8 @@ const emit = defineEmits(["close", "updated"]);
 
 const isEditingForm = ref(false);
 const editingIndex = ref(null);
+const quickPasteText = ref("");
+const pasteNotice = ref("");
 
 const formData = ref({
   id: "",
@@ -177,6 +208,44 @@ const formData = ref({
   postalCode: "",
   setAsActive: true,
 });
+
+function handleQuickPasteInput() {
+  if (!quickPasteText.value.trim()) {
+    pasteNotice.value = "";
+    return;
+  }
+
+  const parsed = parseSingleAddress(quickPasteText.value);
+  if (parsed) {
+    const filledFields = [];
+    if (parsed.recipientName) {
+      formData.value.recipientName = parsed.recipientName;
+      filledFields.push("ชื่อผู้รับ");
+    }
+    if (parsed.phone) {
+      formData.value.phone = parsed.phone;
+      filledFields.push("เบอร์โทร");
+    }
+    if (parsed.address) {
+      formData.value.address = parsed.address;
+      filledFields.push("ที่อยู่");
+    }
+    if (parsed.postalCode) {
+      formData.value.postalCode = parsed.postalCode;
+    }
+
+    if (filledFields.length > 0) {
+      pasteNotice.value = `✨ แยกสำเร็จ: ${filledFields.join(", ")}`;
+    } else {
+      pasteNotice.value = "";
+    }
+  }
+}
+
+function clearQuickPaste() {
+  quickPasteText.value = "";
+  pasteNotice.value = "";
+}
 
 const normKey = computed(() => {
   if (!props.customer?.name) return "";
@@ -228,6 +297,8 @@ function isSelected(addr) {
 }
 
 function openAddForm() {
+  quickPasteText.value = "";
+  pasteNotice.value = "";
   formData.value = {
     id: "addr_" + Date.now(),
     label: `ที่อยู่ ${addressList.value.length + 1}`,
@@ -242,6 +313,8 @@ function openAddForm() {
 }
 
 function openEditForm(addr, index) {
+  quickPasteText.value = "";
+  pasteNotice.value = "";
   formData.value = {
     id: addr.id || "addr_" + Date.now(),
     label: addr.label || `ที่อยู่ ${index + 1}`,
@@ -256,6 +329,8 @@ function openEditForm(addr, index) {
 }
 
 function cancelForm() {
+  quickPasteText.value = "";
+  pasteNotice.value = "";
   isEditingForm.value = false;
   editingIndex.value = null;
 }
@@ -657,6 +732,97 @@ onMounted(() => {
   font-weight: 700;
   color: #fff;
   margin-bottom: 14px;
+}
+
+/* ⚡ Quick Paste Box */
+.cam-quick-paste-box {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.45), rgba(15, 23, 42, 0.55));
+  border: 1px dashed rgba(96, 165, 250, 0.45);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.25s ease;
+}
+
+.cam-quick-paste-box:focus-within {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.65), rgba(15, 23, 42, 0.75));
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.18);
+}
+
+.cam-quick-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cam-quick-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #93c5fd;
+}
+
+.cam-quick-badge {
+  font-size: 0.75em;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 2px 8px;
+  border-radius: 8px;
+  animation: fadeIn 0.3s ease;
+}
+
+.cam-quick-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.cam-quick-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 32px;
+  background: rgba(18, 18, 20, 0.85);
+  border: 1px solid #3f3f46;
+  font-size: 0.85em;
+  line-height: 1.4;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.cam-quick-textarea:focus {
+  border-color: #60a5fa;
+}
+
+.cam-quick-clear-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(63, 63, 70, 0.6);
+  border: none;
+  color: #a1a1aa;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75em;
+  transition: all 0.2s;
+}
+
+.cam-quick-clear-btn:hover {
+  background: #ef4444;
+  color: #fff;
 }
 
 .cam-form-grid {

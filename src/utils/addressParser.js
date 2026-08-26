@@ -38,15 +38,18 @@ export function formatPhoneNumber(phone) {
 export function extractPhone(text) {
   if (!text) return { phone: '', cleanedText: '' };
 
-  // Match 0xx-xxx-xxxx, 0xxxxxxxxx, +66xxxxxxxxx, 02-xxx-xxxx
-  const phoneRegex = /(?:(?:\+66|0)[-\s]?\d{1,2}[-\s]?\d{3}[-\s]?\d{4}|\b0[689]\d{8}\b|\b0[2-7]\d{7}\b)/;
+  // Match 0xx-xxx-xxxx, 0xx.xxx.xxxx, 0xxxxxxxxx, +66xxxxxxxxx, 02-xxx-xxxx
+  const phoneRegex = /(?:(?:\+66|0)[-\s.]?\d{1,2}[-\s.]?\d{3}[-\s.]?\d{4}|\b0[689]\d{8}\b|\b0[2-7]\d{7}\b)/;
   const match = text.match(phoneRegex);
 
   if (match) {
     const rawPhone = match[0];
     const phone = formatPhoneNumber(rawPhone);
-    // Remove the phone from text to avoid picking it up as address/name
-    const cleanedText = text.replace(rawPhone, '').replace(/\b(?:เบอร์(?:โทร)?|โทร|Tel|phone)[:\s-]*/i, '').trim();
+    // Remove the phone and labels from text to avoid picking it up as address/name
+    const cleanedText = text
+      .replace(rawPhone, '')
+      .replace(/(?:^|\s)(?:เบอร์(?:\s*โทร)?|โทร(?:\.)?|Tel(?:\.)?|Phone(?:\.)?)[:\s-]*/gi, ' ')
+      .trim();
     return { phone, cleanedText };
   }
 
@@ -61,8 +64,8 @@ export function extractPhone(text) {
 export function extractPostalCode(text) {
   if (!text) return { postalCode: '', cleanedText: '' };
 
-  // 5-digit postal code (Thai postal codes are 10000 - 96000)
-  const zipRegex = /\b[1-9]\d{4}\b/;
+  // 5-digit postal code (Thai postal codes are 10000 - 96000), not followed by fraction / or digits
+  const zipRegex = /\b[1-9]\d{4}\b(?!\/|\d)/;
   const match = text.match(zipRegex);
 
   if (match) {
@@ -99,31 +102,47 @@ export function parseSingleAddress(rawBlock) {
   const zipResult = extractPostalCode(text);
   postalCode = zipResult.postalCode;
 
+  // Address marker pattern for line detection
+  const addressMarkerRegex = /^(?:\d+[\d\/\-\.]*|\b\d+\b(?=\s*(?:หมู่|ม\.|ซอย|ซ\.|ถนน|ถ\.|\/))|หมู่|ม\.|บ้านเลขที่|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|กทม|ถ\.|ถนน|ซ\.|ซอย)/i;
+
   if (lines.length >= 2) {
     // Multi-line format:
-    // Line 1 is usually Name (or "ชื่อ: ...", "ผู้รับ: ...")
+    // Check if line 1 starts with address markers (e.g. 191 หมู่ 3, บ้านเลขที่, 123/45, ถ., ซ.)
     let firstLine = lines[0];
-    firstLine = firstLine.replace(/^(?:ชื่อลูกค้า|ชื่อผู้รับ|ผู้รับ|ชื่อ|Name|Customer|To)\s*[:\-]\s*/i, '').trim();
+    const isFirstLineAddress = addressMarkerRegex.test(
+      firstLine.replace(/^(?:ที่อยู่|ที่อยู่จัดส่ง|ส่งที่|Address)[:\s-]*/i, '').trim()
+    );
 
-    // Check if first line contains phone
-    const firstLinePhone = extractPhone(firstLine);
-    if (firstLinePhone.phone && !phone) {
-      phone = firstLinePhone.phone;
-      firstLine = firstLinePhone.cleanedText;
-    } else if (firstLinePhone.phone) {
-      firstLine = firstLinePhone.cleanedText;
+    const addressParts = [];
+
+    if (!isFirstLineAddress) {
+      firstLine = firstLine.replace(/^(?:ชื่อลูกค้า|ชื่อผู้รับ|ผู้รับ|ชื่อ|Name|Customer|To)\s*[:\-]\s*/i, '').trim();
+
+      // Check if first line contains phone
+      const firstLinePhone = extractPhone(firstLine);
+      if (firstLinePhone.phone && !phone) {
+        phone = firstLinePhone.phone;
+        firstLine = firstLinePhone.cleanedText;
+      } else if (firstLinePhone.phone) {
+        firstLine = firstLinePhone.cleanedText;
+      }
+
+      name = firstLine.trim();
+    } else {
+      // First line is part of the address
+      const cleanedFirst = firstLine.replace(/^(?:ที่อยู่|ที่อยู่จัดส่ง|ส่งที่|Address)[:\s-]*/i, '').trim();
+      if (cleanedFirst) {
+        addressParts.push(cleanedFirst);
+      }
     }
-
-    name = firstLine.trim();
 
     // Remaining lines make up the address and potentially phone
     const remainingLines = lines.slice(1);
-    const addressParts = [];
 
     for (let line of remainingLines) {
       let cleaned = line
         .replace(/^(?:ที่อยู่|ที่อยู่จัดส่ง|ส่งที่|Address)[:\s-]*/i, '')
-        .replace(/^(?:เบอร์(?:โทร)?|โทร|Tel|Phone)[:\s-]*/i, '')
+        .replace(/^(?:เบอร์(?:โทร)?|โทร(?:\.)?|Tel(?:\.)?|Phone(?:\.)?)[:\s-]*/i, '')
         .trim();
 
       // Check if this line is purely a phone number
@@ -144,17 +163,22 @@ export function parseSingleAddress(rawBlock) {
     address = addressParts.join(' ');
   } else {
     // Single line format: "สมชาย ใจดี 0812345678 123/45 ถ.สุขุมวิท กทม 10110"
-    let singleLine = phoneResult.cleanedText;
+    let singleLine = phoneResult.cleanedText.trim();
 
     // Detect Name at beginning (usually 1-3 words before house numbers / addresses)
-    // House number indicator regex: \d+\/\d+|\d+|หมู่|ม\.|บ้านเลขที่|ต\.|อ\.|จ\.
-    const addressStartMatch = singleLine.match(/(?:\s|^)(?:\d+\/\d+|\b\d+\b(?=\s*(?:หมู่|ม\.|ซอย|ซ\.|ถนน|ถ\.))|หมู่|ม\.|บ้านเลขที่|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|กทม)/i);
+    const addressStartMatch = singleLine.match(/(?:\s|^)(?:\d+[\d\/\-\.]*|\b\d+\b(?=\s*(?:หมู่|ม\.|ซอย|ซ\.|ถนน|ถ\.|\/))|หมู่|ม\.|บ้านเลขที่|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|กทม|ถ\.|ถนน|ซ\.|ซอย)/i);
 
-    if (addressStartMatch && addressStartMatch.index > 0) {
-      name = singleLine.substring(0, addressStartMatch.index).replace(/^(?:ชื่อลูกค้า|ชื่อผู้รับ|ผู้รับ|ชื่อ|Name|Customer|To)\s*[:\-]\s*/i, '').trim();
-      address = singleLine.substring(addressStartMatch.index).replace(/^(?:ที่อยู่|ส่งที่|Address)\s*[:\-]\s*/i, '').trim();
+    if (addressStartMatch) {
+      if (addressStartMatch.index === 0) {
+        // Entire single line is address (no name prefix)
+        name = '';
+        address = singleLine.replace(/^(?:ที่อยู่|ส่งที่|Address)\s*[:\-]\s*/i, '').trim();
+      } else {
+        name = singleLine.substring(0, addressStartMatch.index).replace(/^(?:ชื่อลูกค้า|ชื่อผู้รับ|ผู้รับ|ชื่อ|Name|Customer|To)\s*[:\-]\s*/i, '').trim();
+        address = singleLine.substring(addressStartMatch.index).replace(/^(?:ที่อยู่|ส่งที่|Address)\s*[:\-]\s*/i, '').trim();
+      }
     } else {
-      // Fallback: take first 2 words as name
+      // Fallback: check if line has name + address or only address
       const words = singleLine.split(/\s+/);
       if (words.length > 2) {
         name = words.slice(0, 2).join(' ');
@@ -166,7 +190,7 @@ export function parseSingleAddress(rawBlock) {
     }
   }
 
-  // Clean up address
+  // Clean up address & name
   address = address.replace(/\s+/g, ' ').trim();
   name = name.replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, '').trim();
 

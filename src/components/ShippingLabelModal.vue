@@ -140,9 +140,8 @@
             <!-- Left Column: Sender (FROM) -->
             <div class="ls-sender-col">
               <div class="ls-sender-name">{{ sender.name || 'มะนาวแซ่บ' }}</div>
-              <div class="ls-sender-addr">
-                <div>191 หมู่3 ต.ขามใหญ่</div>
-                <div>อ.เมือง จ.อุบลราชธานี 34000</div>
+              <div class="ls-sender-addr" style="white-space: pre-line;">
+                {{ sender.address || '191 หมู่3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000' }}
               </div>
               <div class="ls-sender-phone">โทร. {{ sender.phone || '095-155-5706' }}</div>
             </div>
@@ -167,9 +166,8 @@
             <div class="label-sender-block">
               <div class="sender-body">
                 <div class="sender-name-line">{{ sender.name || 'มะนาวแซ่บ' }}</div>
-                <div class="sender-addr-line">
-                  <div>191 หมู่3 ต.ขามใหญ่</div>
-                  <div>อ.เมือง จ.อุบลราชธานี 34000</div>
+                <div class="sender-addr-line" style="white-space: pre-line;">
+                  {{ sender.address || '191 หมู่3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000' }}
                 </div>
                 <div class="sender-phone-line">โทร. {{ sender.phone || '095-155-5706' }}</div>
               </div>
@@ -381,6 +379,7 @@ function handlePrint() {
   const pageHeight = isLandscape ? "76mm" : "130mm";
   const senderName = sender.value.name || "มะนาวแซ่บ";
   const senderPhone = sender.value.phone || "095-155-5706";
+  const senderAddress = (sender.value.address || "191 หมู่3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000").replace(/\n/g, "<br>");
   const thankYou = sender.value.thankYouText || "🙏 ขอบคุณที่อุดหนุนนะคะ ❤️";
 
   const cardsHtml = printableCustomers.value
@@ -398,10 +397,7 @@ function handlePrint() {
                 <!-- Left: Sender -->
                 <div class="ls-sender">
                   <div class="sender-name">${senderName}</div>
-                  <div class="sender-addr">
-                    <div>191 หมู่3 ต.ขามใหญ่</div>
-                    <div>อ.เมือง จ.อุบลราชธานี 34000</div>
-                  </div>
+                  <div class="sender-addr">${senderAddress}</div>
                   <div class="sender-phone">โทร. ${senderPhone}</div>
                 </div>
 
@@ -425,10 +421,7 @@ function handlePrint() {
             <div class="print-card portrait">
               <div class="port-sender">
                 <div class="sender-name">${senderName}</div>
-                <div class="sender-addr">
-                  <div>191 หมู่3 ต.ขามใหญ่</div>
-                  <div>อ.เมือง จ.อุบลราชธานี 34000</div>
-                </div>
+                <div class="sender-addr">${senderAddress}</div>
                 <div class="sender-phone">โทร. ${senderPhone}</div>
               </div>
 
@@ -483,7 +476,8 @@ function handlePrint() {
             break-after: page;
             page-break-inside: avoid;
             break-inside: avoid;
-            padding: 2mm;
+            padding: 0;
+            margin: 0;
             box-sizing: border-box;
             display: block;
             overflow: hidden;
@@ -495,9 +489,9 @@ function handlePrint() {
           .print-card {
             width: 100%;
             height: 100%;
-            border: 1.5px solid #000000;
-            border-radius: 4px;
-            padding: 4mm 6mm 2mm 6mm;
+            border: none;
+            border-radius: 0;
+            padding: 4mm 6mm 1mm 6mm;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -509,28 +503,29 @@ function handlePrint() {
           .card-grid {
             display: flex;
             width: 100%;
-            gap: 4mm;
+            gap: 6mm;
             flex: 1;
           }
           .ls-sender {
-            width: 32%;
-            font-size: 9pt;
+            width: 28%;
+            font-size: 8.5pt;
             line-height: 1.35;
             display: flex;
             flex-direction: column;
+            padding-top: 1mm;
           }
           .sender-name {
-            font-size: 11pt;
+            font-size: 10.5pt;
             font-weight: 800;
             margin-bottom: 2px;
           }
           .sender-addr {
-            font-size: 8.5pt;
+            font-size: 8.2pt;
             margin-top: 2px;
             line-height: 1.35;
           }
           .sender-phone {
-            font-size: 9pt;
+            font-size: 8.5pt;
             font-weight: 700;
             margin-top: 3px;
           }
@@ -538,17 +533,17 @@ function handlePrint() {
             flex: 1;
             display: flex;
             flex-direction: column;
-            padding-top: 20mm;
+            padding-top: 28mm;
             padding-left: 0;
             word-break: break-word;
             overflow-wrap: break-word;
           }
           .port-sender {
-            font-size: 9pt;
+            font-size: 8.5pt;
             line-height: 1.35;
           }
           .port-receiver {
-            padding-top: 35mm;
+            padding-top: 42mm;
             word-break: break-word;
             overflow-wrap: break-word;
           }
@@ -559,18 +554,18 @@ function handlePrint() {
             margin-bottom: 2px;
           }
           .receiver-addr {
-            font-size: 10pt;
+            font-size: 9.5pt;
             line-height: 1.35;
             font-weight: 500;
           }
           .receiver-zip {
             margin-top: 2px;
-            font-size: 13pt;
+            font-size: 12.5pt;
             font-weight: 900;
             letter-spacing: 1.5px;
           }
           .receiver-phone {
-            font-size: 10.5pt;
+            font-size: 10pt;
             font-weight: 800;
             margin-top: 2px;
           }
@@ -579,7 +574,8 @@ function handlePrint() {
             font-size: 9pt;
             font-weight: 700;
             margin-top: auto;
-            padding-top: 1mm;
+            padding-top: 0;
+            padding-bottom: 0.5mm;
           }
         </style>
       </head>
@@ -590,7 +586,12 @@ function handlePrint() {
   `);
   doc.close();
 
-  setTimeout(() => {
+  setTimeout(async () => {
+    try {
+      if (iframe.contentWindow && iframe.contentWindow.document.fonts) {
+        await iframe.contentWindow.document.fonts.ready;
+      }
+    } catch (e) {}
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
   }, 250);
@@ -612,23 +613,23 @@ function exportExcelForApp() {
   ];
 
   printableCustomers.value.forEach((c, idx) => {
-    const recipient = getRecipientDisplayName(c);
-    const phone = getCustomerPhone(c);
-    const addr = getCustomerAddress(c);
-    const zip = getCustomerZip(c);
+    const recipient = getRecipientDisplayName(c) || "";
+    const phone = getCustomerPhone(c) || "";
+    const addr = getCustomerAddress(c) || "";
+    const zip = getCustomerZip(c) || "";
     rows.push([
       idx + 1,
       `"${recipient.replace(/"/g, '""')}"`,
-      `"${c.name.replace(/"/g, '""')}"`,
+      `"${(c.name || '').replace(/"/g, '""')}"`,
       `"${phone}"`,
       `"${addr.replace(/"/g, '""')}"`,
       `"${zip}"`,
       c.itemCount || 0,
       c.deliveryDate || "",
       `"${(c.note || '').replace(/"/g, '""')}"`,
-      `"${sender.value.name}"`,
-      `"${sender.value.phone}"`,
-      `"${sender.value.address}"`,
+      `"${(sender.value.name || '').replace(/"/g, '""')}"`,
+      `"${(sender.value.phone || '').replace(/"/g, '""')}"`,
+      `"${(sender.value.address || '').replace(/"/g, '""')}"`,
     ]);
   });
 
@@ -995,9 +996,9 @@ onMounted(() => {
 .shipping-label-card {
   background: #ffffff;
   color: #000000;
-  border: 1.5px solid #000000;
+  border: none;
   border-radius: 4px;
-  padding: 12px 16px;
+  padding: 16px 20px 8px 20px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1265,7 +1266,7 @@ onMounted(() => {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     box-shadow: none !important;
-    border: 1px solid #000000 !important;
+    border: none !important;
     margin: 0 auto !important;
     box-sizing: border-box !important;
     overflow: hidden !important;

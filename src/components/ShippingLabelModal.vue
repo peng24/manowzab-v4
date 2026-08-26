@@ -146,11 +146,11 @@
               <div class="ls-sender-phone">โทร. {{ sender.phone || '095-155-5706' }}</div>
             </div>
 
-            <!-- Right Column: Receiver (TO) - Shifted down & moved left -->
+            <!-- Right Column: Receiver (TO) - Shifted down towards bottom with 10% bottom margin -->
             <div class="ls-receiver-col">
               <div class="ls-receiver-name">{{ getRecipientDisplayName(customer) }}</div>
               <div class="ls-receiver-addr">
-                {{ getCustomerAddress(customer) || '⚠️ ยังไม่มีที่อยู่จัดส่ง (กรุณานำเข้าจาก Note หรือพิมพ์เพิ่ม)' }}
+                {{ getCustomerCleanAddress(customer) || '⚠️ ยังไม่มีที่อยู่จัดส่ง (กรุณานำเข้าจาก Note หรือพิมพ์เพิ่ม)' }}
               </div>
               <div class="ls-receiver-zip" v-if="getCustomerZip(customer)">
                 <span class="zip-big">{{ getCustomerZip(customer) }}</span>
@@ -177,7 +177,7 @@
               <div class="receiver-body">
                 <div class="receiver-name">{{ getRecipientDisplayName(customer) }}</div>
                 <div class="receiver-address">
-                  {{ getCustomerAddress(customer) || '⚠️ ยังไม่มีที่อยู่จัดส่ง (กรุณานำเข้าจาก Note หรือพิมพ์เพิ่ม)' }}
+                  {{ getCustomerCleanAddress(customer) || '⚠️ ยังไม่มีที่อยู่จัดส่ง (กรุณานำเข้าจาก Note หรือพิมพ์เพิ่ม)' }}
                 </div>
                 <div class="receiver-zipcode" v-if="getCustomerZip(customer)">
                   <span class="zip-num">{{ getCustomerZip(customer) }}</span>
@@ -350,8 +350,16 @@ function getCustomerAddress(customer) {
 function getCustomerZip(customer) {
   const data = getCustomerAddressData(customer);
   if (data.postalCode) return data.postalCode;
-  const match = (data.address || "").match(/\b[1-9]\d{4}\b/);
+  const match = (data.address || "").match(/\b[1-9]\d{4}\b(?!\/|\d)/);
   return match ? match[0] : "";
+}
+
+function getCustomerCleanAddress(customer) {
+  const addr = getCustomerAddress(customer) || "";
+  const zip = getCustomerZip(customer);
+  if (!zip) return addr;
+  // Remove duplicate zip code from the address string
+  return addr.replace(new RegExp(`\\b${zip}\\b(?![/\\d])`, "g"), "").replace(/\s+/g, " ").trim();
 }
 
 function handlePrint() {
@@ -385,7 +393,7 @@ function handlePrint() {
   const cardsHtml = printableCustomers.value
     .map((customer, idx) => {
       const recipient = getRecipientDisplayName(customer);
-      const address = getCustomerAddress(customer) || "⚠️ ยังไม่มีที่อยู่จัดส่ง";
+      const address = getCustomerCleanAddress(customer) || "⚠️ ยังไม่มีที่อยู่จัดส่ง";
       const zip = getCustomerZip(customer);
       const phone = getCustomerPhone(customer) || "-";
 
@@ -533,7 +541,9 @@ function handlePrint() {
             flex: 1;
             display: flex;
             flex-direction: column;
-            padding-top: 28mm;
+            justify-content: flex-end;
+            padding-bottom: 7.5mm;
+            padding-top: 0;
             padding-left: 0;
             word-break: break-word;
             overflow-wrap: break-word;
@@ -543,31 +553,36 @@ function handlePrint() {
             line-height: 1.35;
           }
           .port-receiver {
-            padding-top: 42mm;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding-bottom: 13mm;
+            padding-top: 0;
             word-break: break-word;
             overflow-wrap: break-word;
           }
           .receiver-name {
-            font-size: 13pt;
+            font-size: 13.5pt;
             font-weight: 800;
             line-height: 1.25;
-            margin-bottom: 2px;
+            margin-bottom: 3px;
           }
           .receiver-addr {
-            font-size: 9.5pt;
-            line-height: 1.35;
-            font-weight: 500;
+            font-size: 11pt;
+            line-height: 1.4;
+            font-weight: 600;
           }
           .receiver-zip {
-            margin-top: 2px;
-            font-size: 12.5pt;
+            margin-top: 3px;
+            font-size: 14pt;
             font-weight: 900;
-            letter-spacing: 1.5px;
+            letter-spacing: 2px;
           }
           .receiver-phone {
-            font-size: 10pt;
+            font-size: 11pt;
             font-weight: 800;
-            margin-top: 2px;
+            margin-top: 3px;
           }
           .card-footer {
             text-align: center;
@@ -1079,42 +1094,44 @@ onMounted(() => {
   margin-top: 3px;
 }
 
-/* Right Column: Receiver (TO) - Shifted down to half page + 2 lines, moved left */
+/* Right Column: Receiver (TO) - Shifted down towards bottom with 10% bottom margin */
 .ls-receiver-col {
   flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   padding-left: 0;
-  padding-top: 100px;
+  padding-bottom: 28px;
+  padding-top: 0;
   word-break: break-word;
   overflow-wrap: break-word;
 }
 
 .ls-receiver-name {
-  font-size: 1.05em;
-  font-weight: 700;
+  font-size: 1.15em;
+  font-weight: 800;
   line-height: 1.3;
   margin-bottom: 3px;
   color: #000000;
 }
 
 .ls-receiver-addr {
-  font-size: 0.85em;
-  line-height: 1.4;
-  font-weight: 400;
+  font-size: 1.05em;
+  line-height: 1.45;
+  font-weight: 600;
   color: #000000;
 }
 
 .ls-receiver-zip {
   margin-top: 4px;
-  font-size: 1.05em;
-  font-weight: 800;
-  letter-spacing: 1.5px;
+  font-size: 1.25em;
+  font-weight: 900;
+  letter-spacing: 2px;
 }
 
 .ls-receiver-phone {
-  font-size: 0.92em;
-  font-weight: 700;
+  font-size: 1.05em;
+  font-weight: 800;
   margin-top: 3px;
   color: #000000;
 }
@@ -1153,31 +1170,34 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding-top: 75px; /* เลื่อนลงมาในแนวตั้ง */
+  justify-content: flex-end;
+  padding-bottom: 36px;
+  padding-top: 0;
 }
 
 .receiver-name {
-  font-size: 1.05em;
-  font-weight: 700;
+  font-size: 1.15em;
+  font-weight: 800;
   margin-bottom: 3px;
 }
 
 .receiver-address {
-  font-size: 0.85em;
-  line-height: 1.4;
+  font-size: 1.05em;
+  line-height: 1.45;
+  font-weight: 600;
 }
 
 .receiver-zipcode {
   margin-top: 4px;
-  font-size: 1.05em;
-  font-weight: 800;
-  letter-spacing: 1.5px;
+  font-size: 1.25em;
+  font-weight: 900;
+  letter-spacing: 2px;
 }
 
 .receiver-phone {
   margin-top: 3px;
-  font-size: 0.92em;
-  font-weight: 700;
+  font-size: 1.05em;
+  font-weight: 800;
 }
 
 /* Bottom Thank You Bar */

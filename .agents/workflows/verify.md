@@ -188,6 +188,24 @@ description: Mandatory verification checklist after every code change
 | 14.6 | Offline Queue Lock | `src/composables/useOfflineQueue.js` | `flushQueue` ต้องมี `isFlushing` guard lock + `try/finally` ป้องกันการประมวลผลซ้ำคิวออฟไลน์พร้อมกัน |
 
 
+---
+
+## 🏷️ 15. ระบบพิมพ์ใบปะหน้าพัสดุและจัดการที่อยู่อัจฉริยะ (Shipping Labels & Smart Address Parser)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 15.1 | `parseSingleAddress(text)` | `src/utils/addressParser.js` | แยกชื่อผู้รับ, เบอร์โทร, ที่อยู่ และรหัสไปรษณีย์จากข้อความแชท/Note ที่วางด่วน (Smart Quick Paste) |
+| 15.2 | `extractPhone(text)` (Strict Thai Phone Regex) | `src/utils/addressParser.js` | ตรวจจับเบอร์โทรศัพท์ (06x, 08x, 09x, 02x, 03-07x, +66) โดยไม่จับตัวเลขข้ามบรรทัด และไม่จับเลข 0 จากท้ายรหัสไปรษณีย์มารวม (เช่น `20000 0875374130` แยกเป็นเบอร์ `087-537-4130` และรหัส `20000`) |
+| 15.3 | `extractPostalCode(text)` | `src/utils/addressParser.js` | สกัดรหัสไปรษณีย์ 5 หลัก และไม่สับสนกับบ้านเลขที่เศษส่วน เช่น `10123/45` |
+| 15.4 | `getCustomerCleanAddress(customer)` | `src/components/ShippingLabelModal.vue` | ตัดรหัสไปรษณีย์ที่ติดอยู่ในข้อความที่อยู่ออกอัตโนมัติ เพื่อป้องกันการแสดงรหัสไปรษณีย์ซ้ำซ้อนบนใบปะหน้า |
+| 15.5 | Isolated Direct Print Engine (`handlePrint`) | `src/components/ShippingLabelModal.vue` | พิมพ์ผ่าน hidden iframe แยกขาด 100% บังคับตัดหน้ากระดาษ 1 ใบ = 1 แผ่น ไม่ให้หน้าต่างแชทหรือ UI หลักแทรกเข้ามาในหน้าพิมพ์ |
+| 15.6 | สั่งพิมพ์รายบุคคล (`openPrintForCustomer`) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue`, `src/components/ShippingLabelModal.vue` | เมื่อกดปุ่ม `🖨️` ที่แถวลูกค้า ต้องเปิดหน้าต่างพิมพ์และเลือกเฉพาะลูกค้ารายนั้น (1 คน) เสมอ แม้ลูกค้าจะยังไม่ได้ระบุวันส่ง |
+| 15.7 | บันทึกสถานะ "พิมพ์แล้ว" (`togglePrinted`, `toggleCustomerPrinted`) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue`, `src/components/ShippingLabelModal.vue` | อัปเดต `labelPrinted: boolean` และ `labelPrintedAt: timestamp` ลง Firebase ทันทีเมื่อคลิกสลับ หรือเมื่อสั่งพิมพ์ใบปะหน้าเสร็จสิ้น |
+| 15.8 | Customer Selector & Filter Chips | `src/components/ShippingLabelModal.vue` | ค้นหาชื่อผู้รับ, เลือก/ยกเลิกทั้งหมด, กรองเฉพาะที่ยังไม่พิมพ์ (`unprinted`) และสลับเลือกรายชื่อแบบ Checkbox ได้อย่างอิสระ |
+| 15.9 | Clean Borderless Label Layout (130x76mm / 76x130mm) | `src/components/ShippingLabelModal.vue` | ดีไซน์สะอาดตา ไร้กรอบดำ ผู้ส่งอยู่ซ้าย ผู้รับอยู่ขวา (เว้นขอบล่าง 10%) และข้อความขอบคุณอยู่กึ่งกลางล่างสุด |
+| 15.10 | Multi-Address & Custom Recipient Name | `src/components/CustomerAddressModal.vue` | แยกชื่อผู้รับจริง (`recipientName`) จากชื่อ CF และรองรับการบันทึกหลายที่อยู่ต่อ 1 ลูกค้าลง Address Book |
+
+
 ## How to Verify
 
 1. Review the diff of changed files

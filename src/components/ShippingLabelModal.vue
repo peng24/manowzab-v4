@@ -205,30 +205,6 @@
           class="shipping-label-card"
           :class="['label-' + paperSize, orientation === 'landscape' ? 'layout-landscape' : 'layout-portrait']"
         >
-          <!-- Preview Card Top Bar (Non-Printable) -->
-          <div class="card-preview-header no-print">
-            <div class="cph-info">
-              <span class="cph-name">👤 {{ customer.name }}</span>
-              <span
-                class="cph-printed-tag"
-                :class="customer.labelPrinted ? 'printed' : 'unprinted'"
-                @click="toggleCustomerPrinted(customer)"
-                :title="customer.labelPrinted ? 'คลิกเพื่อเปลี่ยนเป็นยังไม่พิมพ์' : 'คลิกเพื่อเปลี่ยนเป็นพิมพ์แล้ว'"
-              >
-                <i :class="customer.labelPrinted ? 'fa-solid fa-circle-check' : 'fa-solid fa-print'"></i>
-                {{ customer.labelPrinted ? 'พิมพ์แล้ว' : 'ยังไม่พิมพ์' }}
-              </span>
-            </div>
-            <button
-              class="cph-remove-btn"
-              @click="toggleCustomerSelection(customer.id)"
-              title="เอาใบนี้ออกจากรายการสั่งพิมพ์"
-            >
-              ✕ ไม่พิมพ์ใบนี้
-            </button>
-          </div>
-          :class="['label-' + paperSize, orientation === 'landscape' ? 'layout-landscape' : 'layout-portrait']"
-        >
           <!-- LANDSCAPE: 2-Column Split Layout -->
           <div class="label-main-grid" v-if="orientation === 'landscape'">
             <!-- Left Column: Sender (FROM) -->
@@ -354,6 +330,13 @@ function getDiffDays(deliveryDate) {
 }
 
 const activeRequested = computed(() => {
+  if (props.initialSelectedId) {
+    const target = props.customers.find((c) => c.id === props.initialSelectedId);
+    const others = props.customers.filter(
+      (c) => c.id !== props.initialSelectedId && c.status !== "done" && c.deliveryDate && c.deliveryDate.trim() !== ""
+    );
+    return target ? [target, ...others] : others;
+  }
   return props.customers.filter(
     (c) => c.status !== "done" && c.deliveryDate && c.deliveryDate.trim() !== ""
   );
@@ -414,10 +397,23 @@ const isAllSelected = computed(() => {
   return currentPool.value.length > 0 && selectedIds.value.length === currentPool.value.length;
 });
 
+watch(
+  () => props.initialSelectedId,
+  (newId) => {
+    if (newId) {
+      filterType.value = "all-requested";
+      selectedIds.value = [newId];
+      searchQuery.value = "";
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   if (props.initialSelectedId) {
     filterType.value = "all-requested";
     selectedIds.value = [props.initialSelectedId];
+    searchQuery.value = "";
   } else {
     // Default to unprinted if available, otherwise today or all-requested
     if (unprintedCount.value > 0) {
@@ -1163,67 +1159,7 @@ onMounted(() => {
   padding: 6px;
 }
 
-/* Card Preview Top Bar (Non-Printable) */
-.card-preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 8px;
-  background: #f1f5f9;
-  border-bottom: 1px dashed #cbd5e1;
-  margin-bottom: 6px;
-  border-radius: 4px 4px 0 0;
-  font-size: 0.8em;
-}
 
-.cph-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cph-name {
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.cph-printed-tag {
-  font-size: 0.75em;
-  padding: 1px 6px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  user-select: none;
-}
-
-.cph-printed-tag.printed {
-  background: #dcfce7;
-  color: #15803d;
-  border: 1px solid #86efac;
-}
-
-.cph-printed-tag.unprinted {
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fcd34d;
-}
-
-.cph-remove-btn {
-  background: transparent;
-  border: 1px solid #cbd5e1;
-  color: #64748b;
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 0.75em;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.cph-remove-btn:hover {
-  background: #fee2e2;
-  color: #dc2626;
-  border-color: #fca5a5;
-}
 
 .slm-options-row {
   display: flex;

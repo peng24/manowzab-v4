@@ -38,8 +38,9 @@ export function formatPhoneNumber(phone) {
 export function extractPhone(text) {
   if (!text) return { phone: '', cleanedText: '' };
 
-  // Match 0xx-xxx-xxxx, 0xx.xxx.xxxx, 0xxxxxxxxx, +66xxxxxxxxx, 02-xxx-xxxx
-  const phoneRegex = /(?:(?:\+66|0)[-\s.]?\d{1,2}[-\s.]?\d{3}[-\s.]?\d{4}|\b0[689]\d{8}\b|\b0[2-7]\d{7}\b)/;
+  // Match Thai mobile (06x, 08x, 09x) & landline (02x, 03x, 04x, 05x, 07x) and +66 formats
+  // Ensure we don't match across newlines and don't match sub-parts of zipcodes or house numbers
+  const phoneRegex = /(?<!\d)(?:(?:\+66\s*|0)[689]\d[-. ]?\d{3,4}[-. ]?\d{3,4}|(?:\+66\s*|0)[2-57]\d?[-. ]?\d{3}[-. ]?\d{3,4}|\b0[689]\d{8}\b|\b0[2-7]\d{7,8}\b)(?!\d)/;
   const match = text.match(phoneRegex);
 
   if (match) {

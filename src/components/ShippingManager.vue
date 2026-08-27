@@ -163,11 +163,11 @@
                 'row-done': c.status === 'done'
               }"
             >
-              <td class="td-center">{{ idx + 1 }}</td>
+              <td class="td-center td-index">{{ idx + 1 }}</td>
               <td>
                 <input
                   type="text"
-                  class="sm-edit-input"
+                  class="sm-edit-input sm-customer-name"
                   :value="c.name"
                   @change="updateField(c.id, 'name', $event.target.value)"
                 />
@@ -191,6 +191,17 @@
                         ยังไม่มีที่อยู่
                       </template>
                     </span>
+                  </span>
+
+                  <!-- 🖨️ Printed status badge with toggle -->
+                  <span
+                    class="sm-printed-pill"
+                    :class="c.labelPrinted ? 'printed' : 'unprinted'"
+                    @click.stop="togglePrinted(c)"
+                    :title="c.labelPrinted ? 'พิมพ์ใบปะหน้าแล้ว (คลิกเพื่อเปลี่ยนเป็นยังไม่พิมพ์)' : 'ยังไม่ได้พิมพ์ใบปะหน้า (คลิกเพื่อเปลี่ยนเป็นพิมพ์แล้ว)'"
+                  >
+                    <i :class="c.labelPrinted ? 'fa-solid fa-circle-check' : 'fa-solid fa-print'"></i>
+                    <span>{{ c.labelPrinted ? 'พิมพ์แล้ว' : 'ยังไม่พิมพ์' }}</span>
                   </span>
                 </div>
               </td>
@@ -239,6 +250,14 @@
               </td>
               <td class="td-center">
                 <div class="action-btns">
+                  <button
+                    class="action-btn print-btn"
+                    :class="{ 'is-printed': c.labelPrinted }"
+                    @click="openPrintForCustomer(c)"
+                    :title="c.labelPrinted ? 'พิมพ์แล้ว (คลิกเพื่อดู/พิมพ์ซ้ำเฉพาะคนนี้)' : 'พิมพ์ใบปะหน้าเฉพาะคนนี้'"
+                  >
+                    🖨️
+                  </button>
                   <button
                     v-if="c.status !== 'done'"
                     class="action-btn done-btn"
@@ -296,10 +315,25 @@
               <span v-else class="sm-addr-tag none" @click="promptEditAddress(c)">
                 + ใส่ที่อยู่
               </span>
+              <span
+                class="sm-printed-pill"
+                :class="c.labelPrinted ? 'printed' : 'unprinted'"
+                @click.stop="togglePrinted(c)"
+                :title="c.labelPrinted ? 'พิมพ์แล้ว (คลิกเพื่อสลับ)' : 'ยังไม่พิมพ์ (คลิกเพื่อสลับ)'"
+              >
+                <i :class="c.labelPrinted ? 'fa-solid fa-circle-check' : 'fa-solid fa-print'"></i>
+                <span>{{ c.labelPrinted ? 'พิมพ์แล้ว' : 'ยังไม่พิมพ์' }}</span>
+              </span>
             </div>
             <div class="sm-card-footer">
               <div style="font-size: 0.85em; color: #94a3b8;">{{ c.note || 'ไม่มีโน้ต' }}</div>
               <div class="action-btns">
+                <button
+                  class="action-btn print-btn"
+                  :class="{ 'is-printed': c.labelPrinted }"
+                  @click="openPrintForCustomer(c)"
+                  title="พิมพ์ใบปะหน้าเฉพาะคนนี้"
+                >🖨️ พิมพ์</button>
                 <button
                   v-if="c.status !== 'done'"
                   class="action-btn done-btn"
@@ -337,7 +371,8 @@
       v-if="showShippingLabels"
       :customers="allCustomers"
       :addressBook="addressBook"
-      @close="showShippingLabels = false"
+      :initialSelectedId="selectedCustomerForPrint"
+      @close="showShippingLabels = false; selectedCustomerForPrint = null"
     />
 
     <!-- 📥 Address Import Modal -->
@@ -389,6 +424,7 @@ const newDate = ref("");
 const showDone = ref(false);
 const viewMode = ref("requested"); // 'requested' | 'unassigned' | 'all'
 const showShippingLabels = ref(false);
+const selectedCustomerForPrint = ref(null);
 const showAddressImport = ref(false);
 const selectedCustomerForAddress = ref(null);
 const addressBook = ref({});
@@ -837,6 +873,31 @@ function markDone(customer) {
   });
 }
 
+function openPrintForCustomer(customer) {
+  selectedCustomerForPrint.value = customer.id;
+  showShippingLabels.value = true;
+}
+
+async function togglePrinted(customer) {
+  const newStatus = !customer.labelPrinted;
+  try {
+    await update(dbRef(db, `delivery_customers/${customer.id}`), {
+      labelPrinted: newStatus,
+      labelPrintedAt: newStatus ? Date.now() : null,
+    });
+    Swal.fire({
+      icon: "success",
+      title: newStatus ? `ทำเครื่องหมาย "${customer.name}" พิมพ์แล้ว` : `ยกเลิกสถานะพิมพ์แล้วของ "${customer.name}"`,
+      toast: true,
+      position: "top-end",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    console.error("Failed to toggle labelPrinted:", err);
+  }
+}
+
 function undoDone(customer) {
   const updates = {
     status: "pending",
@@ -1086,6 +1147,13 @@ function deleteCustomer(id, name) {
 .sm-table td { padding: 7px 6px; border-bottom: 1px solid #2a2a2a; vertical-align: middle; }
 .sm-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
 .td-center { text-align: center; }
+.td-index {
+  font-size: 1.35em;
+  font-weight: 800;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
 .row-urgent { background: rgba(239, 68, 68, 0.06) !important; }
 .row-pack-tonight { background: rgba(249, 115, 22, 0.06) !important; border-left: 3px solid #f97316; }
 .row-done { opacity: 0.45; }
@@ -1095,6 +1163,7 @@ function deleteCustomer(id, name) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  font-size: 1.15em;
   font-weight: 700;
   color: #10b981;
 }
@@ -1103,11 +1172,12 @@ function deleteCustomer(id, name) {
 
 /* Lifetime Bookings (ลูกค้าประจำ) */
 .lifetime-bookings {
-  font-size: 0.7em;
-  color: #8b5cf6;
-  margin-top: 2px;
-  padding-left: 8px;
-  opacity: 0.85;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #c084fc;
+  margin-top: 3px;
+  padding-left: 6px;
+  opacity: 0.95;
   letter-spacing: 0.3px;
 }
 
@@ -1123,6 +1193,7 @@ function deleteCustomer(id, name) {
 }
 
 .thai-date {
+  font-size: 1.05em;
   font-weight: 600;
   color: #e0e0e0;
   white-space: nowrap;
@@ -1167,6 +1238,14 @@ function deleteCustomer(id, name) {
   font-size: 0.95em;
   width: 100%;
   transition: border-color 0.2s;
+}
+
+.sm-customer-name {
+  font-size: 1.45em;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+  line-height: 1.25;
 }
 
 .sm-edit-input:hover { border-color: #555; }
@@ -1231,19 +1310,40 @@ function deleteCustomer(id, name) {
 }
 
 /* Action Buttons */
-.action-btns { display: flex; gap: 6px; justify-content: center; }
+.action-btns { display: flex; gap: 6px; justify-content: center; align-items: center; }
 
 .action-btn {
   background: transparent;
   border: none;
   font-size: 1.1em;
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
   transition: transform 0.15s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.action-btn:hover { transform: scale(1.2); background: rgba(255,255,255,0.05); }
+.action-btn:hover { transform: scale(1.15); background: rgba(255,255,255,0.08); }
+
+.action-btn.print-btn {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+  font-size: 0.9em;
+}
+
+.action-btn.print-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #3b82f6;
+}
+
+.action-btn.print-btn.is-printed {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
 
 /* Footer */
 .sm-footer { padding: 10px 0 0; border-top: 1px solid #2a2a2a; }
@@ -1273,17 +1373,21 @@ function deleteCustomer(id, name) {
 
 /* Subtle Address Pill in Table & Card */
 .sm-addr-row, .sm-card-addr {
-  margin-top: 4px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .sm-addr-mini-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.72em;
-  font-weight: 500;
-  padding: 1px 8px;
-  border-radius: 12px;
+  gap: 6px;
+  font-size: 0.92em;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 14px;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
@@ -1291,26 +1395,70 @@ function deleteCustomer(id, name) {
 }
 
 .sm-addr-mini-pill.has {
-  background: rgba(16, 185, 129, 0.08);
+  background: rgba(16, 185, 129, 0.1);
   color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
 .sm-addr-mini-pill.has:hover {
-  background: rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.2);
   border-color: #10b981;
 }
 
 .sm-addr-mini-pill.none {
-  background: rgba(255, 255, 255, 0.03);
-  color: #71717a;
-  border: 1px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: #a1a1aa;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
 }
 
 .sm-addr-mini-pill.none:hover {
   background: rgba(255, 255, 255, 0.08);
-  color: #a1a1aa;
-  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Printed Status Pill */
+.sm-printed-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.92em;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  line-height: 1.4;
+}
+
+.sm-printed-pill.printed {
+  background: rgba(16, 185, 129, 0.14);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.sm-printed-pill.printed:hover {
+  background: rgba(16, 185, 129, 0.24);
+  border-color: #10b981;
+}
+
+.sm-printed-pill.unprinted {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border: 1px dashed rgba(245, 158, 11, 0.35);
+}
+
+.sm-printed-pill.unprinted:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+}
+
+.sm-card-name {
+  font-size: 1.35em;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.3px;
 }
 
 .multi-count {

@@ -35,6 +35,19 @@ describe('Smart Address Parser Suite', () => {
       const res = extractPhone('Tel. 081-999-8888');
       expect(res.phone).toBe('081-999-8888');
     });
+
+    it('extracts 10-digit continuous phone number after 5-digit postal code (prevents 20000 0875374130 bleeding)', () => {
+      const input = `29/144ม.2มบ.เพชรทวี
+ต.บ้านสวน อ.เมือง จ.ชลบุรี 20000
+0875374130`;
+      const res = extractPhone(input);
+      expect(res.phone).toBe('087-537-4130');
+
+      const parsed = parseSingleAddress(input);
+      expect(parsed.phone).toBe('087-537-4130');
+      expect(parsed.postalCode).toBe('20000');
+      expect(parsed.address).toContain('29/144ม.2มบ.เพชรทวี ต.บ้านสวน อ.เมือง จ.ชลบุรี 20000');
+    });
   });
 
   describe('extractPostalCode', () => {

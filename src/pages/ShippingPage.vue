@@ -205,6 +205,17 @@
                 </template>
               </span>
             </span>
+
+            <!-- 🖨️ Printed status badge with toggle -->
+            <span
+              class="sp-printed-pill"
+              :class="c.labelPrinted ? 'printed' : 'unprinted'"
+              @click.stop="togglePrinted(c)"
+              :title="c.labelPrinted ? 'พิมพ์แล้ว (คลิกเพื่อเปลี่ยนเป็นยังไม่พิมพ์)' : 'ยังไม่พิมพ์ (คลิกเพื่อเปลี่ยนเป็นพิมพ์แล้ว)'"
+            >
+              <i :class="c.labelPrinted ? 'fa-solid fa-circle-check' : 'fa-solid fa-print'"></i>
+              <span>{{ c.labelPrinted ? 'พิมพ์แล้ว' : 'ยังไม่พิมพ์' }}</span>
+            </span>
           </div>
 
           <!-- Row 4: Note (compact) -->
@@ -224,6 +235,12 @@
 
           <!-- Actions: bottom-right -->
           <div class="sp-actions">
+            <button
+              class="sp-act sp-act--print"
+              :class="{ 'is-printed': c.labelPrinted }"
+              @click="openPrintForCustomer(c)"
+              title="พิมพ์ใบปะหน้าเฉพาะคนนี้"
+            >🖨️</button>
             <button
               v-if="c.status !== 'done'"
               class="sp-act sp-act--done"
@@ -262,7 +279,8 @@
       v-if="showShippingLabels"
       :customers="allCustomers"
       :addressBook="addressBook"
-      @close="showShippingLabels = false"
+      :initialSelectedId="selectedCustomerForPrint"
+      @close="showShippingLabels = false; selectedCustomerForPrint = null"
     />
 
     <!-- 📥 Address Import Modal -->
@@ -315,6 +333,7 @@ const activeFilter = ref("requested");
 const isRefreshing = ref(false);
 const shippingCycle = ref("today");
 const showShippingLabels = ref(false);
+const selectedCustomerForPrint = ref(null);
 const showAddressImport = ref(false);
 const selectedCustomerForAddress = ref(null);
 const addressBook = ref({});
@@ -759,6 +778,31 @@ function markDone(customer) {
   });
 }
 
+function openPrintForCustomer(customer) {
+  selectedCustomerForPrint.value = customer.id;
+  showShippingLabels.value = true;
+}
+
+async function togglePrinted(customer) {
+  const newStatus = !customer.labelPrinted;
+  try {
+    await update(dbRef(db, `delivery_customers/${customer.id}`), {
+      labelPrinted: newStatus,
+      labelPrintedAt: newStatus ? Date.now() : null,
+    });
+    Swal.fire({
+      icon: "success",
+      title: newStatus ? `ทำเครื่องหมาย "${customer.name}" พิมพ์แล้ว` : `ยกเลิกสถานะพิมพ์แล้วของ "${customer.name}"`,
+      toast: true,
+      position: "top-end",
+      timer: 1200,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    console.error("Failed to toggle labelPrinted:", err);
+  }
+}
+
 function undoDone(customer) {
   const updates = { status: "pending", updatedAt: Date.now() };
   if (customer.sessions) {
@@ -1189,11 +1233,12 @@ body {
   border: none;
   color: #fff;
   font-family: inherit;
-  font-size: 0.95em;
-  font-weight: 600;
+  font-size: 1.35em;
+  font-weight: 800;
   padding: 2px 0;
   border-bottom: 1px solid transparent;
   transition: border-color 0.15s;
+  letter-spacing: 0.3px;
 }
 
 .sp-name:focus {
@@ -1419,16 +1464,20 @@ body {
 .sp-row-addr {
   margin-top: 3px;
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .sp-addr-mini-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.7em;
-  font-weight: 500;
-  padding: 1px 7px;
-  border-radius: 12px;
+  gap: 5px;
+  font-size: 0.85em;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 14px;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
@@ -1436,26 +1485,71 @@ body {
 }
 
 .sp-addr-mini-pill.has {
-  background: rgba(16, 185, 129, 0.08);
+  background: rgba(16, 185, 129, 0.1);
   color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
 .sp-addr-mini-pill.has:hover {
-  background: rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.2);
   border-color: #10b981;
 }
 
 .sp-addr-mini-pill.none {
-  background: rgba(255, 255, 255, 0.03);
-  color: #71717a;
-  border: 1px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: #a1a1aa;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
 }
 
 .sp-addr-mini-pill.none:hover {
   background: rgba(255, 255, 255, 0.08);
-  color: #a1a1aa;
-  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Printed Status Pill */
+.sp-printed-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85em;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  line-height: 1.4;
+}
+
+.sp-printed-pill.printed {
+  background: rgba(16, 185, 129, 0.14);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.sp-printed-pill.printed:hover {
+  background: rgba(16, 185, 129, 0.24);
+  border-color: #10b981;
+}
+
+.sp-printed-pill.unprinted {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border: 1px dashed rgba(245, 158, 11, 0.3);
+}
+
+.sp-printed-pill.unprinted:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+}
+
+.sp-act--print {
+  color: #60a5fa;
+}
+
+.sp-act--print.is-printed {
+  color: #34d399;
 }
 
 .multi-count {

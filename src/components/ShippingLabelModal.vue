@@ -18,6 +18,13 @@
         <div class="slm-filter-group">
           <button
             class="slm-filter-btn"
+            :class="{ active: filterType === 'unprinted' }"
+            @click="setFilter('unprinted')"
+          >
+            ⏳ ยังไม่พิมพ์ ({{ unprintedCount }})
+          </button>
+          <button
+            class="slm-filter-btn"
             :class="{ active: filterType === 'today' }"
             @click="setFilter('today')"
           >
@@ -37,6 +44,69 @@
           >
             🌐 ทั้งหมดที่รอส่ง ({{ allRequestedCount }})
           </button>
+        </div>
+
+        <!-- 👥 Customer Selector Bar & Chips (เลือกรายบุคคล) -->
+        <div class="slm-customer-selector">
+          <div class="slm-selector-header">
+            <div class="slm-search-box">
+              <i class="fa-solid fa-magnifying-glass slm-search-icon"></i>
+              <input
+                type="text"
+                v-model="searchQuery"
+                class="slm-search-input"
+                placeholder="🔍 ค้นหาชื่อลูกค้า / ผู้รับ (เช่น หนิง, ปิยะวาท)..."
+              />
+              <button v-if="searchQuery" class="slm-clear-search" @click="searchQuery = ''">✕</button>
+            </div>
+            <div class="slm-quick-select-btns">
+              <button class="slm-mini-btn" @click="selectedIds = currentPool.map(c => c.id)">
+                <i class="fa-solid fa-check-double"></i> เลือกทั้งหมด
+              </button>
+              <button class="slm-mini-btn" @click="selectedIds = []">
+                <i class="fa-solid fa-xmark"></i> ยกเลิกทั้งหมด
+              </button>
+              <button class="slm-mini-btn highlight" @click="selectedIds = currentPool.filter(c => !c.labelPrinted).map(c => c.id)">
+                <i class="fa-solid fa-filter"></i> เฉพาะที่ยังไม่พิมพ์
+              </button>
+            </div>
+          </div>
+
+          <div class="slm-chips-scroll">
+            <div
+              v-for="c in currentPool"
+              :key="c.id"
+              class="slm-cust-chip"
+              :class="{
+                'selected': selectedIds.includes(c.id),
+                'printed': c.labelPrinted,
+                'no-address': !getCustomerAddress(c)
+              }"
+              @click="toggleCustomerSelection(c.id)"
+              :title="`คลิกเพื่อ ${selectedIds.includes(c.id) ? 'ยกเลิก' : 'เลือก'} ${c.name}`"
+            >
+              <span class="chip-checkbox">
+                <i class="fa-solid" :class="selectedIds.includes(c.id) ? 'fa-square-check' : 'fa-square'"></i>
+              </span>
+              <span class="chip-name">{{ c.name }}</span>
+              <span class="chip-items" v-if="c.itemCount">({{ c.itemCount }} ชิ้น)</span>
+              <span
+                class="chip-status-tag"
+                :class="c.labelPrinted ? 'is-printed' : 'is-unprinted'"
+                @click.stop="toggleCustomerPrinted(c)"
+                :title="c.labelPrinted ? 'พิมพ์แล้ว (คลิกเพื่อเปลี่ยนเป็นยังไม่พิมพ์)' : 'ยังไม่พิมพ์ (คลิกเพื่อเปลี่ยนเป็นพิมพ์แล้ว)'"
+              >
+                <i :class="c.labelPrinted ? 'fa-solid fa-circle-check' : 'fa-solid fa-print'"></i>
+                {{ c.labelPrinted ? 'พิมพ์แล้ว' : 'ยังไม่พิมพ์' }}
+              </span>
+              <span v-if="!getCustomerAddress(c)" class="chip-warn-tag" title="ยังไม่มีที่อยู่">
+                ⚠️ รอที่อยู่
+              </span>
+            </div>
+            <div v-if="currentPool.length === 0" class="slm-no-chips">
+              ไม่พบรายชื่อในหมวดนี้
+            </div>
+          </div>
         </div>
 
         <div class="slm-options-row">
@@ -105,7 +175,7 @@
                 :checked="isAllSelected"
                 @change="toggleSelectAll($event.target.checked)"
               />
-              <span>เลือกทั้งหมด ({{ selectedIds.length }} จาก {{ currentPool.length }})</span>
+              <span>เลือก {{ selectedIds.length }} จาก {{ currentPool.length }} คน</span>
             </label>
             <span class="slm-addr-counter" v-if="printableCustomers.length > 0">
               <span class="cnt-item has"><i class="fa-solid fa-circle-check"></i> มีที่อยู่ {{ hasAddressCount }}</span>
@@ -115,7 +185,7 @@
 
           <div style="display: flex; gap: 8px;">
             <button class="btn btn-primary slm-print-btn" @click="handlePrint" :disabled="printableCustomers.length === 0">
-              <i class="fa-solid fa-print"></i> พิมพ์ใบปะหน้าแนวนอน ({{ printableCustomers.length }} รายการ)
+              <i class="fa-solid fa-print"></i> สั่งพิมพ์ใบปะหน้า ({{ printableCustomers.length }} ใบ)
             </button>
           </div>
         </div>
@@ -125,7 +195,7 @@
       <div class="slm-preview-area" :class="['paper-' + paperSize, 'mode-' + orientation]">
         <div v-if="printableCustomers.length === 0" class="slm-empty-state no-print">
           <i class="fa-solid fa-box-open slm-empty-icon"></i>
-          <div>ไม่มีรายการที่เลือกพิมพ์ หรือยังไม่มีที่อยู่จัดส่ง</div>
+          <div>ไม่มีรายการที่เลือกพิมพ์ (กรุณาคลิกเลือกรายชื่อลูกค้าด้านบน)</div>
         </div>
 
         <!-- Labels Loop (Landscape Mode by Default) -->
@@ -133,6 +203,30 @@
           v-for="customer in printableCustomers"
           :key="customer.id"
           class="shipping-label-card"
+          :class="['label-' + paperSize, orientation === 'landscape' ? 'layout-landscape' : 'layout-portrait']"
+        >
+          <!-- Preview Card Top Bar (Non-Printable) -->
+          <div class="card-preview-header no-print">
+            <div class="cph-info">
+              <span class="cph-name">👤 {{ customer.name }}</span>
+              <span
+                class="cph-printed-tag"
+                :class="customer.labelPrinted ? 'printed' : 'unprinted'"
+                @click="toggleCustomerPrinted(customer)"
+                :title="customer.labelPrinted ? 'คลิกเพื่อเปลี่ยนเป็นยังไม่พิมพ์' : 'คลิกเพื่อเปลี่ยนเป็นพิมพ์แล้ว'"
+              >
+                <i :class="customer.labelPrinted ? 'fa-solid fa-circle-check' : 'fa-solid fa-print'"></i>
+                {{ customer.labelPrinted ? 'พิมพ์แล้ว' : 'ยังไม่พิมพ์' }}
+              </span>
+            </div>
+            <button
+              class="cph-remove-btn"
+              @click="toggleCustomerSelection(customer.id)"
+              title="เอาใบนี้ออกจากรายการสั่งพิมพ์"
+            >
+              ✕ ไม่พิมพ์ใบนี้
+            </button>
+          </div>
           :class="['label-' + paperSize, orientation === 'landscape' ? 'layout-landscape' : 'layout-portrait']"
         >
           <!-- LANDSCAPE: 2-Column Split Layout -->
@@ -201,6 +295,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
+import { ref as dbRef, update } from "firebase/database";
+import { db } from "../composables/useFirebase";
 import { normalizeName } from "../utils/addressParser";
 import Swal from "sweetalert2";
 
@@ -213,15 +309,20 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  initialSelectedId: {
+    type: String,
+    default: null,
+  },
 });
 
 defineEmits(["close"]);
 
-const filterType = ref("today"); // 'today' | 'pack-tonight' | 'all-requested'
+const filterType = ref("unprinted"); // 'unprinted' | 'today' | 'pack-tonight' | 'all-requested'
 const orientation = ref("landscape"); // 'landscape' (แนวนอน 130x76mm) | 'portrait' (แนวตั้ง 76x130mm)
 const paperSize = ref("thermal-76x130"); // Default 76x130mm
 const showSenderConfig = ref(false);
 const selectedIds = ref([]);
+const searchQuery = ref("");
 
 // Sender State with LocalStorage memory (Defaults from user screenshot)
 const sender = ref({
@@ -258,6 +359,10 @@ const activeRequested = computed(() => {
   );
 });
 
+const unprintedCount = computed(() => {
+  return activeRequested.value.filter((c) => !c.labelPrinted).length;
+});
+
 const todayCount = computed(() => {
   return activeRequested.value.filter((c) => getDiffDays(c.deliveryDate) === 0).length;
 });
@@ -271,13 +376,26 @@ const allRequestedCount = computed(() => {
 });
 
 const currentPool = computed(() => {
-  if (filterType.value === "today") {
-    return activeRequested.value.filter((c) => getDiffDays(c.deliveryDate) === 0);
+  let list = activeRequested.value;
+  if (filterType.value === "unprinted") {
+    list = activeRequested.value.filter((c) => !c.labelPrinted);
+  } else if (filterType.value === "today") {
+    list = activeRequested.value.filter((c) => getDiffDays(c.deliveryDate) === 0);
+  } else if (filterType.value === "pack-tonight") {
+    list = activeRequested.value.filter((c) => getDiffDays(c.deliveryDate) === 1);
   }
-  if (filterType.value === "pack-tonight") {
-    return activeRequested.value.filter((c) => getDiffDays(c.deliveryDate) === 1);
+
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase();
+    list = list.filter((c) => {
+      const name = (c.name || "").toLowerCase();
+      const rec = (c.recipientName || "").toLowerCase();
+      const addr = (getCustomerAddress(c) || "").toLowerCase();
+      return name.includes(q) || rec.includes(q) || addr.includes(q);
+    });
   }
-  return activeRequested.value;
+
+  return list;
 });
 
 const printableCustomers = computed(() => {
@@ -296,6 +414,23 @@ const isAllSelected = computed(() => {
   return currentPool.value.length > 0 && selectedIds.value.length === currentPool.value.length;
 });
 
+onMounted(() => {
+  if (props.initialSelectedId) {
+    filterType.value = "all-requested";
+    selectedIds.value = [props.initialSelectedId];
+  } else {
+    // Default to unprinted if available, otherwise today or all-requested
+    if (unprintedCount.value > 0) {
+      filterType.value = "unprinted";
+    } else if (todayCount.value > 0) {
+      filterType.value = "today";
+    } else {
+      filterType.value = "all-requested";
+    }
+    selectedIds.value = currentPool.value.map((c) => c.id);
+  }
+});
+
 function setFilter(type) {
   filterType.value = type;
   selectedIds.value = currentPool.value.map((c) => c.id);
@@ -306,6 +441,35 @@ function toggleSelectAll(checked) {
     selectedIds.value = currentPool.value.map((c) => c.id);
   } else {
     selectedIds.value = [];
+  }
+}
+
+function toggleCustomerSelection(id) {
+  const idx = selectedIds.value.indexOf(id);
+  if (idx > -1) {
+    selectedIds.value.splice(idx, 1);
+  } else {
+    selectedIds.value.push(id);
+  }
+}
+
+async function toggleCustomerPrinted(c) {
+  const newStatus = !c.labelPrinted;
+  try {
+    await update(dbRef(db, `delivery_customers/${c.id}`), {
+      labelPrinted: newStatus,
+      labelPrintedAt: newStatus ? Date.now() : null,
+    });
+    Swal.fire({
+      icon: "success",
+      title: newStatus ? `ทำเครื่องหมาย "${c.name}" พิมพ์แล้ว` : `ยกเลิกสถานะพิมพ์แล้วของ "${c.name}"`,
+      toast: true,
+      position: "top-end",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    console.error("Error updating printed status:", err);
   }
 }
 
@@ -609,6 +773,21 @@ function handlePrint() {
     } catch (e) {}
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
+
+    // Auto mark printed customers in Firebase
+    try {
+      const updates = {};
+      const now = Date.now();
+      printableCustomers.value.forEach((c) => {
+        updates[`delivery_customers/${c.id}/labelPrinted`] = true;
+        updates[`delivery_customers/${c.id}/labelPrintedAt`] = now;
+      });
+      if (Object.keys(updates).length > 0) {
+        await update(dbRef(db), updates);
+      }
+    } catch (err) {
+      console.error("Error auto-updating labelPrinted status:", err);
+    }
   }, 250);
 }
 
@@ -795,6 +974,255 @@ onMounted(() => {
   border-color: #3b82f6;
   color: #60a5fa;
   font-weight: 700;
+}
+
+/* Customer Selector Strip */
+.slm-customer-selector {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slm-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.slm-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+}
+
+.slm-search-icon {
+  position: absolute;
+  left: 10px;
+  color: #71717a;
+  font-size: 0.85em;
+  pointer-events: none;
+}
+
+.slm-search-input {
+  width: 100%;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  padding: 5px 28px 5px 30px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.85em;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.slm-search-input:focus {
+  border-color: #3b82f6;
+  background: #202024;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.slm-clear-search {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #a1a1aa;
+  cursor: pointer;
+  font-size: 0.8em;
+  padding: 2px 4px;
+}
+
+.slm-quick-select-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.slm-mini-btn {
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  color: #d4d4d8;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.78em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.slm-mini-btn:hover {
+  background: #3f3f46;
+  color: #fff;
+}
+
+.slm-mini-btn.highlight {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.slm-mini-btn.highlight:hover {
+  background: rgba(245, 158, 11, 0.22);
+}
+
+.slm-chips-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  max-height: 85px;
+  flex-wrap: wrap;
+}
+
+.slm-cust-chip {
+  background: #202024;
+  border: 1px solid #333338;
+  border-radius: 8px;
+  padding: 4px 8px;
+  color: #a1a1aa;
+  font-family: inherit;
+  font-size: 0.82em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.slm-cust-chip:hover {
+  background: #27272a;
+  color: #fff;
+  border-color: #52525b;
+}
+
+.slm-cust-chip.selected {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+.slm-cust-chip.selected .chip-checkbox {
+  color: #3b82f6;
+}
+
+.chip-name {
+  font-weight: 600;
+  color: #f4f4f5;
+}
+
+.chip-items {
+  font-size: 0.85em;
+  color: #10b981;
+  font-weight: 700;
+}
+
+.chip-status-tag {
+  font-size: 0.72em;
+  padding: 1px 5px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s;
+}
+
+.chip-status-tag.is-printed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.chip-status-tag.is-unprinted {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.chip-warn-tag {
+  font-size: 0.7em;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.slm-no-chips {
+  font-size: 0.8em;
+  color: #71717a;
+  padding: 6px;
+}
+
+/* Card Preview Top Bar (Non-Printable) */
+.card-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: #f1f5f9;
+  border-bottom: 1px dashed #cbd5e1;
+  margin-bottom: 6px;
+  border-radius: 4px 4px 0 0;
+  font-size: 0.8em;
+}
+
+.cph-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cph-name {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.cph-printed-tag {
+  font-size: 0.75em;
+  padding: 1px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+.cph-printed-tag.printed {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.cph-printed-tag.unprinted {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+.cph-remove-btn {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.75em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cph-remove-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
 }
 
 .slm-options-row {

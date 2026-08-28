@@ -329,43 +329,44 @@ function getDiffDays(deliveryDate) {
   return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
 }
 
-const activeRequested = computed(() => {
-  if (props.initialSelectedId) {
-    const target = props.customers.find((c) => c.id === props.initialSelectedId);
-    const others = props.customers.filter(
-      (c) => c.id !== props.initialSelectedId && c.status !== "done" && c.deliveryDate && c.deliveryDate.trim() !== ""
-    );
-    return target ? [target, ...others] : others;
-  }
+const allAvailableCustomers = computed(() => {
   return props.customers.filter(
-    (c) => c.status !== "done" && c.deliveryDate && c.deliveryDate.trim() !== ""
+    (c) => (props.initialSelectedId && c.id === props.initialSelectedId) || c.status !== "done"
   );
 });
 
 const unprintedCount = computed(() => {
-  return activeRequested.value.filter((c) => !c.labelPrinted).length;
+  return allAvailableCustomers.value.filter((c) => !c.labelPrinted).length;
 });
 
 const todayCount = computed(() => {
-  return activeRequested.value.filter((c) => getDiffDays(c.deliveryDate) === 0).length;
+  return allAvailableCustomers.value.filter((c) => getDiffDays(c.deliveryDate) === 0).length;
 });
 
 const packTonightCount = computed(() => {
-  return activeRequested.value.filter((c) => getDiffDays(c.deliveryDate) === 1).length;
+  return allAvailableCustomers.value.filter((c) => getDiffDays(c.deliveryDate) === 1).length;
 });
 
 const allRequestedCount = computed(() => {
-  return activeRequested.value.length;
+  return allAvailableCustomers.value.length;
 });
 
 const currentPool = computed(() => {
-  let list = activeRequested.value;
+  let list = allAvailableCustomers.value;
   if (filterType.value === "unprinted") {
-    list = activeRequested.value.filter((c) => !c.labelPrinted);
+    list = allAvailableCustomers.value.filter((c) => !c.labelPrinted);
   } else if (filterType.value === "today") {
-    list = activeRequested.value.filter((c) => getDiffDays(c.deliveryDate) === 0);
+    list = allAvailableCustomers.value.filter((c) => getDiffDays(c.deliveryDate) === 0);
   } else if (filterType.value === "pack-tonight") {
-    list = activeRequested.value.filter((c) => getDiffDays(c.deliveryDate) === 1);
+    list = allAvailableCustomers.value.filter((c) => getDiffDays(c.deliveryDate) === 1);
+  }
+
+  // If props.initialSelectedId is provided, always ensure the target customer is in list and prioritized at the top
+  if (props.initialSelectedId) {
+    const target = allAvailableCustomers.value.find((c) => c.id === props.initialSelectedId);
+    if (target && !list.some((c) => c.id === props.initialSelectedId)) {
+      list = [target, ...list];
+    }
   }
 
   if (searchQuery.value.trim()) {
@@ -616,7 +617,7 @@ function handlePrint() {
       <head>
         <meta charset="utf-8">
         <title>พิมพ์ใบปะหน้าพัสดุ - ${senderName}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800;900&family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <style>
           @page {
             size: ${pageWidth} ${pageHeight} ${isLandscape ? "landscape" : "portrait"};
@@ -631,7 +632,7 @@ function handlePrint() {
             margin: 0;
             padding: 0;
             background: #ffffff;
-            font-family: 'Kanit', 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Sarabun', 'TH Sarabun New', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
@@ -677,24 +678,25 @@ function handlePrint() {
           .ls-sender {
             width: 28%;
             font-size: 8.5pt;
-            line-height: 1.35;
+            line-height: 1.4;
             display: flex;
             flex-direction: column;
             padding-top: 1mm;
           }
           .sender-name {
             font-size: 10.5pt;
-            font-weight: 800;
+            font-weight: 600;
             margin-bottom: 2px;
           }
           .sender-addr {
-            font-size: 8.2pt;
+            font-size: 8.5pt;
+            font-weight: 400;
             margin-top: 2px;
-            line-height: 1.35;
+            line-height: 1.4;
           }
           .sender-phone {
             font-size: 8.5pt;
-            font-weight: 700;
+            font-weight: 500;
             margin-top: 3px;
           }
           .ls-receiver {
@@ -710,7 +712,7 @@ function handlePrint() {
           }
           .port-sender {
             font-size: 8.5pt;
-            line-height: 1.35;
+            line-height: 1.4;
           }
           .port-receiver {
             flex: 1;
@@ -724,30 +726,30 @@ function handlePrint() {
           }
           .receiver-name {
             font-size: 13.5pt;
-            font-weight: 800;
-            line-height: 1.25;
+            font-weight: 600;
+            line-height: 1.3;
             margin-bottom: 3px;
           }
           .receiver-addr {
             font-size: 11pt;
-            line-height: 1.4;
-            font-weight: 600;
+            line-height: 1.45;
+            font-weight: 400;
           }
           .receiver-zip {
             margin-top: 3px;
             font-size: 14pt;
-            font-weight: 900;
-            letter-spacing: 2px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
           }
           .receiver-phone {
             font-size: 11pt;
-            font-weight: 800;
+            font-weight: 500;
             margin-top: 3px;
           }
           .card-footer {
             text-align: center;
             font-size: 9pt;
-            font-weight: 700;
+            font-weight: 400;
             margin-top: auto;
             padding-top: 0;
             padding-bottom: 0.5mm;
@@ -1382,7 +1384,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  font-family: "Kanit", "Sarabun", sans-serif;
+  font-family: "Sarabun", "TH Sarabun New", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   page-break-after: always;
 }
@@ -1412,13 +1414,13 @@ onMounted(() => {
 
 .label-badge-shop {
   font-size: 1.05em;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0.5px;
 }
 
 .label-index {
   font-size: 0.8em;
-  font-weight: 700;
+  font-weight: 600;
   color: #000000;
 }
 
@@ -1434,26 +1436,27 @@ onMounted(() => {
 .ls-sender-col {
   width: 28%;
   font-size: 0.82em;
-  line-height: 1.35;
+  line-height: 1.4;
   display: flex;
   flex-direction: column;
   padding-top: 4px;
 }
 
 .ls-sender-name {
-  font-weight: 800;
+  font-weight: 600;
   font-size: 1.02em;
   margin-bottom: 2px;
 }
 
 .ls-sender-addr {
   font-size: 0.88em;
+  font-weight: 400;
   margin-top: 2px;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .ls-sender-phone {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.88em;
   margin-top: 3px;
 }
@@ -1472,30 +1475,30 @@ onMounted(() => {
 }
 
 .ls-receiver-name {
-  font-size: 1.15em;
-  font-weight: 800;
+  font-size: 1.18em;
+  font-weight: 600;
   line-height: 1.3;
   margin-bottom: 3px;
   color: #000000;
 }
 
 .ls-receiver-addr {
-  font-size: 1.05em;
+  font-size: 1.02em;
   line-height: 1.45;
-  font-weight: 600;
+  font-weight: 400;
   color: #000000;
 }
 
 .ls-receiver-zip {
   margin-top: 4px;
-  font-size: 1.25em;
-  font-weight: 900;
-  letter-spacing: 2px;
+  font-size: 1.22em;
+  font-weight: 600;
+  letter-spacing: 1.5px;
 }
 
 .ls-receiver-phone {
-  font-size: 1.05em;
-  font-weight: 800;
+  font-size: 1.02em;
+  font-weight: 500;
   margin-top: 3px;
   color: #000000;
 }
@@ -1511,21 +1514,22 @@ onMounted(() => {
 
 .label-sender-block {
   font-size: 0.82em;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .sender-name-line {
-  font-weight: 800;
+  font-weight: 600;
   font-size: 1.02em;
 }
 
 .sender-addr-line {
   font-size: 0.88em;
+  font-weight: 400;
   margin-top: 2px;
 }
 
 .sender-phone-line {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.88em;
   margin-top: 3px;
 }
@@ -1540,35 +1544,35 @@ onMounted(() => {
 }
 
 .receiver-name {
-  font-size: 1.15em;
-  font-weight: 800;
+  font-size: 1.18em;
+  font-weight: 600;
   margin-bottom: 3px;
 }
 
 .receiver-address {
-  font-size: 1.05em;
+  font-size: 1.02em;
   line-height: 1.45;
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .receiver-zipcode {
   margin-top: 4px;
-  font-size: 1.25em;
-  font-weight: 900;
-  letter-spacing: 2px;
+  font-size: 1.22em;
+  font-weight: 600;
+  letter-spacing: 1.5px;
 }
 
 .receiver-phone {
   margin-top: 3px;
-  font-size: 1.05em;
-  font-weight: 800;
+  font-size: 1.02em;
+  font-weight: 500;
 }
 
 /* Bottom Thank You Bar */
 .label-thankyou-footer {
   text-align: center;
-  font-size: 0.8em;
-  font-weight: 700;
+  font-size: 0.82em;
+  font-weight: 400;
   color: #000000;
   padding-top: 4px;
   margin-top: auto;

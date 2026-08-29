@@ -90,6 +90,17 @@
               </span>
               <span class="chip-name">{{ c.name }}</span>
               <span class="chip-items" v-if="c.itemCount">({{ c.itemCount }} ชิ้น)</span>
+              <!-- 📚 Multi-address tag on chip -->
+              <span
+                v-if="getCustomerAddressCount(c) > 1"
+                class="chip-multi-addr-tag"
+                @click.stop="selectedCustomerForAddress = c"
+                :title="`ลูกค้ารายนี้มี ${getCustomerAddressCount(c)} ที่อยู่ (เลือก: ${getActiveAddressLabel(c) || 'ที่อยู่นี้'}) — คลิกเพื่อเปลี่ยนที่อยู่จัดส่ง`"
+              >
+                <i class="fa-solid fa-layer-group"></i>
+                <span>{{ getCustomerAddressCount(c) }} ที่อยู่</span>
+                <span class="chip-active-lbl" v-if="getActiveAddressLabel(c)">: {{ getActiveAddressLabel(c) }}</span>
+              </span>
               <span
                 class="chip-status-tag"
                 :class="c.labelPrinted ? 'is-printed' : 'is-unprinted'"
@@ -205,6 +216,22 @@
           class="shipping-label-card"
           :class="['label-' + paperSize, orientation === 'landscape' ? 'layout-landscape' : 'layout-portrait']"
         >
+          <!-- 📚 Multi-Address Banner in Preview (Excluded from print) -->
+          <div
+            v-if="getCustomerAddressCount(customer) > 1"
+            class="label-multi-addr-banner no-print"
+            @click="selectedCustomerForAddress = customer"
+            title="คลิกเพื่อสลับหรือเลือกที่อยู่จัดส่ง"
+          >
+            <div class="banner-text">
+              <i class="fa-solid fa-layer-group"></i>
+              <span>มี <b>{{ getCustomerAddressCount(customer) }} ที่อยู่</b> • กำลังเลือกส่งที่: <b class="highlight-label">{{ getActiveAddressLabel(customer) || 'ที่อยู่นี้' }}</b></span>
+            </div>
+            <button class="banner-switch-btn" type="button" @click.stop="selectedCustomerForAddress = customer">
+              <i class="fa-solid fa-arrow-right-arrow-left"></i> สลับ/เลือกที่อยู่
+            </button>
+          </div>
+
           <!-- LANDSCAPE: 2-Column Split Layout -->
           <div class="label-main-grid" v-if="orientation === 'landscape'">
             <!-- Left Column: Sender (FROM) -->
@@ -266,6 +293,14 @@
         </div>
       </div>
     </div>
+
+    <!-- 📍 Multiple Address Manager Modal -->
+    <CustomerAddressModal
+      v-if="currentCustomerForModal"
+      :customer="currentCustomerForModal"
+      :addressBook="addressBook"
+      @close="selectedCustomerForAddress = null"
+    />
   </div>
 </template>
 
@@ -274,6 +309,7 @@ import { ref, computed, watch, onMounted } from "vue";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName } from "../utils/addressParser";
+import CustomerAddressModal from "./CustomerAddressModal.vue";
 import Swal from "sweetalert2";
 
 const props = defineProps({
@@ -299,6 +335,12 @@ const paperSize = ref("thermal-76x130"); // Default 76x130mm
 const showSenderConfig = ref(false);
 const selectedIds = ref([]);
 const searchQuery = ref("");
+const selectedCustomerForAddress = ref(null);
+
+const currentCustomerForModal = computed(() => {
+  if (!selectedCustomerForAddress.value) return null;
+  return props.customers.find((c) => c.id === selectedCustomerForAddress.value.id) || selectedCustomerForAddress.value;
+});
 
 // Sender State with LocalStorage memory (Defaults from user screenshot)
 const sender = ref({
@@ -468,6 +510,50 @@ async function toggleCustomerPrinted(c) {
   } catch (err) {
     console.error("Error updating printed status:", err);
   }
+}
+
+// Multi-address helpers
+function getCustomerSavedAddresses(customer) {
+  if (!customer) return [];
+  const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  const inCust = customer.addresses;
+  const inBook = props.addressBook && props.addressBook[norm]?.addresses;
+  const rawList = inCust || inBook;
+  let list = [];
+  if (Array.isArray(rawList)) {
+    list = rawList.filter(Boolean);
+  } else if (rawList && typeof rawList === "object") {
+    list = Object.values(rawList).filter(Boolean);
+  }
+  if (list.length > 0) return list;
+  if (customer.address && customer.address.trim()) {
+    const info = getCustomerAddressData(customer);
+    return info && info.address ? [info] : [];
+  }
+  return [];
+}
+
+function getCustomerAddressCount(customer) {
+  return getCustomerSavedAddresses(customer).length;
+}
+
+function getActiveAddressLabel(customer) {
+  if (!customer) return "";
+  const list = getCustomerSavedAddresses(customer);
+  if (!list || list.length === 0) return "";
+
+  if (customer.selectedAddressId) {
+    const matched = list.find((a) => a.id === customer.selectedAddressId);
+    if (matched) return matched.label || (matched.recipientName ? `${matched.recipientName}` : "");
+  }
+
+  if (customer.address && customer.address.trim()) {
+    const trimmed = customer.address.trim();
+    const matched = list.find((a) => a.address && a.address.trim() === trimmed);
+    if (matched) return matched.label || (matched.recipientName ? `${matched.recipientName}` : "");
+  }
+
+  return list[0]?.label || "";
 }
 
 function getCustomerAddressData(customer) {
@@ -1147,6 +1233,32 @@ onMounted(() => {
   color: #fbbf24;
 }
 
+.chip-multi-addr-tag {
+  font-size: 0.72em;
+  padding: 1px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip-multi-addr-tag:hover {
+  background: rgba(99, 102, 241, 0.35);
+  border-color: #818cf8;
+  color: #ffffff;
+}
+
+.chip-multi-addr-tag .chip-active-lbl {
+  font-weight: 600;
+  color: #e0e7ff;
+}
+
 .chip-warn-tag {
   font-size: 0.7em;
   color: #f87171;
@@ -1401,6 +1513,65 @@ onMounted(() => {
   max-width: 380px;
   min-height: 520px;
   aspect-ratio: 76 / 130;
+}
+
+/* 📚 Multi-Address Banner in Preview Cards */
+.label-multi-addr-banner {
+  background: #1e1b4b;
+  border: 1px solid #4338ca;
+  color: #e0e7ff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84em;
+  font-family: "Kanit", sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.label-multi-addr-banner:hover {
+  background: #312e81;
+  border-color: #6366f1;
+}
+
+.label-multi-addr-banner .banner-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.label-multi-addr-banner .highlight-label {
+  color: #a5f3fc;
+  background: rgba(6, 182, 212, 0.2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.label-multi-addr-banner .banner-switch-btn {
+  background: #4f46e5;
+  color: #ffffff;
+  border: none;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.label-multi-addr-banner .banner-switch-btn:hover {
+  background: #6366f1;
 }
 
 .label-top-bar {

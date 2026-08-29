@@ -188,6 +188,20 @@
 
           <!-- Row 3: Address Indicator (Sleek & Subtle) -->
           <div class="sp-row-addr">
+            <!-- 📚 Multi-Address Pill when > 1 address -->
+            <span
+              v-if="getCustomerAddressCount(c) > 1"
+              class="sp-multi-addr-pill"
+              @click="selectedCustomerForAddress = c"
+              :title="`ลูกค้ารายนี้มี ${getCustomerAddressCount(c)} ที่อยู่ — คลิกเพื่อเลือกหรือสลับที่อยู่จัดส่ง`"
+            >
+              <i class="fa-solid fa-layer-group"></i>
+              <span class="multi-count-num">{{ getCustomerAddressCount(c) }} ที่อยู่</span>
+              <span class="multi-count-action">
+                {{ getActiveAddressLabel(c) ? `(เลือก: ${getActiveAddressLabel(c)})` : '(เลือกที่อยู่)' }}
+              </span>
+            </span>
+
             <span
               class="sp-addr-mini-pill"
               :class="hasAddress(c) ? 'has' : 'none'"
@@ -197,7 +211,6 @@
               <i class="fa-solid fa-location-dot"></i>
               <span>
                 <template v-if="hasAddress(c)">
-                  <span v-if="getCustomerAddressCount(c) > 1" class="multi-count">({{ getCustomerAddressCount(c) }} ที่อยู่) </span>
                   {{ c.recipientName ? `ผู้รับ: ${c.recipientName}` : 'มีที่อยู่' }}
                 </template>
                 <template v-else>
@@ -287,13 +300,14 @@
     <AddressImportModal
       v-if="showAddressImport"
       :customers="allCustomers"
+      :addressBook="addressBook"
       @close="showAddressImport = false"
     />
 
     <!-- 📍 Multiple Address Manager Modal -->
     <CustomerAddressModal
-      v-if="selectedCustomerForAddress"
-      :customer="selectedCustomerForAddress"
+      v-if="currentCustomerForModal"
+      :customer="currentCustomerForModal"
       :addressBook="addressBook"
       @close="selectedCustomerForAddress = null"
     />
@@ -338,6 +352,11 @@ const showAddressImport = ref(false);
 const selectedCustomerForAddress = ref(null);
 const addressBook = ref({});
 const cleanupFns = [];
+
+const currentCustomerForModal = computed(() => {
+  if (!selectedCustomerForAddress.value) return null;
+  return allCustomers.value.find((c) => c.id === selectedCustomerForAddress.value.id) || selectedCustomerForAddress.value;
+});
 
 async function handleLogout() {
   const res = await Swal.fire({
@@ -486,14 +505,45 @@ function getCustomerSavedAddresses(customer) {
   const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
   const inCust = customer.addresses;
   const inBook = addressBook.value && addressBook.value[norm]?.addresses;
-  const list = inCust || inBook;
-  if (Array.isArray(list) && list.length > 0) return list;
-  if (hasAddress(customer)) return [getCustomerAddressInfo(customer)];
+  const rawList = inCust || inBook;
+  let list = [];
+  if (Array.isArray(rawList)) {
+    list = rawList.filter(Boolean);
+  } else if (rawList && typeof rawList === "object") {
+    list = Object.values(rawList).filter(Boolean);
+  }
+  if (list.length > 0) return list;
+  if (hasAddress(customer)) {
+    const info = getCustomerAddressInfo(customer);
+    return info ? [info] : [];
+  }
   return [];
 }
 
 function getCustomerAddressCount(customer) {
   return getCustomerSavedAddresses(customer).length;
+}
+
+function getActiveAddressLabel(customer) {
+  if (!customer) return "";
+  const list = getCustomerSavedAddresses(customer);
+  if (!list || list.length === 0) return "";
+
+  // 1. Match by selectedAddressId
+  if (customer.selectedAddressId) {
+    const matched = list.find((a) => a.id === customer.selectedAddressId);
+    if (matched) return matched.label || (matched.recipientName ? `${matched.recipientName}` : "");
+  }
+
+  // 2. Match by address string
+  if (customer.address && customer.address.trim()) {
+    const trimmed = customer.address.trim();
+    const matched = list.find((a) => a.address && a.address.trim() === trimmed);
+    if (matched) return matched.label || (matched.recipientName ? `${matched.recipientName}` : "");
+  }
+
+  // 3. Fallback to first item's label
+  return list[0]?.label || "";
 }
 
 function getCustomerAddressInfo(customer) {
@@ -1550,6 +1600,50 @@ body {
 
 .sp-act--print.is-printed {
   color: #34d399;
+}
+
+/* 📚 Multi-Address Indicator Pill */
+.sp-multi-addr-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85em;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 14px;
+  cursor: pointer;
+  background: rgba(99, 102, 241, 0.16);
+  color: #818cf8;
+  border: 1px solid rgba(129, 140, 248, 0.45);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.15);
+  transition: all 0.2s ease;
+  user-select: none;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.sp-multi-addr-pill:hover {
+  background: rgba(99, 102, 241, 0.28);
+  border-color: #a5b4fc;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.35);
+  transform: translateY(-1px);
+}
+
+.sp-multi-addr-pill .multi-count-num {
+  font-weight: 800;
+  color: #a5b4fc;
+}
+
+.sp-multi-addr-pill:hover .multi-count-num {
+  color: #c7d2fe;
+}
+
+.sp-multi-addr-pill .multi-count-action {
+  font-size: 0.88em;
+  color: #e0e7ff;
+  font-weight: 600;
+  opacity: 0.95;
 }
 
 .multi-count {

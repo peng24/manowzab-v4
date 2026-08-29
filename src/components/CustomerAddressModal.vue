@@ -175,7 +175,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName, parseSingleAddress } from "../utils/addressParser";
@@ -286,14 +286,47 @@ const addressList = computed(() => {
   return list;
 });
 
+const currentSelectedAddrId = ref(props.customer?.selectedAddressId || "");
+const currentSelectedAddressText = ref(props.customer?.address || "");
+
+watch(
+  () => [props.customer?.selectedAddressId, props.customer?.address],
+  ([newId, newAddr]) => {
+    if (newId) currentSelectedAddrId.value = newId;
+    if (newAddr) currentSelectedAddressText.value = newAddr;
+  },
+  { immediate: true }
+);
+
 function isSelected(addr) {
   if (!addr) return false;
-  // If customer has selectedAddressId
-  if (props.customer?.selectedAddressId && addr.id) {
-    return props.customer.selectedAddressId === addr.id;
+
+  // 1. Local selection state (Instant Optimistic UI)
+  if (currentSelectedAddrId.value && addr.id) {
+    if (currentSelectedAddrId.value === addr.id) return true;
   }
-  // Fallback: match by address string
-  return props.customer?.address && props.customer.address.trim() === (addr.address || "").trim();
+  if (currentSelectedAddressText.value && addr.address) {
+    if (currentSelectedAddressText.value.trim() === addr.address.trim()) return true;
+  }
+
+  // 2. Customer props fallback
+  if (props.customer?.selectedAddressId && addr.id) {
+    if (props.customer.selectedAddressId === addr.id) return true;
+  }
+  if (props.customer?.address && addr.address) {
+    if (props.customer.address.trim() === addr.address.trim()) return true;
+  }
+
+  // 3. Address book fallback
+  const bookEntry = props.addressBook && props.addressBook[normKey.value];
+  if (bookEntry?.selectedAddressId && addr.id) {
+    if (bookEntry.selectedAddressId === addr.id) return true;
+  }
+  if (bookEntry?.address && addr.address) {
+    if (bookEntry.address.trim() === addr.address.trim()) return true;
+  }
+
+  return false;
 }
 
 function openAddForm() {
@@ -336,27 +369,41 @@ function cancelForm() {
 }
 
 async function selectActiveAddress(addr) {
+  // ⚡ Optimistic UI: Update green highlight instantly!
+  currentSelectedAddrId.value = addr.id || "";
+  currentSelectedAddressText.value = (addr.address || "").trim();
+
   const timestamp = Date.now();
-  const cleanName = props.customer.name.trim();
+  const cleanName = (props.customer?.name || "").trim();
   const recName = (addr.recipientName || "").trim();
 
   const updates = {};
-  updates[`delivery_customers/${props.customer.id}/selectedAddressId`] = addr.id || "";
-  updates[`delivery_customers/${props.customer.id}/recipientName`] = recName;
-  updates[`delivery_customers/${props.customer.id}/phone`] = addr.phone || "";
-  updates[`delivery_customers/${props.customer.id}/address`] = addr.address || "";
-  updates[`delivery_customers/${props.customer.id}/postalCode`] = addr.postalCode || "";
-  updates[`delivery_customers/${props.customer.id}/updatedAt`] = timestamp;
+  if (props.customer?.id) {
+    updates[`delivery_customers/${props.customer.id}/selectedAddressId`] = addr.id || "";
+    updates[`delivery_customers/${props.customer.id}/recipientName`] = recName;
+    updates[`delivery_customers/${props.customer.id}/phone`] = addr.phone || "";
+    updates[`delivery_customers/${props.customer.id}/address`] = addr.address || "";
+    updates[`delivery_customers/${props.customer.id}/postalCode`] = addr.postalCode || "";
+    updates[`delivery_customers/${props.customer.id}/updatedAt`] = timestamp;
+  }
 
   // Also update address book
-  updates[`address_book/${normKey.value}/selectedAddressId`] = addr.id || "";
-  updates[`address_book/${normKey.value}/recipientName`] = recName;
-  updates[`address_book/${normKey.value}/phone`] = addr.phone || "";
-  updates[`address_book/${normKey.value}/address`] = addr.address || "";
-  updates[`address_book/${normKey.value}/postalCode`] = addr.postalCode || "";
-  updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
+  if (normKey.value) {
+    updates[`address_book/${normKey.value}/selectedAddressId`] = addr.id || "";
+    updates[`address_book/${normKey.value}/recipientName`] = recName;
+    updates[`address_book/${normKey.value}/phone`] = addr.phone || "";
+    updates[`address_book/${normKey.value}/address`] = addr.address || "";
+    updates[`address_book/${normKey.value}/postalCode`] = addr.postalCode || "";
+    updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
+  }
 
-  await update(dbRef(db), updates);
+  try {
+    await update(dbRef(db), updates);
+  } catch (err) {
+    console.error("Error updating active address:", err);
+  }
+
+  emit("updated", addr);
 
   Swal.fire({
     icon: "success",
@@ -404,17 +451,24 @@ async function saveForm() {
   updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
 
   if (shouldBeActive) {
-    updates[`delivery_customers/${props.customer.id}/selectedAddressId`] = newAddrObj.id;
-    updates[`delivery_customers/${props.customer.id}/recipientName`] = newAddrObj.recipientName;
-    updates[`delivery_customers/${props.customer.id}/phone`] = newAddrObj.phone;
-    updates[`delivery_customers/${props.customer.id}/address`] = newAddrObj.address;
-    updates[`delivery_customers/${props.customer.id}/postalCode`] = newAddrObj.postalCode;
+    currentSelectedAddrId.value = newAddrObj.id;
+    currentSelectedAddressText.value = newAddrObj.address;
 
-    updates[`address_book/${normKey.value}/selectedAddressId`] = newAddrObj.id;
-    updates[`address_book/${normKey.value}/recipientName`] = newAddrObj.recipientName;
-    updates[`address_book/${normKey.value}/phone`] = newAddrObj.phone;
-    updates[`address_book/${normKey.value}/address`] = newAddrObj.address;
-    updates[`address_book/${normKey.value}/postalCode`] = newAddrObj.postalCode;
+    if (props.customer?.id) {
+      updates[`delivery_customers/${props.customer.id}/selectedAddressId`] = newAddrObj.id;
+      updates[`delivery_customers/${props.customer.id}/recipientName`] = newAddrObj.recipientName;
+      updates[`delivery_customers/${props.customer.id}/phone`] = newAddrObj.phone;
+      updates[`delivery_customers/${props.customer.id}/address`] = newAddrObj.address;
+      updates[`delivery_customers/${props.customer.id}/postalCode`] = newAddrObj.postalCode;
+    }
+
+    if (normKey.value) {
+      updates[`address_book/${normKey.value}/selectedAddressId`] = newAddrObj.id;
+      updates[`address_book/${normKey.value}/recipientName`] = newAddrObj.recipientName;
+      updates[`address_book/${normKey.value}/phone`] = newAddrObj.phone;
+      updates[`address_book/${normKey.value}/address`] = newAddrObj.address;
+      updates[`address_book/${normKey.value}/postalCode`] = newAddrObj.postalCode;
+    }
   }
 
   await update(dbRef(db), updates);
@@ -450,37 +504,55 @@ async function deleteAddress(index) {
 
     const timestamp = Date.now();
     const updates = {};
-    updates[`delivery_customers/${props.customer.id}/addresses`] = currentList;
-    updates[`address_book/${normKey.value}/addresses`] = currentList;
-    updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
+    if (props.customer?.id) {
+      updates[`delivery_customers/${props.customer.id}/addresses`] = currentList;
+    }
+    if (normKey.value) {
+      updates[`address_book/${normKey.value}/addresses`] = currentList;
+      updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
+    }
 
     // If deleted active address, fallback to first available
     if (isSelected(item)) {
       if (currentList.length > 0) {
         const nextActive = currentList[0];
-        updates[`delivery_customers/${props.customer.id}/selectedAddressId`] = nextActive.id;
-        updates[`delivery_customers/${props.customer.id}/recipientName`] = nextActive.recipientName || "";
-        updates[`delivery_customers/${props.customer.id}/phone`] = nextActive.phone || "";
-        updates[`delivery_customers/${props.customer.id}/address`] = nextActive.address || "";
-        updates[`delivery_customers/${props.customer.id}/postalCode`] = nextActive.postalCode || "";
+        currentSelectedAddrId.value = nextActive.id || "";
+        currentSelectedAddressText.value = nextActive.address || "";
 
-        updates[`address_book/${normKey.value}/selectedAddressId`] = nextActive.id;
-        updates[`address_book/${normKey.value}/recipientName`] = nextActive.recipientName || "";
-        updates[`address_book/${normKey.value}/phone`] = nextActive.phone || "";
-        updates[`address_book/${normKey.value}/address`] = nextActive.address || "";
-        updates[`address_book/${normKey.value}/postalCode`] = nextActive.postalCode || "";
+        if (props.customer?.id) {
+          updates[`delivery_customers/${props.customer.id}/selectedAddressId`] = nextActive.id;
+          updates[`delivery_customers/${props.customer.id}/recipientName`] = nextActive.recipientName || "";
+          updates[`delivery_customers/${props.customer.id}/phone`] = nextActive.phone || "";
+          updates[`delivery_customers/${props.customer.id}/address`] = nextActive.address || "";
+          updates[`delivery_customers/${props.customer.id}/postalCode`] = nextActive.postalCode || "";
+        }
+
+        if (normKey.value) {
+          updates[`address_book/${normKey.value}/selectedAddressId`] = nextActive.id;
+          updates[`address_book/${normKey.value}/recipientName`] = nextActive.recipientName || "";
+          updates[`address_book/${normKey.value}/phone`] = nextActive.phone || "";
+          updates[`address_book/${normKey.value}/address`] = nextActive.address || "";
+          updates[`address_book/${normKey.value}/postalCode`] = nextActive.postalCode || "";
+        }
       } else {
-        updates[`delivery_customers/${props.customer.id}/selectedAddressId`] = "";
-        updates[`delivery_customers/${props.customer.id}/recipientName`] = "";
-        updates[`delivery_customers/${props.customer.id}/phone`] = "";
-        updates[`delivery_customers/${props.customer.id}/address`] = "";
-        updates[`delivery_customers/${props.customer.id}/postalCode`] = "";
+        currentSelectedAddrId.value = "";
+        currentSelectedAddressText.value = "";
 
-        updates[`address_book/${normKey.value}/selectedAddressId`] = "";
-        updates[`address_book/${normKey.value}/recipientName`] = "";
-        updates[`address_book/${normKey.value}/phone`] = "";
-        updates[`address_book/${normKey.value}/address`] = "";
-        updates[`address_book/${normKey.value}/postalCode`] = "";
+        if (props.customer?.id) {
+          updates[`delivery_customers/${props.customer.id}/selectedAddressId`] = "";
+          updates[`delivery_customers/${props.customer.id}/recipientName`] = "";
+          updates[`delivery_customers/${props.customer.id}/phone`] = "";
+          updates[`delivery_customers/${props.customer.id}/address`] = "";
+          updates[`delivery_customers/${props.customer.id}/postalCode`] = "";
+        }
+
+        if (normKey.value) {
+          updates[`address_book/${normKey.value}/selectedAddressId`] = "";
+          updates[`address_book/${normKey.value}/recipientName`] = "";
+          updates[`address_book/${normKey.value}/phone`] = "";
+          updates[`address_book/${normKey.value}/address`] = "";
+          updates[`address_book/${normKey.value}/postalCode`] = "";
+        }
       }
     }
 

@@ -87,13 +87,46 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
         itemCount: existingCustomer ? (existingCustomer.itemCount ?? 0) : 0,
         deliveryDate: "2026-08-13",
         note: (existingCustomer && existingCustomer.note) || "",
+        paymentType: (existingCustomer && existingCustomer.paymentType) || "transfer",
         status: "pending",
         createdAt: existingCustomer ? (existingCustomer.createdAt ?? 12345) : 12345,
         updatedAt: 12345,
       };
 
       expect(payload.note).toBe("");
+      expect(payload.paymentType).toBe("transfer");
       expect(Object.values(payload).includes(undefined)).toBe(false);
+    });
+
+    it("identifies paymentType (transfer vs cod vs unspecified) based on explicit field or note fallback", () => {
+      const getPaymentType = (c) => {
+        if (!c) return "";
+        if (c.paymentType) {
+          const pt = String(c.paymentType).trim().toLowerCase();
+          if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") return "cod";
+          if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") return "transfer";
+        }
+        const note = (c.note || "").toLowerCase();
+        const addr = (c.address || "").toLowerCase();
+        if (note.includes("cod") || note.includes("ปลายทาง") || note.includes("เก็บเงิน") || addr.includes("cod") || addr.includes("ปลายทาง")) {
+          return "cod";
+        }
+        return "";
+      };
+
+      const getDisplay = (c) => {
+        const t = getPaymentType(c);
+        if (t === "cod") return "COD";
+        if (t === "transfer") return "โอน";
+        return "ยังไม่ระบุ";
+      };
+
+      expect(getPaymentType({ paymentType: "cod" })).toBe("cod");
+      expect(getPaymentType({ paymentType: "transfer" })).toBe("transfer");
+      expect(getPaymentType({ note: "COD 350 บาท" })).toBe("cod");
+      expect(getPaymentType({ note: "เก็บเงินปลายทาง" })).toBe("cod");
+      expect(getPaymentType({})).toBe("");
+      expect(getDisplay({})).toBe("ยังไม่ระบุ");
     });
   });
 });

@@ -102,6 +102,16 @@
                 <span class="chip-active-lbl" v-if="getActiveAddressLabel(c)">: {{ getActiveAddressLabel(c) }}</span>
               </span>
               <span
+                class="chip-payment-tag"
+                :class="getCustomerPaymentType(c) === 'cod' ? 'is-cod' : (getCustomerPaymentType(c) === 'transfer' ? 'is-transfer' : 'is-unspecified')"
+                @click.stop="togglePaymentType(c)"
+                :title="`รูปแบบจัดส่ง: ${getPaymentTypeDisplay(c)} (คลิกเพื่อสลับระหว่าง โอน / COD)`"
+              >
+                <template v-if="getCustomerPaymentType(c) === 'cod'">💵 COD</template>
+                <template v-else-if="getCustomerPaymentType(c) === 'transfer'">💳 โอน</template>
+                <template v-else>❓ ยังไม่ระบุ</template>
+              </span>
+              <span
                 class="chip-status-tag"
                 :class="c.labelPrinted ? 'is-printed' : 'is-unprinted'"
                 @click.stop="toggleCustomerPrinted(c)"
@@ -234,13 +244,27 @@
 
           <!-- LANDSCAPE: 2-Column Split Layout -->
           <div class="label-main-grid" v-if="orientation === 'landscape'">
-            <!-- Left Column: Sender (FROM) -->
+            <!-- Left Column: Sender (FROM) + Bottom-Left System Info -->
             <div class="ls-sender-col">
-              <div class="ls-sender-name">{{ sender.name || 'มะนาวแซ่บ' }}</div>
-              <div class="ls-sender-addr" style="white-space: pre-line;">
-                {{ sender.address || '191 หมู่3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000' }}
+              <div class="ls-sender-info">
+                <div class="ls-sender-name">{{ sender.name || 'มะนาวแซ่บ' }}</div>
+                <div class="ls-sender-addr" style="white-space: pre-line;">
+                  {{ sender.address || '191 หมู่3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000' }}
+                </div>
+                <div class="ls-sender-phone">โทร. {{ sender.phone || '095-155-5706' }}</div>
               </div>
-              <div class="ls-sender-phone">โทร. {{ sender.phone || '095-155-5706' }}</div>
+
+              <!-- 📌 Bottom-Left Meta: System Name & Payment Type (Plain Text) -->
+              <div class="ls-bottom-left">
+                <div class="ls-meta-text system-name" title="ชื่อลูกค้าในระบบ / ชื่อ CF">{{ customer.name }}</div>
+                <div
+                  class="ls-meta-text payment-text"
+                  @click.stop="togglePaymentType(customer)"
+                  title="คลิกเพื่อสลับ โอน / COD"
+                >
+                  {{ getPaymentTypeDisplay(customer) }}
+                </div>
+              </div>
             </div>
 
             <!-- Right Column: Receiver (TO) - Shifted down towards bottom with 10% bottom margin -->
@@ -282,6 +306,18 @@
                 <div class="receiver-phone">
                   โทร {{ getCustomerPhone(customer) || '-' }}
                 </div>
+              </div>
+            </div>
+
+            <!-- Portrait Bottom Left Meta (Plain Text) -->
+            <div class="portrait-meta-bottom">
+              <div class="ls-meta-text system-name" title="ชื่อลูกค้าในระบบ / ชื่อ CF">{{ customer.name }}</div>
+              <div
+                class="ls-meta-text payment-text"
+                @click.stop="togglePaymentType(customer)"
+                title="คลิกเพื่อสลับ โอน / COD"
+              >
+                {{ getPaymentTypeDisplay(customer) }}
               </div>
             </div>
           </div>
@@ -609,6 +645,80 @@ function getCustomerCleanAddress(customer) {
   return addr.replace(new RegExp(`\\b${zip}\\b(?![/\\d])`, "g"), "").replace(/\s+/g, " ").trim();
 }
 
+// 💳 Payment Type Helpers (โอน / COD / ยังไม่ระบุ)
+function getCustomerPaymentType(customer) {
+  if (!customer) return "";
+  if (customer.paymentType) {
+    const pt = String(customer.paymentType).trim().toLowerCase();
+    if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") {
+      return "cod";
+    }
+    if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") {
+      return "transfer";
+    }
+  }
+
+  // Smart Heuristic: check note or address for COD keywords
+  const note = (customer.note || "").toLowerCase();
+  const addr = (customer.address || "").toLowerCase();
+  if (
+    note.includes("cod") ||
+    note.includes("ปลายทาง") ||
+    note.includes("เก็บเงิน") ||
+    addr.includes("cod") ||
+    addr.includes("ปลายทาง")
+  ) {
+    return "cod";
+  }
+
+  return "";
+}
+
+function isCodCustomer(customer) {
+  return getCustomerPaymentType(customer) === "cod";
+}
+
+function getPaymentTypeDisplay(customer) {
+  const type = getCustomerPaymentType(customer);
+  if (type === "cod") {
+    const match = (customer?.note || "").match(/(?:cod|ปลายทาง)\s*[:=]?\s*(\d+)/i);
+    if (match && match[1]) {
+      return `COD (${match[1]}฿)`;
+    }
+    return "COD";
+  }
+  if (type === "transfer") {
+    return "โอน";
+  }
+  return "ยังไม่ระบุ";
+}
+
+async function togglePaymentType(customer) {
+  if (!customer) return;
+  const current = getCustomerPaymentType(customer);
+  const nextType = current === "cod" ? "transfer" : (current === "transfer" ? "cod" : "transfer");
+
+  // Optimistic update
+  customer.paymentType = nextType;
+
+  try {
+    await update(dbRef(db, `delivery_customers/${customer.id}`), {
+      paymentType: nextType,
+      updatedAt: Date.now(),
+    });
+    Swal.fire({
+      icon: "success",
+      title: `เปลี่ยนรูปแบบส่งของ "${customer.name}" เป็น "${nextType === 'cod' ? 'COD' : (nextType === 'transfer' ? 'โอน' : 'ยังไม่ระบุ')}" แล้ว`,
+      toast: true,
+      position: "top-end",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    console.error("Error toggling paymentType:", err);
+  }
+}
+
 function handlePrint() {
   if (printableCustomers.value.length === 0) return;
 
@@ -643,17 +753,28 @@ function handlePrint() {
       const address = getCustomerCleanAddress(customer) || "⚠️ ยังไม่มีที่อยู่จัดส่ง";
       const zip = getCustomerZip(customer);
       const phone = getCustomerPhone(customer) || "-";
+      const isCod = isCodCustomer(customer);
+      const paymentDisplay = getPaymentTypeDisplay(customer);
+      const systemName = customer.name || "-";
 
       if (isLandscape) {
         return `
           <div class="print-page">
             <div class="print-card landscape">
               <div class="card-grid">
-                <!-- Left: Sender -->
+                <!-- Left: Sender + Bottom-Left System Info -->
                 <div class="ls-sender">
-                  <div class="sender-name">${senderName}</div>
-                  <div class="sender-addr">${senderAddress}</div>
-                  <div class="sender-phone">โทร. ${senderPhone}</div>
+                  <div class="sender-top-info">
+                    <div class="sender-name">${senderName}</div>
+                    <div class="sender-addr">${senderAddress}</div>
+                    <div class="sender-phone">โทร. ${senderPhone}</div>
+                  </div>
+
+                  <!-- 📌 Bottom-Left Meta on Printed Label (Plain Text) -->
+                  <div class="ls-meta-bottom">
+                    <div class="meta-system-name">${systemName}</div>
+                    <div class="meta-payment-row">${paymentDisplay}</div>
+                  </div>
                 </div>
 
                 <!-- Right: Receiver -->
@@ -685,6 +806,12 @@ function handlePrint() {
                 <div class="receiver-addr">${address}</div>
                 ${zip ? `<div class="receiver-zip">${zip}</div>` : ""}
                 <div class="receiver-phone">โทร ${phone}</div>
+              </div>
+
+              <!-- Portrait Bottom-Left Meta (Plain Text) -->
+              <div class="port-meta-bottom">
+                <div class="meta-system-name">${systemName}</div>
+                <div class="meta-payment-row">${paymentDisplay}</div>
               </div>
 
               <div class="card-footer">${thankYou}</div>
@@ -762,12 +889,18 @@ function handlePrint() {
             flex: 1;
           }
           .ls-sender {
-            width: 28%;
+            width: 32%;
             font-size: 8.5pt;
             line-height: 1.4;
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
             padding-top: 1mm;
+            padding-bottom: 1.5mm;
+          }
+          .sender-top-info {
+            display: flex;
+            flex-direction: column;
           }
           .sender-name {
             font-size: 10.5pt;
@@ -784,6 +917,26 @@ function handlePrint() {
             font-size: 8.5pt;
             font-weight: 500;
             margin-top: 3px;
+          }
+          .ls-meta-bottom {
+            margin-top: auto;
+            padding-top: 1.5mm;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5mm;
+            font-size: 9pt;
+            line-height: 1.3;
+          }
+          .meta-system-name {
+            font-size: 9pt;
+            color: #000000;
+            font-weight: 500;
+            word-break: break-word;
+          }
+          .meta-payment-row {
+            font-size: 9pt;
+            color: #000000;
+            font-weight: 500;
           }
           .ls-receiver {
             flex: 1;
@@ -805,10 +958,20 @@ function handlePrint() {
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
-            padding-bottom: 13mm;
+            padding-bottom: 10mm;
             padding-top: 0;
             word-break: break-word;
             overflow-wrap: break-word;
+          }
+          .port-meta-bottom {
+            margin-top: auto;
+            padding-top: 1.5mm;
+            padding-bottom: 1.5mm;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5mm;
+            font-size: 9pt;
+            line-height: 1.3;
           }
           .receiver-name {
             font-size: 13.5pt;
@@ -887,7 +1050,7 @@ function exportExcelForApp() {
   }
 
   const rows = [
-    ["ลำดับ", "ชื่อผู้รับ (พิมพ์บนกล่อง)", "ชื่อลูกค้า (CF)", "เบอร์โทร", "ที่อยู่", "รหัสไปรษณีย์", "จำนวนสินค้า", "รอบส่ง", "โน้ต", "ผู้ส่ง", "เบอร์ผู้ส่ง", "ที่อยู่ผู้ส่ง"],
+    ["ลำดับ", "ชื่อผู้รับ (พิมพ์บนกล่อง)", "ชื่อในระบบ (CF)", "รูปแบบการส่ง", "เบอร์โทร", "ที่อยู่", "รหัสไปรษณีย์", "จำนวนสินค้า", "รอบส่ง", "โน้ต", "ผู้ส่ง", "เบอร์ผู้ส่ง", "ที่อยู่ผู้ส่ง"],
   ];
 
   printableCustomers.value.forEach((c, idx) => {
@@ -895,10 +1058,12 @@ function exportExcelForApp() {
     const phone = getCustomerPhone(c) || "";
     const addr = getCustomerAddress(c) || "";
     const zip = getCustomerZip(c) || "";
+    const payment = getPaymentTypeDisplay(c);
     rows.push([
       idx + 1,
       `"${recipient.replace(/"/g, '""')}"`,
       `"${(c.name || '').replace(/"/g, '""')}"`,
+      `"${payment}"`,
       `"${phone}"`,
       `"${addr.replace(/"/g, '""')}"`,
       `"${zip}"`,
@@ -1598,19 +1763,26 @@ onMounted(() => {
 /* Landscape 2-Column Split Layout */
 .label-main-grid {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   flex: 1;
   align-items: stretch;
   padding: 4px 6px;
 }
 
 .ls-sender-col {
-  width: 28%;
+  width: 32%;
+  min-width: 140px;
   font-size: 0.82em;
   line-height: 1.4;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   padding-top: 4px;
+}
+
+.ls-sender-info {
+  display: flex;
+  flex-direction: column;
 }
 
 .ls-sender-name {
@@ -1630,6 +1802,73 @@ onMounted(() => {
   font-weight: 500;
   font-size: 0.88em;
   margin-top: 3px;
+}
+
+/* 📌 Bottom-Left Metadata (ชื่อในระบบ, รูปแบบจัดส่ง โอน/COD) Plain text */
+.ls-bottom-left,
+.portrait-meta-bottom {
+  margin-top: auto;
+  padding-top: 6px;
+  padding-bottom: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ls-meta-text {
+  font-size: 0.95em;
+  line-height: 1.35;
+  color: #111827;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.ls-meta-text.system-name {
+  font-weight: 500;
+}
+
+.ls-meta-text.payment-text {
+  cursor: pointer;
+  display: inline-block;
+  width: fit-content;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.ls-meta-text.payment-text:hover {
+  opacity: 0.75;
+  text-decoration: underline;
+}
+
+/* Chip Payment Tag in selector bar */
+.chip-payment-tag {
+  font-size: 0.72em;
+  padding: 1px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip-payment-tag.is-transfer {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.chip-payment-tag.is-cod {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.chip-payment-tag.is-unspecified {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
 }
 
 /* Right Column: Receiver (TO) - Shifted down towards bottom with 10% bottom margin */
@@ -1710,7 +1949,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding-bottom: 36px;
+  padding-bottom: 12px;
   padding-top: 0;
 }
 
@@ -1843,8 +2082,13 @@ onMounted(() => {
     max-height: 74mm !important;
   }
 
+  .shipping-label-card.layout-landscape .ls-sender-col {
+    justify-content: space-between !important;
+    padding-bottom: 2mm !important;
+  }
+
   .shipping-label-card.layout-landscape .ls-receiver-col {
-    padding-top: 22mm !important;
+    padding-top: 20mm !important;
     padding-left: 0 !important;
   }
 

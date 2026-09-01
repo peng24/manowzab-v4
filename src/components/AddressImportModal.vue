@@ -106,6 +106,14 @@
                   <label>เบอร์โทรศัพท์</label>
                   <input type="text" v-model="entry.phone" class="aim-input" placeholder="08x-xxx-xxxx" />
                 </div>
+                <div class="aim-field">
+                  <label>รูปแบบส่ง</label>
+                  <select v-model="entry.paymentType" class="aim-input">
+                    <option value="">❓ ยังไม่ระบุ</option>
+                    <option value="transfer">💳 โอนเงิน</option>
+                    <option value="cod">💵 COD (เก็บปลายทาง)</option>
+                  </select>
+                </div>
               </div>
 
               <div class="aim-field" style="margin-top: 6px;">
@@ -169,11 +177,16 @@ function handleParse() {
     return;
   }
 
-  parsedEntries.value = list.map((item) => ({
-    ...item,
-    recipientName: item.recipientName || item.name || "",
-    selected: true,
-  }));
+  parsedEntries.value = list.map((item) => {
+    const raw = (item.rawText || "") + " " + (item.address || "") + " " + (item.name || "");
+    const isCod = /cod|เก็บเงินปลายทาง|เก็บปลายทาง|ปลายทาง/i.test(raw);
+    return {
+      ...item,
+      recipientName: item.recipientName || item.name || "",
+      paymentType: isCod ? "cod" : "",
+      selected: true,
+    };
+  });
 }
 
 function removeEntry(index) {
@@ -223,6 +236,7 @@ async function saveAllAddresses() {
             phone: matched?.phone || props.addressBook?.[normKey]?.phone || "",
             address: singleOldAddr.trim(),
             postalCode: matched?.postalCode || props.addressBook?.[normKey]?.postalCode || "",
+            paymentType: matched?.paymentType || "",
           });
         }
       }
@@ -240,6 +254,7 @@ async function saveAllAddresses() {
         phone: entry.phone || "",
         address: entry.address || "",
         postalCode: entry.postalCode || "",
+        paymentType: entry.paymentType || "",
       };
 
       if (alreadyIndex >= 0) {
@@ -248,6 +263,7 @@ async function saveAllAddresses() {
           recipientName: recName || existingList[alreadyIndex].recipientName,
           phone: entry.phone || existingList[alreadyIndex].phone,
           postalCode: entry.postalCode || existingList[alreadyIndex].postalCode,
+          paymentType: entry.paymentType || existingList[alreadyIndex].paymentType || "",
         };
         newAddrObj.id = existingList[alreadyIndex].id || newAddrId;
       } else {
@@ -272,6 +288,7 @@ async function saveAllAddresses() {
         multiPathUpdates[`delivery_customers/${matched.id}/phone`] = entry.phone || "";
         multiPathUpdates[`delivery_customers/${matched.id}/address`] = entry.address || "";
         multiPathUpdates[`delivery_customers/${matched.id}/postalCode`] = entry.postalCode || "";
+        multiPathUpdates[`delivery_customers/${matched.id}/paymentType`] = entry.paymentType || "";
         multiPathUpdates[`delivery_customers/${matched.id}/selectedAddressId`] = newAddrObj.id;
         multiPathUpdates[`delivery_customers/${matched.id}/addresses`] = existingList;
         multiPathUpdates[`delivery_customers/${matched.id}/updatedAt`] = timestamp;

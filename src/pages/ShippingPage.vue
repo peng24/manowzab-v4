@@ -219,6 +219,17 @@
               </span>
             </span>
 
+            <!-- 💳 Payment Type Pill (โอน / COD / ยังไม่ระบุ) -->
+            <span
+              class="sp-payment-pill"
+              :class="getCustomerPaymentType(c) === 'cod' ? 'cod' : (getCustomerPaymentType(c) === 'transfer' ? 'transfer' : 'unspecified')"
+              @click.stop="togglePaymentType(c)"
+              :title="`รูปแบบส่ง: ${getPaymentTypeDisplay(c)} (คลิกเพื่อสลับ)`"
+            >
+              <i :class="getCustomerPaymentType(c) === 'cod' ? 'fa-solid fa-money-bill-wave' : (getCustomerPaymentType(c) === 'transfer' ? 'fa-solid fa-credit-card' : 'fa-regular fa-circle-question')"></i>
+              <span>{{ getPaymentTypeDisplay(c) }}</span>
+            </span>
+
             <!-- 🖨️ Printed status badge with toggle -->
             <span
               class="sp-printed-pill"
@@ -850,6 +861,76 @@ async function togglePrinted(customer) {
     });
   } catch (err) {
     console.error("Failed to toggle labelPrinted:", err);
+  }
+}
+
+// 💳 Payment Type Helpers (โอน / COD / ยังไม่ระบุ)
+function getCustomerPaymentType(customer) {
+  if (!customer) return "";
+  if (customer.paymentType) {
+    const pt = String(customer.paymentType).trim().toLowerCase();
+    if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") {
+      return "cod";
+    }
+    if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") {
+      return "transfer";
+    }
+  }
+
+  const note = (customer.note || "").toLowerCase();
+  const addr = (customer.address || "").toLowerCase();
+  if (
+    note.includes("cod") ||
+    note.includes("ปลายทาง") ||
+    note.includes("เก็บเงิน") ||
+    addr.includes("cod") ||
+    addr.includes("ปลายทาง")
+  ) {
+    return "cod";
+  }
+
+  return "";
+}
+
+function isCod(customer) {
+  return getCustomerPaymentType(customer) === "cod";
+}
+
+function getPaymentTypeDisplay(customer) {
+  const type = getCustomerPaymentType(customer);
+  if (type === "cod") {
+    const match = (customer?.note || "").match(/(?:cod|ปลายทาง)\s*[:=]?\s*(\d+)/i);
+    if (match && match[1]) {
+      return `COD (${match[1]}฿)`;
+    }
+    return "COD";
+  }
+  if (type === "transfer") {
+    return "โอน";
+  }
+  return "ยังไม่ระบุ";
+}
+
+async function togglePaymentType(customer) {
+  if (!customer) return;
+  const current = getCustomerPaymentType(customer);
+  const nextType = current === "cod" ? "transfer" : (current === "transfer" ? "cod" : "transfer");
+
+  try {
+    await update(dbRef(db, `delivery_customers/${customer.id}`), {
+      paymentType: nextType,
+      updatedAt: Date.now(),
+    });
+    Swal.fire({
+      icon: "success",
+      title: `เปลี่ยนรูปแบบส่งของ "${customer.name}" เป็น "${nextType === 'cod' ? 'COD' : (nextType === 'transfer' ? 'โอน' : 'ยังไม่ระบุ')}" แล้ว`,
+      toast: true,
+      position: "top-end",
+      timer: 1200,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    console.error("Failed to toggle paymentType:", err);
   }
 }
 
@@ -1555,6 +1636,55 @@ body {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Payment Type Pill */
+.sp-payment-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85em;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  line-height: 1.4;
+}
+
+.sp-payment-pill.transfer {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.sp-payment-pill.transfer:hover {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: #3b82f6;
+}
+
+.sp-payment-pill.cod {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.sp-payment-pill.cod:hover {
+  background: rgba(245, 158, 11, 0.24);
+  border-color: #f59e0b;
+}
+
+.sp-payment-pill.unspecified {
+  background: rgba(148, 163, 184, 0.08);
+  color: #94a3b8;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+}
+
+.sp-payment-pill.unspecified:hover {
+  background: rgba(148, 163, 184, 0.16);
+  border-color: #cbd5e1;
+  color: #f1f5f9;
 }
 
 /* Printed Status Pill */

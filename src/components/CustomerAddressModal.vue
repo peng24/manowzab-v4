@@ -155,6 +155,15 @@
             </div>
 
             <div class="cam-form-group col-span">
+              <label>รูปแบบการจัดส่งและการชำระเงิน:</label>
+              <select v-model="formData.paymentType" class="cam-input">
+                <option value="">❓ ยังไม่ระบุ</option>
+                <option value="transfer">💳 โอนเงิน</option>
+                <option value="cod">💵 COD (เก็บเงินปลายทาง)</option>
+              </select>
+            </div>
+
+            <div class="cam-form-group col-span">
               <label class="cam-checkbox-wrap">
                 <input type="checkbox" v-model="formData.setAsActive" />
                 <span>ใช้ที่อยู่นี้เป็นที่อยู่จัดส่งสำหรับรอบปัจจุบันทันที</span>
@@ -206,6 +215,7 @@ const formData = ref({
   phone: "",
   address: "",
   postalCode: "",
+  paymentType: "",
   setAsActive: true,
 });
 
@@ -339,6 +349,7 @@ function openAddForm() {
     phone: props.customer?.phone || "",
     address: "",
     postalCode: "",
+    paymentType: props.customer?.paymentType || "",
     setAsActive: true,
   };
   editingIndex.value = null;
@@ -355,6 +366,7 @@ function openEditForm(addr, index) {
     phone: addr.phone || "",
     address: addr.address || "",
     postalCode: addr.postalCode || "",
+    paymentType: addr.paymentType || props.customer?.paymentType || "",
     setAsActive: isSelected(addr),
   };
   editingIndex.value = index;
@@ -426,6 +438,7 @@ async function saveForm() {
     phone: formData.value.phone.trim(),
     address: formData.value.address.trim(),
     postalCode: formData.value.postalCode.trim(),
+    paymentType: formData.value.paymentType || "",
   };
 
   // Extract postal code if missing
@@ -446,6 +459,7 @@ async function saveForm() {
 
   const updates = {};
   updates[`delivery_customers/${props.customer.id}/addresses`] = currentList;
+  updates[`delivery_customers/${props.customer.id}/paymentType`] = formData.value.paymentType || "";
   updates[`address_book/${normKey.value}/addresses`] = currentList;
   updates[`address_book/${normKey.value}/name`] = cleanName;
   updates[`address_book/${normKey.value}/updatedAt`] = timestamp;

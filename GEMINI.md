@@ -33,7 +33,7 @@ Manowzab Command Center (currently v4.31.2) coordinates live sales stream manage
 ### 4. Audio & Text-to-Speech (TTS)
 - **Unified Audio Queue**: Managed in [useAudio.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/composables/useAudio.js). All audio events (SFX + TTS) must go through `queueAudio(sfxType, author, message)`. **Do not call TTS services directly** to prevent overlapping.
 - **Synthesized SFX**: Sound effects (`'success'`, `'error'`, `'cancel'`) are generated dynamically on-the-fly using the Web Audio API (zero latency, no external assets).
-- **TTS Engine**: [TextToSpeech.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/services/TextToSpeech.js) handles Google Cloud TTS with a 2-second timeout before falling back to native offline SpeechSynthesis. Includes `ensureAudioContextReady()` to recover from browser idle suspension.
+- **TTS Engine**: [TextToSpeech.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/services/TextToSpeech.js) handles 4 TTS modes: `P` (Microsoft Edge TTS `th-TH-PremwadeeNeural` via Cloudflare Worker), `N` (Google Cloud Neural2 `th-TH-Neural2-C`), `S` (Google Cloud Standard `th-TH-Standard-A`), and `🤖` (Native offline SpeechSynthesis). Includes multi-tier auto-fallback and `ensureAudioContextReady()` to recover from browser idle suspension.
 
 ### 5. Shipping & Lifetime Bookings
 - **Shipping Manager**: [ShippingManager.vue](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/components/ShippingManager.vue) manages delivery customers, relative dates, countdowns, and order status updates (`Pending` / `Done`).

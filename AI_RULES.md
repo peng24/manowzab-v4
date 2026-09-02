@@ -12,7 +12,7 @@
 - **State Management:** Pinia
 - **Backend:** Firebase Realtime Database
 - **CSS:** Custom vanilla CSS
-- **TTS:** Google Cloud TTS + Native TTS (fallback)
+- **TTS:** Microsoft Edge TTS (`th-TH-PremwadeeNeural`) + Google Cloud TTS (Neural2/Standard) + Native TTS (fallback)
 
 ## 3. 🚨 CRITICAL RULES (DO NOT BREAK)
 
@@ -26,7 +26,7 @@
 
 1.  **iPad/iOS Compatibility:** The system uses a 3-layer audio unlock strategy (`iosAudioUnlock.js`, `unlockAudio()`, `ensureAudioContextReady()`). **NEVER REMOVE THIS.**
 2.  **Singleton Pattern:** Always use the shared `ttsService` instance.
-3.  **Smart Fallback:** If Google TTS times out (>2s), fallback to Native TTS immediately. After 5 consecutive Google failures, switch to Native permanently for the session.
+3.  **Smart Multi-Tier Fallback:** Edge TTS (`P`) ➡️ Google Cloud TTS (`N`/`S`, >2s timeout fallback) ➡️ Native TTS (`🤖`). After 5 consecutive Google failures, switch to Native permanently for the session.
 4.  **Unified Audio Queue:** ALL audio (SFX + TTS) must go through `queueAudio()` in `useAudio.js`. **DO NOT** call `ttsService.speak()` directly — it bypasses the queue and causes audio overlap.
 
 ### 🔑 API Key Rotation

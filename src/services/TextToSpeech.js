@@ -24,6 +24,9 @@ export class TextToSpeech {
     this.consecutiveGoogleFailures = 0; // ✅ Track consecutive Google TTS failures
     this.MAX_CONSECUTIVE_FAILURES = 5; // ✅ Switch to Native permanently after N failures
     this.googleDisabledPermanently = false; // ✅ Flag for permanent Native mode
+    this.consecutiveEdgeFailures = 0; // ✅ Track consecutive Edge TTS failures
+    this.MAX_EDGE_CONSECUTIVE_FAILURES = 3; // ✅ Cooldown after N failures
+    this.edgeCooldownUntil = 0; // ✅ Timestamp for Edge TTS cooldown circuit breaker
     this.speakingCheckRetries = 0; // ✅ Track retries when waiting for native speaking state
     this.cachedBestVoice = null; // 🚀 O(1) Cached Thai Voice reference
 
@@ -150,6 +153,248 @@ export class TextToSpeech {
     return new Blob([bytes], { type });
   }
 
+  async _generateSecMsGec() {
+    const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
+    const WIN_EPOCH = 11644473600n;
+    const S_TO_NS = 10000000n;
+    let ticks = BigInt(Math.floor(Date.now() / 1000)) + WIN_EPOCH;
+    ticks -= ticks % 300n;
+    ticks *= S_TO_NS;
+    const strToHash = `${ticks}${TRUSTED_CLIENT_TOKEN}`;
+
+    const encoder = new TextEncoder();
+    const data = encoder.encode(strToHash);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+  }
+
+  async synthesizeEdgeDirect(text, voice = "th-TH-PremwadeeNeural") {
+    const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
+    const WSS_URL = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
+    const secMsGec = await this._generateSecMsGec();
+    const connectionId = crypto.randomUUID().replace(/-/g, "");
+    const requestId = crypto.randomUUID().replace(/-/g, "");
+    const timestamp = new Date().toISOString();
+
+    const url = `${WSS_URL}?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${secMsGec}&Sec-MS-GEC-Version=1-133.0.3065.82&ConnectionId=${connectionId}`;
+
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(url);
+      ws.binaryType = "arraybuffer";
+
+      const audioChunks = [];
+      const timeout = setTimeout(() => {
+        try { ws.close(); } catch (e) {}
+        reject(new Error("Edge TTS Timeout (6s)"));
+      }, 6000);
+
+      ws.addEventListener("open", () => {
+        const configMessage =
+          `X-Timestamp:${timestamp}\r\n` +
+          `Content-Type:application/json; charset=utf-8\r\n` +
+          `Path:speech.config\r\n\r\n` +
+          JSON.stringify({
+            context: {
+              synthesis: {
+                audio: {
+                  metadataOptions: {
+                    bookmarkEnabled: false,
+                    sentenceBoundaryEnabled: false,
+                  },
+                  outputFormat: "audio-24khz-48kbitrate-mono-mp3",
+                },
+              },
+            },
+          });
+        ws.send(configMessage);
+
+        const cleanText = text.replace(/[<>&'"]/g, (c) => {
+          switch (c) {
+            case "<": return "&lt;";
+            case ">": return "&gt;";
+            case "&": return "&amp;";
+            case "'": return "&apos;";
+            case '"': return "&quot;";
+          }
+        });
+
+        const ssmlMessage =
+          `X-RequestId:${requestId}\r\n` +
+          `Content-Type:application/ssml+xml\r\n` +
+          `X-Timestamp:${timestamp}Z\r\n` +
+          `Path:ssml\r\n\r\n` +
+          `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='th-TH'>` +
+          `<voice name='${voice}'>` +
+          `<prosody pitch='+0Hz' rate='+0%'>${cleanText}</prosody>` +
+          `</voice>` +
+          `</speak>`;
+        ws.send(ssmlMessage);
+      });
+
+      ws.addEventListener("message", (event) => {
+        if (typeof event.data === "string") {
+          if (event.data.includes("Path:turn.end")) {
+            clearTimeout(timeout);
+            try { ws.close(); } catch (e) {}
+
+            let totalLength = 0;
+            for (const chunk of audioChunks) totalLength += chunk.length;
+            const completeAudio = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const chunk of audioChunks) {
+              completeAudio.set(chunk, offset);
+              offset += chunk.length;
+            }
+            resolve(completeAudio.buffer);
+          }
+        } else if (event.data instanceof ArrayBuffer) {
+          const view = new DataView(event.data);
+          if (view.byteLength >= 2) {
+            const headerLength = view.getUint16(0);
+            if (view.byteLength > 2 + headerLength) {
+              const audioData = new Uint8Array(event.data, 2 + headerLength);
+              audioChunks.push(audioData);
+            }
+          }
+        }
+      });
+
+      ws.addEventListener("error", (err) => {
+        clearTimeout(timeout);
+        reject(err || new Error("Edge TTS WebSocket error"));
+      });
+
+      ws.addEventListener("close", () => {
+        clearTimeout(timeout);
+        if (audioChunks.length > 0) {
+          let totalLength = 0;
+          for (const chunk of audioChunks) totalLength += chunk.length;
+          const completeAudio = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const chunk of audioChunks) {
+            completeAudio.set(chunk, offset);
+            offset += chunk.length;
+          }
+          resolve(completeAudio.buffer);
+        }
+      });
+    });
+  }
+
+  /**
+   * Speak using Microsoft Edge TTS (Premwadee Neural)
+   * Cloudflare Worker Proxy (with Google Cloud Fallback)
+   */
+  async speakEdge(text) {
+    const systemStore = useSystemStore();
+    const sanitized = this.sanitize(text);
+    const safeText = sanitized.substring(0, 500);
+
+    // ✅ Circuit Breaker: If Edge TTS recently failed consecutively, skip to Google TTS until cooldown expires
+    if (Date.now() < this.edgeCooldownUntil) {
+      this.speakOnline(text);
+      return;
+    }
+
+    logger.tts(`Edge TTS (Premwadee): ${safeText.substring(0, 50)}...`);
+
+    let arrayBuffer = null;
+
+    // 1. Fetch from Cloudflare Worker Proxy (snappy 3.5s timeout)
+    if (systemStore.edgeTtsUrl) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+        const baseUrl = systemStore.edgeTtsUrl.replace(/\/+$/, "");
+        const requestUrl = `${baseUrl}?text=${encodeURIComponent(safeText)}&voice=th-TH-PremwadeeNeural`;
+
+        const response = await fetch(requestUrl, {
+          method: "GET",
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          arrayBuffer = await response.arrayBuffer();
+        } else {
+          logger.warn(`Edge TTS Worker proxy responded with status ${response.status}`);
+        }
+      } catch (workerErr) {
+        logger.warn(`Edge TTS Worker proxy failed: ${workerErr.message}`);
+      }
+    }
+
+    // 2. Try Direct WebSocket if proxy was not available
+    if (!arrayBuffer) {
+      try {
+        arrayBuffer = await this.synthesizeEdgeDirect(safeText);
+      } catch (directErr) {
+        logger.warn(`Edge TTS Direct failed: ${directErr.message || directErr}`);
+      }
+    }
+
+    // 3. Fallback to Google Cloud TTS if Edge TTS was unavailable
+    if (!arrayBuffer) {
+      this.consecutiveEdgeFailures++;
+      if (this.consecutiveEdgeFailures >= this.MAX_EDGE_CONSECUTIVE_FAILURES) {
+        this.edgeCooldownUntil = Date.now() + 60000; // 60s cooldown before retrying Edge
+        logger.warn(
+          `Edge TTS failed ${this.consecutiveEdgeFailures} times — entering 60s cooldown, switching seamlessly to Google TTS`,
+        );
+      } else {
+        logger.warn("Edge TTS unavailable — falling back seamlessly to Google TTS");
+      }
+      this.speakOnline(text);
+      return;
+    }
+
+    // Ensure AudioContext is running
+    const isReady = await this.ensureAudioContextReady();
+    if (!isReady) {
+      logger.warn("AudioContext not running after resume — falling back to Google TTS");
+      this.speakOnline(text);
+      return;
+    }
+
+    try {
+      const audioBuffer = await this.audioCtx.decodeAudioData(arrayBuffer);
+      this.currentSource = this.audioCtx.createBufferSource();
+      this.currentSource.buffer = audioBuffer;
+      this.currentSource.connect(this.audioCtx.destination);
+
+      let hasEnded = false;
+      const advanceQueue = () => {
+        if (hasEnded) return;
+        hasEnded = true;
+        this.clearStuckTimer();
+        if (this._currentOnComplete) {
+          this._currentOnComplete();
+          this._currentOnComplete = null;
+        }
+        this.isSpeaking = false;
+        this.currentSource = null;
+        this.processQueue();
+      };
+
+      this.currentSource.onended = advanceQueue;
+      this.currentSource.start(0);
+
+      // ✅ Reset Edge failure counter on success
+      this.consecutiveEdgeFailures = 0;
+      this.edgeCooldownUntil = 0;
+      logger.success("Edge TTS (Premwadee) playback started");
+      return;
+    } catch (decodeErr) {
+      logger.error("Edge TTS Audio decode error:", decodeErr);
+      this.consecutiveEdgeFailures++;
+      this.speakOnline(text);
+      return;
+    }
+  }
+
   /**
    * Speak using Google Cloud TTS API with key rotation
    */
@@ -172,7 +417,7 @@ export class TextToSpeech {
 
     // Sanitize and limit text
     const sanitized = this.sanitize(text);
-    const safeText = sanitized.substring(0, 500); // Limit for API (Aligned with sanitize)
+    const safeText = sanitized.substring(0, 500);
 
     logger.tts(
       `Google Cloud TTS: ${safeText.substring(0, 50)}... (${keys.length} keys available)`,
@@ -188,9 +433,9 @@ export class TextToSpeech {
       try {
         logger.tts(`Trying key ${i + 1}/${keys.length}...`);
 
-        // Create AbortController with 5-second timeout (allow slow internet/large text)
+        // Snappy 3.0s timeout per key for rapid failover
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
 
         const voiceName = systemStore.googleVoiceName || "th-TH-Neural2-C";
 
@@ -204,22 +449,20 @@ export class TextToSpeech {
             },
             body: JSON.stringify({
               input: { text: safeText },
-              // ✅ Dynamic Voice (Neural2 vs Standard)
               voice: {
                 languageCode: "th-TH",
                 name: voiceName,
               },
               audioConfig: {
                 audioEncoding: "MP3",
-                speakingRate: 1.0, // ✅ Standard Speed (Factory Default)
-                pitch: 0.0, // ✅ Natural Pitch (Factory Default)
+                speakingRate: 1.0,
+                pitch: 0.0,
               },
             }),
-            signal: controller.signal, // Bind abort signal
+            signal: controller.signal,
           },
         );
 
-        // Clear timeout on success
         clearTimeout(timeoutId);
 
         if (!response.ok) {
@@ -228,7 +471,7 @@ export class TextToSpeech {
 
         const data = await response.json();
 
-        // ✅ Convert Base64 to ArrayBuffer for AudioContext decoding
+        // Convert Base64 to ArrayBuffer for AudioContext decoding
         const binaryString = atob(data.audioContent);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
@@ -236,7 +479,7 @@ export class TextToSpeech {
           bytes[j] = binaryString.charCodeAt(j);
         }
 
-        // ✅ Ensure AudioContext is running (auto-resume for iPad idle)
+        // Ensure AudioContext is running
         const isReady = await this.ensureAudioContextReady();
         if (!isReady) {
           logger.warn("AudioContext not running after resume — falling back to Native");
@@ -251,7 +494,6 @@ export class TextToSpeech {
           this.currentSource.buffer = audioBuffer;
           this.currentSource.connect(this.audioCtx.destination);
 
-          // ✅ Guard against double processQueue calls
           let hasEnded = false;
           const advanceQueue = () => {
             if (hasEnded) return;
@@ -273,42 +515,32 @@ export class TextToSpeech {
           const systemStore2 = useSystemStore();
           if (systemStore2.activeKeyIndex !== i + 1) {
             systemStore2.activeKeyIndex = i + 1;
-            systemStore2.updatePresenceTtsKey(); // ✅ Show other machines we took this key
+            systemStore2.updatePresenceTtsKey();
           }
 
-          // ✅ Reset failure counter on success
+          // Reset failure counter on success
           this.consecutiveGoogleFailures = 0;
           logger.success(`Google TTS success with key ${i + 1}`);
-          return; // Success! Exit the function
+          return;
         } catch (decodeErr) {
           logger.error("Audio decode error:", decodeErr);
-          this.clearStuckTimer();
-          this.isSpeaking = false;
           this.speakNative(text);
-          this.startStuckTimer();
           return;
         }
       } catch (error) {
-        // 🚨 CASE 1: Timeout (Internet Lag / iPad idle)
+        // 🚨 CASE 1: Timeout
         if (error.name === "AbortError") {
-          this.consecutiveGoogleFailures++;
-          logger.warn(
-            `Key ${i + 1} timed out (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} fails). Fallback to Native.`,
-          );
-          this._checkPermanentSwitch();
-          this.speakNative(text);
-          return;
+          logger.warn(`Key ${i + 1} timed out.`);
+        } else {
+          // 🚨 CASE 2: API Error (403 Quota / 500)
+          logger.warn(`Key ${i + 1} failed: ${error.message}`);
         }
 
-        // 🚨 CASE 2: API Error (403 Quota / 500)
-        logger.warn(`Key ${i + 1} failed: ${error.message}`);
-
-        // ✅ Fixed: Use count (loop iteration) instead of i (rotated index)
-        // When startIndex ≠ 0, i won't equal keys.length-1 on last iteration
+        // If this was the last key tried, fallback to Native TTS
         if (count === keys.length - 1) {
           this.consecutiveGoogleFailures++;
           logger.error(
-            `All Google Keys failed (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} consecutive fails).`,
+            `All Google Keys failed (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} consecutive fails). Seamlessly switching to Native TTS.`,
           );
           this._checkPermanentSwitch();
           this.speakNative(text);
@@ -482,6 +714,11 @@ export class TextToSpeech {
     const systemStore = useSystemStore();
 
     if (
+      systemStore.ttsVoiceMode === "edge" &&
+      !this.googleDisabledPermanently
+    ) {
+      this.speakEdge(text);
+    } else if (
       systemStore.useOnlineTts &&
       systemStore.googleApiKey &&
       !this.googleDisabledPermanently

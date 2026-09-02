@@ -59,6 +59,9 @@ description: Mandatory verification checklist after every code change
 | 4.8 | Emoji and Run Fallback | `src/composables/useChatProcessor.js` | อ่านสติกเกอร์เป็น "ส่งสติกเกอร์" เมื่อ sanitizes เป็นค่าว่าง, fallback ไป `messageRuns` เมื่อ `displayMessage` ว่าง |
 | 4.9 | เว้นวรรคหน่วงเวลาในคิวเสียง (`delayAfter`) | `src/composables/useAudio.js` | คิวเสียง `queueAudio` รองรับ `options.delayAfter` (เช่น 800ms) เพื่อเว้นจังหวะอ่านชื่อลูกค้าแต่ละคนให้ชัดเจน ไม่รัวติดกัน |
 | 4.10 | ออกเสียงชื่อลูกค้าจริงเมื่อแอดมินจองแทน (Admin Proxy TTS) | `src/composables/useChatProcessor.js` | เมื่อแอดมินพิมพ์จองให้ลูกค้า เสียง TTS จะอ่านเป็นชื่อลูกค้าเท่านั้น ไม่นำชื่อแอดมินมาอ่าน |
+| 4.11 | Microsoft Edge TTS Proxy (`th-TH-PremwadeeNeural`) | `src/services/TextToSpeech.js`, `scripts/cloudflare-edge-tts-worker.js` | สังเคราะห์เสียงเปรมวดี (`th-TH-PremwadeeNeural`) ผ่าน Cloudflare Worker proxy พร้อมคำนวณ `Sec-MS-GEC` token และตัด metadata binary header length (uint16 big-endian) ออกเพื่อสตรีม MP3 สมบูรณ์ |
+| 4.12 | TTS 4-State Toggle Switcher | `src/components/Header.vue`, `src/stores/system.js` | ปุ่มสลับเสียงรองรับ 4 โหมดวนลูป (`P` เปรมวดี ➡️ `N` Google Neural2 ➡️ `S` Google Standard ➡️ `🤖` Native TTS) พร้อมจำค่าลง `localStorage` |
+| 4.13 | Multi-Tier TTS Fallback System | `src/services/TextToSpeech.js` | หากโหมด `P` ขัดข้องหรือไม่สามารถเชื่อมต่อได้ ระบบต้อง Fallback อัตโนมัติไปยัง Google Neural2 ➡️ Google Standard ➡️ Native TTS โดยคิวเสียงไม่ค้างและไม่สะดุด |
 
 
 ---

@@ -82,16 +82,20 @@
         </button>
       </div>
 
-      <!-- TTS Toggle - 3-State (Neural2 / Standard / Native) -->
+      <!-- TTS Toggle - 4-State (Edge Premwadee / Google Neural2 / Google Standard / Native) -->
       <button
         :class="['btn']"
         :style="{
-          background: systemStore.ttsVoiceMode === 'neural2'
+          background: systemStore.ttsVoiceMode === 'edge'
+            ? 'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)'
+            : systemStore.ttsVoiceMode === 'neural2'
             ? 'linear-gradient(135deg, #00C6FF 0%, #7928CA 100%)'
             : systemStore.ttsVoiceMode === 'standard'
             ? 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)'
             : 'linear-gradient(135deg, #4B5563 0%, #374151 100%)',
-          boxShadow: systemStore.ttsVoiceMode === 'neural2'
+          boxShadow: systemStore.ttsVoiceMode === 'edge'
+            ? '0 4px 15px rgba(236, 72, 153, 0.45)'
+            : systemStore.ttsVoiceMode === 'neural2'
             ? '0 4px 15px rgba(121, 40, 202, 0.45)'
             : systemStore.ttsVoiceMode === 'standard'
             ? '0 4px 15px rgba(0, 114, 255, 0.4)'
@@ -102,7 +106,9 @@
         }"
         @click="toggleTtsMode"
         :title="
-          systemStore.ttsVoiceMode === 'neural2'
+          systemStore.ttsVoiceMode === 'edge'
+            ? `Microsoft Edge TTS (th-TH-PremwadeeNeural) ${systemStore.edgeTtsUrl ? '✅ พร้อมใช้งาน' : '⚠️ ยังไม่ใส่ URL'}`
+            : systemStore.ttsVoiceMode === 'neural2'
             ? `Google Cloud Neural2 (th-TH-Neural2-C) - Key #${systemStore.activeKeyIndex} Active`
             : systemStore.ttsVoiceMode === 'standard'
             ? `Google Cloud Standard (th-TH-Standard-A) - Key #${systemStore.activeKeyIndex} Active`
@@ -112,7 +118,9 @@
         <!-- Icon -->
         <i
           :class="[
-            systemStore.useOnlineTts
+            systemStore.ttsVoiceMode === 'edge'
+              ? 'fa-solid fa-bolt-lightning'
+              : systemStore.useOnlineTts
               ? 'fa-solid fa-cloud'
               : 'fa-solid fa-robot',
           ]"
@@ -124,7 +132,7 @@
           v-if="systemStore.useOnlineTts"
           style="margin-left: 5px; font-size: 1.05em; font-weight: bold; font-family: monospace; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
         >
-          {{ systemStore.ttsVoiceMode === 'neural2' ? 'N' : 'S' }}{{ systemStore.activeKeyIndex }}
+          {{ systemStore.ttsVoiceMode === 'edge' ? 'P' : (systemStore.ttsVoiceMode === 'neural2' ? 'N' : 'S') + systemStore.activeKeyIndex }}
         </span>
       </button>
 
@@ -163,6 +171,10 @@
               <a @click="openPhoneticMgr" class="menu-phonetic">
                 <i class="fa-solid fa-microphone-lines"></i>
                 <span>จัดการคำอ่าน (TTS)</span>
+              </a>
+              <a @click="openEdgeTtsSettings" class="menu-edge-tts">
+                <i class="fa-solid fa-bolt-lightning" style="color: #ec4899;"></i>
+                <span>ตั้งค่า Cloudflare (เสียงเปรมวดี)</span>
               </a>
               <a @click="testVoice" class="menu-voice">
                 <i class="fa-solid fa-volume-high"></i>
@@ -705,12 +717,63 @@ function getVersionTooltip() {
 
 function toggleTtsMode() {
   const newMode = systemStore.cycleTtsMode();
-  let modeName = "Google Neural2";
-  if (newMode === "standard") modeName = "Google Standard";
+  let modeName = "Microsoft เปรมวดี";
+  if (newMode === "neural2") modeName = "Google Neural2";
+  else if (newMode === "standard") modeName = "Google Standard";
   else if (newMode === "native") modeName = "Native TTS";
 
   logger.log("🔊 Switched to:", modeName);
   queueAudio(null, "", `เปลี่ยนเป็น ${modeName}`);
+}
+
+async function openEdgeTtsSettings() {
+  if (showDropdown.value) showDropdown.value = false;
+
+  const currentUrl = systemStore.edgeTtsUrl || "";
+  const result = await Swal.fire({
+    title: "⚡ ตั้งค่า Microsoft Edge TTS (เสียงเปรมวดี)",
+    html: `
+      <div style="text-align: left; font-size: 0.9em; line-height: 1.6; color: #cbd5e1;">
+        <p>นำ URL ของ <b>Cloudflare Worker</b> ที่ Deploy แล้วมาวางที่นี่ (ฟรี 100,000 ครั้ง/วัน):</p>
+        <div style="background: rgba(15, 23, 42, 0.6); padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 0.85em; color: #38bdf8; margin-bottom: 12px; border: 1px solid rgba(56, 189, 248, 0.2);">
+          โค้ด Worker อยู่ใน: <code>scripts/cloudflare-edge-tts-worker.js</code>
+        </div>
+      </div>
+    `,
+    input: "url",
+    inputValue: currentUrl,
+    inputPlaceholder: "https://your-worker.workers.dev",
+    showCancelButton: true,
+    confirmButtonText: "บันทึก URL",
+    cancelButtonText: "ยกเลิก",
+    confirmButtonColor: "#ec4899",
+    cancelButtonColor: "#334155",
+    showDenyButton: !!currentUrl,
+    denyButtonText: "ลบ URL ออก",
+    denyButtonColor: "#ef4444",
+  });
+
+  if (result.isConfirmed && result.value !== undefined) {
+    systemStore.setEdgeTtsUrl(result.value);
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      title: "บันทึก Edge TTS URL เรียบร้อย!",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+  } else if (result.isDenied) {
+    systemStore.setEdgeTtsUrl("");
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "info",
+      title: "ลบ Edge TTS URL ออกแล้ว",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+  }
 }
 
 function showChangelog() {

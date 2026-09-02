@@ -71,6 +71,7 @@
         <div
           v-for="chat in filteredVisibleMessages"
           :key="chat.id"
+          v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color]"
           :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type]"
         >
           <!-- Avatar Left -->
@@ -79,6 +80,7 @@
               :src="chat.avatar"
               class="avatar"
               loading="lazy"
+              decoding="async"
               @error="(e) => (e.target.style.display = 'none')"
             />
             <div
@@ -137,6 +139,7 @@
                       :alt="run.emoji.emojiId || 'emoji'"
                       class="emoji-image"
                       loading="lazy"
+                      decoding="async"
                     />
                   </template>
                 </template>

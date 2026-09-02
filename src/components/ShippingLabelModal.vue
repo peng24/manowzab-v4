@@ -256,7 +256,9 @@
 
               <!-- 📌 Bottom-Left Meta: System Name & Payment Type (Plain Text) -->
               <div class="ls-bottom-left">
-                <div class="ls-meta-text system-name" title="ชื่อลูกค้าในระบบ / ชื่อ CF">{{ customer.name }}</div>
+                <div class="ls-meta-text system-name" :title="`ชื่อลูกค้าในระบบ: ${customer.name}`">
+                  {{ getSystemNameDisplay(customer) }}
+                </div>
                 <div
                   class="ls-meta-text payment-text"
                   @click.stop="togglePaymentType(customer)"
@@ -311,7 +313,9 @@
 
             <!-- Portrait Bottom Left Meta (Plain Text) -->
             <div class="portrait-meta-bottom">
-              <div class="ls-meta-text system-name" title="ชื่อลูกค้าในระบบ / ชื่อ CF">{{ customer.name }}</div>
+              <div class="ls-meta-text system-name" :title="`ชื่อลูกค้าในระบบ: ${customer.name}`">
+                {{ getSystemNameDisplay(customer) }}
+              </div>
               <div
                 class="ls-meta-text payment-text"
                 @click.stop="togglePaymentType(customer)"
@@ -645,6 +649,13 @@ function getCustomerCleanAddress(customer) {
   return addr.replace(new RegExp(`\\b${zip}\\b(?![/\\d])`, "g"), "").replace(/\s+/g, " ").trim();
 }
 
+// 👤 System Name Display Helper (จำกัดความยาวไม่ให้ยาวเกินไปบนใบปะหน้า)
+function getSystemNameDisplay(customer, maxLen = 15) {
+  const name = (customer?.name || "-").trim();
+  if (name.length <= maxLen) return name;
+  return name.slice(0, maxLen).trim() + "…";
+}
+
 // 💳 Payment Type Helpers (โอน / COD / ยังไม่ระบุ)
 function getCustomerPaymentType(customer) {
   if (!customer) return "";
@@ -755,7 +766,7 @@ function handlePrint() {
       const phone = getCustomerPhone(customer) || "-";
       const isCod = isCodCustomer(customer);
       const paymentDisplay = getPaymentTypeDisplay(customer);
-      const systemName = customer.name || "-";
+      const systemName = getSystemNameDisplay(customer);
 
       if (isLandscape) {
         return `
@@ -931,7 +942,10 @@ function handlePrint() {
             font-size: 9pt;
             color: #000000;
             font-weight: 500;
-            word-break: break-word;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 36mm;
           }
           .meta-payment-row {
             font-size: 9pt;
@@ -972,6 +986,9 @@ function handlePrint() {
             gap: 0.5mm;
             font-size: 9pt;
             line-height: 1.3;
+          }
+          .port-meta-bottom .meta-system-name {
+            max-width: 60mm;
           }
           .receiver-name {
             font-size: 13.5pt;
@@ -1825,6 +1842,10 @@ onMounted(() => {
 
 .ls-meta-text.system-name {
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .ls-meta-text.payment-text {

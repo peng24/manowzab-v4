@@ -442,16 +442,18 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, inject, onMounted, onUnmounted, watch, defineAsyncComponent } from "vue";
 import { ref as dbRef, onValue, update, remove, get, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import Swal from "sweetalert2";
 import ThaiDatePicker from "./ThaiDatePicker.vue";
-import ShippingLabelModal from "./ShippingLabelModal.vue";
-import AddressImportModal from "./AddressImportModal.vue";
-import CustomerAddressModal from "./CustomerAddressModal.vue";
+
+// 🚀 Performance: Lazy load modals on demand
+const ShippingLabelModal = defineAsyncComponent(() => import("./ShippingLabelModal.vue"));
+const AddressImportModal = defineAsyncComponent(() => import("./AddressImportModal.vue"));
+const CustomerAddressModal = defineAsyncComponent(() => import("./CustomerAddressModal.vue"));
 import { normalizeName, parseSingleAddress } from "../utils/addressParser";
 import {
   resolveShippingCycleDate,

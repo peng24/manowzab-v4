@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, provide, watch } from "vue";
+import { ref, onMounted, onUnmounted, provide, watch, defineAsyncComponent } from "vue";
 import { useAuthStore } from "./stores/auth";
 import AuthGate from "./components/AuthGate.vue";
 import { useSystemStore } from "./stores/system";
@@ -62,14 +62,16 @@ import { useAudio } from "./composables/useAudio"; // ✅ Import useAudio
 import Header from "./components/Header.vue";
 import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
-import Dashboard from "./components/Dashboard.vue";
-import HistoryModal from "./components/HistoryModal.vue";
-import ShippingManager from "./components/ShippingManager.vue";
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
-import PhoneticManager from "./components/PhoneticManager.vue"; // ✅ Import Phonetic Manager
 import { useVoiceLearningStore } from "./stores/voiceLearning";
 import { useChatProcessor } from "./composables/useChatProcessor";
+
+// 🚀 Performance: Lazy load heavy modals on demand via defineAsyncComponent
+const Dashboard = defineAsyncComponent(() => import("./components/Dashboard.vue"));
+const HistoryModal = defineAsyncComponent(() => import("./components/HistoryModal.vue"));
+const ShippingManager = defineAsyncComponent(() => import("./components/ShippingManager.vue"));
+const PhoneticManager = defineAsyncComponent(() => import("./components/PhoneticManager.vue"));
 
 const authStore = useAuthStore();
 const systemStore = useSystemStore();

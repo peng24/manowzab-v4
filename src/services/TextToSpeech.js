@@ -29,6 +29,7 @@ export class TextToSpeech {
     this.edgeCooldownUntil = 0; // ✅ Timestamp for Edge TTS cooldown circuit breaker
     this.speakingCheckRetries = 0; // ✅ Track retries when waiting for native speaking state
     this.cachedBestVoice = null; // 🚀 O(1) Cached Thai Voice reference
+    this.audioCache = new Map(); // 🚀 LRU In-Memory Audio Buffer Cache (Max 50 items)
 
     // Bind methods
     this.processQueue = this.processQueue.bind(this);
@@ -40,6 +41,32 @@ export class TextToSpeech {
       this.loadVoices();
       this.poller = setInterval(this.loadVoices, 500);
     }
+  }
+
+  /**
+   * 🚀 Get cached audio ArrayBuffer (returns slice copy for AudioContext decoding safety)
+   */
+  getCachedAudio(key) {
+    if (this.audioCache && this.audioCache.has(key)) {
+      const buffer = this.audioCache.get(key);
+      // Refresh LRU order
+      this.audioCache.delete(key);
+      this.audioCache.set(key, buffer);
+      return buffer.slice(0);
+    }
+    return null;
+  }
+
+  /**
+   * 🚀 Set cached audio ArrayBuffer (bounded to max 50 items)
+   */
+  setCachedAudio(key, arrayBuffer) {
+    if (!this.audioCache) this.audioCache = new Map();
+    if (this.audioCache.size >= 50) {
+      const oldestKey = this.audioCache.keys().next().value;
+      this.audioCache.delete(oldestKey);
+    }
+    this.audioCache.set(key, arrayBuffer.slice(0));
   }
 
   /**
@@ -299,40 +326,50 @@ export class TextToSpeech {
 
     logger.tts(`Edge TTS (Premwadee): ${safeText.substring(0, 50)}...`);
 
-    let arrayBuffer = null;
+    const cacheKey = `edge:${safeText}`;
+    let arrayBuffer = this.getCachedAudio(cacheKey);
 
-    // 1. Fetch from Cloudflare Worker Proxy (snappy 3.5s timeout)
-    if (systemStore.edgeTtsUrl) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+    if (arrayBuffer) {
+      logger.tts(`Edge TTS Cache Hit (0ms): ${safeText.substring(0, 30)}`);
+    } else {
+      // 1. Fetch from Cloudflare Worker Proxy (snappy 3.5s timeout)
+      if (systemStore.edgeTtsUrl) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-        const baseUrl = systemStore.edgeTtsUrl.replace(/\/+$/, "");
-        const requestUrl = `${baseUrl}?text=${encodeURIComponent(safeText)}&voice=th-TH-PremwadeeNeural`;
+          const baseUrl = systemStore.edgeTtsUrl.replace(/\/+$/, "");
+          const requestUrl = `${baseUrl}?text=${encodeURIComponent(safeText)}&voice=th-TH-PremwadeeNeural`;
 
-        const response = await fetch(requestUrl, {
-          method: "GET",
-          signal: controller.signal,
-        });
+          const response = await fetch(requestUrl, {
+            method: "GET",
+            signal: controller.signal,
+          });
 
-        clearTimeout(timeoutId);
+          clearTimeout(timeoutId);
 
-        if (response.ok) {
-          arrayBuffer = await response.arrayBuffer();
-        } else {
-          logger.warn(`Edge TTS Worker proxy responded with status ${response.status}`);
+          if (response.ok) {
+            arrayBuffer = await response.arrayBuffer();
+          } else {
+            logger.warn(`Edge TTS Worker proxy responded with status ${response.status}`);
+          }
+        } catch (workerErr) {
+          logger.warn(`Edge TTS Worker proxy failed: ${workerErr.message}`);
         }
-      } catch (workerErr) {
-        logger.warn(`Edge TTS Worker proxy failed: ${workerErr.message}`);
       }
-    }
 
-    // 2. Try Direct WebSocket if proxy was not available
-    if (!arrayBuffer) {
-      try {
-        arrayBuffer = await this.synthesizeEdgeDirect(safeText);
-      } catch (directErr) {
-        logger.warn(`Edge TTS Direct failed: ${directErr.message || directErr}`);
+      // 2. Try Direct WebSocket if proxy was not available
+      if (!arrayBuffer) {
+        try {
+          arrayBuffer = await this.synthesizeEdgeDirect(safeText);
+        } catch (directErr) {
+          logger.warn(`Edge TTS Direct failed: ${directErr.message || directErr}`);
+        }
+      }
+
+      // Save to audio cache on success
+      if (arrayBuffer) {
+        this.setCachedAudio(cacheKey, arrayBuffer);
       }
     }
 
@@ -423,6 +460,45 @@ export class TextToSpeech {
       `Google Cloud TTS: ${safeText.substring(0, 50)}... (${keys.length} keys available)`,
     );
 
+    const voiceName = systemStore.googleVoiceName || "th-TH-Neural2-C";
+    const cacheKey = `google:${voiceName}:${safeText}`;
+    const cachedBuffer = this.getCachedAudio(cacheKey);
+
+    if (cachedBuffer) {
+      const isReady = await this.ensureAudioContextReady();
+      if (isReady) {
+        try {
+          const audioBuffer = await this.audioCtx.decodeAudioData(cachedBuffer);
+          this.currentSource = this.audioCtx.createBufferSource();
+          this.currentSource.buffer = audioBuffer;
+          this.currentSource.connect(this.audioCtx.destination);
+
+          let hasEnded = false;
+          const advanceQueue = () => {
+            if (hasEnded) return;
+            hasEnded = true;
+            this.clearStuckTimer();
+            if (this._currentOnComplete) {
+              this._currentOnComplete();
+              this._currentOnComplete = null;
+            }
+            this.isSpeaking = false;
+            this.currentSource = null;
+            this.processQueue();
+          };
+
+          this.currentSource.onended = advanceQueue;
+          this.currentSource.start(0);
+
+          this.consecutiveGoogleFailures = 0;
+          logger.tts(`Google Cloud TTS Cache Hit (0ms): ${safeText.substring(0, 30)}`);
+          return;
+        } catch (cachedErr) {
+          logger.warn("Cached Google TTS playback failed, fetching fresh:", cachedErr);
+        }
+      }
+    }
+
     // Rotate keys sequentially, starting from the machine's assigned activeKeyIndex
     const startIndex = (systemStore.activeKeyIndex || 1) - 1;
 
@@ -436,8 +512,6 @@ export class TextToSpeech {
         // Snappy 3.0s timeout per key for rapid failover
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-        const voiceName = systemStore.googleVoiceName || "th-TH-Neural2-C";
 
         // Call Google Cloud TTS API
         const response = await fetch(
@@ -478,6 +552,9 @@ export class TextToSpeech {
         for (let j = 0; j < len; j++) {
           bytes[j] = binaryString.charCodeAt(j);
         }
+
+        // Save raw audio buffer to LRU cache
+        this.setCachedAudio(cacheKey, bytes.buffer);
 
         // Ensure AudioContext is running
         const isReady = await this.ensureAudioContextReady();

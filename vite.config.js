@@ -135,6 +135,20 @@ export default defineConfig({
               },
             },
           },
+          {
+            urlPattern: /^https:\/\/cdnjs\.cloudflare\.com\/.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "cdnjs-assets-cache",
+              expiration: {
+                maxEntries: 30,
+                maxAgeSeconds: 60 * 60 * 24 * 365,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
         ],
       },
     }),
@@ -156,6 +170,24 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         shipping: resolve(__dirname, 'shipping/index.html'),
         history: resolve(__dirname, 'history/index.html'),
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('firebase')) {
+              return 'vendor-firebase';
+            }
+            if (id.includes('vue') || id.includes('pinia')) {
+              return 'vendor-vue';
+            }
+            if (id.includes('sweetalert2')) {
+              return 'vendor-sweetalert';
+            }
+            if (id.includes('canvas-confetti')) {
+              return 'vendor-confetti';
+            }
+          }
+        },
       },
     },
   },

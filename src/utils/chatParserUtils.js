@@ -77,18 +77,30 @@ export function thaiToArabic(text) {
   return text.replace(/[๐-๙]/g, (ch) => THAI_TO_ARABIC_MAP[ch]);
 }
 
+// 🚀 Performance: In-Memory Memoization Map for user colors (capped at 500 users)
+const USER_COLOR_CACHE = new Map();
+
 /**
- * Deterministic color generation based on user name string
+ * Deterministic color generation based on user name string (Memoized)
  * @param {string} str 
  * @returns {string} HSL color string
  */
 export function stringToColor(str) {
   if (!str) return "hsl(0, 85%, 75%)";
+  if (USER_COLOR_CACHE.has(str)) {
+    return USER_COLOR_CACHE.get(str);
+  }
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return `hsl(${Math.abs(hash) % 360}, 85%, 75%)`;
+  const color = `hsl(${Math.abs(hash) % 360}, 85%, 75%)`;
+  if (USER_COLOR_CACHE.size >= 500) {
+    const oldest = USER_COLOR_CACHE.keys().next().value;
+    USER_COLOR_CACHE.delete(oldest);
+  }
+  USER_COLOR_CACHE.set(str, color);
+  return color;
 }
 
 // Module-scoped compiled regex instance

@@ -192,6 +192,8 @@ export class TextToSpeech {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
+        const voiceName = systemStore.googleVoiceName || "th-TH-Neural2-C";
+
         // Call Google Cloud TTS API
         const response = await fetch(
           `https://texttospeech.googleapis.com/v1/text:synthesize?key=${currentKey}`,
@@ -202,10 +204,10 @@ export class TextToSpeech {
             },
             body: JSON.stringify({
               input: { text: safeText },
-              // ✅ Config for Bright & Enthusiastic Female Voice
+              // ✅ Dynamic Voice (Neural2 vs Standard)
               voice: {
                 languageCode: "th-TH",
-                name: "th-TH-Standard-A", // Female Voice
+                name: voiceName,
               },
               audioConfig: {
                 audioEncoding: "MP3",

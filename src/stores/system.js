@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { ref as dbRef, onValue, get, update, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import pkg from "../../package.json";
@@ -22,7 +22,35 @@ export const useSystemStore = defineStore("system", () => {
   // ✅ Google Cloud TTS API Key - Load from .env
   const googleApiKey = ref(import.meta.env.VITE_GOOGLE_API_KEYS || "");
 
-  const useOnlineTts = ref(true); // ✅ เปิด/ปิด Online TTS (Google Cloud) - Default ON
+  // ✅ TTS Voice Mode: 'neural2' | 'standard' | 'native'
+  const ttsVoiceMode = ref(localStorage.getItem("manowzab_tts_voice_mode") || "neural2");
+  const useOnlineTts = computed({
+    get: () => ttsVoiceMode.value !== "native",
+    set: (val) => {
+      if (!val) {
+        ttsVoiceMode.value = "native";
+      } else if (ttsVoiceMode.value === "native") {
+        ttsVoiceMode.value = "neural2";
+      }
+      localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
+    },
+  });
+  const googleVoiceName = computed(() => {
+    return ttsVoiceMode.value === "standard" ? "th-TH-Standard-A" : "th-TH-Neural2-C";
+  });
+
+  function cycleTtsMode() {
+    if (ttsVoiceMode.value === "neural2") {
+      ttsVoiceMode.value = "standard";
+    } else if (ttsVoiceMode.value === "standard") {
+      ttsVoiceMode.value = "native";
+    } else {
+      ttsVoiceMode.value = "neural2";
+    }
+    localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
+    return ttsVoiceMode.value;
+  }
+
   const activeKeyIndex = ref(1); // ✅ Track which API key is currently active
   const shippingCycle = ref("today"); // ✅ รอบจัดส่งเริ่มต้น ('today' | 'tomorrow' | 'พฤหัส' etc. | 'YYYY-MM-DD')
 
@@ -195,6 +223,9 @@ export const useSystemStore = defineStore("system", () => {
     updatePresenceTtsKey, // ✅ Export
     googleApiKey, // ✅ Export (from .env)
     useOnlineTts, // ✅ Export
+    ttsVoiceMode, // ✅ Export
+    googleVoiceName, // ✅ Export
+    cycleTtsMode, // ✅ Export
     activeKeyIndex, // ✅ Export
     shippingCycle, // ✅ Export
     initShippingCycleListener, // ✅ Export

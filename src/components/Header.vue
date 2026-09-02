@@ -82,14 +82,18 @@
         </button>
       </div>
 
-      <!-- TTS Toggle - Vibrant Blue Gradient (Fixed) -->
+      <!-- TTS Toggle - 3-State (Neural2 / Standard / Native) -->
       <button
         :class="['btn']"
         :style="{
-          background: systemStore.useOnlineTts
+          background: systemStore.ttsVoiceMode === 'neural2'
+            ? 'linear-gradient(135deg, #00C6FF 0%, #7928CA 100%)'
+            : systemStore.ttsVoiceMode === 'standard'
             ? 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)'
             : 'linear-gradient(135deg, #4B5563 0%, #374151 100%)',
-          boxShadow: systemStore.useOnlineTts
+          boxShadow: systemStore.ttsVoiceMode === 'neural2'
+            ? '0 4px 15px rgba(121, 40, 202, 0.45)'
+            : systemStore.ttsVoiceMode === 'standard'
             ? '0 4px 15px rgba(0, 114, 255, 0.4)'
             : 'none',
           border: 'none',
@@ -98,8 +102,10 @@
         }"
         @click="toggleTtsMode"
         :title="
-          systemStore.useOnlineTts
-            ? `Google Cloud TTS - Key #${systemStore.activeKeyIndex} Active`
+          systemStore.ttsVoiceMode === 'neural2'
+            ? `Google Cloud Neural2 (th-TH-Neural2-C) - Key #${systemStore.activeKeyIndex} Active`
+            : systemStore.ttsVoiceMode === 'standard'
+            ? `Google Cloud Standard (th-TH-Standard-A) - Key #${systemStore.activeKeyIndex} Active`
             : 'Native TTS (Offline)'
         "
       >
@@ -113,12 +119,12 @@
           style="font-size: 1.1em; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
         ></i>
 
-        <!-- Key Index Number -->
+        <!-- Mode & Key Index Number -->
         <span
           v-if="systemStore.useOnlineTts"
-          style="margin-left: 6px; font-size: 1.1em; font-weight: bold; font-family: monospace; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
+          style="margin-left: 5px; font-size: 1.05em; font-weight: bold; font-family: monospace; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
         >
-          {{ systemStore.activeKeyIndex }}
+          {{ systemStore.ttsVoiceMode === 'neural2' ? 'N' : 'S' }}{{ systemStore.activeKeyIndex }}
         </span>
       </button>
 
@@ -698,11 +704,13 @@ function getVersionTooltip() {
 }
 
 function toggleTtsMode() {
-  systemStore.useOnlineTts = !systemStore.useOnlineTts;
-  const mode = systemStore.useOnlineTts ? "Google Cloud TTS" : "Native TTS";
-  logger.log("🔊 Switched to:", mode);
+  const newMode = systemStore.cycleTtsMode();
+  let modeName = "Google Neural2";
+  if (newMode === "standard") modeName = "Google Standard";
+  else if (newMode === "native") modeName = "Native TTS";
 
-  queueAudio(null, "", `เปลี่ยนเป็น ${mode}`);
+  logger.log("🔊 Switched to:", modeName);
+  queueAudio(null, "", `เปลี่ยนเป็น ${modeName}`);
 }
 
 function showChangelog() {

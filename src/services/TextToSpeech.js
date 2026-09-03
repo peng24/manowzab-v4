@@ -110,7 +110,12 @@ export class TextToSpeech {
    */
   async ensureAudioContextReady() {
     try {
+      if (!this.audioCtx) return false;
       if (this.audioCtx.state === "suspended") {
+        if (typeof navigator !== "undefined" && navigator.userActivation && !navigator.userActivation.hasBeenActive) {
+          logger.tts("AudioContext suspended — awaiting user interaction");
+          return false;
+        }
         logger.tts("AudioContext suspended — attempting auto-resume...");
         await Promise.race([
           this.audioCtx.resume(),
@@ -332,11 +337,15 @@ export class TextToSpeech {
     if (arrayBuffer) {
       logger.tts(`Edge TTS Cache Hit (0ms): ${safeText.substring(0, 30)}`);
     } else {
-      // 1. Fetch from Cloudflare Worker Proxy (snappy 3.5s timeout)
+      // 1. Fetch from Cloudflare Worker Proxy (adaptive timeout for live streaming)
       if (systemStore.edgeTtsUrl) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3500);
+          // ✅ Adaptive Timeout:
+          // If queue has items waiting (busy live chat), limit to 2500ms to prevent backlog lag.
+          // When queue is calm, allow 4500ms (accommodates Worker ~3.8s synthesis for Premwadee voice).
+          const timeoutMs = this.queue.length > 0 ? 2500 : 4500;
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
           const baseUrl = systemStore.edgeTtsUrl.replace(/\/+$/, "");
           const requestUrl = `${baseUrl}?text=${encodeURIComponent(safeText)}&voice=th-TH-PremwadeeNeural`;
@@ -354,16 +363,7 @@ export class TextToSpeech {
             logger.warn(`Edge TTS Worker proxy responded with status ${response.status}`);
           }
         } catch (workerErr) {
-          logger.warn(`Edge TTS Worker proxy failed: ${workerErr.message}`);
-        }
-      }
-
-      // 2. Try Direct WebSocket if proxy was not available
-      if (!arrayBuffer) {
-        try {
-          arrayBuffer = await this.synthesizeEdgeDirect(safeText);
-        } catch (directErr) {
-          logger.warn(`Edge TTS Direct failed: ${directErr.message || directErr}`);
+          logger.warn(`Edge TTS Worker proxy unavailable (${workerErr.message}) — switching immediately to Google TTS`);
         }
       }
 
@@ -373,7 +373,7 @@ export class TextToSpeech {
       }
     }
 
-    // 3. Fallback to Google Cloud TTS if Edge TTS was unavailable
+    // 2. Fallback to Google Cloud TTS if Edge TTS was unavailable or timed out
     if (!arrayBuffer) {
       this.consecutiveEdgeFailures++;
       if (this.consecutiveEdgeFailures >= this.MAX_EDGE_CONSECUTIVE_FAILURES) {
@@ -382,7 +382,7 @@ export class TextToSpeech {
           `Edge TTS failed ${this.consecutiveEdgeFailures} times — entering 60s cooldown, switching seamlessly to Google TTS`,
         );
       } else {
-        logger.warn("Edge TTS unavailable — falling back seamlessly to Google TTS");
+        logger.warn("Edge TTS unavailable/timeout — falling back seamlessly to Google TTS");
       }
       this.speakOnline(text);
       return;

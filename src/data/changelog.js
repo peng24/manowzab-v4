@@ -12,6 +12,24 @@
  */
 
 export const changelog = [
+  // ─── 4.83.x ───────────────────────────────────────────
+  {
+    version: '4.83.0',
+    date: '2026-09-03',
+    changes: {
+      added: [
+        'ระบบ Adaptive Live Streaming Timeout สำหรับ Edge TTS — ปรับความเร็วตามสถานการณ์อัตโนมัติ: ในช่วงปกติอนุญาตให้ Worker สังเคราะห์เสียงเปรมวดีได้เต็มที่ 4.5 วินาที และในช่วงแชทเร่งด่วนที่มีคิวรออ่านจะลดเวลาเหลือ 2.5 วินาทีเพื่อสลับไป Google TTS ทันใจ ป้องกันคิวเสียงดีเลย์สะสม',
+        'ระบบปลดล็อกเสียงอัตโนมัติ (User Gesture Global AudioContext Auto-Unlock) — ตรวจจับการคลิก, แตะจอ หรือกดปุ่มแรกของผู้ใช้ (One-time Capture) เพื่อสั่ง Resume และปลดล็อก AudioContext ทันที ป้องกันข้อผิดพลาด Autoplay Policy และ Resume Timeout เมื่อเปิดแอป',
+      ],
+      fixed: [
+        'แก้ไขข้อผิดพลาด SweetAlert2 Toast Warning (heightAuto & returnFocus) — ปรับปรุงตัวห่อหุ้มระดับโกลบอล (Global Swal Wrapper) ใน main.js, shipping-main.js, history-main.js และ ChatPanel.vue ไม่ให้ส่งพารามิเตอร์ heightAuto และ returnFocus ใน Toast Notifications ให้ถูกต้องตามมาตรฐาน',
+        'ตัดขั้นตอน Direct WebSocket ที่ตกค้างใน Edge TTS — นำการเชื่อมต่อ WebSocket ตรงไปยัง Bing ที่ถูกเบราว์เซอร์บล็อกออก เพื่อให้ระบบสลับไปใช้ Google Cloud TTS ได้ทันที 0ms โดยไม่เกิด Error ใน Console',
+      ],
+      improved: [
+        'ลดการสร้าง AudioContext ซ้ำซ้อน (Shared Singleton AudioContext) — ปรับให้ระบบเสียงฉลองยอดขาย (Celebration Audio) ใช้งาน Singleton audioCtx ร่วมกับ useAudio.js ลดการบริโภคหน่วยความจำและลดคำเตือนเบราว์เซอร์',
+      ],
+    },
+  },
   // ─── 4.82.x ───────────────────────────────────────────
   {
     version: '4.82.0',

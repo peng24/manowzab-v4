@@ -322,8 +322,6 @@ async function editNickname(chat) {
           position: "top-end",
           showConfirmButton: false,
           timer: 1500,
-          heightAuto: false,
-          returnFocus: false,
         });
 
         if (el && savedScrollTop !== null) {
@@ -527,8 +525,6 @@ async function forceProcess(chat) {
       showConfirmButton: false,
       timer: 2000,
       timerProgressBar: true,
-      heightAuto: false,
-      returnFocus: false,
     });
   }
 

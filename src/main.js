@@ -22,13 +22,17 @@ Swal.fire = function (...args) {
     args = [opts];
   }
 
-  const isToast = opts && (opts.toast || (this && this.defaultParams && this.defaultParams.toast));
+  const isToast = Boolean(opts && (opts.toast || (this && this.defaultParams && this.defaultParams.toast)));
   if (opts && typeof opts === "object") {
-    if (opts.heightAuto === undefined) opts.heightAuto = false;
-    if (opts.returnFocus === undefined) opts.returnFocus = false;
     if (!isToast) {
+      if (opts.heightAuto === undefined) opts.heightAuto = false;
+      if (opts.returnFocus === undefined) opts.returnFocus = false;
       if (opts.showCloseButton === undefined) opts.showCloseButton = true;
       if (opts.allowOutsideClick === undefined) opts.allowOutsideClick = true;
+    } else {
+      // Incompatible with toasts in SweetAlert2
+      delete opts.heightAuto;
+      delete opts.returnFocus;
     }
   }
   

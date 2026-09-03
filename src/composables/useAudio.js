@@ -3,11 +3,34 @@ import { useSystemStore } from "../stores/system";
 import { ttsService } from "../services/TextToSpeech";
 
 // ✅ Global Singleton AudioContext (Shared across all components)
-const audioCtx =
+export const audioCtx =
   typeof window !== "undefined" &&
   (window.AudioContext || window.webkitAudioContext)
     ? new (window.AudioContext || window.webkitAudioContext)()
     : null;
+
+// ✅ Auto-unlock AudioContext on first user interaction (click / touch / keydown)
+if (typeof window !== "undefined") {
+  const unlockAudio = async () => {
+    try {
+      if (audioCtx && audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+      if (ttsService?.audioCtx && ttsService.audioCtx.state === "suspended") {
+        await ttsService.audioCtx.resume();
+      }
+    } catch (e) {
+      // Ignore unlock failure
+    }
+  };
+
+  const unlockEvents = ["click", "touchstart", "keydown", "pointerdown"];
+  const onUserInteraction = () => {
+    unlockAudio();
+    unlockEvents.forEach((evt) => window.removeEventListener(evt, onUserInteraction, true));
+  };
+  unlockEvents.forEach((evt) => window.addEventListener(evt, onUserInteraction, { capture: true, passive: true }));
+}
 
 // ✅ Global Unified Audio Queue (persists across re-renders)
 const audioQueue = [];
@@ -67,10 +90,14 @@ export function useAudio() {
         }
 
         if (audioCtx && audioCtx.state === "suspended") {
-          await Promise.race([
-            audioCtx.resume(),
-            new Promise((resolve) => setTimeout(resolve, 2000))
-          ]).catch(() => console.warn("SFX AudioContext resume timeout"));
+          if (typeof navigator !== "undefined" && navigator.userActivation && !navigator.userActivation.hasBeenActive) {
+            // Awaiting first user interaction on page before resuming
+          } else {
+            await Promise.race([
+              audioCtx.resume(),
+              new Promise((resolve) => setTimeout(resolve, 2000))
+            ]).catch(() => console.warn("SFX AudioContext resume timeout"));
+          }
         }
         if (!audioCtx) {
           return;
@@ -162,10 +189,14 @@ export function useAudio() {
         await waitForSpeechToFinish();
 
         if (audioCtx && audioCtx.state === "suspended") {
-          await Promise.race([
-            audioCtx.resume(),
-            new Promise((resolve) => setTimeout(resolve, 2000))
-          ]).catch(() => console.warn("Sleep AudioContext resume timeout"));
+          if (typeof navigator !== "undefined" && navigator.userActivation && !navigator.userActivation.hasBeenActive) {
+            // Awaiting first user interaction on page before resuming
+          } else {
+            await Promise.race([
+              audioCtx.resume(),
+              new Promise((resolve) => setTimeout(resolve, 2000))
+            ]).catch(() => console.warn("Sleep AudioContext resume timeout"));
+          }
         }
 
         if (!audioCtx) {

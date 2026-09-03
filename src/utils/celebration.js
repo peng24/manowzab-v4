@@ -1,17 +1,13 @@
 import confetti from "canvas-confetti";
+import { audioCtx } from "../composables/useAudio";
 
 // Preload cache variables
 let celebrationAudioBuffer = null;
-let audioContext = null;
 
 // ✅ Preload the audio file into memory immediately when the app loads
 export async function preloadCelebrationAudio() {
   try {
-    if (typeof window === "undefined") return;
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    audioContext = new AudioContextClass();
+    if (typeof window === "undefined" || !audioCtx) return;
 
     // Fetch the MP3 file once
     const response = await fetch(
@@ -20,7 +16,7 @@ export async function preloadCelebrationAudio() {
     const arrayBuffer = await response.arrayBuffer();
 
     // Decode into AudioBuffer for instant, zero-latency playback
-    celebrationAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    celebrationAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
     console.log("🎉 Celebration audio preloaded successfully!");
   } catch (err) {
     console.warn("⚠️ Failed to preload celebration audio:", err);
@@ -35,19 +31,19 @@ export function triggerCelebration(percentage) {
   const animationEnd = Date.now() + duration;
 
   // ✅ Play the preloaded audio buffer directly from memory
-  if (audioContext && celebrationAudioBuffer) {
+  if (audioCtx && celebrationAudioBuffer) {
     try {
-      if (audioContext.state === "suspended") {
-        audioContext.resume();
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
       }
-      const source = audioContext.createBufferSource();
+      const source = audioCtx.createBufferSource();
       source.buffer = celebrationAudioBuffer;
 
-      const gainNode = audioContext.createGain();
+      const gainNode = audioCtx.createGain();
       gainNode.gain.value = 0.2; // 20% volume (very soft)
 
       source.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      gainNode.connect(audioCtx.destination);
 
       source.start(0);
     } catch (err) {

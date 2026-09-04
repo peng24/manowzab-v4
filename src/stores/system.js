@@ -22,27 +22,10 @@ export const useSystemStore = defineStore("system", () => {
   // ✅ Google Cloud TTS API Key - Load from .env
   const googleApiKey = ref(import.meta.env.VITE_GOOGLE_API_KEYS || "");
 
-  // ✅ Edge TTS Proxy URL (Cloudflare Worker)
-  const defaultEdgeUrl = (
-    import.meta.env.VITE_EDGE_TTS_URL ||
-    "https://manowzab-edge-tts.peng24.workers.dev"
-  ).trim().replace(/\/+$/, "");
-
-  const edgeTtsUrl = ref(
-    localStorage.getItem("manowzab_edge_tts_url") || defaultEdgeUrl
-  );
-
-  function setEdgeTtsUrl(url) {
-    const cleanUrl = (url || "").trim().replace(/\/+$/, "");
-    edgeTtsUrl.value = cleanUrl || defaultEdgeUrl;
-    localStorage.setItem("manowzab_edge_tts_url", edgeTtsUrl.value);
-    logger.tts(`Edge TTS Proxy URL updated: ${edgeTtsUrl.value}`);
-  }
-
-  // ✅ TTS Voice Mode: 'edge' | 'neural2' | 'standard' | 'native' (Default: 'edge' - เสียงเปรมวดี)
+  // ✅ TTS Voice Mode: 'neural2' | 'standard' | 'native' (Default: 'neural2' - Google Cloud Neural2-C)
   const savedMode = localStorage.getItem("manowzab_tts_voice_mode");
-  const validModes = ["edge", "neural2", "standard", "native"];
-  const ttsVoiceMode = ref(validModes.includes(savedMode) ? savedMode : "edge");
+  const validModes = ["neural2", "standard", "native"];
+  const ttsVoiceMode = ref(validModes.includes(savedMode) ? savedMode : "neural2");
 
   const useOnlineTts = computed({
     get: () => ttsVoiceMode.value !== "native",
@@ -50,7 +33,7 @@ export const useSystemStore = defineStore("system", () => {
       if (!val) {
         ttsVoiceMode.value = "native";
       } else if (ttsVoiceMode.value === "native") {
-        ttsVoiceMode.value = "edge";
+        ttsVoiceMode.value = "neural2";
       }
       localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     },
@@ -60,14 +43,12 @@ export const useSystemStore = defineStore("system", () => {
   });
 
   function cycleTtsMode() {
-    if (ttsVoiceMode.value === "edge") {
-      ttsVoiceMode.value = "neural2";
-    } else if (ttsVoiceMode.value === "neural2") {
+    if (ttsVoiceMode.value === "neural2") {
       ttsVoiceMode.value = "standard";
     } else if (ttsVoiceMode.value === "standard") {
       ttsVoiceMode.value = "native";
     } else {
-      ttsVoiceMode.value = "edge";
+      ttsVoiceMode.value = "neural2";
     }
     localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     return ttsVoiceMode.value;
@@ -244,8 +225,6 @@ export const useSystemStore = defineStore("system", () => {
     assignOptimalTtsKey, // ✅ Export
     updatePresenceTtsKey, // ✅ Export
     googleApiKey, // ✅ Export (from .env)
-    edgeTtsUrl, // ✅ Export (from .env or localStorage)
-    setEdgeTtsUrl, // ✅ Export
     useOnlineTts, // ✅ Export
     ttsVoiceMode, // ✅ Export
     googleVoiceName, // ✅ Export

@@ -798,6 +798,8 @@ function addManualCustomer() {
     deliveryDate: parsedDate,
     note: (existingCustomer && existingCustomer.note) || "",
     status: "pending",
+    labelPrinted: false,
+    labelPrintedAt: null,
     createdAt: existingCustomer ? (existingCustomer.createdAt ?? Date.now()) : Date.now(),
     updatedAt: Date.now(),
   }).then(() => {
@@ -808,10 +810,19 @@ function addManualCustomer() {
 }
 
 function updateField(id, field, value) {
-  update(dbRef(db, `delivery_customers/${id}`), {
+  const updates = {
     [field]: value ?? "",
     updatedAt: Date.now(),
-  });
+  };
+  if (field === "deliveryDate" && value) {
+    const cust = allCustomers.value.find((c) => c.id === id);
+    if (cust && cust.status === "done") {
+      updates.status = "pending";
+      updates.labelPrinted = false;
+      updates.labelPrintedAt = null;
+    }
+  }
+  update(dbRef(db, `delivery_customers/${id}`), updates);
 }
 
 function markDone(customer) {
@@ -829,7 +840,13 @@ function markDone(customer) {
         const totalRef = dbRef(db, `delivery_customers/${customer.id}/totalBookings`);
         await runTransaction(totalRef, (currentTotal) => (currentTotal || 0) + currentCount);
       }
-      const updates = { status: "done", itemCount: 0, updatedAt: Date.now() };
+      const updates = {
+        status: "done",
+        itemCount: 0,
+        labelPrinted: false,
+        labelPrintedAt: null,
+        updatedAt: Date.now(),
+      };
       if (customer.sessions) {
         Object.keys(customer.sessions).forEach((vid) => {
           updates[`sessions/${vid}/status`] = "done";

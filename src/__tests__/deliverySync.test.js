@@ -128,5 +128,38 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
       expect(getPaymentType({})).toBe("");
       expect(getDisplay({})).toBe("ยังไม่ระบุ");
     });
+
+    it("resets labelPrinted to false when marked done and preparing for next delivery round", () => {
+      // Simulate markDone payload
+      const markDonePayload = (customer) => ({
+        status: "done",
+        itemCount: 0,
+        labelPrinted: false,
+        labelPrintedAt: null,
+        updatedAt: 12345,
+      });
+
+      // Simulate re-activating done customer for next round
+      const nextRoundPayload = (customer, newDate) => ({
+        name: customer.name,
+        deliveryDate: newDate,
+        status: "pending",
+        labelPrinted: false,
+        labelPrintedAt: null,
+        updatedAt: 12345,
+      });
+
+      const customer = { id: "cust-1", name: "สมศรี", status: "pending", labelPrinted: true, labelPrintedAt: 11111 };
+      const doneResult = markDonePayload(customer);
+      expect(doneResult.status).toBe("done");
+      expect(doneResult.labelPrinted).toBe(false);
+      expect(doneResult.labelPrintedAt).toBeNull();
+
+      const nextRoundResult = nextRoundPayload(doneResult, "2026-09-10");
+      expect(nextRoundResult.status).toBe("pending");
+      expect(nextRoundResult.deliveryDate).toBe("2026-09-10");
+      expect(nextRoundResult.labelPrinted).toBe(false);
+      expect(nextRoundResult.labelPrintedAt).toBeNull();
+    });
   });
 });

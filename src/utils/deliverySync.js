@@ -183,6 +183,8 @@ export async function syncDeliveryCustomerForOwner(
         if (existing.status === "done") {
           updates.status = "pending";
           updates.deliveryDate = null; // ✅ Clear old delivery date so customer goes to "ฝากสินค้า" tab, not "แจ้งส่ง"
+          updates.labelPrinted = false; // ✅ Reset print status for new round
+          updates.labelPrintedAt = null;
         }
         await update(customerRef, updates);
       }

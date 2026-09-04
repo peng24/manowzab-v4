@@ -906,6 +906,8 @@ function addManualCustomer() {
     deliveryDate: parsedDate,
     note: (existingCustomer && existingCustomer.note) || "",
     status: "pending",
+    labelPrinted: false,
+    labelPrintedAt: null,
     createdAt: existingCustomer ? (existingCustomer.createdAt ?? Date.now()) : Date.now(),
     updatedAt: Date.now(),
   }).then(() => {
@@ -916,10 +918,19 @@ function addManualCustomer() {
 }
 
 function updateField(id, field, value) {
-  update(dbRef(db, `delivery_customers/${id}`), {
+  const updates = {
     [field]: value ?? "",
     updatedAt: Date.now(),
-  });
+  };
+  if (field === "deliveryDate" && value) {
+    const cust = allCustomers.value.find((c) => c.id === id);
+    if (cust && cust.status === "done") {
+      updates.status = "pending";
+      updates.labelPrinted = false;
+      updates.labelPrintedAt = null;
+    }
+  }
+  update(dbRef(db, `delivery_customers/${id}`), updates);
 }
 
 function markDone(customer) {
@@ -942,10 +953,12 @@ function markDone(customer) {
         });
       }
 
-      // ✅ Reset สถานะ (เซ็ต status: "done" ของลูกค้าและทุก sessions เป็น "done")
+      // ✅ Reset สถานะ (เซ็ต status: "done" ของลูกค้าและทุก sessions เป็น "done", รีเซ็ตสถานะพิมพ์เป็นยังไม่พิมพ์)
       const updates = {
         status: "done",
         itemCount: 0,
+        labelPrinted: false,
+        labelPrintedAt: null,
         updatedAt: Date.now(),
       };
       if (customer.sessions) {

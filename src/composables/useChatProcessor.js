@@ -570,6 +570,8 @@ export function useChatProcessor() {
           name: autoShipName,
           deliveryDate: parsedDate,
           status: "pending",
+          labelPrinted: false,
+          labelPrintedAt: null,
           updatedAt: Date.now(),
         });
 

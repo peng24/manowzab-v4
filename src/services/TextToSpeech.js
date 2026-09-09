@@ -210,7 +210,7 @@ export class TextToSpeech {
       `Google Cloud TTS: ${safeText.substring(0, 50)}... (${keys.length} keys available)`,
     );
 
-    const voiceName = systemStore.googleVoiceName || "th-TH-Neural2-C";
+    const voiceName = systemStore.googleVoiceName || "th-TH-Standard-A";
     const cacheKey = `google:${voiceName}:${safeText}`;
     const cachedBuffer = this.getCachedAudio(cacheKey);
 

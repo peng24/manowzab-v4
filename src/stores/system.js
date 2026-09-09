@@ -22,34 +22,27 @@ export const useSystemStore = defineStore("system", () => {
   // ✅ Google Cloud TTS API Key - Load from .env
   const googleApiKey = ref(import.meta.env.VITE_GOOGLE_API_KEYS || "");
 
-  // ✅ TTS Voice Mode: 'neural2' | 'standard' | 'native' (Default: 'neural2' - Google Cloud Neural2-C)
+  // ✅ TTS Voice Mode: 'standard' | 'native' (Default: 'standard' - Google Cloud Standard-A)
   const savedMode = localStorage.getItem("manowzab_tts_voice_mode");
-  const validModes = ["neural2", "standard", "native"];
-  const ttsVoiceMode = ref(validModes.includes(savedMode) ? savedMode : "neural2");
+  const validModes = ["standard", "native"];
+  const ttsVoiceMode = ref(validModes.includes(savedMode) ? savedMode : "standard");
+  if (savedMode === "neural2") {
+    localStorage.setItem("manowzab_tts_voice_mode", "standard");
+  }
 
   const useOnlineTts = computed({
-    get: () => ttsVoiceMode.value !== "native",
+    get: () => ttsVoiceMode.value === "standard",
     set: (val) => {
-      if (!val) {
-        ttsVoiceMode.value = "native";
-      } else if (ttsVoiceMode.value === "native") {
-        ttsVoiceMode.value = "neural2";
-      }
+      ttsVoiceMode.value = val ? "standard" : "native";
       localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     },
   });
   const googleVoiceName = computed(() => {
-    return ttsVoiceMode.value === "standard" ? "th-TH-Standard-A" : "th-TH-Neural2-C";
+    return "th-TH-Standard-A";
   });
 
   function cycleTtsMode() {
-    if (ttsVoiceMode.value === "neural2") {
-      ttsVoiceMode.value = "standard";
-    } else if (ttsVoiceMode.value === "standard") {
-      ttsVoiceMode.value = "native";
-    } else {
-      ttsVoiceMode.value = "neural2";
-    }
+    ttsVoiceMode.value = ttsVoiceMode.value === "standard" ? "native" : "standard";
     localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     return ttsVoiceMode.value;
   }

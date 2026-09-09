@@ -82,18 +82,14 @@
         </button>
       </div>
 
-      <!-- TTS Toggle - 3-State (Google Neural2 / Google Standard / Native) -->
+      <!-- TTS Toggle - 2-State (Google Standard / Native) -->
       <button
         :class="['btn']"
         :style="{
-          background: systemStore.ttsVoiceMode === 'neural2'
-            ? 'linear-gradient(135deg, #00C6FF 0%, #7928CA 100%)'
-            : systemStore.ttsVoiceMode === 'standard'
+          background: systemStore.ttsVoiceMode === 'standard'
             ? 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)'
             : 'linear-gradient(135deg, #4B5563 0%, #374151 100%)',
-          boxShadow: systemStore.ttsVoiceMode === 'neural2'
-            ? '0 4px 15px rgba(121, 40, 202, 0.45)'
-            : systemStore.ttsVoiceMode === 'standard'
+          boxShadow: systemStore.ttsVoiceMode === 'standard'
             ? '0 4px 15px rgba(0, 114, 255, 0.4)'
             : 'none',
           border: 'none',
@@ -102,9 +98,7 @@
         }"
         @click="toggleTtsMode"
         :title="
-          systemStore.ttsVoiceMode === 'neural2'
-            ? `Google Cloud Neural2 (th-TH-Neural2-C) - Key #${systemStore.activeKeyIndex} Active`
-            : systemStore.ttsVoiceMode === 'standard'
+          systemStore.ttsVoiceMode === 'standard'
             ? `Google Cloud Standard (th-TH-Standard-A) - Key #${systemStore.activeKeyIndex} Active`
             : 'Native TTS (Offline)'
         "
@@ -124,7 +118,7 @@
           v-if="systemStore.useOnlineTts"
           style="margin-left: 5px; font-size: 1.05em; font-weight: bold; font-family: monospace; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
         >
-          {{ (systemStore.ttsVoiceMode === 'neural2' ? 'N' : 'S') + systemStore.activeKeyIndex }}
+          {{ 'S' + systemStore.activeKeyIndex }}
         </span>
       </button>
 
@@ -705,9 +699,7 @@ function getVersionTooltip() {
 
 function toggleTtsMode() {
   const newMode = systemStore.cycleTtsMode();
-  let modeName = "Google Neural2";
-  if (newMode === "standard") modeName = "Google Standard";
-  else if (newMode === "native") modeName = "Native TTS";
+  const modeName = newMode === "standard" ? "Google Standard" : "Native TTS";
 
   logger.log("🔊 Switched to:", modeName);
   queueAudio(null, "", `เปลี่ยนเป็น ${modeName}`);

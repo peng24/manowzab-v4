@@ -12,6 +12,25 @@
  */
 
 export const changelog = [
+  // ─── 4.86.x ───────────────────────────────────────────
+  {
+    version: '4.86.0',
+    date: '2026-09-09',
+    changes: {
+      added: [
+        'เพิ่มชุด Agent Skill เฉพาะทาง Manowzab Command Center (.agents/skills/manowzab-core) — รวมมาตรฐานสถาปัตยกรรม, กฎเหล็ก Invariants, ผังฐานข้อมูล Firebase RTDB และขั้นตอนการตรวจสอบความปลอดภัยของระบบสด',
+        'เพิ่มชุดทดสอบ Unit Tests สำหรับระบบเสียง TTS (ttsStore.test.js) — ทดสอบความถูกต้องของการสลับโหมด 2 สถานะ, การไมเกรตค่าเก่าจาก localStorage และการทำงานของ Fallback',
+      ],
+      improved: [
+        'ปรับให้ Google Cloud Standard (th-TH-Standard-A) เป็นเสียงหลักของระบบ (Primary Default Voice) — ตอบสนองรวดเร็ว ประหยัดโควตา และคงประสิทธิภาพเสียงภาษาไทยคมชัด',
+        'ปรับปุ่มสลับเสียงบน Header เป็น 2 สถานะมาตรฐาน (2-State TTS Switcher) — สลับวนลูประหว่าง Google Cloud Standard (ป้าย S) 🔁 Native TTS ออฟไลน์ (🤖) พร้อมประกาศเสียงภาษาไทยชัดเจน',
+        'คงระบบความคงทนสมบูรณ์ 100% — Zero-Stall Fallback สลับไป Native TTS อัตโนมัติเมื่อ Google API ขัดข้อง, In-Memory LRU Cache 0ms สำหรับข้อความซ้ำ, และระบบหมุนเวียน API Key',
+      ],
+      removed: [
+        'ถอดตัวเลือกเสียง Google Cloud Neural2 (th-TH-Neural2-C) ออกจากระบบทั้งหมด — ลดความซับซ้อนและไมเกรตค่าคอนฟิกเดิมในเครื่องผู้ใช้กลับมาเป็น Standard อัตโนมัติ',
+      ],
+    },
+  },
   // ─── 4.85.x ───────────────────────────────────────────
   {
     version: '4.85.0',

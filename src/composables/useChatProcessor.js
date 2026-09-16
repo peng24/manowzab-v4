@@ -941,7 +941,7 @@ export function useChatProcessor() {
     if (!videoId || videoId === "demo") return null;
 
     const listenerInitTime = Date.now();
-    console.log(
+    logger.debug(
       `🎙️ Initializing ManowPriceVoiceListener for video: ${videoId}`,
     );
     const voiceChatRef = dbRef(db, `voice_chats/${videoId}`);
@@ -955,11 +955,11 @@ export function useChatProcessor() {
         const msgTime = val.timestamp || Date.now();
         // Skip historical voice messages added before the listener initialized (with 5-second buffer)
         if (msgTime < listenerInitTime - 5000) {
-          console.log("🎙️ Skipping historical voice chat:", val.text);
+          logger.debug("🎙️ Skipping historical voice chat:", val.text);
           return;
         }
 
-        console.log("🎙️ New Voice Chat Message Detected:", val);
+        logger.debug("🎙️ New Voice Chat Message Detected:", val);
 
         const dataItem = {
           id: snapshot.key,

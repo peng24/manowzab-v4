@@ -85,7 +85,7 @@ watch(
   () => systemStore.isSoundOn,
   (isOn) => {
     if (!isOn) {
-      console.log(
+      logger.info(
         "🔇 Sound turned OFF - Silencing immediately (App Singleton).",
       );
       const { resetVoice } = useAudio();
@@ -129,7 +129,7 @@ watch(
       voiceListenerUnsub = null;
     }
     if (isDetector && vid && vid !== "demo") {
-      console.log(`🎙️ [Active Price Detector] Starting voice listener for video: ${vid}`);
+      logger.info(`🎙️ [Active Price Detector] Starting voice listener for video: ${vid}`);
       voiceListenerUnsub = initManowPriceVoiceListener(vid);
     }
   },
@@ -137,17 +137,17 @@ watch(
 );
 
 onMounted(async () => {
-  console.log("🚀 App mounted");
+  logger.info("🚀 App mounted");
 
   // 🤖 Test Mode: Auto-Login
   const testEmail = import.meta.env.VITE_TEST_EMAIL;
   const testPass = import.meta.env.VITE_TEST_PASSWORD;
 
   if (testEmail && testPass && !auth.currentUser) {
-    console.log("🤖 Test Mode Detected: Attempting Auto-Login...");
+    logger.info("🤖 Test Mode Detected: Attempting Auto-Login...");
     try {
       await signInWithEmailAndPassword(auth, testEmail, testPass);
-      console.log("✅ Auto-Login Success:", testEmail);
+      logger.info("✅ Auto-Login Success:", testEmail);
     } catch (e) {
       console.error("❌ Auto-Login Failed:", e.message);
     }
@@ -203,7 +203,7 @@ onMounted(async () => {
       }).catch((err) => console.error("Presence error:", err));
 
       onDisconnect(myConnectionRef).remove();
-      console.log("✅ Presence setup complete");
+      logger.info("✅ Presence setup complete");
     }
   }
 
@@ -237,7 +237,7 @@ onMounted(async () => {
   // ✅ Auth State Listener
   const unsubAuth = onAuthStateChanged(auth, (user) => {
     isUserAuthenticated.value = !!user;
-    console.log(
+    logger.info(
       `✅ Auth state changed: ${user ? "authenticated" : "not authenticated"}`,
     );
     setupPresence();
@@ -326,7 +326,7 @@ function handleGlobalHotkeys(e) {
 
 // ✅ Register Cleanup at top level (Vue 3 safe)
 onUnmounted(() => {
-  console.log("♻️ Cleaning up App.vue listeners...");
+  logger.info("♻️ Cleaning up App.vue listeners...");
   window.removeEventListener("keydown", handleGlobalHotkeys);
   if (voiceListenerUnsub) {
     voiceListenerUnsub();

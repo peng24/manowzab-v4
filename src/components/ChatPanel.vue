@@ -177,6 +177,7 @@ import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import { sanitizeDbKey } from "../utils/dbUtils";
+import { logger } from "../utils/logger";
 
 const chatStore = useChatStore();
 const stockStore = useStockStore();
@@ -450,7 +451,7 @@ onMounted(() => {
   if (systemStore.currentVideoId) {
     if (chatUnsubscribe) chatUnsubscribe();
     chatUnsubscribe = chatStore.syncFromFirebase(systemStore.currentVideoId);
-    console.log("✅ Chat sync initialized for:", systemStore.currentVideoId);
+    logger.info("✅ Chat sync initialized for:", systemStore.currentVideoId);
   }
 });
 
@@ -467,7 +468,7 @@ watch(
   () => systemStore.currentVideoId,
   (newVideoId, oldVideoId) => {
     if (newVideoId && newVideoId !== oldVideoId) {
-      console.log(
+      logger.info(
         `🔄 Video ID changed from ${oldVideoId} to ${newVideoId}, re-syncing chat...`,
       );
       if (chatUnsubscribe) chatUnsubscribe();

@@ -462,6 +462,7 @@ import {
   shipDayOfWeekRegex,
   calcNextDayOfWeekDate,
 } from "../utils/chatParserUtils";
+import { logger } from "../utils/logger";
 
 const emit = defineEmits(["close"]);
 
@@ -614,7 +615,7 @@ onUnmounted(() => {
     }
   });
   cleanupFns.length = 0;
-  console.log("🧹 Memory Cleaned Up!");
+  logger.debug("🧹 Memory Cleaned Up!");
 });
 
 // Address Helpers

@@ -771,7 +771,7 @@ onBeforeUnmount(() => {
     }
   });
   cleanupFns.length = 0;
-  console.log("🧹 Memory Cleaned Up!");
+  logger.log("🧹 Memory Cleaned Up!");
   document.removeEventListener("click", handleClickOutside);
   if (simIntervalId) clearInterval(simIntervalId);
   if (videoId.value) localStorage.setItem("lastVideoId", videoId.value);

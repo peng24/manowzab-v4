@@ -584,7 +584,7 @@ onUnmounted(() => {
   });
   cleanupFns.length = 0;
   window.removeEventListener('keydown', handleGlobalKeydown);
-  console.log("🧹 Memory Cleaned Up!");
+  logger.log("🧹 Memory Cleaned Up!");
 });
 
 const motivationalText = computed(() => {

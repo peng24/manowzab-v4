@@ -1,6 +1,8 @@
 import { ref } from "vue";
 import { useSystemStore } from "../stores/system";
 import { ttsService } from "../services/TextToSpeech";
+import { logger } from "../utils/logger";
+
 
 // ✅ Global Singleton AudioContext (Shared across all components)
 export const audioCtx =
@@ -54,9 +56,9 @@ async function preloadSleepAudio() {
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const arrayBuffer = await response.arrayBuffer();
     sleepAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    console.log("💤 Sleep mode audio preloaded successfully!");
+    logger.debug("💤 Sleep mode audio preloaded successfully!");
   } catch (err) {
-    console.warn("⚠️ Failed to preload sleep mode audio:", err);
+    logger.warn("⚠️ Failed to preload sleep mode audio:", err);
   }
 }
 

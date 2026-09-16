@@ -233,6 +233,7 @@ import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import { resolveDeliveryUid, recalcItemCount, normalizeCustomerName } from "../utils/deliverySync";
 import { sanitizeDbKey } from "../utils/dbUtils";
+import { logger } from "../utils/logger";
 
 const emit = defineEmits(["close"]);
 
@@ -574,7 +575,7 @@ function updateCustomerName(uid, name) {
 
   update(dbRef(db, `nicknames/${safeUid}`), { nick: name.trim() })
     .then(() => {
-      console.log("✅ Updated nickname:", name);
+      logger.debug("✅ Updated nickname:", name);
     })
     .catch((error) => {
       console.error("Error updating nickname:", error);
@@ -695,7 +696,7 @@ onUnmounted(() => {
     }
   });
   cleanupFns.length = 0;
-  console.log("🧹 Memory Cleaned Up!");
+  logger.debug("🧹 Memory Cleaned Up!");
 });
 </script>
 

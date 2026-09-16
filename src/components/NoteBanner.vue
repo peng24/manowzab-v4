@@ -49,6 +49,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
+import { logger } from "../utils/logger";
 
 const allNotes = ref({});
 const collapsedNotes = ref({});
@@ -111,7 +112,7 @@ onUnmounted(() => {
     }
   });
   cleanupFns.length = 0;
-  console.log("🧹 Memory Cleaned Up!");
+  logger.debug("🧹 Memory Cleaned Up!");
 });
 </script>
 

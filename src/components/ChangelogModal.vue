@@ -166,7 +166,6 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { useSystemStore } from '../stores/system'
-import { changelog } from '../data/changelog'
 import { escapeHtml } from '../utils/dbUtils'
 
 const systemStore = useSystemStore()
@@ -177,6 +176,21 @@ const searchQuery = ref('')
 const expandedVersions = ref(new Set())
 const searchInput = ref(null)
 const bodyRef = ref(null)
+
+// 🚀 Lazy-loaded changelog data — loaded on first open to keep initial bundle small (~155KB saved)
+const changelog = ref([])
+const isChangelogLoading = ref(false)
+
+async function loadChangelog() {
+  if (changelog.value.length > 0) return // Already loaded
+  isChangelogLoading.value = true
+  try {
+    const module = await import('../data/changelog.js')
+    changelog.value = module.changelog
+  } finally {
+    isChangelogLoading.value = false
+  }
+}
 
 // Default: expand first 3 versions
 const DEFAULT_EXPANDED_COUNT = 3
@@ -189,10 +203,10 @@ const categoryOrder = [
 ]
 
 const filteredChangelog = computed(() => {
-  if (!searchQuery.value.trim()) return changelog
+  if (!searchQuery.value.trim()) return changelog.value
 
   const q = searchQuery.value.toLowerCase()
-  return changelog.filter((entry) => {
+  return changelog.value.filter((entry) => {
     // Match version
     if (entry.version.includes(q)) return true
     // Match change text
@@ -220,12 +234,14 @@ const allExpanded = computed(() => {
   )
 })
 
-function open() {
+async function open() {
   isOpen.value = true
   searchQuery.value = ''
+  // 🚀 Load changelog data on first open
+  await loadChangelog()
   // Reset expanded state: open first N
   expandedVersions.value = new Set(
-    changelog.slice(0, DEFAULT_EXPANDED_COUNT).map((e) => e.version)
+    changelog.value.slice(0, DEFAULT_EXPANDED_COUNT).map((e) => e.version)
   )
   // Focus search on next tick
   nextTick(() => {

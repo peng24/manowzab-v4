@@ -90,6 +90,7 @@ import {
 import { db } from "../composables/useFirebase";
 import { useSystemStore } from "../stores/system";
 import Swal from "sweetalert2";
+import { logger } from "../utils/logger";
 
 const systemStore = useSystemStore();
 
@@ -200,7 +201,7 @@ onUnmounted(() => {
     }
   });
   cleanupFns.length = 0;
-  console.log("🧹 Memory Cleaned Up!");
+  logger.debug("🧹 Memory Cleaned Up!");
 });
 
 // Expose open for parent

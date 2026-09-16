@@ -12,6 +12,19 @@
  */
 
 export const changelog = [
+  // ─── 4.87.x ───────────────────────────────────────────
+  {
+    version: '4.87.0',
+    date: '2026-09-16',
+    changes: {
+      improved: [
+        'เพิ่ม Pre-commit Git Hook ป้องกัน .env และ API Keys หลุดเข้า git history โดยอัตโนมัติ — บล็อกการ commit ทันทีเมื่อตรวจพบไฟล์ .env หรือ pattern ของ API Key จริงใน staged diff',
+        'แปลง console.log ทั้งหมด (37 จุด) ในทุก component และ composable ให้ผ่านระบบ logger มาตรฐาน — ปิดการแสดง debug log ใน production โดยอัตโนมัติ',
+        'ปรับ ChangelogModal ให้โหลดข้อมูล Changelog แบบ Lazy Load (Dynamic Import) — ลดขนาด Initial Bundle ลง ~155KB ช่วยให้แอปโหลดหน้าแรกเร็วขึ้น',
+        'เพิ่ม JSDoc ให้ useGemini.js — ระบุวัตถุประสงค์, ขอบเขตความปลอดภัย และ security warning อย่างชัดเจน',
+      ],
+    },
+  },
   // ─── 4.86.x ───────────────────────────────────────────
   {
     version: '4.86.0',

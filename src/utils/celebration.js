@@ -1,5 +1,6 @@
 import confetti from "canvas-confetti";
 import { audioCtx } from "../composables/useAudio";
+import { logger } from "./logger";
 
 // Preload cache variables
 let celebrationAudioBuffer = null;
@@ -17,9 +18,9 @@ export async function preloadCelebrationAudio() {
 
     // Decode into AudioBuffer for instant, zero-latency playback
     celebrationAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    console.log("🎉 Celebration audio preloaded successfully!");
+    logger.debug("🎉 Celebration audio preloaded successfully!");
   } catch (err) {
-    console.warn("⚠️ Failed to preload celebration audio:", err);
+    logger.warn("⚠️ Failed to preload celebration audio:", err);
   }
 }
 
@@ -47,7 +48,7 @@ export function triggerCelebration(percentage) {
 
       source.start(0);
     } catch (err) {
-      console.warn("Audio buffer playback error:", err);
+      logger.warn("Audio buffer playback error:", err);
     }
   } else {
     // Fallback just in case the trigger happens before the preload finishes
@@ -58,7 +59,7 @@ export function triggerCelebration(percentage) {
       audio.volume = 0.2;
       audio
         .play()
-        .catch((e) => console.warn("Fallback audio autoplay blocked"));
+        .catch((e) => logger.warn("Fallback audio autoplay blocked", e));
     } catch (e) {}
   }
 

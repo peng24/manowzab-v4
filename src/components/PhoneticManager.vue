@@ -213,6 +213,7 @@ import { db } from "../composables/useFirebase";
 import { ttsService } from "../services/TextToSpeech";
 import Swal from "sweetalert2";
 import { sanitizeDbKey } from "../utils/dbUtils";
+import { logger } from "../utils/logger";
 
 // ✅ รายการคำนำหน้า (เหมือนใน nickname store)
 const TITLE_PREFIXES = ["คุณ", "พี่", "น้อง", "เฮีย", "เจ๊", "ป้า", "น้า", "อา", "ลุง", "ตา", "ยาย", "แม่", "พ่อ", "ดร.", "หมอ", "ครู", "ซ้อ", "เสี่ย"];
@@ -341,7 +342,7 @@ function previewVoice() {
   if (!textToRead) return;
 
   const finalText = applyTitlePrefix(textToRead);
-  console.log("🔊 Preview TTS:", finalText);
+  logger.debug("🔊 Preview TTS:", finalText);
 
   // ✅ เรียก ttsService.speak() ตรงๆ — ดังแค่เครื่องที่กด ไม่ผ่าน Firebase
   ttsService.speak("ทดสอบเสียง", finalText);
@@ -353,7 +354,7 @@ function previewItemVoice(item) {
   if (!textToRead) return;
 
   const finalText = applyTitlePrefix(textToRead);
-  console.log("🔊 Preview item TTS:", finalText);
+  logger.debug("🔊 Preview item TTS:", finalText);
   ttsService.speak("ทดสอบเสียง", finalText);
 }
 
@@ -494,7 +495,7 @@ onUnmounted(() => {
   });
   cleanupFns.length = 0;
   document.removeEventListener("click", handleClickOutside);
-  console.log("🧹 PhoneticManager cleaned up!");
+  logger.debug("🧹 PhoneticManager cleaned up!");
 });
 </script>
 

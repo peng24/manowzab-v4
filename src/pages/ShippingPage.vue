@@ -792,11 +792,15 @@ function addManualCustomer() {
   const existingCustomer = allCustomers.value.find(c => c.name === name && c.status !== "done");
   if (existingCustomer) targetUid = existingCustomer.id;
 
+  const normKey = normalizeName(name).replace(/[.#$[\]/]/g, "_");
+  const defaultPaymentType = existingCustomer?.paymentType || (addressBook.value && addressBook.value[normKey]?.paymentType) || "";
+
   update(dbRef(db, `delivery_customers/${targetUid}`), {
     name,
     itemCount: existingCustomer ? (existingCustomer.itemCount ?? 0) : 0,
     deliveryDate: parsedDate,
     note: (existingCustomer && existingCustomer.note) || "",
+    paymentType: defaultPaymentType,
     status: "pending",
     labelPrinted: false,
     labelPrintedAt: null,
@@ -822,6 +826,39 @@ function updateField(id, field, value) {
       updates.labelPrintedAt = null;
     }
   }
+
+  // 💳 Auto-sync paymentType to address_book if note specifies payment intent
+  if (field === "note" && typeof value === "string") {
+    const noteLower = value.toLowerCase();
+    const cust = allCustomers.value.find((c) => c.id === id);
+    const normKey = cust ? normalizeName(cust.name).replace(/[.#$[\]/]/g, "_") : "";
+    if (noteLower.includes("cod") || noteLower.includes("ปลายทาง") || noteLower.includes("เก็บเงิน")) {
+      updates.paymentType = "cod";
+      if (cust) cust.paymentType = "cod";
+      if (normKey) {
+        update(dbRef(db, `address_book/${normKey}`), {
+          paymentType: "cod",
+          updatedAt: Date.now(),
+        });
+        if (addressBook.value && addressBook.value[normKey]) {
+          addressBook.value[normKey].paymentType = "cod";
+        }
+      }
+    } else if (noteLower.includes("โอน") || noteLower.includes("transfer")) {
+      updates.paymentType = "transfer";
+      if (cust) cust.paymentType = "transfer";
+      if (normKey) {
+        update(dbRef(db, `address_book/${normKey}`), {
+          paymentType: "transfer",
+          updatedAt: Date.now(),
+        });
+        if (addressBook.value && addressBook.value[normKey]) {
+          addressBook.value[normKey].paymentType = "transfer";
+        }
+      }
+    }
+  }
+
   update(dbRef(db, `delivery_customers/${id}`), updates);
 }
 
@@ -896,6 +933,35 @@ function getCustomerPaymentType(customer) {
     }
   }
 
+  // 1. Fallback: check central address_book
+  const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  const bookEntry = addressBook.value && norm ? addressBook.value[norm] : null;
+  if (bookEntry && bookEntry.paymentType) {
+    const pt = String(bookEntry.paymentType).trim().toLowerCase();
+    if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") {
+      return "cod";
+    }
+    if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") {
+      return "transfer";
+    }
+  }
+
+  // 2. Fallback: check active or saved address's paymentType
+  const savedAddrs = getCustomerSavedAddresses(customer);
+  const activeAddr = customer.selectedAddressId
+    ? savedAddrs.find((a) => a.id === customer.selectedAddressId)
+    : savedAddrs[0];
+  if (activeAddr && activeAddr.paymentType) {
+    const pt = String(activeAddr.paymentType).trim().toLowerCase();
+    if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") {
+      return "cod";
+    }
+    if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") {
+      return "transfer";
+    }
+  }
+
+  // 3. Fallback: check note or address for COD keywords
   const note = (customer.note || "").toLowerCase();
   const addr = (customer.address || "").toLowerCase();
   if (
@@ -935,17 +1001,49 @@ async function togglePaymentType(customer) {
   const current = getCustomerPaymentType(customer);
   const nextType = current === "cod" ? "transfer" : (current === "transfer" ? "cod" : "transfer");
 
+  // ⚡ Optimistic UI update
+  customer.paymentType = nextType;
+
+  const timestamp = Date.now();
+  const normKey = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+
+  const multiPathUpdates = {
+    [`delivery_customers/${customer.id}/paymentType`]: nextType,
+    [`delivery_customers/${customer.id}/updatedAt`]: timestamp,
+  };
+
+  if (normKey) {
+    multiPathUpdates[`address_book/${normKey}/paymentType`] = nextType;
+    multiPathUpdates[`address_book/${normKey}/name`] = customer.name.trim();
+    multiPathUpdates[`address_book/${normKey}/updatedAt`] = timestamp;
+    if (addressBook.value && addressBook.value[normKey]) {
+      addressBook.value[normKey].paymentType = nextType;
+    }
+  }
+
+  // Also update in customer's active address if available
+  const savedAddrs = getCustomerSavedAddresses(customer);
+  if (savedAddrs.length > 0) {
+    const updatedAddrs = savedAddrs.map((a) => ({
+      ...a,
+      paymentType: (customer.selectedAddressId && a.id === customer.selectedAddressId) || savedAddrs.length === 1
+        ? nextType
+        : (a.paymentType || nextType),
+    }));
+    multiPathUpdates[`delivery_customers/${customer.id}/addresses`] = updatedAddrs;
+    if (normKey) {
+      multiPathUpdates[`address_book/${normKey}/addresses`] = updatedAddrs;
+    }
+  }
+
   try {
-    await update(dbRef(db, `delivery_customers/${customer.id}`), {
-      paymentType: nextType,
-      updatedAt: Date.now(),
-    });
+    await update(dbRef(db), multiPathUpdates);
     Swal.fire({
       icon: "success",
-      title: `เปลี่ยนรูปแบบส่งของ "${customer.name}" เป็น "${nextType === 'cod' ? 'COD' : (nextType === 'transfer' ? 'โอน' : 'ยังไม่ระบุ')}" แล้ว`,
+      title: `บันทึกรูปแบบ "${customer.name}" เป็น "${nextType === 'cod' ? 'COD' : 'โอน'}" ไว้ในประวัติลูกค้าแล้ว`,
       toast: true,
       position: "top-end",
-      timer: 1200,
+      timer: 1500,
       showConfirmButton: false,
     });
   } catch (err) {

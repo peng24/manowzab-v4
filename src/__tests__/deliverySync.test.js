@@ -98,14 +98,32 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
       expect(Object.values(payload).includes(undefined)).toBe(false);
     });
 
-    it("identifies paymentType (transfer vs cod vs unspecified) based on explicit field or note fallback", () => {
-      const getPaymentType = (c) => {
+    it("identifies paymentType (transfer vs cod vs unspecified) based on explicit field, addressBook fallback, or note fallback", () => {
+      const getPaymentType = (c, addressBook = {}) => {
         if (!c) return "";
         if (c.paymentType) {
           const pt = String(c.paymentType).trim().toLowerCase();
           if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") return "cod";
           if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") return "transfer";
         }
+
+        // 1. Central address_book fallback
+        const normKey = (c.name || "").trim().toLowerCase().replace(/\s+/g, " ").replace(/[.#$[\]/]/g, "_");
+        const bookEntry = addressBook && normKey ? addressBook[normKey] : null;
+        if (bookEntry && bookEntry.paymentType) {
+          const pt = String(bookEntry.paymentType).trim().toLowerCase();
+          if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") return "cod";
+          if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") return "transfer";
+        }
+
+        // 2. Active address fallback
+        const activeAddr = c.addresses?.find(a => a.id === c.selectedAddressId) || c.addresses?.[0];
+        if (activeAddr && activeAddr.paymentType) {
+          const pt = String(activeAddr.paymentType).trim().toLowerCase();
+          if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") return "cod";
+          if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") return "transfer";
+        }
+
         const note = (c.note || "").toLowerCase();
         const addr = (c.address || "").toLowerCase();
         if (note.includes("cod") || note.includes("ปลายทาง") || note.includes("เก็บเงิน") || addr.includes("cod") || addr.includes("ปลายทาง")) {
@@ -114,8 +132,8 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
         return "";
       };
 
-      const getDisplay = (c) => {
-        const t = getPaymentType(c);
+      const getDisplay = (c, addressBook = {}) => {
+        const t = getPaymentType(c, addressBook);
         if (t === "cod") return "COD";
         if (t === "transfer") return "โอน";
         return "ยังไม่ระบุ";
@@ -127,6 +145,26 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
       expect(getPaymentType({ note: "เก็บเงินปลายทาง" })).toBe("cod");
       expect(getPaymentType({})).toBe("");
       expect(getDisplay({})).toBe("ยังไม่ระบุ");
+
+      // AddressBook fallback test
+      const mockAddressBook = {
+        "somchai ka": { name: "somchai ka", paymentType: "cod" },
+        "somsri th": { name: "somsri th", paymentType: "transfer" },
+      };
+      expect(getPaymentType({ name: "Somchai Ka" }, mockAddressBook)).toBe("cod");
+      expect(getDisplay({ name: "Somchai Ka" }, mockAddressBook)).toBe("COD");
+      expect(getPaymentType({ name: "Somsri TH" }, mockAddressBook)).toBe("transfer");
+      expect(getDisplay({ name: "Somsri TH" }, mockAddressBook)).toBe("โอน");
+
+      // Active address fallback test
+      expect(getPaymentType({
+        name: "New Person",
+        selectedAddressId: "addr_2",
+        addresses: [
+          { id: "addr_1", paymentType: "transfer" },
+          { id: "addr_2", paymentType: "cod" },
+        ],
+      })).toBe("cod");
     });
 
     it("resets labelPrinted to false when marked done and preparing for next delivery round", () => {

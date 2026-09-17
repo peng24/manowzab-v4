@@ -169,17 +169,42 @@ export async function syncDeliveryCustomerForOwner(
 
     if (count > 0) {
       if (!existing) {
+        // Look up central address_book to prefill customer's saved paymentType
+        let prefilledPaymentType = "";
+        try {
+          const normKey = normName.replace(/[.#$[\]/]/g, "_");
+          const bookSnap = await get(dbRef(db, `address_book/${normKey}`));
+          if (bookSnap.exists()) {
+            const bookData = bookSnap.val();
+            prefilledPaymentType = bookData.paymentType || "";
+          }
+        } catch (e) {
+          logger.warn("deliverySync address_book lookup error:", e);
+        }
+
         // Create new delivery customer
         await update(customerRef, {
           name: ownerName.trim(),
           deliveryDate: null,
           note: "",
+          paymentType: prefilledPaymentType,
           status: "pending",
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       } else {
         const updates = { name: ownerName.trim(), updatedAt: Date.now() };
+        if (!existing.paymentType) {
+          try {
+            const normKey = normName.replace(/[.#$[\]/]/g, "_");
+            const bookSnap = await get(dbRef(db, `address_book/${normKey}`));
+            if (bookSnap.exists() && bookSnap.val()?.paymentType) {
+              updates.paymentType = bookSnap.val().paymentType;
+            }
+          } catch (e) {
+            logger.warn("deliverySync address_book lookup error:", e);
+          }
+        }
         if (existing.status === "done") {
           updates.status = "pending";
           updates.deliveryDate = null; // ✅ Clear old delivery date so customer goes to "ฝากสินค้า" tab, not "แจ้งส่ง"

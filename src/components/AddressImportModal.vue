@@ -278,6 +278,9 @@ async function saveAllAddresses() {
       multiPathUpdates[`address_book/${normKey}/postalCode`] = entry.postalCode || "";
       multiPathUpdates[`address_book/${normKey}/selectedAddressId`] = newAddrObj.id;
       multiPathUpdates[`address_book/${normKey}/addresses`] = existingList;
+      if (entry.paymentType) {
+        multiPathUpdates[`address_book/${normKey}/paymentType`] = entry.paymentType;
+      }
       multiPathUpdates[`address_book/${normKey}/updatedAt`] = timestamp;
 
       // 2. Also update delivery_customers if matched

@@ -669,7 +669,35 @@ function getCustomerPaymentType(customer) {
     }
   }
 
-  // Smart Heuristic: check note or address for COD keywords
+  // 1. Fallback: check central address_book
+  const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  const bookEntry = props.addressBook && norm ? props.addressBook[norm] : null;
+  if (bookEntry && bookEntry.paymentType) {
+    const pt = String(bookEntry.paymentType).trim().toLowerCase();
+    if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") {
+      return "cod";
+    }
+    if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") {
+      return "transfer";
+    }
+  }
+
+  // 2. Fallback: check active or saved address's paymentType
+  const savedAddrs = getCustomerSavedAddresses(customer);
+  const activeAddr = customer.selectedAddressId
+    ? savedAddrs.find((a) => a.id === customer.selectedAddressId)
+    : savedAddrs[0];
+  if (activeAddr && activeAddr.paymentType) {
+    const pt = String(activeAddr.paymentType).trim().toLowerCase();
+    if (pt === "cod" || pt === "ปลายทาง" || pt === "เก็บเงินปลายทาง" || pt === "เก็บปลายทาง") {
+      return "cod";
+    }
+    if (pt === "transfer" || pt === "โอน" || pt === "โอนเงิน") {
+      return "transfer";
+    }
+  }
+
+  // 3. Smart Heuristic: check note or address for COD keywords
   const note = (customer.note || "").toLowerCase();
   const addr = (customer.address || "").toLowerCase();
   if (
@@ -712,14 +740,43 @@ async function togglePaymentType(customer) {
   // Optimistic update
   customer.paymentType = nextType;
 
+  const timestamp = Date.now();
+  const normKey = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+
+  const multiPathUpdates = {
+    [`delivery_customers/${customer.id}/paymentType`]: nextType,
+    [`delivery_customers/${customer.id}/updatedAt`]: timestamp,
+  };
+
+  if (normKey) {
+    multiPathUpdates[`address_book/${normKey}/paymentType`] = nextType;
+    multiPathUpdates[`address_book/${normKey}/name`] = customer.name.trim();
+    multiPathUpdates[`address_book/${normKey}/updatedAt`] = timestamp;
+    if (props.addressBook && props.addressBook[normKey]) {
+      props.addressBook[normKey].paymentType = nextType;
+    }
+  }
+
+  // Also update in customer's active address if available
+  const savedAddrs = getCustomerSavedAddresses(customer);
+  if (savedAddrs.length > 0) {
+    const updatedAddrs = savedAddrs.map((a) => ({
+      ...a,
+      paymentType: (customer.selectedAddressId && a.id === customer.selectedAddressId) || savedAddrs.length === 1
+        ? nextType
+        : (a.paymentType || nextType),
+    }));
+    multiPathUpdates[`delivery_customers/${customer.id}/addresses`] = updatedAddrs;
+    if (normKey) {
+      multiPathUpdates[`address_book/${normKey}/addresses`] = updatedAddrs;
+    }
+  }
+
   try {
-    await update(dbRef(db, `delivery_customers/${customer.id}`), {
-      paymentType: nextType,
-      updatedAt: Date.now(),
-    });
+    await update(dbRef(db), multiPathUpdates);
     Swal.fire({
       icon: "success",
-      title: `เปลี่ยนรูปแบบส่งของ "${customer.name}" เป็น "${nextType === 'cod' ? 'COD' : (nextType === 'transfer' ? 'โอน' : 'ยังไม่ระบุ')}" แล้ว`,
+      title: `บันทึกรูปแบบ "${customer.name}" เป็น "${nextType === 'cod' ? 'COD' : 'โอน'}" ไว้ในประวัติลูกค้าแล้ว`,
       toast: true,
       position: "top-end",
       timer: 1500,

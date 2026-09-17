@@ -349,7 +349,7 @@ function openAddForm() {
     phone: props.customer?.phone || "",
     address: "",
     postalCode: "",
-    paymentType: props.customer?.paymentType || "",
+    paymentType: props.customer?.paymentType || props.addressBook?.[normKey.value]?.paymentType || "",
     setAsActive: true,
   };
   editingIndex.value = null;
@@ -366,7 +366,7 @@ function openEditForm(addr, index) {
     phone: addr.phone || "",
     address: addr.address || "",
     postalCode: addr.postalCode || "",
-    paymentType: addr.paymentType || props.customer?.paymentType || "",
+    paymentType: addr.paymentType || props.customer?.paymentType || props.addressBook?.[normKey.value]?.paymentType || "",
     setAsActive: isSelected(addr),
   };
   editingIndex.value = index;
@@ -396,6 +396,10 @@ async function selectActiveAddress(addr) {
     updates[`delivery_customers/${props.customer.id}/phone`] = addr.phone || "";
     updates[`delivery_customers/${props.customer.id}/address`] = addr.address || "";
     updates[`delivery_customers/${props.customer.id}/postalCode`] = addr.postalCode || "";
+    if (addr.paymentType) {
+      updates[`delivery_customers/${props.customer.id}/paymentType`] = addr.paymentType;
+      props.customer.paymentType = addr.paymentType;
+    }
     updates[`delivery_customers/${props.customer.id}/updatedAt`] = timestamp;
   }
 
@@ -406,6 +410,12 @@ async function selectActiveAddress(addr) {
     updates[`address_book/${normKey.value}/phone`] = addr.phone || "";
     updates[`address_book/${normKey.value}/address`] = addr.address || "";
     updates[`address_book/${normKey.value}/postalCode`] = addr.postalCode || "";
+    if (addr.paymentType) {
+      updates[`address_book/${normKey.value}/paymentType`] = addr.paymentType;
+      if (props.addressBook && props.addressBook[normKey.value]) {
+        props.addressBook[normKey.value].paymentType = addr.paymentType;
+      }
+    }
     updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
   }
 
@@ -460,8 +470,17 @@ async function saveForm() {
   const updates = {};
   updates[`delivery_customers/${props.customer.id}/addresses`] = currentList;
   updates[`delivery_customers/${props.customer.id}/paymentType`] = formData.value.paymentType || "";
+  if (props.customer) {
+    props.customer.paymentType = formData.value.paymentType || "";
+  }
   updates[`address_book/${normKey.value}/addresses`] = currentList;
   updates[`address_book/${normKey.value}/name`] = cleanName;
+  if (formData.value.paymentType) {
+    updates[`address_book/${normKey.value}/paymentType`] = formData.value.paymentType;
+    if (props.addressBook && props.addressBook[normKey.value]) {
+      props.addressBook[normKey.value].paymentType = formData.value.paymentType;
+    }
+  }
   updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
 
   if (shouldBeActive) {

@@ -330,13 +330,12 @@ watch(
   },
 );
 
-// ✅ Watcher: เปิด Modal สรุปผลการขายอัตโนมัติเมื่อจบไลฟ์ และอ่านรายชื่อลูกค้าที่ให้จัดส่ง (รอ 5s)
+// ✅ Watcher: เมื่อจบไลฟ์ อ่านรายชื่อลูกค้าที่ให้จัดส่ง (รอ 5s) โดยไม่เด้งหน้าต่างสรุปอัตโนมัติ (สามารถกดดูเองได้จากปุ่มบน Header)
 watch(
   () => systemStore.isLiveFinished,
   (isFinished, oldVal) => {
     if (isFinished && !oldVal) {
-      logger.log("🎉 Stream finished detected! Opening summary modal...");
-      openLiveSummary();
+      logger.log("🎉 Stream finished detected!");
       setTimeout(() => {
         announceShippingCustomers(systemStore.currentVideoId);
       }, CONSTANTS.YOUTUBE.ANNOUNCE_SHIPPING_DELAY_MS);
@@ -435,7 +434,6 @@ async function toggleConnection() {
     systemStore.statusChat = "idle"; // ✅ Changed from 'err' to 'idle'
     systemStore.statusApi = "idle"; // ✅ Reset API status too
     queueAudio(null, "", "หยุดการเชื่อมต่อ");
-    openLiveSummary();
     return;
   }
 

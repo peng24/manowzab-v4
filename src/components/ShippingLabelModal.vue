@@ -412,9 +412,26 @@ function getDiffDays(deliveryDate) {
 }
 
 const allAvailableCustomers = computed(() => {
-  return props.customers.filter(
-    (c) => (props.initialSelectedId && c.id === props.initialSelectedId) || c.status !== "done"
-  );
+  const filtered = props.customers.filter((c) => {
+    // If opening for a specific customer directly via individual print button, allow that customer
+    if (props.initialSelectedId && c.id === props.initialSelectedId) return true;
+    // Otherwise, strictly include only active customers who have requested delivery (มีวันจัดส่ง / พร้อมส่ง)
+    return (
+      c &&
+      c.status !== "done" &&
+      c.deliveryDate &&
+      typeof c.deliveryDate === "string" &&
+      c.deliveryDate.trim() !== ""
+    );
+  });
+
+  // Sort by delivery date / countdown days ascending (matching ShippingManager table order)
+  return [...filtered].sort((a, b) => {
+    const daysA = getDiffDays(a.deliveryDate);
+    const daysB = getDiffDays(b.deliveryDate);
+    if (daysA !== daysB) return daysA - daysB;
+    return (a.deliveryDate || "").localeCompare(b.deliveryDate || "");
+  });
 });
 
 const unprintedCount = computed(() => {
@@ -487,6 +504,9 @@ watch(
       filterType.value = "all-requested";
       selectedIds.value = [newId];
       searchQuery.value = "";
+    } else {
+      filterType.value = "all-requested";
+      selectedIds.value = currentPool.value.map((c) => c.id);
     }
   },
   { immediate: true }
@@ -498,14 +518,8 @@ onMounted(() => {
     selectedIds.value = [props.initialSelectedId];
     searchQuery.value = "";
   } else {
-    // Default to unprinted if available, otherwise today or all-requested
-    if (unprintedCount.value > 0) {
-      filterType.value = "unprinted";
-    } else if (todayCount.value > 0) {
-      filterType.value = "today";
-    } else {
-      filterType.value = "all-requested";
-    }
+    // Default to all-requested so all ready-to-ship customers in this list are selected and ready to print
+    filterType.value = "all-requested";
     selectedIds.value = currentPool.value.map((c) => c.id);
   }
 });

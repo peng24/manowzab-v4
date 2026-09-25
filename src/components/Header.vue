@@ -750,9 +750,15 @@ defineExpose({
 
 onMounted(() => {
   logger.log("🎯 Header mounted");
-  const unsubShipping = onValue(dbRef(db, "shipping"), (snapshot) => {
-    shippingData.value = snapshot.val() || {};
-  });
+  const unsubShipping = onValue(
+    dbRef(db, "system/shipping"),
+    (snapshot) => {
+      shippingData.value = snapshot.val() || {};
+    },
+    (err) => {
+      logger.warn("Header shipping listener warning:", err);
+    }
+  );
   cleanupFns.push(unsubShipping);
   document.addEventListener("click", handleClickOutside);
   const savedVideoId = localStorage.getItem("lastVideoId");

@@ -116,12 +116,12 @@ export function useHistory() {
 
         try {
             await Promise.all([
-                remove(dbRef(db, `history/${videoId}`)),
-                remove(dbRef(db, `chats/${videoId}`)),
-                remove(dbRef(db, `stock/${videoId}`)),
-                remove(dbRef(db, `settings/${videoId}`)),
-                remove(dbRef(db, `voice_chats/${videoId}`)),
-                remove(dbRef(db, `shipping/${videoId}`))
+                remove(dbRef(db, `history/${videoId}`)).catch(e => logger.warn(`History cleanup warning:`, e)),
+                remove(dbRef(db, `chats/${videoId}`)).catch(e => logger.warn(`Chats cleanup warning:`, e)),
+                remove(dbRef(db, `stock/${videoId}`)).catch(e => logger.warn(`Stock cleanup warning:`, e)),
+                remove(dbRef(db, `settings/${videoId}`)).catch(e => logger.warn(`Settings cleanup warning:`, e)),
+                remove(dbRef(db, `voice_chats/${videoId}`)).catch(e => logger.warn(`Voice chats cleanup warning:`, e)),
+                remove(dbRef(db, `system/shipping/${videoId}`)).catch(e => logger.warn(`Shipping cleanup warning:`, e))
             ]);
 
             // Refresh list
@@ -155,20 +155,20 @@ export function useHistory() {
                 let bytes = 0;
                 try {
                     const [historySnap, chatsSnap, stockSnap, settingsSnap, voiceSnap, shippingSnap] = await Promise.all([
-                        get(dbRef(db, `history/${vid}`)),
-                        get(dbRef(db, `chats/${vid}`)),
-                        get(dbRef(db, `stock/${vid}`)),
-                        get(dbRef(db, `settings/${vid}`)),
-                        get(dbRef(db, `voice_chats/${vid}`)),
-                        get(dbRef(db, `shipping/${vid}`))
+                        get(dbRef(db, `history/${vid}`)).catch(() => null),
+                        get(dbRef(db, `chats/${vid}`)).catch(() => null),
+                        get(dbRef(db, `stock/${vid}`)).catch(() => null),
+                        get(dbRef(db, `settings/${vid}`)).catch(() => null),
+                        get(dbRef(db, `voice_chats/${vid}`)).catch(() => null),
+                        get(dbRef(db, `system/shipping/${vid}`)).catch(() => null)
                     ]);
                     
-                    if (historySnap.exists()) bytes += JSON.stringify(historySnap.val()).length;
-                    if (chatsSnap.exists()) bytes += JSON.stringify(chatsSnap.val()).length;
-                    if (stockSnap.exists()) bytes += JSON.stringify(stockSnap.val()).length;
-                    if (settingsSnap.exists()) bytes += JSON.stringify(settingsSnap.val()).length;
-                    if (voiceSnap.exists()) bytes += JSON.stringify(voiceSnap.val()).length;
-                    if (shippingSnap.exists()) bytes += JSON.stringify(shippingSnap.val()).length;
+                    if (historySnap?.exists()) bytes += JSON.stringify(historySnap.val()).length;
+                    if (chatsSnap?.exists()) bytes += JSON.stringify(chatsSnap.val()).length;
+                    if (stockSnap?.exists()) bytes += JSON.stringify(stockSnap.val()).length;
+                    if (settingsSnap?.exists()) bytes += JSON.stringify(settingsSnap.val()).length;
+                    if (voiceSnap?.exists()) bytes += JSON.stringify(voiceSnap.val()).length;
+                    if (shippingSnap?.exists()) bytes += JSON.stringify(shippingSnap.val()).length;
                 } catch (err) {
                     console.error(`Error estimating size for video ${vid}:`, err);
                 }
@@ -197,12 +197,12 @@ export function useHistory() {
         const deletePromises = videoIds.map(async (videoId) => {
             try {
                 await Promise.all([
-                    remove(dbRef(db, `history/${videoId}`)),
-                    remove(dbRef(db, `chats/${videoId}`)),
-                    remove(dbRef(db, `stock/${videoId}`)),
-                    remove(dbRef(db, `settings/${videoId}`)),
-                    remove(dbRef(db, `voice_chats/${videoId}`)),
-                    remove(dbRef(db, `shipping/${videoId}`))
+                    remove(dbRef(db, `history/${videoId}`)).catch(e => logger.warn(`History cleanup warning:`, e)),
+                    remove(dbRef(db, `chats/${videoId}`)).catch(e => logger.warn(`Chats cleanup warning:`, e)),
+                    remove(dbRef(db, `stock/${videoId}`)).catch(e => logger.warn(`Stock cleanup warning:`, e)),
+                    remove(dbRef(db, `settings/${videoId}`)).catch(e => logger.warn(`Settings cleanup warning:`, e)),
+                    remove(dbRef(db, `voice_chats/${videoId}`)).catch(e => logger.warn(`Voice chats cleanup warning:`, e)),
+                    remove(dbRef(db, `system/shipping/${videoId}`)).catch(e => logger.warn(`Shipping cleanup warning:`, e))
                 ]);
             } catch (err) {
                 console.error(`❌ Error deleting history for ${videoId}:`, err);

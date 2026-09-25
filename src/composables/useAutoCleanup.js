@@ -66,11 +66,11 @@ export function useAutoCleanup() {
 
                     // ✅ Delete all related nodes for old sessions (matching deleteHistory logic)
                     Promise.all([
-                        remove(dbRef(db, `chats/${videoId}`)),
-                        remove(dbRef(db, `stock/${videoId}`)),
-                        remove(dbRef(db, `settings/${videoId}`)),
-                        remove(dbRef(db, `voice_chats/${videoId}`)),
-                        remove(dbRef(db, `shipping/${videoId}`)),
+                        remove(dbRef(db, `chats/${videoId}`)).catch((e) => logger.warn(`Chat cleanup error (${videoId}):`, e)),
+                        remove(dbRef(db, `stock/${videoId}`)).catch((e) => logger.warn(`Stock cleanup error (${videoId}):`, e)),
+                        remove(dbRef(db, `settings/${videoId}`)).catch((e) => logger.warn(`Settings cleanup error (${videoId}):`, e)),
+                        remove(dbRef(db, `voice_chats/${videoId}`)).catch((e) => logger.warn(`Voice chats cleanup error (${videoId}):`, e)),
+                        remove(dbRef(db, `system/shipping/${videoId}`)).catch((e) => logger.warn(`Shipping cleanup error (${videoId}):`, e)),
                     ])
                         .then(() => logger.success(`Cleaned up all data for ${videoId}`))
                         .catch((err) => logger.error(`Failed to cleanup ${videoId}:`, err));

@@ -139,30 +139,56 @@ async function createNote() {
   const text = newNoteText.value.trim();
   if (!text) return;
 
-  const noteRef = dbRef(db, "notes");
-  await push(noteRef, {
-    text,
-    color: selectedColor.value,
-    active: true,
-    createdAt: Date.now(),
-    createdBy: systemStore.myDeviceId,
-  });
+  try {
+    const noteRef = dbRef(db, "system/notes");
+    await push(noteRef, {
+      text,
+      color: selectedColor.value,
+      active: true,
+      createdAt: Date.now(),
+      createdBy: systemStore.myDeviceId,
+    });
 
-  newNoteText.value = "";
+    newNoteText.value = "";
 
-  Swal.fire({
-    icon: "success",
-    title: "สร้าง Note แล้ว",
-    text: `"${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`,
-    timer: 1500,
-    showConfirmButton: false,
-    toast: true,
-    position: "top-end",
-  });
+    Swal.fire({
+      icon: "success",
+      title: "สร้าง Note แล้ว",
+      text: `"${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`,
+      timer: 1500,
+      showConfirmButton: false,
+      toast: true,
+      position: "top-end",
+    });
+  } catch (err) {
+    logger.error("Failed to create note:", err);
+    Swal.fire({
+      icon: "error",
+      title: "บันทึก Note ไม่สำเร็จ",
+      text: err.message || "เกิดข้อผิดพลาดในการบันทึก Note",
+      timer: 3000,
+      showConfirmButton: false,
+      toast: true,
+      position: "top-end",
+    });
+  }
 }
 
 async function deactivateNote(id) {
-  await update(dbRef(db, `notes/${id}`), { active: false });
+  try {
+    await update(dbRef(db, `system/notes/${id}`), { active: false });
+  } catch (err) {
+    logger.error("Failed to deactivate note:", err);
+    Swal.fire({
+      icon: "error",
+      title: "ปิด Note ไม่สำเร็จ",
+      text: err.message || "เกิดข้อผิดพลาด",
+      timer: 2000,
+      showConfirmButton: false,
+      toast: true,
+      position: "top-end",
+    });
+  }
 }
 
 async function deleteNote(id) {
@@ -177,20 +203,35 @@ async function deleteNote(id) {
   });
 
   if (result.isConfirmed) {
-    await remove(dbRef(db, `notes/${id}`));
-    Swal.fire({
-      icon: "success",
-      title: "ลบ Note แล้ว",
-      timer: 1200,
-      showConfirmButton: false,
-    });
+    try {
+      await remove(dbRef(db, `system/notes/${id}`));
+      Swal.fire({
+        icon: "success",
+        title: "ลบ Note แล้ว",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      logger.error("Failed to delete note:", err);
+      Swal.fire({
+        icon: "error",
+        title: "ลบ Note ไม่สำเร็จ",
+        text: err.message || "เกิดข้อผิดพลาด",
+      });
+    }
   }
 }
 
 onMounted(() => {
-  const unsubNotes = onValue(dbRef(db, "notes"), (snapshot) => {
-    allNotes.value = snapshot.val() || {};
-  });
+  const unsubNotes = onValue(
+    dbRef(db, "system/notes"),
+    (snapshot) => {
+      allNotes.value = snapshot.val() || {};
+    },
+    (error) => {
+      logger.error("Error listening to system/notes:", error);
+    }
+  );
   cleanupFns.push(unsubNotes);
 });
 

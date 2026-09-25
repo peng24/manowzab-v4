@@ -14,6 +14,19 @@
 export const changelog = [
   // ─── 4.90.x ───────────────────────────────────────────
   {
+    version: '4.90.1',
+    date: '2026-09-25',
+    changes: {
+      fixed: [
+        'แก้ไขปัญหาบันทึกโน๊ตไม่ได้ (PERMISSION_DENIED on /notes) — ปรับย้ายการจัดเก็บและซิงค์โน๊ตข้ามเครื่องไปที่ system/notes ซึ่งมีสิทธิ์ Read/Write ครบถ้วน พร้อมเพิ่ม try...catch และ SweetAlert2 แจ้งเตือน',
+        'แก้ไขสิทธิ์การเข้าถึงข้อมูลจัดส่งและการล้างประวัติ (PERMISSION_DENIED on /shipping) — ย้ายเส้นทางจัดส่งใน Dashboard, ChatProcessor, AutoCleanup และ History ไปที่ system/shipping พร้อมเพิ่ม error handlers แยกย่อย ป้องกันการล้มเหลวของระบบล้างข้อมูลเก่า',
+      ],
+      improved: [
+        'เพิ่มไฟล์คอนฟิกความปลอดภัยฐานข้อมูลกลาง (database.rules.json) — จัดทำและบันทึก Security Rules ของ Firebase RTDB ที่ครอบคลุมทั้ง 12 Top-Level Paths ในระบบ',
+      ],
+    },
+  },
+  {
     version: '4.90.0',
     date: '2026-09-25',
     changes: {

@@ -1,0 +1,54 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "system": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "stock": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "chats": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "delivery_customers": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "address_book": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "nicknames": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "settings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "voice_chats": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "history": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "notes": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "shipping": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "presence": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

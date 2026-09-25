@@ -99,9 +99,15 @@ function truncate(text, len) {
 }
 
 onMounted(() => {
-  const unsubNotes = onValue(dbRef(db, "notes"), (snapshot) => {
-    allNotes.value = snapshot.val() || {};
-  });
+  const unsubNotes = onValue(
+    dbRef(db, "system/notes"),
+    (snapshot) => {
+      allNotes.value = snapshot.val() || {};
+    },
+    (error) => {
+      logger.error("Error listening to system/notes in banner:", error);
+    }
+  );
   cleanupFns.push(unsubNotes);
 });
 

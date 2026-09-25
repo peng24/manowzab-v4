@@ -896,7 +896,7 @@ export function useChatProcessor() {
         if (!isVoiceChat) {
           const shippingRef = dbRef(
             db,
-            `shipping/${systemStore.currentVideoId}/${uid}`,
+            `system/shipping/${systemStore.currentVideoId}/${uid}`,
           );
           update(shippingRef, {
             ready: true,
@@ -906,13 +906,13 @@ export function useChatProcessor() {
 
           const historyRef = dbRef(
             db,
-            `shipping/${systemStore.currentVideoId}/${uid}/history`,
+            `system/shipping/${systemStore.currentVideoId}/${uid}/history`,
           );
           push(historyRef, {
             text: msg,
             timestamp: Date.now(),
             type: "user",
-          });
+          }).catch((e) => logger.warn("Shipping history push warning:", e));
         }
       }
 

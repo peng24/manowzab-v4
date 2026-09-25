@@ -441,12 +441,16 @@ async function addToShipping() {
 
   const customerName = savedNames.value[shippingUid]?.nick || order.name;
 
-  // 1. Mark ready in shipping (เดิม)
-  const path = `shipping/${videoId}/${shippingUid}`;
-  await update(dbRef(db, path), {
-    ready: true,
-    timestamp: Date.now(),
-  });
+  // 1. Mark ready in shipping (system/shipping)
+  try {
+    const path = `system/shipping/${videoId}/${shippingUid}`;
+    await update(dbRef(db, path), {
+      ready: true,
+      timestamp: Date.now(),
+    });
+  } catch (err) {
+    logger.warn("Shipping mark ready error:", err);
+  }
 
   // 2. AUTO-SYNC to delivery_customers
   await syncCustomerToDelivery(groupKey, customerName, order, videoId);
@@ -551,7 +555,7 @@ function removeFromShipping(uid) {
     confirmButtonColor: "#d32f2f",
   }).then((result) => {
     if (result.isConfirmed) {
-      const path = `shipping/${systemStore.currentVideoId}/${uid}`;
+      const path = `system/shipping/${systemStore.currentVideoId}/${uid}`;
       update(dbRef(db, path), { ready: null })
         .then(() => {
           Swal.fire({
@@ -597,7 +601,7 @@ async function openChatHistory(uid, item) {
   // Load History
   const historyRef = dbRef(
     db,
-    `shipping/${systemStore.currentVideoId}/${uid}/history`
+    `system/shipping/${systemStore.currentVideoId}/${uid}/history`
   );
   try {
     const snapshot = await get(historyRef);
@@ -637,7 +641,7 @@ function syncChatFromMemory() {
   let count = 0;
   const historyRef = dbRef(
     db,
-    `shipping/${systemStore.currentVideoId}/${selectedChatUid.value}/history`
+    `system/shipping/${systemStore.currentVideoId}/${selectedChatUid.value}/history`
   );
 
   memoryMsgs.forEach((memMsg) => {
@@ -652,7 +656,7 @@ function syncChatFromMemory() {
         text: memMsg.text,
         timestamp: memMsg.timestamp,
         type: "user",
-      });
+      }).catch((e) => logger.warn("Push chat history error:", e));
       count++;
     }
   });
@@ -671,21 +675,39 @@ const cleanupFns = [];
 
 onMounted(() => {
   // Listen to shipping data
-  const unsubShipping = onValue(dbRef(db, "shipping"), (snapshot) => {
-    shippingData.value = snapshot.val() || {};
-  });
+  const unsubShipping = onValue(
+    dbRef(db, "system/shipping"),
+    (snapshot) => {
+      shippingData.value = snapshot.val() || {};
+    },
+    (err) => {
+      logger.warn("Shipping listener warning:", err);
+    }
+  );
   cleanupFns.push(unsubShipping);
 
   // Listen to saved names
-  const unsubNames = onValue(dbRef(db, "nicknames"), (snapshot) => {
-    savedNames.value = snapshot.val() || {};
-  });
+  const unsubNames = onValue(
+    dbRef(db, "nicknames"),
+    (snapshot) => {
+      savedNames.value = snapshot.val() || {};
+    },
+    (err) => {
+      logger.warn("Nicknames listener warning:", err);
+    }
+  );
   cleanupFns.push(unsubNames);
 
   // Listen to delivery customers
-  const unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
-    deliveryCustomers.value = snapshot.val() || {};
-  });
+  const unsubDelivery = onValue(
+    dbRef(db, "delivery_customers"),
+    (snapshot) => {
+      deliveryCustomers.value = snapshot.val() || {};
+    },
+    (err) => {
+      logger.warn("Delivery customers listener warning:", err);
+    }
+  );
   cleanupFns.push(unsubDelivery);
 });
 

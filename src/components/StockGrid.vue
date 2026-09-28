@@ -95,58 +95,58 @@
       @touchmove="handleTouchMove"
       @touchend="handleTouchEnd"
     >
-      <template v-for="i in stockStore.stockSize" :key="i">
-        <div
-          v-if="isItemVisible(i)"
-          v-memo="[
-            getStockItem(i).owner,
-            getStockItem(i).price,
-            getOwnerCount(getStockItem(i).owner, getStockItem(i).uid),
-            getQueueLength(i),
-            highlightedId === i,
-            cancelledItems.has(i),
-            newOrders.has(i),
-            activeFilter
-          ]"
-          :class="[
-            'stock-item',
-            getStockItem(i).owner ? 'sold' : '',
-            isNewOrder(i) ? 'new-order' : '',
-            highlightedId === i ? 'highlight' : '',
-            cancelledItems.has(i) ? 'cancelled-blink' : '',
-          ]"
-          @click="openQueueModal(i)"
-          :id="`stock-${i}`"
-        >
-          <div class="stock-num">{{ i }}</div>
-          <div v-if="cancelledItems.has(i) && !getStockItem(i).owner" class="stock-status cancelled-name">
-            ❌ {{ cancelledItems.get(i) }}
-          </div>
-          <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
-            {{ getStockItem(i).owner || "ว่าง" }}
-          </div>
-          <div
-            v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
-            class="owner-count-badge"
-            :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
-            @click.stop="showOwnerItems(getStockItem(i).owner)"
-          >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
-
-          <div
-            v-if="getStockItem(i).owner && getStockItem(i).backdated"
-            class="backdated-time"
-            :title="`จองย้อนหลัง: ${formatTime(getStockItem(i).time)}`"
-          >
-            🕒 {{ formatTime(getStockItem(i).time) }}
-          </div>
-          <!-- <div v-if="getStockItem(i).price" class="stock-price">
-            {{ getStockItem(i).price }} บาท
-          </div> -->
-          <div v-if="getQueueLength(i) > 0" class="queue-badge">
-            +{{ getQueueLength(i) }}
-          </div>
+      <div
+        v-for="i in visibleItemIds"
+        :key="i"
+        v-memo="[
+          getStockItem(i).owner,
+          getStockItem(i).price,
+          getOwnerCount(getStockItem(i).owner, getStockItem(i).uid),
+          getQueueLength(i),
+          highlightedId === i,
+          cancelledItems.has(i),
+          newOrders.has(i),
+          activeFilter
+        ]"
+        :class="[
+          'stock-item',
+          getStockItem(i).owner ? 'sold' : '',
+          isNewOrder(i) ? 'new-order' : '',
+          highlightedId === i ? 'highlight' : '',
+          cancelledItems.has(i) ? 'cancelled-blink' : '',
+        ]"
+        @click="openQueueModal(i)"
+        :id="`stock-${i}`"
+      >
+        <div class="stock-num">{{ i }}</div>
+        <div v-if="cancelledItems.has(i) && !getStockItem(i).owner" class="stock-status cancelled-name">
+          ❌ {{ cancelledItems.get(i) }}
         </div>
-      </template>
+        <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
+          {{ getStockItem(i).owner || "ว่าง" }}
+        </div>
+        <div
+          v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
+          class="owner-count-badge"
+          :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
+          @click.stop="showOwnerItems(getStockItem(i).owner)"
+        >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
+
+        <div
+          v-if="getStockItem(i).owner && getStockItem(i).backdated"
+          class="backdated-time"
+          :title="`จองย้อนหลัง: ${formatTime(getStockItem(i).time)}`"
+        >
+          🕒 {{ formatTime(getStockItem(i).time) }}
+        </div>
+        <!-- <div v-if="getStockItem(i).price" class="stock-price">
+          {{ getStockItem(i).price }} บาท
+        </div> -->
+        <div v-if="getQueueLength(i) > 0" class="queue-badge">
+          +{{ getQueueLength(i) }}
+        </div>
+      </div>
+
 
       <!-- 📦 Window Capping Load More Indicator -->
       <div
@@ -335,21 +335,46 @@ function handleGridScroll(e) {
   }
 }
 
-function isItemVisible(i) {
-  // 1. Window capping: จำกัดจำนวนไอเทมที่ render ในกระดาน
-  // ถ้าเป็นไอเทมที่กำลังไฮไลท์หรือเปิดแก้ไขอยู่ ให้แสดงเสมอเพื่อไม่ให้หลุด DOM
-  if (i > gridDisplayLimit.value && highlightedId.value !== i && editingId.value !== i) {
-    return false;
-  }
+const visibleItemIds = computed(() => {
+  const size = stockStore.stockSize;
+  if (!size) return [];
 
-  // 2. Active filter check
-  if (activeFilter.value === "all") return true;
-  const item = stockStore.stockData[i];
-  if (activeFilter.value === "sold") return !!(item && item.owner);
-  if (activeFilter.value === "vacant") return !(item && item.owner);
-  if (activeFilter.value === "queue") return (queueLengthsMap.value[i] || 0) > 0;
-  return true;
-}
+  const limit = gridDisplayLimit.value;
+  const hId = highlightedId.value;
+  const eId = editingId.value;
+  const filter = activeFilter.value;
+  const stock = stockStore.stockData || {};
+  const queueMap = queueLengthsMap.value || {};
+
+  const result = [];
+  for (let i = 1; i <= size; i++) {
+    // 1. Window capping: render ถึง limit หรือถ้าไอเทมกำลังถูกไฮไลท์/แก้ไขอยู่
+    if (i > limit && hId !== i && eId !== i) {
+      continue;
+    }
+
+    // 2. Filter check
+    if (filter === "all") {
+      result.push(i);
+      continue;
+    }
+    const item = stock[i];
+    if (filter === "sold" && item?.owner) {
+      result.push(i);
+      continue;
+    }
+    if (filter === "vacant" && !item?.owner) {
+      result.push(i);
+      continue;
+    }
+    if (filter === "queue" && (queueMap[i] || 0) > 0) {
+      result.push(i);
+      continue;
+    }
+  }
+  return result;
+});
+
 
 
 // ✅ Cancelled Items Blink Effect (15 seconds)

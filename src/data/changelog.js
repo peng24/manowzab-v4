@@ -14,6 +14,15 @@
 export const changelog = [
   // ─── 4.91.x ───────────────────────────────────────────
   {
+    version: '4.91.4',
+    date: '2026-09-28',
+    changes: {
+      fixed: [
+        'แก้ไขบั๊ก TypeError: Cannot read properties of null (reading \'Symbol(_vei)\') ใน StockGrid: ปรับโครงสร้างลูปในตารางสต็อกโดยย้าย v-for="i in visibleItemIds" และ v-memo ให้อยู่บน <div> element เดียวกันตามข้อกำหนดของ Vue 3 (ตัดการใช้ <template v-for> + <div v-if> ซ้อน v-memo ที่ทำให้เกิด Comment Node ใน VNode Cache)',
+      ],
+    },
+  },
+  {
     version: '4.91.3',
     date: '2026-09-28',
     changes: {

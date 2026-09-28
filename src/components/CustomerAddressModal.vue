@@ -66,6 +66,10 @@
                   <i class="fa-solid fa-phone"></i>
                   <span>{{ addr.phone }}</span>
                 </div>
+                <div class="cam-contact-line" v-if="addr.contactChannel">
+                  <i class="fa-solid fa-comments"></i>
+                  <span><b>ช่องทางติดต่อ:</b> {{ getContactLabel(addr.contactChannel) }}</span>
+                </div>
                 <div class="cam-addr-line">
                   <i class="fa-solid fa-map-location-dot"></i>
                   <span>{{ addr.address }}</span>
@@ -154,12 +158,22 @@
               ></textarea>
             </div>
 
-            <div class="cam-form-group col-span">
+            <div class="cam-form-group">
               <label>รูปแบบการจัดส่งและการชำระเงิน:</label>
               <select v-model="formData.paymentType" class="cam-input">
                 <option value="">❓ ยังไม่ระบุ</option>
                 <option value="transfer">💳 โอนเงิน</option>
                 <option value="cod">💵 COD (เก็บเงินปลายทาง)</option>
+              </select>
+            </div>
+
+            <div class="cam-form-group">
+              <label>ช่องทางการติดต่อ:</label>
+              <select v-model="formData.contactChannel" class="cam-input">
+                <option value="">- (ยังไม่ระบุ)</option>
+                <option value="line">💬 Line</option>
+                <option value="lineoa">💚 LineOA</option>
+                <option value="phone">📞 โทรศัพท์</option>
               </select>
             </div>
 
@@ -216,8 +230,16 @@ const formData = ref({
   address: "",
   postalCode: "",
   paymentType: "",
+  contactChannel: "",
   setAsActive: true,
 });
+
+function getContactLabel(channel) {
+  if (channel === "lineoa") return "💚 LineOA";
+  if (channel === "phone") return "📞 โทรศัพท์";
+  if (channel === "line") return "💬 Line";
+  return "-";
+}
 
 function handleQuickPasteInput() {
   if (!quickPasteText.value.trim()) {
@@ -350,6 +372,7 @@ function openAddForm() {
     address: "",
     postalCode: "",
     paymentType: props.customer?.paymentType || props.addressBook?.[normKey.value]?.paymentType || "",
+    contactChannel: props.customer?.contactChannel || props.addressBook?.[normKey.value]?.contactChannel || "",
     setAsActive: true,
   };
   editingIndex.value = null;
@@ -367,6 +390,7 @@ function openEditForm(addr, index) {
     address: addr.address || "",
     postalCode: addr.postalCode || "",
     paymentType: addr.paymentType || props.customer?.paymentType || props.addressBook?.[normKey.value]?.paymentType || "",
+    contactChannel: addr.contactChannel || props.customer?.contactChannel || props.addressBook?.[normKey.value]?.contactChannel || "",
     setAsActive: isSelected(addr),
   };
   editingIndex.value = index;
@@ -400,6 +424,10 @@ async function selectActiveAddress(addr) {
       updates[`delivery_customers/${props.customer.id}/paymentType`] = addr.paymentType;
       props.customer.paymentType = addr.paymentType;
     }
+    if (addr.contactChannel) {
+      updates[`delivery_customers/${props.customer.id}/contactChannel`] = addr.contactChannel;
+      props.customer.contactChannel = addr.contactChannel;
+    }
     updates[`delivery_customers/${props.customer.id}/updatedAt`] = timestamp;
   }
 
@@ -414,6 +442,12 @@ async function selectActiveAddress(addr) {
       updates[`address_book/${normKey.value}/paymentType`] = addr.paymentType;
       if (props.addressBook && props.addressBook[normKey.value]) {
         props.addressBook[normKey.value].paymentType = addr.paymentType;
+      }
+    }
+    if (addr.contactChannel) {
+      updates[`address_book/${normKey.value}/contactChannel`] = addr.contactChannel;
+      if (props.addressBook && props.addressBook[normKey.value]) {
+        props.addressBook[normKey.value].contactChannel = addr.contactChannel;
       }
     }
     updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
@@ -449,6 +483,7 @@ async function saveForm() {
     address: formData.value.address.trim(),
     postalCode: formData.value.postalCode.trim(),
     paymentType: formData.value.paymentType || "",
+    contactChannel: formData.value.contactChannel || "",
   };
 
   // Extract postal code if missing
@@ -470,8 +505,10 @@ async function saveForm() {
   const updates = {};
   updates[`delivery_customers/${props.customer.id}/addresses`] = currentList;
   updates[`delivery_customers/${props.customer.id}/paymentType`] = formData.value.paymentType || "";
+  updates[`delivery_customers/${props.customer.id}/contactChannel`] = formData.value.contactChannel || "";
   if (props.customer) {
     props.customer.paymentType = formData.value.paymentType || "";
+    props.customer.contactChannel = formData.value.contactChannel || "";
   }
   updates[`address_book/${normKey.value}/addresses`] = currentList;
   updates[`address_book/${normKey.value}/name`] = cleanName;
@@ -479,6 +516,12 @@ async function saveForm() {
     updates[`address_book/${normKey.value}/paymentType`] = formData.value.paymentType;
     if (props.addressBook && props.addressBook[normKey.value]) {
       props.addressBook[normKey.value].paymentType = formData.value.paymentType;
+    }
+  }
+  if (formData.value.contactChannel !== undefined) {
+    updates[`address_book/${normKey.value}/contactChannel`] = formData.value.contactChannel || "";
+    if (props.addressBook && props.addressBook[normKey.value]) {
+      props.addressBook[normKey.value].contactChannel = formData.value.contactChannel || "";
     }
   }
   updates[`address_book/${normKey.value}/updatedAt`] = timestamp;

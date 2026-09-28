@@ -37,7 +37,11 @@ if (typeof window !== "undefined") {
 // ✅ Global Unified Audio Queue (persists across re-renders)
 const audioQueue = [];
 let isAudioProcessing = false;
-let activeOscillators = []; // ✅ Shared globally across all useAudio instances
+
+// ✅ Phase 1.2: Track {osc, gain} pairs instead of oscillators alone
+// เพื่อให้สามารถ disconnect gain node ได้ด้วย ป้องกัน AudioNode leak ใน Web Audio graph
+let activeAudioNodes = []; // { osc: OscillatorNode, gain: GainNode }[]
+
 
 let sleepAudioBuffer = null;
 let activeSleepSources = [];
@@ -108,16 +112,13 @@ export function useAudio() {
         const ctx = audioCtx;
         const now = ctx.currentTime;
 
-        // Stop any active sounds to prevent overlapping
-        activeOscillators.forEach((osc) => {
-          try {
-            osc.stop();
-            osc.disconnect();
-          } catch (e) {
-            // ignore
-          }
+        // ✅ Phase 1.2: Stop & disconnect BOTH oscillator and gain node to prevent AudioContext graph leak
+        activeAudioNodes.forEach(({ osc, gain }) => {
+          try { osc.stop(); osc.disconnect(); } catch (e) { /* already stopped */ }
+          try { gain.disconnect(); } catch (e) { /* already disconnected */ }
         });
-        activeOscillators = [];
+        activeAudioNodes = [];
+
 
         if (type === "success") {
           // Soft Bright Chime
@@ -143,7 +144,9 @@ export function useAudio() {
           osc2.start(now);
           osc2.stop(now + 0.3);
 
-          activeOscillators.push(osc1, osc2);
+          // ✅ Track both osc+gain pairs for complete cleanup
+          activeAudioNodes.push({ osc: osc1, gain: gain1 }, { osc: osc2, gain: gain2 });
+
         } else if (type === "error") {
           // Soft Low Boop
           const osc = ctx.createOscillator();
@@ -157,7 +160,8 @@ export function useAudio() {
           osc.start(now);
           osc.stop(now + 0.3);
 
-          activeOscillators.push(osc);
+          // ✅ Track osc+gain pair for complete cleanup
+          activeAudioNodes.push({ osc, gain });
         } else if (type === "cancel") {
           // Soft Pop
           const osc = ctx.createOscillator();
@@ -172,7 +176,9 @@ export function useAudio() {
           osc.start(now);
           osc.stop(now + 0.15);
 
-          activeOscillators.push(osc);
+          // ✅ Track osc+gain pair for complete cleanup
+          activeAudioNodes.push({ osc, gain });
+
         } else if (type === "sleep") {
           await playSleepSound();
         }
@@ -260,16 +266,13 @@ export function useAudio() {
     // 1. Clear the global unified audio queue
     audioQueue.length = 0;
 
-    // 2. Stop any currently playing SFX
-    activeOscillators.forEach((osc) => {
-      try {
-        osc.stop();
-        osc.disconnect();
-      } catch (e) {
-        // ignore
-      }
+    // 2. Stop any currently playing SFX (disconnect both osc and gain)
+    activeAudioNodes.forEach(({ osc, gain }) => {
+      try { osc.stop(); osc.disconnect(); } catch (e) { /* already stopped */ }
+      try { gain.disconnect(); } catch (e) { /* already disconnected */ }
     });
-    activeOscillators = [];
+    activeAudioNodes = [];
+
 
     // Stop active sleep sources
     activeSleepSources.forEach((src) => {

@@ -1923,11 +1923,6 @@ body {
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
 }
 
-.menu-sim i {
-  background: linear-gradient(135deg, #fbbf24, #d97706);
-  color: #000;
-}
-
 .menu-sales i {
   background: linear-gradient(135deg, #14b8a6, #0d9488);
 }
@@ -1952,17 +1947,7 @@ body {
   background: linear-gradient(135deg, #a855f7, #7e22ce);
 }
 
-/* Active breathing glow states for simulation and away mode */
-.menu-sim.active {
-  background: rgba(245, 158, 11, 0.15) !important;
-  color: #fbbf24 !important;
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
-}
-
-.menu-sim.active i {
-  animation: pulse-sim-icon 1.5s infinite alternate;
-}
-
+/* Active breathing glow states for away mode */
 .menu-away.active {
   background: rgba(139, 92, 246, 0.15) !important;
   color: #a78bfa !important;
@@ -1971,17 +1956,6 @@ body {
 
 .menu-away.active i {
   animation: pulse-away-icon 1.5s infinite alternate;
-}
-
-@keyframes pulse-sim-icon {
-  0% {
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
-    transform: scale(1);
-  }
-  100% {
-    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.6);
-    transform: scale(1.1);
-  }
 }
 
 @keyframes pulse-away-icon {

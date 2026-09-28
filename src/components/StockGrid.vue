@@ -90,61 +90,71 @@
     <div
       class="stock-grid"
       ref="gridContainer"
+      @scroll="handleGridScroll"
       @touchstart="handleTouchStart"
       @touchmove="handleTouchMove"
       @touchend="handleTouchEnd"
     >
-      <div
-        v-for="i in stockStore.stockSize"
-        :key="i"
-        v-show="shouldShowItem(i)"
-        v-memo="[
-          getStockItem(i).owner,
-          getStockItem(i).price,
-          getOwnerCount(getStockItem(i).owner, getStockItem(i).uid),
-          getQueueLength(i),
-          highlightedId === i,
-          cancelledItems.has(i),
-          newOrders.has(i),
-          activeFilter
-        ]"
-        :class="[
-          'stock-item',
-          getStockItem(i).owner ? 'sold' : '',
-          isNewOrder(i) ? 'new-order' : '',
-          highlightedId === i ? 'highlight' : '',
-          cancelledItems.has(i) ? 'cancelled-blink' : '',
-        ]"
-        @click="openQueueModal(i)"
-        :id="`stock-${i}`"
-      >
-        <div class="stock-num">{{ i }}</div>
-        <div v-if="cancelledItems.has(i) && !getStockItem(i).owner" class="stock-status cancelled-name">
-          ❌ {{ cancelledItems.get(i) }}
-        </div>
-        <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
-          {{ getStockItem(i).owner || "ว่าง" }}
-        </div>
+      <template v-for="i in stockStore.stockSize" :key="i">
         <div
-          v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
-          class="owner-count-badge"
-          :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
-          @click.stop="showOwnerItems(getStockItem(i).owner)"
-        >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
-
-        <div
-          v-if="getStockItem(i).owner && getStockItem(i).backdated"
-          class="backdated-time"
-          :title="`จองย้อนหลัง: ${formatTime(getStockItem(i).time)}`"
+          v-if="isItemVisible(i)"
+          v-memo="[
+            getStockItem(i).owner,
+            getStockItem(i).price,
+            getOwnerCount(getStockItem(i).owner, getStockItem(i).uid),
+            getQueueLength(i),
+            highlightedId === i,
+            cancelledItems.has(i),
+            newOrders.has(i),
+            activeFilter
+          ]"
+          :class="[
+            'stock-item',
+            getStockItem(i).owner ? 'sold' : '',
+            isNewOrder(i) ? 'new-order' : '',
+            highlightedId === i ? 'highlight' : '',
+            cancelledItems.has(i) ? 'cancelled-blink' : '',
+          ]"
+          @click="openQueueModal(i)"
+          :id="`stock-${i}`"
         >
-          🕒 {{ formatTime(getStockItem(i).time) }}
+          <div class="stock-num">{{ i }}</div>
+          <div v-if="cancelledItems.has(i) && !getStockItem(i).owner" class="stock-status cancelled-name">
+            ❌ {{ cancelledItems.get(i) }}
+          </div>
+          <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
+            {{ getStockItem(i).owner || "ว่าง" }}
+          </div>
+          <div
+            v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
+            class="owner-count-badge"
+            :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
+            @click.stop="showOwnerItems(getStockItem(i).owner)"
+          >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
+
+          <div
+            v-if="getStockItem(i).owner && getStockItem(i).backdated"
+            class="backdated-time"
+            :title="`จองย้อนหลัง: ${formatTime(getStockItem(i).time)}`"
+          >
+            🕒 {{ formatTime(getStockItem(i).time) }}
+          </div>
+          <!-- <div v-if="getStockItem(i).price" class="stock-price">
+            {{ getStockItem(i).price }} บาท
+          </div> -->
+          <div v-if="getQueueLength(i) > 0" class="queue-badge">
+            +{{ getQueueLength(i) }}
+          </div>
         </div>
-        <!-- <div v-if="getStockItem(i).price" class="stock-price">
-          {{ getStockItem(i).price }} บาท
-        </div> -->
-        <div v-if="getQueueLength(i) > 0" class="queue-badge">
-          +{{ getQueueLength(i) }}
-        </div>
+      </template>
+
+      <!-- 📦 Window Capping Load More Indicator -->
+      <div
+        v-if="gridDisplayLimit < stockStore.stockSize && activeFilter === 'all'"
+        class="grid-load-more"
+        @click="expandDisplayLimit"
+      >
+        <span>แสดงเพิ่ม (เหลืออีก {{ stockStore.stockSize - gridDisplayLimit }} รายการ) <i class="fa-solid fa-chevron-down"></i></span>
       </div>
     </div>
 
@@ -175,22 +185,6 @@
             </div>
           </div>
           <div class="queue-body">
-            <div class="price-input-section">
-              <label class="price-label">
-                <i class="fa-solid fa-tag"></i> ราคา
-              </label>
-              <div class="price-input-row">
-                <input
-                  type="number"
-                  v-model="editingPrice"
-                  ref="priceInputRef"
-                  class="price-input-field"
-                  placeholder="0"
-                  @keyup.enter="saveQueueChanges"
-                />
-                <span class="price-unit">บาท</span>
-              </div>
-            </div>
             <div class="queue-list">
               <div
                 v-if="tempQueue.length === 0"
@@ -322,7 +316,33 @@ const queueLengthsMap = computed(() => {
   return map;
 });
 
-function shouldShowItem(i) {
+// ✅ Phase 3.3: Window Capping & v-if Visibility Logic
+// ลด DOM node จาก 300+ โหนด เหลือเฉพาะชุดที่ผู้ใช้กำลังดูอยู่ (เริ่มต้น 120 โหนด)
+// และขยายแบบ dynamic เมื่อผู้ใช้เลื่อนหน้าจอ หรือเมื่อมีการกระโดดไปหารายการใดๆ
+const gridDisplayLimit = ref(120);
+
+function expandDisplayLimit() {
+  if (gridDisplayLimit.value < stockStore.stockSize) {
+    gridDisplayLimit.value = Math.min(stockStore.stockSize, gridDisplayLimit.value + 60);
+  }
+}
+
+function handleGridScroll(e) {
+  const el = e.target;
+  if (!el) return;
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 250) {
+    expandDisplayLimit();
+  }
+}
+
+function isItemVisible(i) {
+  // 1. Window capping: จำกัดจำนวนไอเทมที่ render ในกระดาน
+  // ถ้าเป็นไอเทมที่กำลังไฮไลท์หรือเปิดแก้ไขอยู่ ให้แสดงเสมอเพื่อไม่ให้หลุด DOM
+  if (i > gridDisplayLimit.value && highlightedId.value !== i && editingId.value !== i) {
+    return false;
+  }
+
+  // 2. Active filter check
   if (activeFilter.value === "all") return true;
   const item = stockStore.stockData[i];
   if (activeFilter.value === "sold") return !!(item && item.owner);
@@ -330,6 +350,7 @@ function shouldShowItem(i) {
   if (activeFilter.value === "queue") return (queueLengthsMap.value[i] || 0) > 0;
   return true;
 }
+
 
 // ✅ Cancelled Items Blink Effect (15 seconds)
 const cancelledItems = ref(new Map());
@@ -396,25 +417,24 @@ const deliveryStrip = computed(() => {
     .sort((a, b) => a.days - b.days);
 });
 
-// ✅ Precomputed map of reservation counts for O(1) grid lookups
-// ✅ Precomputed map of reservation counts for O(1) grid lookups
-const deliveryCountsMap = computed(() => {
+// ✅ Phase 3.1 (A): Pre-normalize stockData owner counts — O(n) single pass
+// คำนวณแยกออกมา ป้องกันไม่ให้ deliveryCountsMap ต้อง iterate stockData ซ้ำ
+const currentNormCountsMap = computed(() => {
   const counts = {};
-
-  // 1. Map current live session counts by normalized owner name
-  const currentNormCounts = {};
   Object.values(stockStore.stockData).forEach((item) => {
     if (item?.owner) {
       const norm = normalizeCustomerName(item.owner);
-      if (norm) {
-        currentNormCounts[norm] = (currentNormCounts[norm] || 0) + 1;
-      }
+      if (norm) counts[norm] = (counts[norm] || 0) + 1;
     }
   });
+  return counts;
+});
 
-  // 2. Add counts from deliveryCustomers (only active non-done customers)
+// ✅ Phase 3.1 (B): Pre-aggregate past session counts per customer — O(m×sessions)
+// คำนวณแยก — deliveryCountsMap จะ depend แค่ computed นี้ ไม่ต้อง loop sessions ซ้ำ
+const pastSessionCountsMap = computed(() => {
   const videoId = systemStore.currentVideoId;
-
+  const map = {};
   deliveryCustomers.value.forEach((cust) => {
     if (!cust || cust.status === "done" || !cust.name) return;
     const norm = normalizeCustomerName(cust.name);
@@ -431,7 +451,20 @@ const deliveryCountsMap = computed(() => {
         }
       });
     }
+    map[norm] = { cust, pastCount };
+  });
+  return map;
+});
 
+// ✅ Phase 3.1 (C): Final O(n+m) delivery counts map — no nested loops
+// ใช้ผลลัพธ์จาก 2 computed ด้านบน เพื่อให้ complexity ลดลงจาก O(n×m) → O(n+m)
+const deliveryCountsMap = computed(() => {
+  const counts = {};
+  const currentNormCounts = currentNormCountsMap.value;
+  const pastSessions = pastSessionCountsMap.value;
+
+  // 1. รวมข้อมูลจาก deliveryCustomers + stockData ใน single pass
+  Object.entries(pastSessions).forEach(([norm, { cust, pastCount }]) => {
     const currentCount = currentNormCounts[norm] || 0;
     const total = currentCount + pastCount;
 
@@ -440,7 +473,7 @@ const deliveryCountsMap = computed(() => {
     if (cust.name) counts[cust.name] = total;
   });
 
-  // 3. For any owner in current live stock not in deliveryCustomers yet
+  // 2. Owners ที่อยู่ใน stock live แต่ไม่มีใน deliveryCustomers
   Object.keys(currentNormCounts).forEach((norm) => {
     if (counts[norm] === undefined) {
       counts[norm] = currentNormCounts[norm];
@@ -449,6 +482,7 @@ const deliveryCountsMap = computed(() => {
 
   return counts;
 });
+
 
 onMounted(() => {
   // 📦 Listen delivery_customers for badge count + strip
@@ -492,7 +526,6 @@ const showModal = ref(false);
 const editingId = ref(null);
 const editingPrice = ref(0);
 const tempQueue = ref([]);
-const priceInputRef = ref(null);
 let draggingIndex = null;
 
 // ✅ Autocomplete State
@@ -817,6 +850,9 @@ async function showOwnerItems(ownerName) {
   activeOwnerName.value = ownerName;
   pastItems.value = [];
 
+  // ✅ Phase 4.1: Reference สำหรับ cleanup listener & observer
+  let cleanupOwnerModal = null;
+
   // เปิด Swal ขึ้นมาพร้อมหน้าตา Loading หรือข้อมูลเริ่มต้นทันที
   Swal.fire({
     title: `👗 ${ownerName}`,
@@ -828,7 +864,12 @@ async function showOwnerItems(ownerName) {
     confirmButtonColor: '#374151',
     showCloseButton: true,
     width: 420,
+    willClose: () => {
+      // ✅ Phase 4.1: Clean up observer & event listener explicitly on close
+      if (cleanupOwnerModal) cleanupOwnerModal();
+    },
     didOpen: () => {
+
       // ฟัง event ลบรายการ
       const handler = async (e) => {
         const [numStr, vid] = e.detail.split('|');
@@ -938,14 +979,34 @@ async function showOwnerItems(ownerName) {
       document.addEventListener('remove-owner-item', handler);
       // cleanup เมื่อปิด
       const swalEl = Swal.getPopup();
-      const observer = new MutationObserver(() => {
-        if (!document.contains(swalEl)) {
-          document.removeEventListener('remove-owner-item', handler);
-          activeOwnerName.value = null;
+      let observerTimeout = null;
+
+      cleanupOwnerModal = () => {
+        document.removeEventListener('remove-owner-item', handler);
+        activeOwnerName.value = null;
+        if (observer) {
           observer.disconnect();
+          observer = null;
+        }
+        if (observerTimeout) {
+          clearTimeout(observerTimeout);
+          observerTimeout = null;
+        }
+        cleanupOwnerModal = null;
+      };
+
+      let observer = new MutationObserver(() => {
+        if (!document.contains(swalEl)) {
+          if (cleanupOwnerModal) cleanupOwnerModal();
         }
       });
       observer.observe(document.body, { childList: true, subtree: true });
+
+      // ✅ Phase 4.1: Safety timeout fallback (300,000ms = 5 mins) ป้องกัน observer ค้างใน Memory
+      observerTimeout = setTimeout(() => {
+        if (cleanupOwnerModal) cleanupOwnerModal();
+      }, 300000);
+
     },
   });
 
@@ -1101,6 +1162,9 @@ watch(
 );
 
 function scrollToItem(num) {
+  if (num > gridDisplayLimit.value) {
+    gridDisplayLimit.value = Math.min(stockStore.stockSize, num + 20);
+  }
   nextTick(() => {
     if (activeFilter.value === "vacant") {
       activeFilter.value = "all";
@@ -1136,7 +1200,7 @@ function openQueueModal(num) {
     tempQueue.value.push(...JSON.parse(JSON.stringify(item.queue)));
   }
   showModal.value = true;
-  nextTick(() => { if (priceInputRef.value) priceInputRef.value.focus(); });
+  nextTick(() => { if (queueInputRefs.value[0]) queueInputRefs.value[0].focus(); });
 }
 
 function closeModal() {
@@ -1369,6 +1433,9 @@ async function saveAndNavigate(direction) {
   }
 
   if (nextId !== editingId.value) {
+    if (nextId > gridDisplayLimit.value) {
+      gridDisplayLimit.value = Math.min(stockStore.stockSize, nextId + 20);
+    }
     if (activeAutocompleteIdx.value !== null) {
       activeAutocompleteIdx.value = null; // Clear autocomplete
     }
@@ -1920,6 +1987,28 @@ watch(
   transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
+
+.grid-load-more {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 12px;
+  cursor: pointer;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.grid-load-more:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
 
 @media (hover: hover) {
   .stock-item:hover {

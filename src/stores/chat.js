@@ -1,16 +1,18 @@
 import { defineStore } from "pinia";
 import { ref, reactive } from "vue";
-import { ref as dbRef, onChildAdded, push } from "firebase/database";
+import { ref as dbRef, onChildAdded, push, query, limitToLast } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useAudio } from "../composables/useAudio";
 import { logger } from "../utils/logger";
 import { useNicknameStore } from "./nickname";
+import { archiveChatEntries, getAllChatEntries, clearChatEntries } from "../utils/chatIdb";
 
 export const useChatStore = defineStore("chat", () => {
   const MAX_MESSAGES = 500;
   const MAX_SEEN_IDS = 2000;
+  const MAX_FULL_LOG = 3000; // ✅ RAM buffer cap: ป้องกัน fullChatLog ล้น Heap
 
-  const messages = reactive([]); // ✅ เปลี่ยนเป็น reactive
+  const messages = reactive([]); // ✅ reactive array สำหรับแสดงผล UI
   const seenMessageIds = ref({});
   const fullChatLog = ref([]);
   const streamStartTime = ref(null);
@@ -59,18 +61,33 @@ export const useChatStore = defineStore("chat", () => {
     logger.chat(`Message added from ${message.authorName || "System"}: "${textSnippet}" (Total: ${messages.length})`);
 
     // Log for CSV
-    fullChatLog.value.push({
+    const logEntry = {
       id: message.id,
       author: message.authorName,
       comment: message.text,
       videoTime: calculateVideoTime(message.timestamp),
       messageTime: new Date(message.timestamp).toLocaleString("en-US"),
-      // ✅ เพิ่มข้อมูล Raw เพื่อให้ HistoryModal เอาไปใช้ได้
+      // ✅ Raw fields สำหรับ HistoryModal และ IDB export
       displayName: message.displayName || message.authorName,
       realName: message.realName || message.displayName || message.authorName,
       text: message.text,
-      timestamp: message.timestamp, // Raw timestamp for Date formatting
-    });
+      timestamp: message.timestamp,
+    };
+    fullChatLog.value.push(logEntry);
+
+    // ✅ Phase 1.1: Archive-then-trim — persist to IndexedDB BEFORE removing from RAM
+    // การ export CSV จะอ่านจากทั้ง RAM + IndexedDB ทำให้ได้ข้อมูลครบ 100%
+    if (fullChatLog.value.length > MAX_FULL_LOG) {
+      const trimCount = fullChatLog.value.length - MAX_FULL_LOG;
+      const entriesToArchive = fullChatLog.value.slice(0, trimCount);
+
+      // Background async — ไม่ block main thread
+      if (currentVideoId && entriesToArchive.length > 0) {
+        archiveChatEntries(currentVideoId, entriesToArchive).catch(() => {});
+      }
+
+      fullChatLog.value.splice(0, trimCount);
+    }
   }
 
   function calculateVideoTime(timestamp) {
@@ -94,26 +111,57 @@ export const useChatStore = defineStore("chat", () => {
   function clearChat() {
     messages.splice(0); // Clear UI messages
     seenMessageIds.value = {}; // Clear deduplication cache
-    fullChatLog.value = []; // ✅ Clear CSV Log
+    fullChatLog.value = []; // ✅ Clear RAM log
     streamStartTime.value = null; // ✅ Reset Timer
+
+    // ✅ Clear IndexedDB archive for current session (prevents stale data on re-connect)
+    if (currentVideoId) {
+      clearChatEntries(currentVideoId).catch(() => {});
+    }
+
     logger.chat("Chat & Logs cleared completely");
   }
 
-  function downloadChatCSV(videoId) {
-    if (fullChatLog.value.length === 0) {
+  /**
+   * ✅ Download CSV ที่รวมข้อมูลจาก RAM + IndexedDB archive
+   * เพื่อให้ได้ข้อมูลครบ 100% แม้ session ยาวจนมีการ trim
+   * @param {string} videoId
+   */
+  async function downloadChatCSV(videoId) {
+    const targetVideoId = videoId || currentVideoId;
+
+    // 1. ดึงจาก RAM
+    const inMemory = [...fullChatLog.value];
+
+    // 2. ดึงจาก IndexedDB archive (ข้อความที่ถูก trim ออกไปแล้ว)
+    const archived = await getAllChatEntries(targetVideoId).catch(() => []);
+
+    // 3. Merge + Deduplicate ด้วย id (archived มาก่อน, inMemory override)
+    const seen = new Set();
+    const merged = [...archived, ...inMemory].filter((row) => {
+      if (!row.id || seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+
+    // 4. Sort by timestamp ascending
+    merged.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    if (merged.length === 0) {
       alert("ไม่มีข้อมูลแชท");
       return;
     }
 
+    // 5. Generate CSV
     let csvContent = "\uFEFF\"Id\",\"Author name\",\"Comment\",\"Video time\",\"Message time\"\n";
 
-    fullChatLog.value.forEach((row) => {
+    merged.forEach((row) => {
       const safeId = row.id ? String(row.id).replace(/"/g, '""') : "";
       const safeComment = row.comment ? String(row.comment).replace(/"/g, '""') : "";
       const safeAuthor = row.author ? String(row.author).replace(/"/g, '""') : "";
       const safeVideoTime = row.videoTime ? String(row.videoTime).replace(/"/g, '""') : "";
       const safeMessageTime = row.messageTime ? String(row.messageTime).replace(/"/g, '""') : "";
-      
+
       csvContent += `"${safeId}","${safeAuthor}","${safeComment}","${safeVideoTime}","${safeMessageTime}"\n`;
     });
 
@@ -121,15 +169,17 @@ export const useChatStore = defineStore("chat", () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `chat_log_${videoId}.csv`);
+    link.setAttribute("download", `chat_log_${targetVideoId}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   /**
    * ✅ Sync chat messages from Firebase in real-time
+   * Phase 2.4: ใช้ limitToLast(200) เพื่อป้องกัน Reconnect Storm
    * @param {string} videoId - The video ID to sync chats from
    * @returns {Function} Cleanup function to remove listener
    */
@@ -155,14 +205,19 @@ export const useChatStore = defineStore("chat", () => {
     }
 
     currentVideoId = videoId;
-    const chatRef = dbRef(db, `chats/${videoId}`);
 
-    logger.firebase(`Starting Firebase chat sync for: ${videoId}`);
+    // ✅ Phase 2.4: limitToLast(200) — ป้องกัน Reconnect Storm
+    // เมื่อเน็ตหลุดแล้วต่อใหม่ Firebase จะ deliver เฉพาะข้อความล่าสุด 200 รายการ
+    // ไม่ทำให้ main thread freeze จากการ replay ข้อมูลหลักพัน
+    const chatRef = dbRef(db, `chats/${videoId}`);
+    const chatQuery = query(chatRef, limitToLast(200));
+
+    logger.firebase(`Starting Firebase chat sync for: ${videoId} (limitToLast: 200)`);
 
     const syncStartTime = Date.now();
 
     // Listen for new chat messages
-    const listener = onChildAdded(chatRef, (snapshot) => {
+    const listener = onChildAdded(chatQuery, (snapshot) => {
       const messageData = snapshot.val();
       if (messageData) {
         const isNew = !seenMessageIds.value[messageData.id];

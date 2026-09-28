@@ -139,10 +139,6 @@
               <div class="dropdown-group-title">
                 <i class="fa-solid fa-tower-broadcast"></i> แชท & ไลฟ์สตรีม
               </div>
-              <a @click="toggleSimulation" class="menu-sim" :class="{ active: isSimulating }">
-                <i :class="isSimulating ? 'fa-solid fa-stop' : 'fa-solid fa-bolt'"></i>
-                <span>{{ isSimulating ? "หยุดจำลองแชท" : "เริ่มจำลองแชท" }}</span>
-              </a>
               <a @click="downloadCSV" class="menu-csv">
                 <i class="fa-solid fa-file-csv"></i>
                 <span>บันทึกแชท (CSV)</span>
@@ -305,7 +301,6 @@ function handleOpenHistory() {
 
 const videoId = ref("");
 const showDropdown = ref(false);
-const isSimulating = ref(false);
 const isConnecting = ref(false);
 const shippingData = ref({});
 const dropdownRef = ref(null);
@@ -313,7 +308,6 @@ const dropdownStyle = ref({});
 const noteEditorRef = ref(null); // ✅ Note Editor Ref
 const changelogModalRef = ref(null); // ✅ Changelog Modal Ref
 const liveSummaryModalRef = ref(null); // ✅ Live Summary Modal Ref
-let simIntervalId = null;
 const cleanupFns = [];
 
 // ✅ Base URL for linking to sub-pages
@@ -596,61 +590,6 @@ function toggleAwayMode() {
   showDropdown.value = false;
 }
 
-async function toggleSimulation() {
-  // (Logic เดิม)
-  isSimulating.value = !isSimulating.value;
-  if (isSimulating.value) {
-    const { useChatProcessor } =
-      await import("../composables/useChatProcessor");
-    const { processMessage } = useChatProcessor();
-    Swal.fire({
-      icon: "info",
-      title: "เริ่มจำลองแชท",
-      text: "กำลังจำลองข้อความแชท...",
-      timer: 1500,
-      toast: true,
-      position: "top-end",
-      showConfirmButton: false,
-    });
-    simIntervalId = setInterval(() => {
-      const rNum = Math.floor(Math.random() * stockStore.stockSize) + 1;
-      const actions = [
-        `F${rNum}`,
-        `${rNum}`,
-        `รับ ${rNum}`,
-        `เอา ${rNum}`,
-        `CF${rNum}`,
-      ];
-      const randomAction = actions[Math.floor(Math.random() * actions.length)];
-      processMessage({
-        id: "sim-" + Date.now(),
-        snippet: {
-          displayMessage: randomAction,
-          publishedAt: new Date().toISOString(),
-        },
-        authorDetails: {
-          channelId: "sim-" + Math.random().toString(36).substr(2, 9),
-          displayName: "SimUser" + Math.floor(Math.random() * 100),
-          profileImageUrl: "",
-        },
-      });
-    }, 2000);
-  } else {
-    if (simIntervalId) {
-      clearInterval(simIntervalId);
-      simIntervalId = null;
-    }
-    Swal.fire({
-      icon: "success",
-      title: "หยุดจำลองแล้ว",
-      timer: 1500,
-      toast: true,
-      position: "top-end",
-      showConfirmButton: false,
-    });
-  }
-  showDropdown.value = false;
-}
 
 function openNoteEditor() {
   if (noteEditorRef.value) {
@@ -777,7 +716,6 @@ onBeforeUnmount(() => {
   cleanupFns.length = 0;
   logger.log("🧹 Memory Cleaned Up!");
   document.removeEventListener("click", handleClickOutside);
-  if (simIntervalId) clearInterval(simIntervalId);
   if (videoId.value) localStorage.setItem("lastVideoId", videoId.value);
 });
 </script>

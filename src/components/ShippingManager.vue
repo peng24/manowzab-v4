@@ -218,6 +218,17 @@
                     <span>{{ getPaymentTypeDisplay(c) }}</span>
                   </span>
 
+                  <!-- 💬 Contact Channel Pill (Line / LineOA / โทร) -->
+                  <span
+                    class="sm-contact-pill"
+                    :class="getCustomerContactChannel(c) || 'unspecified'"
+                    @click.stop="toggleContactChannel(c)"
+                    :title="`ช่องทางติดต่อ: ${getContactChannelDisplay(c)} (คลิกเพื่อสลับ Line / LineOA / โทร)`"
+                  >
+                    <i :class="getCustomerContactChannel(c) === 'lineoa' ? 'fa-solid fa-comment-dots' : (getCustomerContactChannel(c) === 'phone' ? 'fa-solid fa-phone' : (getCustomerContactChannel(c) === 'line' ? 'fa-brands fa-line' : 'fa-regular fa-comment'))"></i>
+                    <span>{{ getContactChannelDisplay(c) }}</span>
+                  </span>
+
                   <!-- 🖨️ Printed status badge with toggle -->
                   <span
                     class="sm-printed-pill"
@@ -361,6 +372,16 @@
                 >
                   <i :class="getCustomerPaymentType(c) === 'cod' ? 'fa-solid fa-money-bill-wave' : (getCustomerPaymentType(c) === 'transfer' ? 'fa-solid fa-credit-card' : 'fa-regular fa-circle-question')"></i>
                   <span>{{ getPaymentTypeDisplay(c) }}</span>
+                </span>
+                <!-- 💬 Contact Channel Pill (Line / LineOA / โทร) -->
+                <span
+                  class="sm-contact-pill"
+                  :class="getCustomerContactChannel(c) || 'unspecified'"
+                  @click.stop="toggleContactChannel(c)"
+                  :title="`ช่องทางติดต่อ: ${getContactChannelDisplay(c)} (คลิกเพื่อสลับ Line / LineOA / โทร)`"
+                >
+                  <i :class="getCustomerContactChannel(c) === 'lineoa' ? 'fa-solid fa-comment-dots' : (getCustomerContactChannel(c) === 'phone' ? 'fa-solid fa-phone' : (getCustomerContactChannel(c) === 'line' ? 'fa-brands fa-line' : 'fa-regular fa-comment'))"></i>
+                  <span>{{ getContactChannelDisplay(c) }}</span>
                 </span>
               </div>
               <span
@@ -903,6 +924,7 @@ function addManualCustomer() {
 
   const normKey = normalizeName(name).replace(/[.#$[\]/]/g, "_");
   const defaultPaymentType = existingCustomer?.paymentType || (addressBook.value && addressBook.value[normKey]?.paymentType) || "";
+  const defaultContactChannel = existingCustomer?.contactChannel || (addressBook.value && addressBook.value[normKey]?.contactChannel) || "";
 
   update(dbRef(db, `delivery_customers/${targetUid}`), {
     name,
@@ -910,6 +932,7 @@ function addManualCustomer() {
     deliveryDate: parsedDate,
     note: (existingCustomer && existingCustomer.note) || "",
     paymentType: defaultPaymentType,
+    contactChannel: defaultContactChannel,
     status: "pending",
     labelPrinted: false,
     labelPrintedAt: null,
@@ -1164,6 +1187,105 @@ async function togglePaymentType(customer) {
     });
   } catch (err) {
     console.error("Failed to toggle paymentType:", err);
+  }
+}
+
+// 💬 Contact Channel Helpers (Line / LineOA / โทรศัพท์)
+function getCustomerContactChannel(customer) {
+  if (!customer) return "";
+  if (customer.contactChannel) {
+    const cc = String(customer.contactChannel).trim().toLowerCase();
+    if (cc === "lineoa" || cc === "line_oa" || cc === "line-oa") return "lineoa";
+    if (cc === "phone" || cc === "tel" || cc === "โทร" || cc === "โทรศัพท์") return "phone";
+    if (cc === "line") return "line";
+  }
+
+  // 1. Fallback: check central address_book
+  const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  const bookEntry = addressBook.value && norm ? addressBook.value[norm] : null;
+  if (bookEntry && bookEntry.contactChannel) {
+    const cc = String(bookEntry.contactChannel).trim().toLowerCase();
+    if (cc === "lineoa" || cc === "line_oa" || cc === "line-oa") return "lineoa";
+    if (cc === "phone" || cc === "tel" || cc === "โทร" || cc === "โทรศัพท์") return "phone";
+    if (cc === "line") return "line";
+  }
+
+  // 2. Fallback: check active or saved address
+  const savedAddrs = getCustomerSavedAddresses(customer);
+  const activeAddr = customer.selectedAddressId
+    ? savedAddrs.find((a) => a.id === customer.selectedAddressId)
+    : savedAddrs[0];
+  if (activeAddr && activeAddr.contactChannel) {
+    const cc = String(activeAddr.contactChannel).trim().toLowerCase();
+    if (cc === "lineoa" || cc === "line_oa" || cc === "line-oa") return "lineoa";
+    if (cc === "phone" || cc === "tel" || cc === "โทร" || cc === "โทรศัพท์") return "phone";
+    if (cc === "line") return "line";
+  }
+
+  return "";
+}
+
+function getContactChannelDisplay(customer) {
+  const ch = getCustomerContactChannel(customer);
+  if (ch === "lineoa") return "💚 LineOA";
+  if (ch === "phone") return "📞 โทร";
+  if (ch === "line") return "💬 Line";
+  return "-";
+}
+
+async function toggleContactChannel(customer) {
+  if (!customer) return;
+  const current = getCustomerContactChannel(customer);
+  const next = current === "line" ? "lineoa" : (current === "lineoa" ? "phone" : "line");
+
+  // ⚡ Optimistic UI update
+  customer.contactChannel = next;
+
+  const timestamp = Date.now();
+  const normKey = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+
+  const multiPathUpdates = {
+    [`delivery_customers/${customer.id}/contactChannel`]: next,
+    [`delivery_customers/${customer.id}/updatedAt`]: timestamp,
+  };
+
+  if (normKey) {
+    multiPathUpdates[`address_book/${normKey}/contactChannel`] = next;
+    multiPathUpdates[`address_book/${normKey}/name`] = customer.name.trim();
+    multiPathUpdates[`address_book/${normKey}/updatedAt`] = timestamp;
+    if (addressBook.value && addressBook.value[normKey]) {
+      addressBook.value[normKey].contactChannel = next;
+    }
+  }
+
+  // Also update in customer's active address if available
+  const savedAddrs = getCustomerSavedAddresses(customer);
+  if (savedAddrs.length > 0) {
+    const updatedAddrs = savedAddrs.map((a) => ({
+      ...a,
+      contactChannel: (customer.selectedAddressId && a.id === customer.selectedAddressId) || savedAddrs.length === 1
+        ? next
+        : (a.contactChannel || next),
+    }));
+    multiPathUpdates[`delivery_customers/${customer.id}/addresses`] = updatedAddrs;
+    if (normKey) {
+      multiPathUpdates[`address_book/${normKey}/addresses`] = updatedAddrs;
+    }
+  }
+
+  try {
+    await update(dbRef(db), multiPathUpdates);
+    const nextLabel = next === "lineoa" ? "LineOA" : (next === "phone" ? "โทรศัพท์" : "Line");
+    Swal.fire({
+      icon: "success",
+      title: `บันทึกช่องทางติดต่อ "${customer.name}" เป็น "${nextLabel}" ไว้ในประวัติลูกค้าแล้ว`,
+      toast: true,
+      position: "top-end",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    console.error("Failed to toggle contactChannel:", err);
   }
 }
 
@@ -1733,6 +1855,66 @@ function deleteCustomer(id, name) {
   background: rgba(148, 163, 184, 0.16);
   border-color: #cbd5e1;
   color: #f1f5f9;
+}
+
+/* Contact Channel Pill */
+.sm-contact-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.9em;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  line-height: 1.4;
+}
+
+.sm-contact-pill.line {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.sm-contact-pill.line:hover {
+  background: rgba(34, 197, 94, 0.22);
+  border-color: #22c55e;
+}
+
+.sm-contact-pill.lineoa {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.sm-contact-pill.lineoa:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+}
+
+.sm-contact-pill.phone {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.sm-contact-pill.phone:hover {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: #3b82f6;
+}
+
+.sm-contact-pill.unspecified {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+}
+
+.sm-contact-pill.unspecified:hover {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: #94a3b8;
+  color: #e2e8f0;
 }
 
 /* Printed Status Pill */

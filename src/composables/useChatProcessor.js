@@ -15,26 +15,13 @@ import {
   onChildAdded,
 } from "firebase/database";
 import { db } from "../composables/useFirebase";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { extractMessageRuns } from "../services/YouTubeLiveChat";
 import Swal from "sweetalert2";
 import { watch } from "vue";
 import { logger } from "../utils/logger";
 import { resolveDeliveryUid } from "../utils/deliverySync";
 
-// 🚀 Performance: Reverse lookup helper (nickname -> uid) powered by Pinia nicknameStore
-function getNameToUidMap(nicknameStore) {
-  const map = {};
-  const data = nicknameStore.nicknames || {};
-  Object.keys(data).forEach((uid) => {
-    const entry = data[uid];
-    const nick = typeof entry === "object" ? entry.nick : entry;
-    if (nick) {
-      map[nick.trim().toLowerCase()] = uid;
-    }
-  });
-  return map;
-}
 
 import {
   MAX_ITEM_ID,
@@ -82,6 +69,7 @@ const Toast = Swal.mixin({
 // ✅ Concurrency Lock for Chat Processing
 const processingLocks = new Set();
 const warnedNewCustomers = new Set(); // Track new customers who have been read instructions
+const MAX_WARNED_CUSTOMERS = 1000; // ✅ Phase 1.4: Cap set size to prevent unbounded growth
 let _lastVideoId = null; // ✅ Track current session for auto-clear
 
 export function useChatProcessor() {
@@ -92,7 +80,21 @@ export function useChatProcessor() {
 
   const { queueAudio, playSfx, resetVoice } = useAudio();
 
-  // extractMessageRuns is now imported from ../services/YouTubeLiveChat
+  // 🚀 Phase 1.3: Memoized name→uid reverse lookup (computed — recomputes only when nicknames change)
+  // แทนที่ getNameToUidMap() ที่ O(n) ทุกครั้งที่มี shipping message
+  const nameToUidMap = computed(() => {
+    const map = {};
+    const data = nicknameStore.nicknames || {};
+    Object.keys(data).forEach((uid) => {
+      const entry = data[uid];
+      const nick = typeof entry === "object" ? entry.nick : entry;
+      if (nick) {
+        map[nick.trim().toLowerCase()] = uid;
+      }
+    });
+    return map;
+  });
+
 
   async function processMessage(item) {
     // ✅ Auto-clear session state when video changes
@@ -164,20 +166,15 @@ export function useChatProcessor() {
       const voiceLearningStore = useVoiceLearningStore();
       voiceLearningStore.initVoicePatterns();
 
-      const codePattern = voiceLearningStore.codeKeywords.join("|");
-      const pricePattern = voiceLearningStore.priceKeywords.join("|");
-      const unitPattern = voiceLearningStore.unitKeywords.join("|");
+      // 🚀 Phase 2.2: ใช้ cached compiled regex แทนการ new RegExp() ทุก message
+      // compiledVoiceRegex เป็น computed ที่ recompile เฉพาะเมื่อ keywords เปลี่ยนเท่านั้น
+      const { r1, r2, r3, r4 } = voiceLearningStore.compiledVoiceRegex;
 
-      // Dynamic regex matching
-      const regex1 = new RegExp(`(?:${codePattern})\\s*(\\d+)\\s*(?:${pricePattern})?\\s*(\\d+)\\s*(?:${unitPattern})?`, 'i');
-      const regex2 = new RegExp(`(\\d+)\\s*(?:${pricePattern})\\s*(\\d+)\\s*(?:${unitPattern})?`, 'i');
-      const regex3 = new RegExp(`(?:${codePattern})?\\s*(\\d+)\\s*[-/]\\s*(\\d+)`, 'i');
-      const regex4 = new RegExp(`(?:${codePattern})?\\s*(\\d+)\\.(\\d+)\\s*(?:${unitPattern})?`, 'i');
+      const match = normalizedMsg.match(r1) ||
+                    normalizedMsg.match(r2) ||
+                    normalizedMsg.match(r3) ||
+                    normalizedMsg.match(r4);
 
-      const match = normalizedMsg.match(regex1) || 
-                    normalizedMsg.match(regex2) || 
-                    normalizedMsg.match(regex3) || 
-                    normalizedMsg.match(regex4);
       if (match) {
         const itemId = parseInt(match[1]);
         const priceVal = parseInt(match[2]);
@@ -228,6 +225,15 @@ export function useChatProcessor() {
     let ttsMessage = msg;
     const isGreetingOrSticker = /^(?:ทักทาย|ส่งสติกเกอร์|สวัสดี|ดีครับ|ดีค่ะ|hello|hi)$/i.test(msg.trim());
     if (isNewCustomer && !isAdmin && !warnedNewCustomers.has(uid) && !isGreetingOrSticker) {
+      // ✅ Phase 1.4: FIFO eviction เพื่อจำกัดขนาด Set ไม่เกิน MAX_WARNED_CUSTOMERS
+      if (warnedNewCustomers.size >= MAX_WARNED_CUSTOMERS) {
+        const iter = warnedNewCustomers.values();
+        for (let i = 0; i < 200; i++) {
+          const oldest = iter.next().value;
+          if (oldest === undefined) break;
+          warnedNewCustomers.delete(oldest);
+        }
+      }
       warnedNewCustomers.add(uid);
       ttsMessage = `${msg} ... ลูกค้าใหม่ พิมพ์ชื่อ ตามด้วยรหัสเพื่อจอง ... ค่าส่ง โอน 40 ... ปลายทาง 50 ค่ะ`;
     }
@@ -479,8 +485,8 @@ export function useChatProcessor() {
         if (cleanName.length > 0 && !isAdminUser(cleanName)) {
           autoShipName = cleanName;
 
-          const nameToUidMap = getNameToUidMap(nicknameStore);
-          let foundUid = nameToUidMap[autoShipName.toLowerCase()];
+          // 🚀 Phase 1.3: ใช้ computed nameToUidMap แทน getNameToUidMap() — O(1) lookup, recomputed only when nicknames change
+          let foundUid = nameToUidMap.value[autoShipName.toLowerCase()];
 
           if (!foundUid) {
             foundUid =

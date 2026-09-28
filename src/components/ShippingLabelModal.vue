@@ -257,7 +257,14 @@
               <!-- 📌 Bottom-Left Meta: System Name & Payment Type (Plain Text) -->
               <div class="ls-bottom-left">
                 <div class="ls-meta-text system-name" :title="`ชื่อลูกค้าในระบบ: ${customer.name}`">
-                  {{ getSystemNameDisplay(customer) }}
+                  <span>{{ getSystemNameDisplay(customer) }}</span>
+                  <span
+                    class="ls-contact-tag"
+                    @click.stop="toggleContactChannel(customer)"
+                    title="คลิกเพื่อสลับช่องทางติดต่อ (Line / LineOA / โทร)"
+                  >
+                    ({{ getContactChannelShort(customer) }})
+                  </span>
                 </div>
                 <div
                   class="ls-meta-text payment-text"
@@ -314,7 +321,14 @@
             <!-- Portrait Bottom Left Meta (Plain Text) -->
             <div class="portrait-meta-bottom">
               <div class="ls-meta-text system-name" :title="`ชื่อลูกค้าในระบบ: ${customer.name}`">
-                {{ getSystemNameDisplay(customer) }}
+                <span>{{ getSystemNameDisplay(customer) }}</span>
+                <span
+                  class="ls-contact-tag"
+                  @click.stop="toggleContactChannel(customer)"
+                  title="คลิกเพื่อสลับช่องทางติดต่อ (Line / LineOA / โทร)"
+                >
+                  ({{ getContactChannelShort(customer) }})
+                </span>
               </div>
               <div
                 class="ls-meta-text payment-text"
@@ -801,6 +815,113 @@ async function togglePaymentType(customer) {
   }
 }
 
+// 💬 Contact Channel Helpers (Line / LineOA / โทรศัพท์)
+function getCustomerContactChannel(customer) {
+  if (!customer) return "";
+  if (customer.contactChannel) {
+    const cc = String(customer.contactChannel).trim().toLowerCase();
+    if (cc === "lineoa" || cc === "line_oa" || cc === "line-oa") return "lineoa";
+    if (cc === "phone" || cc === "tel" || cc === "โทร" || cc === "โทรศัพท์") return "phone";
+    if (cc === "line") return "line";
+  }
+
+  // 1. Fallback: check central address_book
+  const norm = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  const bookEntry = props.addressBook && norm ? props.addressBook[norm] : null;
+  if (bookEntry && bookEntry.contactChannel) {
+    const cc = String(bookEntry.contactChannel).trim().toLowerCase();
+    if (cc === "lineoa" || cc === "line_oa" || cc === "line-oa") return "lineoa";
+    if (cc === "phone" || cc === "tel" || cc === "โทร" || cc === "โทรศัพท์") return "phone";
+    if (cc === "line") return "line";
+  }
+
+  // 2. Fallback: check active or saved address
+  const savedAddrs = getCustomerSavedAddresses(customer);
+  const activeAddr = customer.selectedAddressId
+    ? savedAddrs.find((a) => a.id === customer.selectedAddressId)
+    : savedAddrs[0];
+  if (activeAddr && activeAddr.contactChannel) {
+    const cc = String(activeAddr.contactChannel).trim().toLowerCase();
+    if (cc === "lineoa" || cc === "line_oa" || cc === "line-oa") return "lineoa";
+    if (cc === "phone" || cc === "tel" || cc === "โทร" || cc === "โทรศัพท์") return "phone";
+    if (cc === "line") return "line";
+  }
+
+  return "";
+}
+
+function getContactChannelShort(customer) {
+  const ch = getCustomerContactChannel(customer);
+  if (ch === "lineoa") return "LineOA";
+  if (ch === "phone") return "โทร";
+  if (ch === "line") return "Line";
+  return "-";
+}
+
+function getContactChannelDisplay(customer) {
+  const ch = getCustomerContactChannel(customer);
+  if (ch === "lineoa") return "💚 LineOA";
+  if (ch === "phone") return "📞 โทร";
+  if (ch === "line") return "💬 Line";
+  return "-";
+}
+
+async function toggleContactChannel(customer) {
+  if (!customer) return;
+  const current = getCustomerContactChannel(customer);
+  const next = current === "line" ? "lineoa" : (current === "lineoa" ? "phone" : "line");
+
+  // Optimistic update
+  customer.contactChannel = next;
+
+  const timestamp = Date.now();
+  const normKey = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+
+  const multiPathUpdates = {
+    [`delivery_customers/${customer.id}/contactChannel`]: next,
+    [`delivery_customers/${customer.id}/updatedAt`]: timestamp,
+  };
+
+  if (normKey) {
+    multiPathUpdates[`address_book/${normKey}/contactChannel`] = next;
+    multiPathUpdates[`address_book/${normKey}/name`] = customer.name.trim();
+    multiPathUpdates[`address_book/${normKey}/updatedAt`] = timestamp;
+    if (props.addressBook && props.addressBook[normKey]) {
+      props.addressBook[normKey].contactChannel = next;
+    }
+  }
+
+  // Also update active/saved addresses
+  const savedAddrs = getCustomerSavedAddresses(customer);
+  if (savedAddrs.length > 0) {
+    const updatedAddrs = savedAddrs.map((a) => ({
+      ...a,
+      contactChannel: (customer.selectedAddressId && a.id === customer.selectedAddressId) || savedAddrs.length === 1
+        ? next
+        : (a.contactChannel || next),
+    }));
+    multiPathUpdates[`delivery_customers/${customer.id}/addresses`] = updatedAddrs;
+    if (normKey) {
+      multiPathUpdates[`address_book/${normKey}/addresses`] = updatedAddrs;
+    }
+  }
+
+  try {
+    await update(dbRef(db), multiPathUpdates);
+    const nextLabel = next === "lineoa" ? "LineOA" : (next === "phone" ? "โทรศัพท์" : "Line");
+    Swal.fire({
+      icon: "success",
+      title: `บันทึกช่องทางติดต่อ "${customer.name}" เป็น "${nextLabel}" เรียบร้อย`,
+      toast: true,
+      position: "top-end",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    console.error("Error toggling contactChannel:", err);
+  }
+}
+
 function handlePrint() {
   if (printableCustomers.value.length === 0) return;
 
@@ -838,6 +959,7 @@ function handlePrint() {
       const isCod = isCodCustomer(customer);
       const paymentDisplay = getPaymentTypeDisplay(customer);
       const systemName = getSystemNameDisplay(customer);
+      const contactChannelDisplay = getContactChannelShort(customer);
 
       if (isLandscape) {
         return `
@@ -854,7 +976,7 @@ function handlePrint() {
 
                   <!-- 📌 Bottom-Left Meta on Printed Label (Plain Text) -->
                   <div class="ls-meta-bottom">
-                    <div class="meta-system-name">${systemName}</div>
+                    <div class="meta-system-name">${systemName} (${contactChannelDisplay})</div>
                     <div class="meta-payment-row">${paymentDisplay}</div>
                   </div>
                 </div>
@@ -892,7 +1014,7 @@ function handlePrint() {
 
               <!-- Portrait Bottom-Left Meta (Plain Text) -->
               <div class="port-meta-bottom">
-                <div class="meta-system-name">${systemName}</div>
+                <div class="meta-system-name">${systemName} (${contactChannelDisplay})</div>
                 <div class="meta-payment-row">${paymentDisplay}</div>
               </div>
 
@@ -1917,6 +2039,24 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+.ls-contact-tag {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #16a34a;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.ls-contact-tag:hover {
+  background: rgba(22, 163, 74, 0.15);
+  text-decoration: underline;
 }
 
 .ls-meta-text.payment-text {

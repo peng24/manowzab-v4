@@ -99,7 +99,7 @@
                 class="chat-name"
                 :style="{ backgroundColor: chat.color }"
                 @click="editNickname(chat)"
-                title="คลิกเพื่อแก้ไขชื่อเล่น"
+                title="คลิกเพื่อแก้ไขข้อมูลลูกค้า (ชื่อเล่น, ที่อยู่, ช่องทางติดต่อ)"
               >
                 {{ chat.displayName }}
               </span>
@@ -164,6 +164,9 @@
     <button v-if="showScrollButton" class="new-msg-btn" @click="scrollToBottom">
       ข้อความใหม่ ⬇
     </button>
+
+    <!-- ✏️ Modal แก้ไขข้อมูลลูกค้า (ชื่อเล่น, ที่อยู่, ช่องทางติดต่อ) -->
+    <CustomerQuickEditModal ref="quickEditModalRef" />
   </div>
 </template>
 
@@ -173,6 +176,7 @@ import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "../composables/useAudio";
+import CustomerQuickEditModal from "./CustomerQuickEditModal.vue";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
@@ -186,6 +190,7 @@ const { resetVoice, playSfx } = useAudio();
 let chatUnsubscribe = null;
 
 const chatViewport = ref(null);
+const quickEditModalRef = ref(null);
 const showScrollButton = ref(false);
 const displayLimit = ref(200); // ✅ Pagination: Start with last 200 messages
 let isUserScrolling = false;
@@ -264,87 +269,10 @@ function formatTime(timestamp) {
   });
 }
 
-// ✅ Edit Nickname Logic
-async function editNickname(chat) {
-  const targetUid = chat.uid || chat.realName || chat.authorName;
-  const realNameStr = chat.realName || chat.authorName || chat.displayName;
-  if (!targetUid) return;
-
-  const el = chatViewport.value;
-  const savedScrollTop = el ? el.scrollTop : null;
-  const wasAtBottom = el ? (el.scrollHeight - el.scrollTop - el.clientHeight < 50) : false;
-
-  const { value: newNick } = await Swal.fire({
-    title: "แก้ไขชื่อเล่น",
-    input: "text",
-    inputLabel: `ชื่อจริง: ${realNameStr}`,
-    inputValue: chat.displayName,
-    showCancelButton: true,
-    confirmButtonText: "บันทึก",
-    cancelButtonText: "ยกเลิก",
-    heightAuto: false,
-    returnFocus: false,
-  });
-
-  if (newNick && newNick.trim() !== "") {
-    const trimmedNick = newNick.trim();
-    const safeTargetUid = sanitizeDbKey(targetUid);
-    const updates = {};
-    updates[`nicknames/${safeTargetUid}`] = {
-      nick: trimmedNick,
-      realName: realNameStr,
-      updatedAt: Date.now(),
-    };
-    if (chat.uid && chat.realName && chat.uid !== chat.realName) {
-      const safeRealName = sanitizeDbKey(chat.realName);
-      if (safeRealName !== safeTargetUid) {
-        updates[`nicknames/${safeRealName}`] = {
-          nick: trimmedNick,
-          realName: realNameStr,
-          updatedAt: Date.now(),
-        };
-      }
-    }
-
-    update(dbRef(db), updates)
-      .then(() => {
-        // ✅ Instant update across all messages in local chatStore memory
-        if (chatStore.messages) {
-          chatStore.messages.forEach((m) => {
-            if (m.uid === chat.uid || m.realName === realNameStr || m.authorName === realNameStr) {
-              m.displayName = trimmedNick;
-            }
-          });
-        }
-        Swal.fire({
-          icon: "success",
-          title: "บันทึกแล้ว",
-          toast: true,
-          position: "top-end",
-          showConfirmButton: false,
-          timer: 1500,
-        });
-
-        if (el && savedScrollTop !== null) {
-          nextTick(() => {
-            if (wasAtBottom) {
-              scrollToBottom(false);
-            } else {
-              el.scrollTop = savedScrollTop;
-            }
-          });
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: "บันทึกไม่สำเร็จ",
-          heightAuto: false,
-          returnFocus: false,
-        });
-      });
+// ✅ Edit Customer Info Logic (ชื่อเล่น, ที่อยู่, ช่องทางติดต่อ)
+function editNickname(chat) {
+  if (quickEditModalRef.value) {
+    quickEditModalRef.value.open(chat);
   }
 }
 
@@ -385,23 +313,38 @@ function handleScroll() {
   }
 }
 
-// เลื่อนลงล่างสุด (Fast Instant Scroll for live chat stream)
+// ✅ Phase 3.2: Scroll throttle ด้วย requestAnimationFrame
+// ป้องกัน Layout Thrashing เมื่อแชทเข้ามารัวๆ — multiple scroll requests ใน 1 frame
+// จะถูก coalesce เป็น 1 scroll call แทนที่จะ force layout ทุกครั้ง
 let scrollAnimFrame = null;
+let scrollPending = false; // ✅ pending flag — ป้องกัน RAF stack ซ้อน
+
 function scrollToBottom(isSmooth = false) {
   const el = chatViewport.value;
   if (!el) return;
 
-  if (scrollAnimFrame) cancelAnimationFrame(scrollAnimFrame);
-
   if (isSmooth) {
+    // Smooth scroll: execute immediately (user-initiated, no coalescing needed)
+    if (scrollAnimFrame) {
+      cancelAnimationFrame(scrollAnimFrame);
+      scrollAnimFrame = null;
+    }
+    scrollPending = false;
     el.scrollTo({ top: el.scrollHeight + 1000, behavior: "smooth" });
     showScrollButton.value = false;
     showNewMsgPill.value = false;
     isUserScrolling = false;
     clearAutoScrollTimer();
   } else {
+    // Instant scroll: ถ้ามี RAF pending อยู่แล้ว ไม่ต้อง queue อีก (coalesce)
+    if (scrollPending) return;
+    scrollPending = true;
     scrollAnimFrame = requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
+      scrollPending = false;
+      scrollAnimFrame = null;
+      const container = chatViewport.value;
+      if (!container) return;
+      container.scrollTop = container.scrollHeight;
       showScrollButton.value = false;
       showNewMsgPill.value = false;
       isUserScrolling = false;
@@ -409,6 +352,7 @@ function scrollToBottom(isSmooth = false) {
     });
   }
 }
+
 
 // ✅ Load more messages (pagination)
 function loadMoreMessages() {
@@ -457,6 +401,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearAutoScrollTimer();
+  // ✅ Phase 3.2: Cancel pending RAF scroll ป้องกัน callback ทำงานหลัง unmount
+  if (scrollAnimFrame) {
+    cancelAnimationFrame(scrollAnimFrame);
+    scrollAnimFrame = null;
+  }
+  scrollPending = false;
   if (chatUnsubscribe) {
     chatUnsubscribe();
     chatUnsubscribe = null;

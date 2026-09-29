@@ -22,6 +22,9 @@
           <a :href="`${baseUrl}shipping/`" class="nav-btn">
             <i class="fa-solid fa-truck-fast"></i> รายการจัดส่ง
           </a>
+          <a :href="`${baseUrl}address/`" class="nav-btn">
+            <i class="fa-solid fa-address-book"></i> สมุดที่อยู่ลูกค้า
+          </a>
           <button class="nav-btn" @click="handleLogout" style="color: #f87171; cursor: pointer;">
             <i class="fa-solid fa-arrow-right-from-bracket"></i> ออกจากระบบ
           </button>

@@ -20,6 +20,9 @@
           <button class="sp-icon-btn" @click="refreshData" title="รีเฟรช">
             <i class="fa-solid fa-arrows-rotate" :class="{ 'fa-spin': isRefreshing }"></i>
           </button>
+          <a :href="`${baseUrl}address/`" class="sp-icon-btn" title="สมุดที่อยู่ลูกค้า">
+            <i class="fa-solid fa-address-book"></i>
+          </a>
           <a :href="baseUrl" class="sp-icon-btn" title="กลับ Command Center">
             <i class="fa-solid fa-desktop"></i>
           </a>

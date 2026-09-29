@@ -36,6 +36,100 @@
       <button class="chat-tab tab-cf" :class="{ active: selectedChatTab === 'buy' }" @click="selectedChatTab = 'buy'">🛒 เฉพาะ CF</button>
       <button class="chat-tab tab-cancel" :class="{ active: selectedChatTab === 'cancel' }" @click="selectedChatTab = 'cancel'">❌ ยกเลิก</button>
       <button class="chat-tab tab-admin" :class="{ active: selectedChatTab === 'admin' }" @click="selectedChatTab = 'admin'">⚡ ระบบ/แอดมิน</button>
+      <button
+        type="button"
+        class="chat-tab tab-author"
+        :class="{ active: selectedAuthors.length > 0 || showAuthorDropdown }"
+        @click="showAuthorDropdown = !showAuthorDropdown"
+        title="เลือกรายชื่อลูกค้าที่ต้องการดูแชท"
+      >
+        <i class="fa-solid fa-users-viewfinder"></i>
+        <span>{{ selectedAuthors.length > 0 ? `กรองชื่อ (${selectedAuthors.length})` : 'กรองตามชื่อ' }}</span>
+      </button>
+    </div>
+
+    <!-- 🎯 Active Author Filter Bar -->
+    <div v-if="selectedAuthors.length > 0" class="active-author-bar">
+      <div class="active-author-left">
+        <i class="fa-solid fa-filter text-warning"></i>
+        <span class="active-author-label">แสดงเฉพาะ ({{ filteredVisibleMessages.length }} ข้อความ):</span>
+        <div class="active-author-chips">
+          <span
+            v-for="name in selectedAuthors"
+            :key="name"
+            class="author-chip"
+          >
+            {{ name }}
+            <button type="button" class="chip-remove-btn" @click.stop="removeAuthor(name)" title="นำออก">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </span>
+        </div>
+      </div>
+      <button type="button" class="btn-clear-author-filter" @click="clearAuthorFilter" title="ล้างตัวกรอง">
+        <i class="fa-solid fa-rotate-left"></i> ล้าง
+      </button>
+    </div>
+
+    <!-- 👥 Author Dropdown Popover -->
+    <div v-if="showAuthorDropdown" class="author-dropdown-popover" @click.stop>
+      <div class="author-popover-header">
+        <div class="popover-title">
+          <i class="fa-solid fa-user-tag text-warning"></i>
+          <span>เลือกรายชื่อลูกค้าที่ต้องการกรอง</span>
+        </div>
+        <button type="button" class="popover-close-btn" @click="showAuthorDropdown = false">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="author-search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input
+          type="text"
+          v-model="authorSearchQuery"
+          class="author-search-input"
+          placeholder="ค้นหาชื่อที่แชท..."
+        />
+        <button v-if="authorSearchQuery" class="clear-search-btn" @click="authorSearchQuery = ''">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="author-popover-actions">
+        <button type="button" class="btn-popover-act" @click="selectActiveBuyers" title="เลือกทุกคนที่ CF สินค้าในรอบนี้">
+          🛒 เฉพาะคน CF รอบนี้
+        </button>
+        <button v-if="selectedAuthors.length > 0" type="button" class="btn-popover-act clear" @click="clearAuthorFilter">
+          ล้างทั้งหมด
+        </button>
+      </div>
+
+      <div class="author-list-scroll">
+        <div v-if="filteredActiveChatters.length === 0" class="author-empty">
+          ไม่พบรายชื่อในแชทสด
+        </div>
+        <div
+          v-for="chatter in filteredActiveChatters"
+          :key="chatter.norm"
+          class="author-item-row"
+          :class="{ selected: selectedAuthorsSet.has(chatter.norm) }"
+          @click="toggleAuthorByName(chatter.name)"
+        >
+          <input
+            type="checkbox"
+            :checked="selectedAuthorsSet.has(chatter.norm)"
+            @click.stop
+            @change="toggleAuthorByName(chatter.name)"
+            class="author-checkbox"
+          />
+          <div class="author-item-avatar" :style="{ backgroundColor: chatter.color || '#3b82f6' }">
+            {{ chatter.name[0] || '?' }}
+          </div>
+          <span class="author-item-name">{{ chatter.name }}</span>
+          <span class="author-item-count">{{ chatter.count }} ข้อความ</span>
+        </div>
+      </div>
     </div>
 
     <!-- ✅ Pull-to-Refresh Indicator -->
@@ -71,7 +165,7 @@
         <div
           v-for="chat in filteredVisibleMessages"
           :key="chat.id"
-          v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color]"
+          v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color, isAuthorFiltered(chat), getCustomerMetaKey(chat)]"
           :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type]"
         >
           <!-- Avatar Left -->
@@ -104,7 +198,47 @@
                 {{ chat.displayName }}
               </span>
 
-              <!-- ✅ Intent Badge Separated -->
+              <!-- 🏷️ Customer Status Micro-Badges (Address, Channel, Payment) -->
+              <span
+                v-if="getCustomerMeta(chat)?.hasAddress"
+                class="cust-mini-badge addr"
+                title="📍 มีที่อยู่จัดส่งแล้ว"
+              >
+                <i class="fa-solid fa-location-dot"></i>
+              </span>
+
+              <span
+                v-if="getCustomerMeta(chat)?.contactChannel"
+                class="cust-mini-badge channel"
+                :class="getCustomerMeta(chat).contactChannel"
+                :title="`ช่องทางติดต่อ: ${getChannelLabel(getCustomerMeta(chat).contactChannel)}`"
+              >
+                <i :class="getChannelIcon(getCustomerMeta(chat).contactChannel)"></i>
+                <span class="mini-txt">{{ getChannelShortText(getCustomerMeta(chat).contactChannel) }}</span>
+              </span>
+
+              <span
+                v-if="getCustomerMeta(chat)?.paymentType"
+                class="cust-mini-badge pay"
+                :class="getCustomerMeta(chat).paymentType"
+                :title="`การจัดส่ง/ชำระเงิน: ${getCustomerMeta(chat).paymentType === 'cod' ? 'COD (เก็บปลายทาง)' : 'โอนเงิน'}`"
+              >
+                <i :class="getCustomerMeta(chat).paymentType === 'cod' ? 'fa-solid fa-box' : 'fa-solid fa-money-bill-transfer'"></i>
+                <span class="mini-txt">{{ getCustomerMeta(chat).paymentType === 'cod' ? 'COD' : 'โอน' }}</span>
+              </span>
+
+              <!-- 🎯 Instant 1-Click Filter Button -->
+              <button
+                type="button"
+                class="btn-author-filter"
+                :class="{ 'is-active': isAuthorFiltered(chat) }"
+                @click.stop="toggleAuthorFilter(chat)"
+                :title="isAuthorFiltered(chat) ? 'ยกเลิกกรองคนนี้' : '🎯 กรองดูเฉพาะคนนี้'"
+              >
+                <i class="fa-solid fa-filter"></i>
+              </button>
+
+              <!-- ✅ Intent Badge Separated (ยกเว้น buy/เอฟ ซ่อนไว้ตามต้องการ) -->
               <span
                 v-if="getIntentBadge(chat.type)"
                 class="status-badge"
@@ -116,10 +250,6 @@
               <span v-else-if="chat.type === 'spam'" class="status-emoji-only"
                 >💬</span
               >
-
-              <span v-if="chat.realName !== chat.displayName" class="real-name">
-                ({{ chat.realName }})
-              </span>
             </div>
 
             <div class="chat-bubble">
@@ -177,11 +307,12 @@ import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "../composables/useAudio";
 import CustomerQuickEditModal from "./CustomerQuickEditModal.vue";
-import { ref as dbRef, update } from "firebase/database";
+import { ref as dbRef, update, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import { sanitizeDbKey } from "../utils/dbUtils";
 import { logger } from "../utils/logger";
+import { normalizeName } from "../utils/addressParser";
 
 const chatStore = useChatStore();
 const stockStore = useStockStore();
@@ -206,6 +337,174 @@ let canPull = false;
 const selectedChatTab = ref("all");
 const showNewMsgPill = ref(false);
 
+// 👥 Customer Author Filter & Address Sync State
+const selectedAuthors = ref([]);
+const showAuthorDropdown = ref(false);
+const authorSearchQuery = ref("");
+const addressBook = ref({});
+const deliveryCustomers = ref({});
+const cleanupFns = [];
+
+// 🚀 Performance: O(1) Author Name Lookup via Set
+const selectedAuthorsSet = computed(() => {
+  return new Set(selectedAuthors.value.map((a) => normalizeName(a)));
+});
+
+function isAuthorFiltered(chat) {
+  if (!chat || selectedAuthors.value.length === 0) return false;
+  const name1 = normalizeName(chat.displayName || chat.authorName || "");
+  const name2 = chat.realName ? normalizeName(chat.realName) : "";
+  return selectedAuthorsSet.value.has(name1) || (name2 && selectedAuthorsSet.value.has(name2));
+}
+
+function toggleAuthorFilter(chat) {
+  const targetName = chat.displayName || chat.authorName || chat.realName;
+  if (!targetName) return;
+  toggleAuthorByName(targetName);
+}
+
+function toggleAuthorByName(rawName) {
+  if (!rawName) return;
+  const norm = normalizeName(rawName);
+  const idx = selectedAuthors.value.findIndex((a) => normalizeName(a) === norm);
+  if (idx >= 0) {
+    selectedAuthors.value.splice(idx, 1);
+  } else {
+    selectedAuthors.value.push(rawName.trim());
+  }
+}
+
+function removeAuthor(authorName) {
+  const norm = normalizeName(authorName);
+  selectedAuthors.value = selectedAuthors.value.filter((a) => normalizeName(a) !== norm);
+}
+
+function clearAuthorFilter() {
+  selectedAuthors.value = [];
+  authorSearchQuery.value = "";
+}
+
+function selectActiveBuyers() {
+  const buyers = new Set();
+  if (stockStore.stockData) {
+    Object.values(stockStore.stockData).forEach((item) => {
+      if (item && item.owner && typeof item.owner === "string") {
+        buyers.add(item.owner.trim());
+      }
+    });
+  }
+  if (buyers.size === 0) {
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "info",
+      title: "ยังไม่มีลูกค้า CF ในรอบนี้",
+      showConfirmButton: false,
+      timer: 2000,
+    });
+    return;
+  }
+  selectedAuthors.value = Array.from(buyers);
+  showAuthorDropdown.value = false;
+  Swal.fire({
+    toast: true,
+    position: "top-end",
+    icon: "success",
+    title: `🎯 กรองเฉพาะลูกค้า CF ${buyers.size} รายแล้ว`,
+    showConfirmButton: false,
+    timer: 2000,
+  });
+}
+
+// 🏷️ Customer Metadata (Address, Channel, Payment) Fast O(1) Lookup
+function getCustomerMeta(chat) {
+  if (!chat) return null;
+  const rawName = chat.displayName || chat.authorName || "";
+  const normName = normalizeName(rawName).replace(/[.#$[\]/]/g, "_");
+  const normReal = chat.realName ? normalizeName(chat.realName).replace(/[.#$[\]/]/g, "_") : "";
+
+  // 1. Check address_book
+  const book = (normName && addressBook.value[normName]) || (normReal && addressBook.value[normReal]);
+
+  // 2. Check delivery_customers fallback
+  const deliv =
+    (chat.uid && deliveryCustomers.value[chat.uid]) ||
+    (normName && deliveryCustomers.value[normName]) ||
+    (normReal && deliveryCustomers.value[normReal]);
+
+  const hasAddress = Boolean(
+    (book?.address && book.address.trim()) ||
+    (deliv?.address && deliv.address.trim()) ||
+    (Array.isArray(book?.addresses) && book.addresses.some((a) => a && a.address && a.address.trim()))
+  );
+  const contactChannel = book?.contactChannel || deliv?.contactChannel || "";
+  const paymentType = book?.paymentType || deliv?.paymentType || "";
+
+  if (!hasAddress && !contactChannel && !paymentType) return null;
+
+  return {
+    hasAddress,
+    contactChannel,
+    paymentType,
+  };
+}
+
+function getCustomerMetaKey(chat) {
+  const meta = getCustomerMeta(chat);
+  if (!meta) return "";
+  return `${meta.hasAddress ? 1 : 0}_${meta.contactChannel}_${meta.paymentType}`;
+}
+
+function getChannelLabel(channel) {
+  if (channel === "line") return "Line";
+  if (channel === "lineoa") return "OA";
+  if (channel === "phone") return "โทรศัพท์";
+  return channel;
+}
+
+function getChannelShortText(channel) {
+  if (channel === "line") return "Line";
+  if (channel === "lineoa") return "OA";
+  if (channel === "phone") return "โทร";
+  return channel;
+}
+
+function getChannelIcon(channel) {
+  if (channel === "line") return "fa-brands fa-line";
+  if (channel === "lineoa") return "fa-solid fa-comment-dots";
+  if (channel === "phone") return "fa-solid fa-phone";
+  return "fa-solid fa-comments";
+}
+
+// 👥 Unique Active Chatters for Popover
+const activeChatters = computed(() => {
+  const map = new Map();
+  const msgs = chatStore.messages;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    const name = m.displayName || m.authorName || m.realName;
+    if (!name) continue;
+    const norm = normalizeName(name);
+    if (!map.has(norm)) {
+      map.set(norm, {
+        name,
+        norm,
+        count: 1,
+        color: m.color,
+      });
+    } else {
+      map.get(norm).count++;
+    }
+  }
+  return Array.from(map.values());
+});
+
+const filteredActiveChatters = computed(() => {
+  const q = authorSearchQuery.value.trim().toLowerCase();
+  if (!q) return activeChatters.value;
+  return activeChatters.value.filter((c) => c.name.toLowerCase().includes(q));
+});
+
 // 🚀 Performance: Single-pass Filter & Pagination to avoid intermediate array allocations
 const visibleMessages = computed(() => {
   const total = chatStore.messages.length;
@@ -218,8 +517,10 @@ const filteredVisibleMessages = computed(() => {
   const total = allMsgs.length;
   const tab = selectedChatTab.value;
   const limit = displayLimit.value;
+  const authorSet = selectedAuthorsSet.value;
+  const hasAuthorFilter = authorSet.size > 0;
 
-  if (tab === "all") {
+  if (tab === "all" && !hasAuthorFilter) {
     const start = Math.max(0, total - limit);
     return allMsgs.slice(start);
   }
@@ -228,7 +529,19 @@ const filteredVisibleMessages = computed(() => {
   const result = [];
   for (let i = total - 1; i >= 0 && result.length < limit; i--) {
     const m = allMsgs[i];
+
+    // 1. Author Filter Check (O(1))
+    if (hasAuthorFilter) {
+      const n1 = normalizeName(m.displayName || m.authorName || "");
+      const n2 = m.realName ? normalizeName(m.realName) : "";
+      if (!authorSet.has(n1) && (!n2 || !authorSet.has(n2))) {
+        continue;
+      }
+    }
+
+    // 2. Tab Filter Check
     if (
+      tab === "all" ||
       (tab === "buy" && m.type === "buy") ||
       (tab === "cancel" && m.type === "cancel") ||
       (tab === "admin" && (m.isAdmin || m.type === "shipping" || m.type === "question"))
@@ -248,11 +561,9 @@ const hasMoreMessages = computed(() => {
 function getIntentBadge(type) {
   switch (type) {
     case "buy":
-      return { icon: "🛍️", label: "เอฟ", class: "badge-buy" };
     case "cancel":
-      return { icon: "🥺", label: "ยกเลิก", class: "badge-cancel" };
     case "shipping":
-      return { icon: "📦", label: "ส่ง", class: "badge-shipping" };
+      return null; // ✅ ซ่อนแบดจ์ "เอฟ", "ยกเลิก", และ "ส่ง" ตามที่ผู้ใช้ต้องการ
     case "question":
       return { icon: "💬", label: "ถาม", class: "badge-question" };
     default:
@@ -276,41 +587,15 @@ function editNickname(chat) {
   }
 }
 
-// ✅ Auto-scroll timer: กลับมาข้อความล่าสุดถ้าเลื่อนขึ้นดูเกิน 15 วินาที
-let autoScrollTimer = null;
-const AUTO_SCROLL_DELAY = 15000; // 15 seconds
-
-function startAutoScrollTimer() {
-  clearAutoScrollTimer();
-  autoScrollTimer = setTimeout(() => {
-    scrollToBottom();
-  }, AUTO_SCROLL_DELAY);
-}
-
-function clearAutoScrollTimer() {
-  if (autoScrollTimer) {
-    clearTimeout(autoScrollTimer);
-    autoScrollTimer = null;
-  }
-}
-
 // ตรวจจับการ Scroll
 function handleScroll() {
   const el = chatViewport.value;
   if (!el) return;
 
-  // ถ้า Scroll ขึ้นไปเกิน 100px จากด้านล่าง ถือว่า user กำลังดูประวัติ
+  // ถ้า Scroll ขึ้นไปเกิน 30px จากด้านล่าง ถือว่า user กำลังดูประวัติ (หยุด auto-scroll ทันที)
   const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-  const wasScrolling = isUserScrolling;
-  isUserScrolling = distanceToBottom > 100;
+  isUserScrolling = distanceToBottom > 30;
   showScrollButton.value = isUserScrolling;
-
-  // ✅ เริ่มจับเวลาเมื่อเลื่อนออกจากล่าง, หยุดเมื่อกลับมา
-  if (isUserScrolling && !wasScrolling) {
-    startAutoScrollTimer();
-  } else if (!isUserScrolling) {
-    clearAutoScrollTimer();
-  }
 }
 
 // ✅ Phase 3.2: Scroll throttle ด้วย requestAnimationFrame
@@ -334,7 +619,6 @@ function scrollToBottom(isSmooth = false) {
     showScrollButton.value = false;
     showNewMsgPill.value = false;
     isUserScrolling = false;
-    clearAutoScrollTimer();
   } else {
     // Instant scroll: ถ้ามี RAF pending อยู่แล้ว ไม่ต้อง queue อีก (coalesce)
     if (scrollPending) return;
@@ -348,7 +632,6 @@ function scrollToBottom(isSmooth = false) {
       showScrollButton.value = false;
       showNewMsgPill.value = false;
       isUserScrolling = false;
-      clearAutoScrollTimer();
     });
   }
 }
@@ -397,10 +680,27 @@ onMounted(() => {
     chatUnsubscribe = chatStore.syncFromFirebase(systemStore.currentVideoId);
     logger.info("✅ Chat sync initialized for:", systemStore.currentVideoId);
   }
+
+  // ✅ Real-time Address Book Sync for Customer Badges
+  const unsubBook = onValue(dbRef(db, "address_book"), (snap) => {
+    addressBook.value = snap.val() || {};
+  });
+  cleanupFns.push(unsubBook);
+
+  // ✅ Real-time Delivery Customers Sync
+  const unsubDeliv = onValue(dbRef(db, "delivery_customers"), (snap) => {
+    deliveryCustomers.value = snap.val() || {};
+  });
+  cleanupFns.push(unsubDeliv);
 });
 
 onUnmounted(() => {
-  clearAutoScrollTimer();
+  // ✅ Clean up real-time Firebase listeners
+  cleanupFns.forEach((fn) => {
+    if (typeof fn === "function") fn();
+  });
+  cleanupFns.length = 0;
+
   // ✅ Phase 3.2: Cancel pending RAF scroll ป้องกัน callback ทำงานหลัง unmount
   if (scrollAnimFrame) {
     cancelAnimationFrame(scrollAnimFrame);
@@ -1154,5 +1454,380 @@ async function refreshChat() {
 }
 #chat-viewport::-webkit-scrollbar-thumb:hover {
   background: #475569;
+}
+
+/* ========================================================
+   🏷️ Customer Micro-Badges & Author Filter Styles
+   ======================================================== */
+
+/* 🏷️ Customer Micro-Badges in chat-meta */
+.cust-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  line-height: 1.4;
+  vertical-align: middle;
+  letter-spacing: 0.2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.cust-mini-badge .mini-txt {
+  font-size: 0.95em;
+}
+
+/* 📍 Has Address Badge */
+.cust-mini-badge.addr {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+}
+
+/* 💬 Contact Channel Badges */
+.cust-mini-badge.channel.line {
+  background: rgba(6, 199, 85, 0.2);
+  color: #22c55e;
+  border: 1px solid rgba(6, 199, 85, 0.45);
+}
+
+.cust-mini-badge.channel.lineoa {
+  background: rgba(6, 199, 85, 0.25);
+  color: #4ade80;
+  border: 1px solid rgba(6, 199, 85, 0.55);
+}
+
+.cust-mini-badge.channel.phone {
+  background: rgba(2, 132, 199, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(2, 132, 199, 0.45);
+}
+
+/* 💳 Payment / Delivery Type Badges */
+.cust-mini-badge.pay.transfer {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+}
+
+.cust-mini-badge.pay.cod {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+/* 🎯 Instant 1-Click Filter Button on Chat Row */
+.btn-author-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #64748b;
+  font-size: 0.78em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.btn-author-filter:hover {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  transform: scale(1.08);
+}
+
+.btn-author-filter.is-active {
+  color: #0f172a;
+  background: #f59e0b;
+  border-color: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+/* 🎯 Active Author Filter Bar */
+.active-author-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+  gap: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.active-author-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.active-author-label {
+  font-size: 0.82em;
+  font-weight: 600;
+  color: #fbbf24;
+  white-space: nowrap;
+}
+
+.active-author-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.author-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  background: #f59e0b;
+  color: #0f172a;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.chip-remove-btn {
+  background: transparent;
+  border: none;
+  color: #0f172a;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.85em;
+  display: flex;
+  align-items: center;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.chip-remove-btn:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.btn-clear-author-filter {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.78em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-clear-author-filter:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* 👥 Author Filter Popover Dropdown */
+.author-dropdown-popover {
+  position: absolute;
+  top: 92px;
+  left: 10px;
+  right: 10px;
+  max-width: 360px;
+  z-index: 100;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.author-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.popover-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86em;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.popover-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 0.9em;
+}
+
+.popover-close-btn:hover {
+  color: #fff;
+}
+
+.author-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.author-search-box .search-icon {
+  position: absolute;
+  left: 10px;
+  color: #64748b;
+  font-size: 0.82em;
+}
+
+.author-search-input {
+  width: 100%;
+  padding: 6px 28px 6px 30px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #f8fafc;
+  font-size: 0.84em;
+  font-family: inherit;
+}
+
+.author-search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.author-popover-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-popover-act {
+  flex: 1;
+  padding: 5px 8px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+  border-radius: 6px;
+  font-size: 0.78em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-popover-act:hover {
+  background: rgba(59, 130, 246, 0.3);
+  color: #fff;
+}
+
+.btn-popover-act.clear {
+  flex: 0 0 auto;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.btn-popover-act.clear:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+}
+
+.author-list-scroll {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.author-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.author-item-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.author-item-row.selected {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.author-checkbox {
+  cursor: pointer;
+  accent-color: #f59e0b;
+}
+
+.author-item-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72em;
+  font-weight: 700;
+  color: #000;
+  flex-shrink: 0;
+}
+
+.author-item-name {
+  flex: 1;
+  font-size: 0.84em;
+  font-weight: 500;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.author-item-count {
+  font-size: 0.74em;
+  color: #94a3b8;
+}
+
+.author-empty {
+  text-align: center;
+  padding: 16px;
+  color: #64748b;
+  font-size: 0.82em;
+}
+
+/* Tab Active Color for Author Filter */
+.chat-tab.tab-author.active {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fbbf24;
 }
 </style>

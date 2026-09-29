@@ -172,7 +172,7 @@
               <select v-model="formData.contactChannel" class="cam-input">
                 <option value="">- (ยังไม่ระบุ)</option>
                 <option value="line">💬 Line</option>
-                <option value="lineoa">💚 LineOA</option>
+                <option value="lineoa">💚 OA</option>
                 <option value="phone">📞 โทรศัพท์</option>
               </select>
             </div>
@@ -235,7 +235,7 @@ const formData = ref({
 });
 
 function getContactLabel(channel) {
-  if (channel === "lineoa") return "💚 LineOA";
+  if (channel === "lineoa") return "💚 OA";
   if (channel === "phone") return "📞 โทรศัพท์";
   if (channel === "line") return "💬 Line";
   return "-";

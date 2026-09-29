@@ -179,6 +179,52 @@ export function useAudio() {
           // ✅ Track osc+gain pair for complete cleanup
           activeAudioNodes.push({ osc, gain });
 
+        } else if (type === "bell") {
+          // 🔔 Crisp Silver Bell / Service Chime (เสียงกระดิ่งใสๆ กริ๊งๆ สำหรับลูกค้าใหม่)
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = "sine";
+          osc1.frequency.setValueAtTime(1760, now); // A6 (ting 1)
+          gain1.gain.setValueAtTime(0.045, now);
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc1.connect(gain1);
+          gain1.connect(ctx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.35);
+
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = "sine";
+          osc2.frequency.setValueAtTime(2349, now + 0.08); // D7 (ting 2)
+          gain2.gain.setValueAtTime(0.001, now);
+          gain2.gain.setValueAtTime(0.05, now + 0.08);
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start(now + 0.08);
+          osc2.stop(now + 0.45);
+
+          const osc3 = ctx.createOscillator();
+          const gain3 = ctx.createGain();
+          osc3.type = "sine";
+          osc3.frequency.setValueAtTime(2793, now + 0.08); // F7 metallic shimmer
+          gain3.gain.setValueAtTime(0.001, now);
+          gain3.gain.setValueAtTime(0.025, now + 0.08);
+          gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc3.connect(gain3);
+          gain3.connect(ctx.destination);
+          osc3.start(now + 0.08);
+          osc3.stop(now + 0.4);
+
+          activeAudioNodes.push(
+            { osc: osc1, gain: gain1 },
+            { osc: osc2, gain: gain2 },
+            { osc: osc3, gain: gain3 }
+          );
+
+          // รอกระดิ่งดังกังวานใสๆ ให้จบก่อน (ประมาณ 450ms) แล้วจึง resolve เพื่อให้อ่านชื่อและข้อความถัดไป
+          await new Promise((r) => setTimeout(r, 450));
+
         } else if (type === "sleep") {
           await playSleepSound();
         }

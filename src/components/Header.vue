@@ -181,6 +181,10 @@
                 <i class="fa-solid fa-truck-fast"></i>
                 <span>รายการจัดส่ง (มือถือ)</span>
               </a>
+              <a :href="`${baseUrl}address/`" target="_blank" class="menu-address-page">
+                <i class="fa-solid fa-address-book" style="color: #fbbf24;"></i>
+                <span>สมุดที่อยู่ลูกค้า (แยกหน้า)</span>
+              </a>
               <a :href="`${baseUrl}history/`" target="_blank" class="menu-history-page">
                 <i class="fa-solid fa-clock-rotate-left"></i>
                 <span>ประวัติการขาย (แยกหน้า)</span>

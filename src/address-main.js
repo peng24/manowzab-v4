@@ -1,0 +1,42 @@
+import { createApp } from "vue";
+import { createPinia } from "pinia";
+import AddressPage from "./pages/AddressPage.vue";
+import { globalErrorHandler } from "./utils/errorHandler";
+import { logger } from "./utils/logger";
+import Swal from "sweetalert2";
+
+// ✅ Global SweetAlert2 Config (Adheres to SweetAlert2 Config Invariant)
+const originalSwalFire = Swal.fire;
+Swal.fire = function (...args) {
+  let opts = args[0];
+  if (typeof opts === "string") {
+    opts = { title: args[0], html: args[1], icon: args[2] };
+    args = [opts];
+  }
+  const isToast = Boolean(opts && (opts.toast || (this && this.defaultParams && this.defaultParams.toast)));
+  if (opts && typeof opts === "object") {
+    if (!isToast) {
+      if (opts.heightAuto === undefined) opts.heightAuto = false;
+      if (opts.returnFocus === undefined) opts.returnFocus = false;
+      if (opts.showCloseButton === undefined) opts.showCloseButton = true;
+      if (opts.allowOutsideClick === undefined) opts.allowOutsideClick = true;
+    } else {
+      // Incompatible with toasts in SweetAlert2
+      delete opts.heightAuto;
+      delete opts.returnFocus;
+    }
+  }
+  return originalSwalFire.apply(this, args);
+};
+
+const app = createApp(AddressPage);
+app.use(createPinia());
+
+// ✅ Register Global Error Handler
+app.config.errorHandler = globalErrorHandler;
+
+window.addEventListener("unhandledrejection", (event) => {
+  logger.warn("Unhandled Promise Rejection (Address):", event.reason);
+});
+
+app.mount("#address-app");

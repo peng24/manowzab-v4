@@ -68,8 +68,6 @@ const Toast = Swal.mixin({
 
 // ✅ Concurrency Lock for Chat Processing
 const processingLocks = new Set();
-const warnedNewCustomers = new Set(); // Track new customers who have been read instructions
-const MAX_WARNED_CUSTOMERS = 1000; // ✅ Phase 1.4: Cap set size to prevent unbounded growth
 let _lastVideoId = null; // ✅ Track current session for auto-clear
 
 export function useChatProcessor() {
@@ -100,7 +98,6 @@ export function useChatProcessor() {
     // ✅ Auto-clear session state when video changes
     if (systemStore.currentVideoId !== _lastVideoId) {
       _lastVideoId = systemStore.currentVideoId;
-      warnedNewCustomers.clear();
       processingLocks.clear();
       logger.log(`🔄 Session state cleared for new video: ${_lastVideoId}`);
     }
@@ -221,22 +218,9 @@ export function useChatProcessor() {
       /admin|แอดมิน/i.test(displayName) ||
       /admin|แอดมิน/i.test(realName);
 
-    // ✅ Prepare TTS Message (Append instructions for new customers once, exclude pure greetings/stickers)
+    // ✅ Prepare TTS Message (เอาข้อความแนะนำยาวๆ ออก ไม่อ่านออกเสียงแล้ว)
     let ttsMessage = msg;
-    const isGreetingOrSticker = /^(?:ทักทาย|ส่งสติกเกอร์|สวัสดี|ดีครับ|ดีค่ะ|hello|hi)$/i.test(msg.trim());
-    if (isNewCustomer && !isAdmin && !warnedNewCustomers.has(uid) && !isGreetingOrSticker) {
-      // ✅ Phase 1.4: FIFO eviction เพื่อจำกัดขนาด Set ไม่เกิน MAX_WARNED_CUSTOMERS
-      if (warnedNewCustomers.size >= MAX_WARNED_CUSTOMERS) {
-        const iter = warnedNewCustomers.values();
-        for (let i = 0; i < 200; i++) {
-          const oldest = iter.next().value;
-          if (oldest === undefined) break;
-          warnedNewCustomers.delete(oldest);
-        }
-      }
-      warnedNewCustomers.add(uid);
-      ttsMessage = `${msg} ... ลูกค้าใหม่ พิมพ์ชื่อ ตามด้วยรหัสเพื่อจอง ... ค่าส่ง โอน 40 ... ปลายทาง 50 ค่ะ`;
-    }
+    const isNewCustomerChat = isNewCustomer && !isAdmin;
 
     // Determine intent
     let intent = null;
@@ -364,7 +348,7 @@ export function useChatProcessor() {
           color: stringToColor(uid),
           isAdmin,
           type: "buy",
-          sfxType: "success",
+          sfxType: isNewCustomerChat ? "bell" : "success",
           ttsText: isVoiceChat
             ? ""
             : `${ttsMessage} ... ทั้งหมด ${itemIds.length} รายการ`,
@@ -752,6 +736,8 @@ export function useChatProcessor() {
           : phoneticName;
 
       const pushBuyMessage = (finalSfxType) => {
+        const resolvedSfx =
+          finalSfxType === "success" && isNewCustomerChat ? "bell" : finalSfxType;
         return chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
           id: item.id,
           text: msg,
@@ -765,7 +751,7 @@ export function useChatProcessor() {
           color: stringToColor(uid),
           isAdmin,
           type: intent,
-          sfxType: finalSfxType,
+          sfxType: resolvedSfx,
           ttsText: isVoiceChat ? "" : ttsMessage,
           detectionMethod: method,
           timestamp: new Date(item.snippet.publishedAt).getTime(),
@@ -877,7 +863,7 @@ export function useChatProcessor() {
         }
       }
 
-      const sfxType = cancelSuccess ? "cancel" : null;
+      const sfxType = cancelSuccess ? "cancel" : (isNewCustomerChat ? "bell" : null);
       await chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
         id: item.id,
         text: msg,
@@ -935,7 +921,7 @@ export function useChatProcessor() {
         color: stringToColor(uid),
         isAdmin,
         type: intent,
-        sfxType: null,
+        sfxType: isNewCustomerChat ? "bell" : null,
         ttsText: isVoiceChat ? "" : ttsMessage,
         detectionMethod: method,
         timestamp: new Date(item.snippet.publishedAt).getTime(),

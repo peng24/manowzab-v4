@@ -170,6 +170,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         shipping: resolve(__dirname, 'shipping/index.html'),
         history: resolve(__dirname, 'history/index.html'),
+        address: resolve(__dirname, 'address/index.html'),
       },
       output: {
         manualChunks(id) {

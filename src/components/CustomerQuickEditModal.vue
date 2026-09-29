@@ -73,7 +73,7 @@
                   :class="{ active: formData.contactChannel === 'lineoa' }"
                   @click="formData.contactChannel = 'lineoa'"
                 >
-                  💚 LineOA
+                  💚 OA
                 </button>
                 <button
                   type="button"
@@ -86,7 +86,41 @@
               </div>
             </div>
 
-            <!-- 3. ที่อยู่จัดส่ง -->
+            <!-- 3. รูปแบบการจัดส่งและการชำระเงิน -->
+            <div class="cqe-form-group">
+              <label class="cqe-label">
+                <i class="fa-solid fa-truck-fast text-info"></i>
+                <span>รูปแบบการจัดส่งและการชำระเงิน:</span>
+              </label>
+              <div class="cqe-channel-options">
+                <button
+                  type="button"
+                  class="cqe-channel-btn none"
+                  :class="{ active: !formData.paymentType }"
+                  @click="formData.paymentType = ''"
+                >
+                  ❓ ยังไม่ระบุ
+                </button>
+                <button
+                  type="button"
+                  class="cqe-channel-btn transfer"
+                  :class="{ active: formData.paymentType === 'transfer' }"
+                  @click="formData.paymentType = 'transfer'"
+                >
+                  💳 โอนเงิน
+                </button>
+                <button
+                  type="button"
+                  class="cqe-channel-btn cod"
+                  :class="{ active: formData.paymentType === 'cod' }"
+                  @click="formData.paymentType = 'cod'"
+                >
+                  💵 COD (ปลายทาง)
+                </button>
+              </div>
+            </div>
+
+            <!-- 4. ที่อยู่จัดส่ง -->
             <div class="cqe-form-group">
               <div class="cqe-label-row">
                 <label class="cqe-label">
@@ -104,7 +138,7 @@
               ></textarea>
             </div>
 
-            <!-- 4. ข้อมูลเสริม: ชื่อผู้รับจริง & เบอร์โทรศัพท์ -->
+            <!-- 5. ข้อมูลเสริม: ชื่อผู้รับจริง & เบอร์โทรศัพท์ -->
             <div class="cqe-row-2col">
               <div class="cqe-form-group">
                 <label class="cqe-label-sub">ชื่อผู้รับบนกล่อง (ถ้ามี):</label>
@@ -169,6 +203,7 @@ const nicknameInputRef = ref(null);
 const formData = ref({
   nickname: "",
   contactChannel: "",
+  paymentType: "",
   address: "",
   recipientName: "",
   phone: "",
@@ -212,6 +247,15 @@ function handleAddressInput() {
       formData.value.recipientName = parsed.name;
       hits.push("ชื่อผู้รับ");
     }
+    if (!formData.value.paymentType) {
+      if (/\bcod\b|เก็บเงินปลายทาง|เก็บปลายทาง/i.test(raw)) {
+        formData.value.paymentType = "cod";
+        hits.push("COD");
+      } else if (/โอนเงิน|โอนแล้ว|ชำระแล้ว/i.test(raw)) {
+        formData.value.paymentType = "transfer";
+        hits.push("โอน");
+      }
+    }
     if (hits.length > 0) {
       parseNotice.value = `✨ ตรวจพบ: ${hits.join(", ")}`;
     } else {
@@ -244,6 +288,7 @@ async function open(chat) {
   formData.value = {
     nickname: currentDisplayName,
     contactChannel: "",
+    paymentType: "",
     address: "",
     recipientName: "",
     phone: "",
@@ -267,12 +312,18 @@ async function open(chat) {
 
     if (bookData) {
       if (bookData.contactChannel) formData.value.contactChannel = bookData.contactChannel;
+      if (bookData.paymentType) formData.value.paymentType = bookData.paymentType;
       if (bookData.address) formData.value.address = bookData.address;
       if (bookData.phone) formData.value.phone = bookData.phone;
       if (bookData.recipientName) formData.value.recipientName = bookData.recipientName;
       if (bookData.postalCode) formData.value.postalCode = bookData.postalCode;
       if (Array.isArray(bookData.addresses)) existingAddressList.value = bookData.addresses;
       if (bookData.selectedAddressId) existingActiveAddrId.value = bookData.selectedAddressId;
+
+      if (!formData.value.paymentType && existingAddressList.value.length > 0) {
+        const activeAddr = existingAddressList.value.find((a) => a.id === existingActiveAddrId.value) || existingAddressList.value[0];
+        if (activeAddr?.paymentType) formData.value.paymentType = activeAddr.paymentType;
+      }
     }
 
     // 2. Search in delivery_customers
@@ -294,6 +345,9 @@ async function open(chat) {
         const custData = matched[1];
         if (!formData.value.contactChannel && custData.contactChannel) {
           formData.value.contactChannel = custData.contactChannel;
+        }
+        if (!formData.value.paymentType && custData.paymentType) {
+          formData.value.paymentType = custData.paymentType;
         }
         if (!formData.value.address && custData.address) {
           formData.value.address = custData.address;
@@ -387,13 +441,15 @@ async function save() {
     }
   }
 
-  // 2. Prepare Address & Contact Channel
+  // 2. Prepare Address, Contact Channel & Payment Type
   const primaryName = trimmedNick || currentChat.value.displayName || rawReal;
   const normKey = normalizeName(primaryName).replace(/[.#$[\]/]/g, "_");
   const cleanAddress = formData.value.address.trim();
   let phoneVal = formData.value.phone.trim();
   let recipientVal = formData.value.recipientName.trim();
   let zipVal = formData.value.postalCode.trim();
+  const contactChannelVal = formData.value.contactChannel || "";
+  const paymentTypeVal = formData.value.paymentType || "";
 
   if (cleanAddress) {
     if (!zipVal) {
@@ -409,7 +465,8 @@ async function save() {
   // 3. Save to address_book
   if (normKey) {
     multiPathUpdates[`address_book/${normKey}/name`] = primaryName;
-    multiPathUpdates[`address_book/${normKey}/contactChannel`] = formData.value.contactChannel || "";
+    multiPathUpdates[`address_book/${normKey}/contactChannel`] = contactChannelVal;
+    multiPathUpdates[`address_book/${normKey}/paymentType`] = paymentTypeVal;
     if (cleanAddress) {
       multiPathUpdates[`address_book/${normKey}/address`] = cleanAddress;
       multiPathUpdates[`address_book/${normKey}/recipientName`] = recipientVal || primaryName;
@@ -426,7 +483,8 @@ async function save() {
         phone: phoneVal || "",
         address: cleanAddress,
         postalCode: zipVal || "",
-        contactChannel: formData.value.contactChannel || "",
+        contactChannel: contactChannelVal,
+        paymentType: paymentTypeVal,
       };
       if (addrs.length > 0) {
         const foundIdx = addrs.findIndex((a) => a.id === activeId);
@@ -446,7 +504,8 @@ async function save() {
     if (trimmedNick) {
       multiPathUpdates[`delivery_customers/${matchedCustId.value}/name`] = trimmedNick;
     }
-    multiPathUpdates[`delivery_customers/${matchedCustId.value}/contactChannel`] = formData.value.contactChannel || "";
+    multiPathUpdates[`delivery_customers/${matchedCustId.value}/contactChannel`] = contactChannelVal;
+    multiPathUpdates[`delivery_customers/${matchedCustId.value}/paymentType`] = paymentTypeVal;
     if (cleanAddress) {
       multiPathUpdates[`delivery_customers/${matchedCustId.value}/address`] = cleanAddress;
       multiPathUpdates[`delivery_customers/${matchedCustId.value}/recipientName`] = recipientVal || primaryName;
@@ -462,7 +521,8 @@ async function save() {
         phone: phoneVal || "",
         address: cleanAddress,
         postalCode: zipVal || "",
-        contactChannel: formData.value.contactChannel || "",
+        contactChannel: contactChannelVal,
+        paymentType: paymentTypeVal,
       };
       if (addrs.length > 0) {
         const foundIdx = addrs.findIndex((a) => a.id === activeId);
@@ -883,6 +943,18 @@ defineExpose({
   background: rgba(59, 130, 246, 0.18);
   color: #60a5fa;
   border: 1px solid #3b82f6;
+}
+
+.cqe-channel-btn.active.transfer {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+  border: 1px solid #6366f1;
+}
+
+.cqe-channel-btn.active.cod {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid #f59e0b;
 }
 
 /* Footer */

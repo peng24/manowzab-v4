@@ -10,6 +10,7 @@ function buildQuickEditUpdates({
   chat,
   nickname,
   contactChannel,
+  paymentType = "",
   address,
   recipientName,
   phone,
@@ -48,13 +49,15 @@ function buildQuickEditUpdates({
     }
   }
 
-  // 2. Address & Contact Channel
+  // 2. Address, Contact Channel & Payment Type
   const primaryName = trimmedNick || chat.displayName || rawReal;
   const normKey = normalizeName(primaryName).replace(/[.#$[\]/]/g, "_");
   const cleanAddress = (address || "").trim();
   let phoneVal = (phone || "").trim();
   let recipientVal = (recipientName || "").trim();
   let zipVal = (postalCode || "").trim();
+  const contactChannelVal = contactChannel || "";
+  const paymentTypeVal = paymentType || "";
 
   if (cleanAddress) {
     if (!zipVal) {
@@ -69,7 +72,8 @@ function buildQuickEditUpdates({
 
   if (normKey) {
     updates[`address_book/${normKey}/name`] = primaryName;
-    updates[`address_book/${normKey}/contactChannel`] = contactChannel || "";
+    updates[`address_book/${normKey}/contactChannel`] = contactChannelVal;
+    updates[`address_book/${normKey}/paymentType`] = paymentTypeVal;
     if (cleanAddress) {
       updates[`address_book/${normKey}/address`] = cleanAddress;
       updates[`address_book/${normKey}/recipientName`] = recipientVal || primaryName;
@@ -85,7 +89,8 @@ function buildQuickEditUpdates({
         phone: phoneVal || "",
         address: cleanAddress,
         postalCode: zipVal || "",
-        contactChannel: contactChannel || "",
+        contactChannel: contactChannelVal,
+        paymentType: paymentTypeVal,
       };
       if (addrs.length > 0) {
         const foundIdx = addrs.findIndex((a) => a.id === activeId);
@@ -104,7 +109,8 @@ function buildQuickEditUpdates({
     if (trimmedNick) {
       updates[`delivery_customers/${matchedCustId}/name`] = trimmedNick;
     }
-    updates[`delivery_customers/${matchedCustId}/contactChannel`] = contactChannel || "";
+    updates[`delivery_customers/${matchedCustId}/contactChannel`] = contactChannelVal;
+    updates[`delivery_customers/${matchedCustId}/paymentType`] = paymentTypeVal;
     if (cleanAddress) {
       updates[`delivery_customers/${matchedCustId}/address`] = cleanAddress;
       updates[`delivery_customers/${matchedCustId}/recipientName`] = recipientVal || primaryName;
@@ -177,6 +183,7 @@ describe("CustomerQuickEditModal Logic", () => {
       chat,
       nickname: "คุณเมธินี",
       contactChannel: "lineoa",
+      paymentType: "cod",
       address: "36 ถ.พังงา ต.ตลาดใหญ่ อ.เมือง จ.ภูเก็ต 83000",
       recipientName: "คุณเมธินี",
       phone: "081-234-5678",
@@ -201,6 +208,7 @@ describe("CustomerQuickEditModal Logic", () => {
     const norm = normalizeName("คุณเมธินี");
     expect(updates[`address_book/${norm}/name`]).toBe("คุณเมธินี");
     expect(updates[`address_book/${norm}/contactChannel`]).toBe("lineoa");
+    expect(updates[`address_book/${norm}/paymentType`]).toBe("cod");
     expect(updates[`address_book/${norm}/address`]).toBe("36 ถ.พังงา ต.ตลาดใหญ่ อ.เมือง จ.ภูเก็ต 83000");
     expect(updates[`address_book/${norm}/phone`]).toBe("081-234-5678");
     expect(updates[`address_book/${norm}/postalCode`]).toBe("83000");
@@ -208,10 +216,11 @@ describe("CustomerQuickEditModal Logic", () => {
     // Delivery customers updates
     expect(updates["delivery_customers/cust_999/name"]).toBe("คุณเมธินี");
     expect(updates["delivery_customers/cust_999/contactChannel"]).toBe("lineoa");
+    expect(updates["delivery_customers/cust_999/paymentType"]).toBe("cod");
     expect(updates["delivery_customers/cust_999/address"]).toBe("36 ถ.พังงา ต.ตลาดใหญ่ อ.เมือง จ.ภูเก็ต 83000");
   });
 
-  it("handles empty contact channel defaulting to '' and auto-extracts zip/phone from address", () => {
+  it("handles empty contact channel and paymentType defaulting to '' and auto-extracts zip/phone from address", () => {
     const chat = {
       uid: "UC_99999",
       displayName: "วนัสนันท์",
@@ -222,6 +231,7 @@ describe("CustomerQuickEditModal Logic", () => {
       chat,
       nickname: "วนัสนันท์",
       contactChannel: "",
+      paymentType: "",
       address: "123 หมู่ 4 ต.บางเขน อ.เมือง จ.นนทบุรี 11000 โทร 0891234567",
       recipientName: "",
       phone: "",
@@ -231,6 +241,7 @@ describe("CustomerQuickEditModal Logic", () => {
 
     const norm = normalizeName("วนัสนันท์");
     expect(updates[`address_book/${norm}/contactChannel`]).toBe("");
+    expect(updates[`address_book/${norm}/paymentType`]).toBe("");
     expect(updates[`address_book/${norm}/postalCode`]).toBe("11000");
     expect(updates[`address_book/${norm}/phone`]).toBe("0891234567");
   });

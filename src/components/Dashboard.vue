@@ -231,7 +231,7 @@ import { useChatStore } from "../stores/chat";
 import { ref as dbRef, onValue, update, push, get } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
-import { resolveDeliveryUid, recalcItemCount, normalizeCustomerName } from "../utils/deliverySync";
+import { resolveDeliveryUid, recalcItemCount, normalizeCustomerName, isProxyUid } from "../utils/deliverySync";
 import { sanitizeDbKey } from "../utils/dbUtils";
 import { logger } from "../utils/logger";
 
@@ -251,53 +251,61 @@ const selectedChatUid = ref(null);
 const selectedChatUser = ref({});
 const userChatHistory = ref([]);
 
-// Calculate customer orders
+// Calculate customer orders (Unify by normalized customer name so mixed proxy/UID bookings merge into 1 customer)
 const customerOrders = computed(() => {
   const orders = {};
 
-  // ✅ Helper: UID ที่เป็น proxy จะถูก group ด้วย owner name แทน
-  function isProxyUid(uid) {
-    return uid && (uid.startsWith("proxy-") || uid.startsWith("admin-proxy-") || uid.startsWith("multi-proxy-") || uid.startsWith("manual-"));
-  }
-
   Object.keys(stockStore.stockData).forEach((num) => {
     const item = stockStore.stockData[num];
-    if (item?.uid) {
-      // ✅ ใช้ owner name เป็น key สำหรับ proxy UIDs เพื่อรวมกลุ่มลูกค้าคนเดียวกัน
-      const groupKey = isProxyUid(item.uid) ? `name:${item.owner}` : item.uid;
+    if (item && item.owner) {
+      const normName = normalizeCustomerName(item.owner);
+      // Group key: Use normalized customer name so ALL items of this person merge into one order!
+      const groupKey = normName ? `name:${normName}` : (item.uid || `box-${num}`);
 
       if (!orders[groupKey]) {
         orders[groupKey] = {
-          name: item.owner,
-          uid: isProxyUid(item.uid) ? groupKey : item.uid,
+          name: item.owner.trim(),
+          uid: (item.uid && !isProxyUid(item.uid)) ? item.uid : groupKey,
           items: [],
           totalPrice: 0,
         };
+      } else {
+        // If this item has a real YouTube channel UID, prefer it
+        if (item.uid && !isProxyUid(item.uid) && isProxyUid(orders[groupKey].uid)) {
+          orders[groupKey].uid = item.uid;
+        }
       }
 
       const price = item.price ? parseInt(item.price) : 0;
       orders[groupKey].items.push({ num, price });
-      orders[groupKey].totalPrice += price;
+      orders[groupKey].totalPrice += (isNaN(price) ? 0 : price);
     }
   });
 
   return orders;
 });
 
-// ✅ Helper: ค้นหา shipping ready status — สำหรับ proxy key จะหาจากชื่อตรงกัน
+// ✅ Helper: ค้นหา shipping ready status — รองรับทั้ง groupKey, uid และชื่อลูกค้า
 function isShippingReady(currentShipping, groupKey, name) {
-  // Direct match
+  if (!currentShipping) return false;
+  // Direct match with groupKey
   if (currentShipping[groupKey]?.ready) return true;
-  // Proxy key → ค้นหาจาก uid ที่ตรงกับ delivery_customers
-  if (groupKey.startsWith("name:")) {
-    return Object.keys(currentShipping).some(key => {
-      return currentShipping[key]?.ready && 
-        Object.values(stockStore.stockData).some(item => 
-          item.uid === key && item.owner === name
-        );
-    });
-  }
-  return false;
+
+  const order = customerOrders.value[groupKey];
+  const uid = order?.uid;
+  if (uid && currentShipping[uid]?.ready) return true;
+
+  const normName = normalizeCustomerName(name);
+
+  // Check if any key in currentShipping is marked ready for this customer
+  return Object.keys(currentShipping).some((key) => {
+    if (!currentShipping[key]?.ready) return false;
+    if (uid && key === uid) return true;
+    if (key === groupKey) return true;
+    return Object.values(stockStore.stockData).some(
+      (item) => item && normalizeCustomerName(item.owner) === normName && (item.uid === key || `name:${normalizeCustomerName(item.owner)}` === key)
+    );
+  });
 }
 
 // ✅ Helper: ค้นหา delivery_customers entry จาก UID หรือชื่อแบบ normalize (เฉพาะรายการที่ยังค้างส่ง)
@@ -320,19 +328,19 @@ const shippingList = computed(() => {
   const videoId = systemStore.currentVideoId;
 
   return Object.keys(customerOrders.value)
-    .filter((uid) => {
-      const order = customerOrders.value[uid];
-      return isShippingReady(currentShipping, uid, order.name);
+    .filter((groupKey) => {
+      const order = customerOrders.value[groupKey];
+      return isShippingReady(currentShipping, groupKey, order.name);
     })
-    .map((uid) => {
-      const order = customerOrders.value[uid];
+    .map((groupKey) => {
+      const order = customerOrders.value[groupKey];
       const itemsText = order.items
         .map((i) => `#${i.num}${i.price > 0 ? `(${i.price})` : ""}`)
         .join(", ");
 
       // คำนวณจำนวนจองรวมจากวันอื่นๆ ที่ยังค้างส่งอยู่
       let bookingCount = order.items.length;
-      const delCust = findDeliveryCustomer(uid, order.name);
+      const delCust = findDeliveryCustomer(order.uid, order.name);
       if (delCust && delCust.status !== "done") {
         const sessions = delCust.sessions || {};
         let pastCount = 0;
@@ -347,10 +355,16 @@ const shippingList = computed(() => {
         bookingCount += pastCount;
       }
 
+      const displayName =
+        savedNames.value[order.uid]?.nick ||
+        savedNames.value[groupKey]?.nick ||
+        order.name;
+
       return {
-        uid,
-        name: savedNames.value[uid]?.nick || order.name,
-        editableName: savedNames.value[uid]?.nick || order.name,
+        uid: groupKey,
+        actualUid: order.uid,
+        name: displayName,
+        editableName: displayName,
         itemsText,
         totalPrice: order.totalPrice,
         bookingCount,
@@ -364,15 +378,15 @@ const notReadyCustomers = computed(() => {
   const videoId = systemStore.currentVideoId;
 
   return Object.keys(customerOrders.value)
-    .filter((uid) => {
-      const order = customerOrders.value[uid];
-      return !isShippingReady(currentShipping, uid, order.name);
+    .filter((groupKey) => {
+      const order = customerOrders.value[groupKey];
+      return !isShippingReady(currentShipping, groupKey, order.name);
     })
-    .map((uid) => {
-      const order = customerOrders.value[uid];
+    .map((groupKey) => {
+      const order = customerOrders.value[groupKey];
 
       let bookingCount = order.items.length;
-      const delCust = findDeliveryCustomer(uid, order.name);
+      const delCust = findDeliveryCustomer(order.uid, order.name);
       if (delCust && delCust.status !== "done") {
         const sessions = delCust.sessions || {};
         let pastCount = 0;
@@ -387,9 +401,15 @@ const notReadyCustomers = computed(() => {
         bookingCount += pastCount;
       }
 
+      const displayName =
+        savedNames.value[order.uid]?.nick ||
+        savedNames.value[groupKey]?.nick ||
+        order.name;
+
       return {
-        uid,
-        name: savedNames.value[uid]?.nick || order.name,
+        uid: groupKey,
+        actualUid: order.uid,
+        name: displayName,
         itemCount: bookingCount,
       };
     });
@@ -434,26 +454,29 @@ async function addToShipping() {
   const videoId = systemStore.currentVideoId;
 
   // ✅ Resolve shipping uid: proxy keys ใช้ชื่อจริงเป็น key
-  let shippingUid = groupKey;
-  if (isProxyGroupKey(groupKey)) {
-    shippingUid = await resolveDeliveryUid(groupKey, order.name);
+  let shippingUid = order.uid || groupKey;
+  if (isProxyGroupKey(shippingUid) || isProxyUid(shippingUid)) {
+    shippingUid = await resolveDeliveryUid(shippingUid, order.name);
   }
 
-  const customerName = savedNames.value[shippingUid]?.nick || order.name;
+  const customerName = savedNames.value[shippingUid]?.nick || savedNames.value[groupKey]?.nick || order.name;
 
   // 1. Mark ready in shipping (system/shipping)
   try {
-    const path = `system/shipping/${videoId}/${shippingUid}`;
-    await update(dbRef(db, path), {
-      ready: true,
-      timestamp: Date.now(),
-    });
+    const updates = {};
+    updates[`system/shipping/${videoId}/${shippingUid}/ready`] = true;
+    updates[`system/shipping/${videoId}/${shippingUid}/timestamp`] = Date.now();
+    if (groupKey && groupKey !== shippingUid) {
+      updates[`system/shipping/${videoId}/${groupKey}/ready`] = true;
+      updates[`system/shipping/${videoId}/${groupKey}/timestamp`] = Date.now();
+    }
+    await update(dbRef(db), updates);
   } catch (err) {
     logger.warn("Shipping mark ready error:", err);
   }
 
   // 2. AUTO-SYNC to delivery_customers
-  await syncCustomerToDelivery(groupKey, customerName, order, videoId);
+  await syncCustomerToDelivery(shippingUid, customerName, order, videoId);
 
   Swal.fire({
     icon: "success",
@@ -555,8 +578,22 @@ function removeFromShipping(uid) {
     confirmButtonColor: "#d32f2f",
   }).then((result) => {
     if (result.isConfirmed) {
-      const path = `system/shipping/${systemStore.currentVideoId}/${uid}`;
-      update(dbRef(db, path), { ready: null })
+      const order = customerOrders.value[uid];
+      const videoId = systemStore.currentVideoId;
+      const updates = {};
+      updates[`system/shipping/${videoId}/${uid}/ready`] = null;
+      if (order?.uid && order.uid !== uid) {
+        updates[`system/shipping/${videoId}/${order.uid}/ready`] = null;
+      }
+      if (order?.name) {
+        const normName = normalizeCustomerName(order.name);
+        Object.values(stockStore.stockData).forEach((item) => {
+          if (item && normalizeCustomerName(item.owner) === normName && item.uid) {
+            updates[`system/shipping/${videoId}/${item.uid}/ready`] = null;
+          }
+        });
+      }
+      update(dbRef(db), updates)
         .then(() => {
           Swal.fire({
             icon: "success",
@@ -576,8 +613,14 @@ function removeFromShipping(uid) {
 function updateCustomerName(uid, name) {
   if (!name || !name.trim() || !uid) return;
   const safeUid = sanitizeDbKey(uid);
+  const order = customerOrders.value[uid];
+  const updates = {};
+  updates[`nicknames/${safeUid}/nick`] = name.trim();
+  if (order?.uid && order.uid !== uid) {
+    updates[`nicknames/${sanitizeDbKey(order.uid)}/nick`] = name.trim();
+  }
 
-  update(dbRef(db, `nicknames/${safeUid}`), { nick: name.trim() })
+  update(dbRef(db), updates)
     .then(() => {
       logger.debug("✅ Updated nickname:", name);
     })
@@ -588,20 +631,27 @@ function updateCustomerName(uid, name) {
 
 // Chat History Functions
 async function openChatHistory(uid, item) {
-  selectedChatUid.value = uid;
+  const actualUid = item?.actualUid || item?.uid || uid;
+  selectedChatUid.value = actualUid;
   selectedChatUser.value = {
     name: item.name,
     avatar: null, // เดี๋ยวค่อยดึงจาก chatStore ถ้าต้องการเป๊ะๆ
   };
 
   // Find avatar from chatStore recent messages (optional optimization)
-  const found = chatStore.messages.find((m) => m.uid === uid);
+  const normName = normalizeCustomerName(item.name);
+  const found = chatStore.messages.find(
+    (m) =>
+      m.uid === actualUid ||
+      m.uid === uid ||
+      (normName && normalizeCustomerName(m.authorName) === normName)
+  );
   if (found) selectedChatUser.value.avatar = found.avatar;
 
   // Load History
   const historyRef = dbRef(
     db,
-    `system/shipping/${systemStore.currentVideoId}/${uid}/history`
+    `system/shipping/${systemStore.currentVideoId}/${actualUid}/history`
   );
   try {
     const snapshot = await get(historyRef);

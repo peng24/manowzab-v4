@@ -204,7 +204,7 @@ import { useSystemStore } from "../stores/system";
 import { useStockStore } from "../stores/stock";
 import { useChatStore } from "../stores/chat";
 import { triggerCelebration } from "../utils/celebration";
-import { announceShippingCustomers } from "../utils/deliverySync";
+import { announceShippingCustomers, normalizeCustomerName, isProxyUid } from "../utils/deliverySync";
 import { formatShippingCycleLabel } from "../utils/chatParserUtils";
 import Swal from "sweetalert2";
 
@@ -235,16 +235,21 @@ const metrics = computed(() => {
     if (item && item.owner) {
       soldCount++;
 
-      // Map Buyer Volume Stats
-      const buyerKey = item.uid || item.owner;
+      // Map Buyer Volume Stats (group by normalized customer name so mixed proxy/UID bookings combine)
+      const normName = normalizeCustomerName(item.owner);
+      const buyerKey = normName || item.uid || "unknown";
       if (!buyersMap[buyerKey]) {
         buyersMap[buyerKey] = {
-          name: item.owner,
+          name: item.owner.trim(),
           uid: item.uid || "",
           itemsCount: 0,
         };
       }
       buyersMap[buyerKey].itemsCount += 1;
+      // Prefer real YouTube channel UID over empty/proxy UID
+      if (item.uid && !isProxyUid(item.uid) && (!buyersMap[buyerKey].uid || isProxyUid(buyersMap[buyerKey].uid))) {
+        buyersMap[buyerKey].uid = item.uid;
+      }
     }
 
     // Track Queue

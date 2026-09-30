@@ -200,4 +200,60 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
       expect(nextRoundResult.labelPrintedAt).toBeNull();
     });
   });
+
+  describe("Customer Deduplication and Grouping (วาศินา case)", () => {
+    it("groups mixed YouTube UID, admin proxy, and manual bookings under the same customer", () => {
+      const stockData = {
+        1: { owner: "วาศินา", uid: "UC123456789", price: "100" },
+        3: { owner: "วาศินา", uid: "UC123456789", price: "150" },
+        4: { owner: "วาศินา", uid: "admin-proxy-111", price: "200" },
+        6: { owner: " วาศินา ", uid: "admin-proxy-222", price: "100" },
+        15: { owner: "วาศินา", uid: "UC123456789", price: "250" },
+        17: { owner: "วาศินา", uid: "manual-333", price: "120" },
+        22: { owner: "วาศินา", uid: null, price: "180" },
+        2: { owner: "ลูกค้าท่านอื่น", uid: "UC999", price: "300" },
+      };
+
+      // Aggregation logic matching LiveSummaryModal & Dashboard
+      const buyersMap = {};
+      let soldCount = 0;
+
+      Object.entries(stockData).forEach(([numStr, item]) => {
+        if (item && item.owner) {
+          soldCount++;
+          const normName = normalizeCustomerName(item.owner);
+          const buyerKey = normName || item.uid || "unknown";
+
+          if (!buyersMap[buyerKey]) {
+            buyersMap[buyerKey] = {
+              name: item.owner.trim(),
+              uid: item.uid || "",
+              itemsCount: 0,
+              totalPrice: 0,
+              items: [],
+            };
+          }
+          buyersMap[buyerKey].itemsCount += 1;
+          const price = parseInt(item.price, 10) || 0;
+          buyersMap[buyerKey].totalPrice += price;
+          buyersMap[buyerKey].items.push(numStr);
+
+          if (item.uid && !isProxyUid(item.uid) && (!buyersMap[buyerKey].uid || isProxyUid(buyersMap[buyerKey].uid))) {
+            buyersMap[buyerKey].uid = item.uid;
+          }
+        }
+      });
+
+      const uniqueBuyers = Object.values(buyersMap);
+      // Only 2 unique buyers: "วาศินา" and "ลูกค้าท่านอื่น"
+      expect(uniqueBuyers.length).toBe(2);
+
+      const vasina = buyersMap[normalizeCustomerName("วาศินา")];
+      expect(vasina).toBeDefined();
+      expect(vasina.itemsCount).toBe(7);
+      expect(vasina.totalPrice).toBe(1100);
+      expect(vasina.uid).toBe("UC123456789"); // Preserved real YouTube channel UID
+      expect(vasina.items).toEqual(["1", "3", "4", "6", "15", "17", "22"]);
+    });
+  });
 });

@@ -405,7 +405,7 @@ import { useHistory } from "../composables/useHistory";
 import { ref as dbRef, onValue, get, remove, update, runTransaction, set } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
-import { normalizeCustomerName } from "../utils/deliverySync";
+import { normalizeCustomerName, isProxyUid } from "../utils/deliverySync";
 import Swal from "sweetalert2";
 
 const emit = defineEmits(["close"]);
@@ -693,6 +693,8 @@ const ownerItemCounts = computed(() => {
   if (!selectedItem.value || !selectedItem.value.orders) return counts;
   Object.values(selectedItem.value.orders).forEach((item) => {
     if (item.owner) {
+      const norm = normalizeCustomerName(item.owner);
+      if (norm) counts[norm] = (counts[norm] || 0) + 1;
       counts[item.owner] = (counts[item.owner] || 0) + 1;
     }
   });
@@ -701,7 +703,9 @@ const ownerItemCounts = computed(() => {
 
 function getOwnerCount(ownerName, uid = null) {
   const norm = normalizeCustomerName(ownerName);
-  const currentCount = ownerItemCounts.value[ownerName] || (norm ? ownerItemCounts.value[norm] : 0) || 0;
+  const currentCount = (norm && ownerItemCounts.value[norm] !== undefined)
+    ? ownerItemCounts.value[norm]
+    : (ownerItemCounts.value[ownerName] || 0);
   const cust = deliveryCustomers.value.find(
     (c) => c.status !== "done" && ((uid && c.uid === uid) || (norm && normalizeCustomerName(c.name) === norm) || c.name === ownerName)
   );
@@ -926,18 +930,27 @@ async function updateDeliveryAndHistoryTotals(videoId) {
     let totalItems = 0;
 
     Object.values(allStock).forEach((item) => {
-      if (item.owner) {
+      if (item && item.owner) {
         totalItems++;
         const p = parseInt(item.price, 10);
         const validPrice = isNaN(p) ? 0 : p;
         totalSales += validPrice;
 
-        const key = item.uid || item.owner;
+        const normName = normalizeCustomerName(item.owner);
+        const key = normName || item.uid || "unknown";
         if (!sessionCounts[key]) {
-          sessionCounts[key] = { count: 0, totalPrice: 0 };
+          sessionCounts[key] = {
+            count: 0,
+            totalPrice: 0,
+            uid: item.uid || "",
+            name: item.owner,
+          };
         }
         sessionCounts[key].count++;
         sessionCounts[key].totalPrice += validPrice;
+        if (item.uid && !isProxyUid(item.uid) && (!sessionCounts[key].uid || isProxyUid(sessionCounts[key].uid))) {
+          sessionCounts[key].uid = item.uid;
+        }
       }
     });
 
@@ -946,9 +959,15 @@ async function updateDeliveryAndHistoryTotals(videoId) {
     Object.keys(deliveryData).forEach((custKey) => {
       const cust = deliveryData[custKey];
       const hasSession = cust.sessions && cust.sessions[videoId];
-      const matchKey = Object.keys(sessionCounts).find(
-        (k) => k === cust.uid || k === cust.name
-      );
+      const normCustName = normalizeCustomerName(cust.name);
+      const matchKey = Object.keys(sessionCounts).find((k) => {
+        const stats = sessionCounts[k];
+        return (
+          (normCustName && k === normCustName) ||
+          (cust.uid && (k === cust.uid || stats.uid === cust.uid)) ||
+          (normCustName && normalizeCustomerName(stats.name) === normCustName)
+        );
+      });
 
       const updatedSessions = { ...(cust.sessions || {}) };
 

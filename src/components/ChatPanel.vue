@@ -1,42 +1,64 @@
 <template>
   <div class="chat-panel" :class="{ 'collapsed': systemStore.isChatCollapsed }">
-    <div class="tools-bar">
-      <h3 style="color: #fff; margin: 0; font-size: 1.1em; display: flex; align-items: center; gap: 6px;">
-        <i class="fa-solid fa-comments"></i> Live Chat
-      </h3>
-      <div class="chat-controls">
-        <button
-          class="btn-tool"
-          :class="{ muted: !systemStore.isSoundOn }"
-          @click="toggleSound"
-        >
-          <i
-            :class="
-              systemStore.isSoundOn
-                ? 'fa-solid fa-volume-high'
-                : 'fa-solid fa-volume-xmark'
-            "
-          ></i>
-          {{ systemStore.isSoundOn ? "เสียง: เปิด" : "เสียง: ปิด" }}
-        </button>
+    <!-- 🌟 Redesigned Modern Live Chat Header Bar -->
+    <div class="chat-header-bar">
+      <div class="chat-header-left">
+        <div class="chat-title-group">
+          <i class="fa-solid fa-comments chat-icon"></i>
+          <span class="chat-title">Live Chat</span>
+        </div>
+        <span class="chat-live-pill" title="กำลังเชื่อมต่อสตรีมสด">
+          <span class="pulse-dot"></span>
+          <span class="live-text">LIVE</span>
+        </span>
+      </div>
 
-        <button class="btn-tool" @click="stopVoice">
-          <i class="fa-solid fa-stop"></i> หยุดเสียง
-        </button>
-
-        <button class="btn-tool btn-csv" @click="exportCSV">
-          <i class="fa-solid fa-file-csv"></i> CSV
-        </button>
-
-        <!-- 🚀 Modern Collapse Chat Button -->
+      <div class="chat-header-actions">
+        <!-- 🔊 Sound Toggle -->
         <button
           type="button"
-          class="btn-tool btn-collapse-chat"
+          class="chat-act-btn btn-sound"
+          :class="{ 'is-muted': !systemStore.isSoundOn }"
+          @click="toggleSound"
+          :title="systemStore.isSoundOn ? 'เสียงอ่าน: เปิด (คลิกเพื่อปิด หรือ Shift+M)' : 'เสียงอ่าน: ปิด (คลิกเพื่อเปิด หรือ Shift+M)'"
+        >
+          <i :class="systemStore.isSoundOn ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark'"></i>
+          <span class="act-label">{{ systemStore.isSoundOn ? 'เสียง' : 'ปิด' }}</span>
+        </button>
+
+        <!-- ⏹ Stop Voice -->
+        <button
+          type="button"
+          class="chat-act-btn btn-stop"
+          @click="stopVoice"
+          title="หยุดเสียงอ่านทันที"
+        >
+          <i class="fa-solid fa-stop"></i>
+          <span class="act-label">หยุด</span>
+        </button>
+
+        <!-- 📥 CSV Export -->
+        <button
+          type="button"
+          class="chat-act-btn btn-csv"
+          @click="exportCSV"
+          title="ส่งออกแชททั้งหมดเป็นไฟล์ CSV"
+        >
+          <i class="fa-solid fa-file-csv"></i>
+          <span class="act-label">CSV</span>
+        </button>
+
+        <div class="chat-act-divider"></div>
+
+        <!-- ⇥ Collapse / Hide Chat -->
+        <button
+          type="button"
+          class="chat-act-btn btn-collapse"
           @click="systemStore.toggleChatCollapse"
           title="ซ่อนช่องแชท (Alt + C) เพื่อขยายตารางสต็อกเต็มจอ"
         >
           <i class="fa-solid fa-angles-right"></i>
-          <span class="btn-collapse-label">ซ่อน</span>
+          <span class="act-label">ซ่อน</span>
         </button>
       </div>
     </div>
@@ -977,84 +999,220 @@ async function refreshChat() {
   }
 }
 
-.tools-bar {
-  padding: 10px 15px;
-  background-color: #1e293b;
-  border-bottom: 1px solid #334155;
+/* ========================================
+   🌟 MODERN CHAT HEADER BAR
+   ======================================== */
+.chat-header-bar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  z-index: 10;
-}
-
-.chat-controls {
-  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  position: relative;
+  z-index: 20;
   gap: 8px;
+  min-height: 46px;
+  box-sizing: border-box;
 }
 
-.btn-tool {
-  background: #334155;
-  color: #e2e8f0;
-  border: none;
-  padding: 4px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.85em;
+.chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.chat-title-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.chat-icon {
+  font-size: 1.15em;
+  color: #38bdf8;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.45));
+}
+
+.chat-title {
   font-family: "Kanit", sans-serif;
+  font-weight: 700;
+  font-size: 1.05em;
+  letter-spacing: 0.3px;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.chat-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  padding: 2px 7px;
+  border-radius: 20px;
+  user-select: none;
+}
+
+.chat-live-pill .pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+  animation: liveBlink 1.6s ease-in-out infinite;
+}
+
+.chat-live-pill .live-text {
+  font-size: 0.65em;
+  font-weight: 800;
+  color: #f87171;
+  letter-spacing: 0.8px;
+}
+
+@keyframes liveBlink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+.chat-header-actions {
   display: flex;
   align-items: center;
   gap: 5px;
-  transition: all 0.2s;
+  flex-wrap: nowrap;
 }
 
-.btn-tool:hover {
-  background: #475569;
-  transform: translateY(-1px);
+.chat-act-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font-size: 0.82em;
+  font-weight: 600;
+  font-family: "Kanit", sans-serif;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  white-space: nowrap;
+  user-select: none;
 }
 
-.btn-tool:active {
-  transform: translateY(0);
-}
-
-.btn-tool.muted {
-  background: #475569;
-  opacity: 0.7;
-}
-
-.btn-tool.btn-csv {
-  background: #10b981; /* Green */
-  color: white;
-  font-weight: 500;
-}
-
-.btn-tool.btn-csv:hover {
-  background: #059669;
-}
-
-.btn-tool.btn-collapse-chat {
-  background: rgba(244, 63, 94, 0.16);
-  color: #fda4af;
-  border: 1px solid rgba(244, 63, 94, 0.3);
-  font-weight: 500;
-  transition: all 0.2s ease;
-  margin-left: 2px;
-}
-
-.btn-tool.btn-collapse-chat:hover {
-  background: rgba(244, 63, 94, 0.35);
-  color: #fff;
-  border-color: rgba(244, 63, 94, 0.6);
-  transform: translateX(2px);
-}
-
-.btn-tool.btn-collapse-chat i {
-  transition: transform 0.2s ease;
+.chat-act-btn i {
   font-size: 0.9em;
 }
 
-.btn-tool.btn-collapse-chat:hover i {
+/* 🔊 Sound Button */
+.chat-act-btn.btn-sound {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.28);
+}
+
+.chat-act-btn.btn-sound:hover {
+  background: rgba(16, 185, 129, 0.24);
+  color: #ffffff;
+  border-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+  transform: translateY(-1px);
+}
+
+.chat-act-btn.btn-sound.is-muted {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border-color: rgba(100, 116, 139, 0.25);
+}
+
+.chat-act-btn.btn-sound.is-muted:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ⏹ Stop Voice Button */
+.chat-act-btn.btn-stop {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.chat-act-btn.btn-stop:hover {
+  background: rgba(245, 158, 11, 0.24);
+  color: #ffffff;
+  border-color: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+  transform: translateY(-1px);
+}
+
+.chat-act-btn.btn-stop:active {
+  transform: scale(0.95);
+}
+
+/* 📥 CSV Export Button */
+.chat-act-btn.btn-csv {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.28);
+}
+
+.chat-act-btn.btn-csv:hover {
+  background: rgba(59, 130, 246, 0.24);
+  color: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Separator */
+.chat-act-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+/* ⇥ Collapse Button */
+.chat-act-btn.btn-collapse {
+  background: rgba(244, 63, 94, 0.14);
+  color: #fb7185;
+  border-color: rgba(244, 63, 94, 0.3);
+}
+
+.chat-act-btn.btn-collapse:hover {
+  background: rgba(244, 63, 94, 0.28);
+  color: #ffffff;
+  border-color: #f43f5e;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.35);
   transform: translateX(2px);
+}
+
+.chat-act-btn.btn-collapse i {
+  transition: transform 0.2s ease;
+}
+
+.chat-act-btn.btn-collapse:hover i {
+  transform: translateX(2px);
+}
+
+/* Responsive adjustment for narrow screens */
+@media (max-width: 380px) {
+  .chat-act-btn .act-label {
+    display: none;
+  }
+  .chat-act-btn {
+    padding: 6px 8px;
+  }
 }
 
 #chat-viewport {

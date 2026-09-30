@@ -1002,14 +1002,16 @@ body {
   }
 }
 
-.tools-bar {
+.tools-bar,
+.chat-header-bar {
   display: flex;
-  gap: 8px;
-  padding: 10px;
-  background: #252525;
-  border-bottom: 1px solid var(--border-color);
-  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
 }
 
 #chat-viewport {
@@ -2058,6 +2060,8 @@ body {
   /* Hide all background UI elements when printing */
   .header,
   .tools-bar,
+  .chat-header-bar,
+  .chat-expand-floating-tab,
   .btn,
   .dropdown,
   .chat-panel,

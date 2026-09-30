@@ -5,6 +5,7 @@ import { db } from "../composables/useFirebase";
 import { useAudio } from "../composables/useAudio";
 import { logger } from "../utils/logger";
 import { useNicknameStore } from "./nickname";
+import { useSystemStore } from "./system";
 import { archiveChatEntries, getAllChatEntries, clearChatEntries } from "../utils/chatIdb";
 
 export const useChatStore = defineStore("chat", () => {
@@ -16,6 +17,11 @@ export const useChatStore = defineStore("chat", () => {
   const seenMessageIds = ref({});
   const fullChatLog = ref([]);
   const streamStartTime = ref(null);
+  const unreadCollapsedCount = ref(0); // ✅ จำนวนข้อความใหม่ขณะซ่อนช่องแชท
+
+  function resetUnreadCollapsed() {
+    unreadCollapsedCount.value = 0;
+  }
 
   // ✅ Firebase sync state
   let currentChatListener = null;
@@ -55,6 +61,16 @@ export const useChatStore = defineStore("chat", () => {
     // ✅ Memory safety: trim old messages to prevent unbounded growth during long streams
     if (messages.length > MAX_MESSAGES) {
       messages.splice(0, messages.length - MAX_MESSAGES);
+    }
+
+    // ✅ Track unread messages when chat panel is collapsed
+    try {
+      const systemStore = useSystemStore();
+      if (systemStore.isChatCollapsed) {
+        unreadCollapsedCount.value++;
+      }
+    } catch (e) {
+      // Store not ready
     }
 
     const textSnippet = message.text ? (message.text.length > 30 ? message.text.substring(0, 30) + "..." : message.text) : "(empty)";
@@ -283,5 +299,7 @@ export const useChatStore = defineStore("chat", () => {
     downloadChatCSV,
     syncFromFirebase,
     sendMessageToFirebase,
+    unreadCollapsedCount, // ✅ Export
+    resetUnreadCollapsed, // ✅ Export
   };
 });

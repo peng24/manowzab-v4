@@ -1,7 +1,7 @@
 <template>
-  <div class="chat-panel">
+  <div class="chat-panel" :class="{ 'collapsed': systemStore.isChatCollapsed }">
     <div class="tools-bar">
-      <h3 style="color: #fff; margin: 0; font-size: 1.1em">
+      <h3 style="color: #fff; margin: 0; font-size: 1.1em; display: flex; align-items: center; gap: 6px;">
         <i class="fa-solid fa-comments"></i> Live Chat
       </h3>
       <div class="chat-controls">
@@ -26,6 +26,17 @@
 
         <button class="btn-tool btn-csv" @click="exportCSV">
           <i class="fa-solid fa-file-csv"></i> CSV
+        </button>
+
+        <!-- 🚀 Modern Collapse Chat Button -->
+        <button
+          type="button"
+          class="btn-tool btn-collapse-chat"
+          @click="systemStore.toggleChatCollapse"
+          title="ซ่อนช่องแชท (Alt + C) เพื่อขยายตารางสต็อกเต็มจอ"
+        >
+          <i class="fa-solid fa-angles-right"></i>
+          <span class="btn-collapse-label">ซ่อน</span>
         </button>
       </div>
     </div>
@@ -727,6 +738,21 @@ watch(
   },
 );
 
+// ✅ Watch for chat collapse / expand: Reset unread counter and auto-scroll to bottom on expand
+watch(
+  () => systemStore.isChatCollapsed,
+  (isCollapsed) => {
+    if (!isCollapsed) {
+      chatStore.resetUnreadCollapsed();
+      nextTick(() => {
+        if (chatViewport.value) {
+          chatViewport.value.scrollTop = chatViewport.value.scrollHeight;
+        }
+      });
+    }
+  },
+);
+
 // ✅ Force Process Logic (🛒 คีย์ด่วน)
 async function forceProcess(chat) {
   const el = chatViewport.value;
@@ -1004,6 +1030,31 @@ async function refreshChat() {
 
 .btn-tool.btn-csv:hover {
   background: #059669;
+}
+
+.btn-tool.btn-collapse-chat {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  font-weight: 500;
+  transition: all 0.2s ease;
+  margin-left: 2px;
+}
+
+.btn-tool.btn-collapse-chat:hover {
+  background: rgba(244, 63, 94, 0.35);
+  color: #fff;
+  border-color: rgba(244, 63, 94, 0.6);
+  transform: translateX(2px);
+}
+
+.btn-tool.btn-collapse-chat i {
+  transition: transform 0.2s ease;
+  font-size: 0.9em;
+}
+
+.btn-tool.btn-collapse-chat:hover i {
+  transform: translateX(2px);
 }
 
 #chat-viewport {

@@ -122,6 +122,25 @@
         </span>
       </button>
 
+      <!-- 💬 Live Chat Panel Toggle Button -->
+      <button
+        type="button"
+        class="btn btn-chat-toggle"
+        :class="{ 'is-collapsed': systemStore.isChatCollapsed }"
+        @click="systemStore.toggleChatCollapse"
+        :title="systemStore.isChatCollapsed ? 'แสดงช่องแชทสด (Alt + C)' : 'ซ่อนช่องแชทสด (Alt + C)'"
+      >
+        <i class="fa-solid fa-comments"></i>
+        <span class="chat-toggle-text">{{ systemStore.isChatCollapsed ? 'เปิดแชท' : 'ซ่อนแชท' }}</span>
+        <span
+          v-if="systemStore.isChatCollapsed && chatStore.unreadCollapsedCount > 0"
+          class="chat-toggle-badge"
+          :title="`มี ${chatStore.unreadCollapsedCount} ข้อความใหม่ขณะซ่อนแชท`"
+        >
+          {{ chatStore.unreadCollapsedCount > 99 ? '99+' : chatStore.unreadCollapsedCount }}
+        </span>
+      </button>
+
       <div class="dropdown" ref="dropdownRef">
         <button class="btn btn-sim" :class="{ active: showDropdown }" @click.stop="toggleDropdown">
           ⚡ Tools <i class="fa-solid fa-caret-down"></i>
@@ -139,6 +158,10 @@
               <div class="dropdown-group-title">
                 <i class="fa-solid fa-tower-broadcast"></i> แชท & ไลฟ์สตรีม
               </div>
+              <a @click="systemStore.toggleChatCollapse" class="menu-chat-toggle">
+                <i :class="systemStore.isChatCollapsed ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'"></i>
+                <span>{{ systemStore.isChatCollapsed ? "แสดงแชทสด (เปิดข้าง)" : "ซ่อนแชทสด (เต็มจอ)" }}</span>
+              </a>
               <a @click="downloadCSV" class="menu-csv">
                 <i class="fa-solid fa-file-csv"></i>
                 <span>บันทึกแชท (CSV)</span>

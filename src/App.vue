@@ -6,7 +6,7 @@
     <!-- Protected Application Views -->
     <template v-else>
       <UpdatePrompt />
-      <div class="app-layout">
+      <div class="app-layout" :class="{ 'chat-collapsed': systemStore.isChatCollapsed }">
         <div class="left-column">
           <Header />
 
@@ -36,6 +36,29 @@
           <NoteBanner />
         </div>
         <ChatPanel />
+
+        <!-- 🚀 Floating Modern Expand Tab (Visible when Chat is Collapsed) -->
+        <button
+          v-if="systemStore.isChatCollapsed"
+          type="button"
+          class="chat-expand-floating-tab"
+          @click="systemStore.toggleChatCollapse"
+          title="คลิกเพื่อเปิดช่องแชทสด (Live Chat) หรือกด Alt + C"
+        >
+          <div class="floating-tab-glow"></div>
+          <div class="floating-tab-inner">
+            <i class="fa-solid fa-angles-left arrow-icon"></i>
+            <i class="fa-solid fa-comments chat-bubble-icon"></i>
+            <span class="floating-tab-text">แชทสด</span>
+            <span
+              v-if="chatStore.unreadCollapsedCount > 0"
+              class="floating-tab-badge"
+              :title="`มี ${chatStore.unreadCollapsedCount} ข้อความใหม่ขณะซ่อนแชท`"
+            >
+              {{ chatStore.unreadCollapsedCount > 99 ? '99+' : chatStore.unreadCollapsedCount }}
+            </span>
+          </div>
+        </button>
       </div>
     </template>
   </div>
@@ -319,6 +342,13 @@ function handleGlobalHotkeys(e) {
       ytInput.focus();
       ytInput.select();
     }
+    e.preventDefault();
+    return;
+  }
+
+  // 4. Alt + C (or Alt + ฉ): Toggle Live Chat Panel (Show / Hide)
+  if ((e.altKey && (e.key === "c" || e.key === "C" || e.key === "ฉ")) || (e.shiftKey && !e.ctrlKey && (e.key === "C" || e.key === "c"))) {
+    systemStore.toggleChatCollapse();
     e.preventDefault();
     return;
   }

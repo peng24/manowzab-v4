@@ -50,6 +50,21 @@ export const useSystemStore = defineStore("system", () => {
   const activeKeyIndex = ref(1); // ✅ Track which API key is currently active
   const shippingCycle = ref("today"); // ✅ รอบจัดส่งเริ่มต้น ('today' | 'tomorrow' | 'พฤหัส' etc. | 'YYYY-MM-DD')
 
+  // ✅ Live Chat Panel Collapsible State (Saved to localStorage)
+  const isChatCollapsed = ref(localStorage.getItem("manowzab_chat_collapsed") === "true");
+
+  function toggleChatCollapse() {
+    isChatCollapsed.value = !isChatCollapsed.value;
+    localStorage.setItem("manowzab_chat_collapsed", isChatCollapsed.value ? "true" : "false");
+    logger.log(`💬 Chat panel ${isChatCollapsed.value ? "collapsed" : "expanded"}`);
+    return isChatCollapsed.value;
+  }
+
+  function setChatCollapsed(val) {
+    isChatCollapsed.value = Boolean(val);
+    localStorage.setItem("manowzab_chat_collapsed", isChatCollapsed.value ? "true" : "false");
+  }
+
   // Status Indicators (ok, warn, err, working)
   const statusDb = ref("err");
   const statusApi = ref("ok");
@@ -226,6 +241,9 @@ export const useSystemStore = defineStore("system", () => {
     shippingCycle, // ✅ Export
     initShippingCycleListener, // ✅ Export
     setShippingCycle, // ✅ Export
+    isChatCollapsed, // ✅ Export
+    toggleChatCollapse, // ✅ Export
+    setChatCollapsed, // ✅ Export
   };
 });
 

@@ -296,7 +296,8 @@ export function useChatProcessor() {
 
         if (proxyName && isAdmin) {
           // Admin Proxy Mode
-          ownerName = proxyName;
+          // 🆕 v4.67.0: Sanitize proxy name — strip leading punctuation
+          ownerName = proxyName.replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
           ownerUid =
             "multi-proxy-" +
             Date.now() +
@@ -606,7 +607,8 @@ export function useChatProcessor() {
       ) {
         intent = "buy";
         targetId = parseInt(matchAdminNumFirst[1]);
-        forcedOwnerName = matchAdminNumFirst[2].trim();
+        // 🆕 v4.67.0: Sanitize owner name — strip leading punctuation e.g. "50 ,tit" → "tit"
+        forcedOwnerName = matchAdminNumFirst[2].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
         method = "admin-proxy-num-first";
       } else if (matchPure && parseInt(matchPure[1]) <= MAX_ITEM_ID) {
         intent = "buy";

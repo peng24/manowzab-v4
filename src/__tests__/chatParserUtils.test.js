@@ -14,6 +14,7 @@ import {
   cancelKeywordRegex,
   standalonePassRegex,
   explicitBuyRegex,
+  multiBuyRegex,
   shipDayOfWeekRegex,
   calcNextDayOfWeekDate,
   resolveShippingCycleDate,
@@ -385,6 +386,61 @@ describe("chatParserUtils", () => {
       expect(sanitizeDbKey(null)).toBe("invalid_key");
     });
   });
+
+  describe("🛒 explicitBuyRegex v4.67.0 — เค/เค่ะ keyword", () => {
+    it("catches เคค่ะ 14 (เค confirmation before number)", () => {
+      expect(explicitBuyRegex.test("เคค่ะ 14")).toBe(true);
+    });
+
+    it("catches เค14 (เค directly before number)", () => {
+      expect(explicitBuyRegex.test("เค14")).toBe(true);
+    });
+
+    it("catches เค 14 (เค with space before number)", () => {
+      expect(explicitBuyRegex.test("เค 14")).toBe(true);
+    });
+
+    it("parseIntentDetails recognizes เคค่ะ 14 as SINGLE_BUY", () => {
+      const res = parseIntentDetails("เคค่ะ 14");
+      expect(res.type).toBe("SINGLE_BUY");
+      expect(res.itemId).toBe(14);
+    });
+
+    it("parseIntentDetails recognizes เค14 as SINGLE_BUY", () => {
+      const res = parseIntentDetails("เค14");
+      expect(res.type).toBe("SINGLE_BUY");
+      expect(res.itemId).toBe(14);
+    });
+
+    it("still matches existing buy keywords (regression: โอเค, ok, ตกลง, รับ)", () => {
+      expect(explicitBuyRegex.test("โอเค41ค่ะ")).toBe(true);
+      expect(explicitBuyRegex.test("ok41")).toBe(true);
+      expect(explicitBuyRegex.test("ตกลง41")).toBe(true);
+      expect(explicitBuyRegex.test("รับ43ค่ะ")).toBe(true);
+    });
+  });
+
+  describe("📦 multiBuyRegex v4.67.0 — Admin multi-buy + ชื่อตามหลัง", () => {
+    it("matches '3 4 วาศินา' — two items + customer name suffix", () => {
+      const m = "3 4 วาศินา".match(multiBuyRegex);
+      expect(m).not.toBeNull();
+      expect(m[2]).toBe("3 4");
+      expect(m[3]).toBe("วาศินา");
+    });
+
+    it("matches '15 25 วาศินา' — two items + customer name suffix", () => {
+      const m = "15 25 วาศินา".match(multiBuyRegex);
+      expect(m).not.toBeNull();
+      expect(m[2]).toBe("15 25");
+      expect(m[3]).toBe("วาศินา");
+    });
+
+    it("still matches legacy multi-buy patterns", () => {
+      expect(multiBuyRegex.test("26 38 74")).toBe(true);
+      expect(multiBuyRegex.test("มะระ เอา 19 13 10")).toBe(true);
+    });
+  });
+
 });
 
 

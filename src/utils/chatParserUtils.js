@@ -6,7 +6,7 @@
 // 🛡️ Maximum item ID to prevent absurd stock expansion from spam/typos (e.g. "555555")
 export const MAX_ITEM_ID = 300;
 
-// 🚀 Regex patterns enhanced from real live stream CSV logs (v4.66.0)
+// 🚀 Regex patterns enhanced from real live stream CSV logs (v4.67.0)
 export const multiBuyRegex = /^(?:([ก-๙a-zA-Z]{2,})\s+)?(?:F|f|cf|CF|รับ|เอา|เิา|จอง)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
 export const adminProxyNumFirstRegex = /^(\d+)\s+([ก-๛a-zA-Z].*)$/;
 export const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z]{2,})\s*(\d+)$/; // Supports "พี่อ้อย20" without spaces
@@ -16,7 +16,7 @@ export const questionRegex = /อก|เอว|สะโพก|ยาว|รา�
 export const pureNumberRegex = /^\s*(\d+)\s*$/;
 export const fuzzyNumberRegex = /^\s*[,.\/;:\-_=]*\s*(\d+)\s*[,.\/;:\-_=]*\s*$/;
 export const tryRegex = /(?:(?<!ไม่ต้อง)(?:ลองโลด|ลอง|ขอลอง|ขอดู|โชว์|ดู|ทาบ|รีวิว)|(?:ใส่|ไส่).{0,10}?ให้ดู|ลอง.{0,6}?ให้.{0,4}?ดู|ลองใส่|ลองชุด)/i;
-export const explicitBuyRegex = /(?:(?:F|f|cf|CF|รับ|เอา|เิา|รหัส|ระหัส|เบอร์|รายการที่|รายการ|ชุดที่|ชุด|จอง|โอเค|ok|ตกลง)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(\d+))|(?:(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา|รหัส|ระหัส|เบอร์|รายการที่|รายการ|ชุดที่|ชุด|จอง|โอเค|ok|ตกลง))/i;
+export const explicitBuyRegex = /(?:(?:F|f|cf|CF|รับ|เอา|เิา|เค|รหัส|ระหัส|เบอร์|รายการที่|รายการ|ชุดที่|ชุด|จอง|โอเค|ok|ตกลง)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(\d+))|(?:(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา|เค|รหัส|ระหัส|เบอร์|รายการที่|รายการ|ชุดที่|ชุด|จอง|โอเค|ok|ตกลง))/i;
 export const numberWithPoliteRegex = /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|พี่|ป้า|น้า|อา|แม่|น้อง|ฝาก|\/\/)/;
 export const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 export const customerNameNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,}?)\s+(\d+)$/;

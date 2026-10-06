@@ -50,9 +50,9 @@ function getContactChannelShort(customer, addressBook = {}) {
 
 function getContactChannelDisplay(customer, addressBook = {}) {
   const ch = resolveContactChannel(customer, addressBook);
-  if (ch === "lineoa") return "💚 LineOA";
-  if (ch === "phone") return "📞 โทร";
-  if (ch === "line") return "💬 Line";
+  if (ch === "lineoa") return "LineOA";
+  if (ch === "phone") return "โทร";
+  if (ch === "line") return "Line";
   return "-";
 }
 
@@ -84,7 +84,7 @@ describe("Shipping Contact Channel Logic", () => {
     };
     expect(resolveContactChannel(customer, addressBook)).toBe("lineoa");
     expect(getContactChannelShort(customer, addressBook)).toBe("LineOA");
-    expect(getContactChannelDisplay(customer, addressBook)).toBe("💚 LineOA");
+    expect(getContactChannelDisplay(customer, addressBook)).toBe("LineOA");
   });
 
   it("reads from active address when customer and addressBook have no top-level channel", () => {
@@ -98,7 +98,7 @@ describe("Shipping Contact Channel Logic", () => {
     };
     expect(resolveContactChannel(customer)).toBe("phone");
     expect(getContactChannelShort(customer)).toBe("โทร");
-    expect(getContactChannelDisplay(customer)).toBe("📞 โทร");
+    expect(getContactChannelDisplay(customer)).toBe("โทร");
   });
 
   it("cycles correctly: '' -> line -> lineoa -> phone -> line", () => {

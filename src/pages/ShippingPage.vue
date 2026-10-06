@@ -1104,9 +1104,9 @@ function getCustomerContactChannel(customer) {
 
 function getContactChannelDisplay(customer) {
   const ch = getCustomerContactChannel(customer);
-  if (ch === "lineoa") return "💚 LineOA";
-  if (ch === "phone") return "📞 โทร";
-  if (ch === "line") return "💬 Line";
+  if (ch === "lineoa") return "LineOA";
+  if (ch === "phone") return "โทร";
+  if (ch === "line") return "Line";
   return "-";
 }
 

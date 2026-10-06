@@ -27,7 +27,7 @@
     <div v-if="isCancelled && !item.owner" class="stock-status cancelled-name">
       ❌ {{ cancelledName }}
     </div>
-    <div v-else :class="['stock-status', { empty: !item.owner }]">
+    <div v-else :class="['stock-status', { empty: !item.owner, 'unsaved-owner': isUnsavedOwner(item.owner) }]">
       {{ item.owner || "ว่าง" }}
     </div>
 
@@ -77,4 +77,16 @@ const formattedTime = computed(() => {
   const date = new Date(props.item.time);
   return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 });
+
+function isUnsavedOwner(name) {
+  return typeof name === 'string' && name.trim().startsWith('@');
+}
 </script>
+
+<style scoped>
+.stock-status.unsaved-owner {
+  color: #facc15 !important;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.45);
+}
+</style>

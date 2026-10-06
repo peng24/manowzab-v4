@@ -19,7 +19,9 @@
 Every time the system version is bumped:
 1. **Bump Version in `package.json`** using Semantic Versioning (MAJOR.MINOR.PATCH).
 2. **Update Patch Notes in `src/components/Header.vue`** inside `showChangelog()` function with `Swal.fire({ html: ... })` HTML format (✨ ปรับปรุงใหม่, 🐛 แก้ไขบั๊ก, 🧹 ทำความสะอาด) in Thai.
-3. **Update `src/data/changelog.js`** to maintain structured changelog records.
+3. **Update `src/data/changelog.js` & Prune Old Entries (Changelog Pruning Policy)**:
+   - บันทึกการเปลี่ยนแปลงใน `src/data/changelog.js` ตามรูปแบบ Keep a Changelog
+   - **กฎการตัด Changelog เก่าออก**: ตรวจสอบและคงเหลือเฉพาะเวอร์ชันล่าสุดประมาณ **15–20 เวอร์ชัน** เท่านั้น ทุกครั้งที่มีเวอร์ชันใหม่ให้ตัดเวอร์ชันเก่าทิ้งเสมอ เพื่อไม่ให้ไฟล์บวมและควบคุมขนาด Bundle ของแอปพลิเคชัน
 4. **Build & Verify** with `npm run build` and `npm test`.
 
 ## 📦 Automated Release Trigger Rule ("อัพเลย")

@@ -785,6 +785,15 @@ function selectSuggestion(name, index) {
   highlightedSuggestionIdx.value = -1;
 }
 
+function scrollActiveSuggestionIntoView() {
+  nextTick(() => {
+    const el = document.querySelector(".autocomplete-dropdown .autocomplete-item.active");
+    if (el) {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  });
+}
+
 function handleAutocompleteKeydown(event, index) {
   const suggestions = filteredSuggestions.value;
   if (suggestions.length === 0) return;
@@ -795,9 +804,11 @@ function handleAutocompleteKeydown(event, index) {
       highlightedSuggestionIdx.value + 1,
       suggestions.length - 1,
     );
+    scrollActiveSuggestionIntoView();
   } else if (event.key === "ArrowUp") {
     event.preventDefault();
     highlightedSuggestionIdx.value = Math.max(highlightedSuggestionIdx.value - 1, 0);
+    scrollActiveSuggestionIntoView();
   } else if (event.key === "Enter" && highlightedSuggestionIdx.value >= 0) {
     event.preventDefault();
     selectSuggestion(suggestions[highlightedSuggestionIdx.value], index);

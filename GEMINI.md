@@ -90,6 +90,6 @@ We have adapted and installed developer-agent workflows from `9arm-skills` into 
 ---
 
 ## 🔄 Development Workflows
-- **Version Updates (`/update`)**: After completing code changes, use the `/update` workflow (see [.agents/workflows/update.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/.agents/workflows/update.md)) to bump the version in `package.json` and add a detailed log inside the `showChangelog()` method in [Header.vue](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/components/Header.vue).
+- **Version Updates (`/update`)**: After completing code changes, use the `/update` workflow (see [.agents/workflows/update.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/.agents/workflows/update.md)) to bump the version in `package.json`, update patch notes inside [Header.vue](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/components/Header.vue), and update `src/data/changelog.js` (พร้อมตัด Changelog เก่าออกให้คงเหลือเฉพาะ 15–20 เวอร์ชันล่าสุดเสมอ เพื่อควบคุมขนาด Bundle).
 - **Mandatory Verification (`/verify`)**: Always run through the verification checklist in [.agents/workflows/verify.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/.agents/workflows/verify.md) before concluding your work to ensure critical paths (YouTube sync, queueing, key rotation) remain functional.
 - **Automated Deploy Command ("อัพเลย")**: When the user says **"อัพเลย"**, automatically run `/verify` -> `/update` -> Git Commit & Push to GitHub -> `npm run deploy` to GitHub Pages without stopping.

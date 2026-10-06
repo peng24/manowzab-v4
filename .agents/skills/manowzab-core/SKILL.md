@@ -76,7 +76,7 @@ Verify the 15 categories documented in [.agents/workflows/verify.md](../../workf
 ### 🏷️ 2. Version Bump Protocol (`/update`)
 When bumping versions:
 1. Increment version in `package.json` (SemVer).
-2. Add changelog entry in `src/data/changelog.js` (under `added`, `improved`, `fixed`, or `removed`).
+2. Add changelog entry in `src/data/changelog.js` (under `added`, `improved`, `fixed`, or `removed`) and prune old versions to keep only recent 15–20 versions.
 3. Update `showChangelog()` in `src/components/Header.vue` with Thai HTML patch notes.
 4. Run `npm test` and `npm run build` to ensure a clean build.
 

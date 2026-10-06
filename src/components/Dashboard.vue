@@ -110,6 +110,7 @@
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <input
                     class="edit-input"
+                    :class="{ 'unsaved-owner': isUnsavedOwner(item.editableName) }"
                     v-model="item.editableName"
                     @change="updateCustomerName(item.uid, item.editableName)"
                     placeholder="พิมพ์ชื่อแล้ว Enter"
@@ -629,6 +630,10 @@ function updateCustomerName(uid, name) {
     });
 }
 
+function isUnsavedOwner(name) {
+  return typeof name === 'string' && name.trim().startsWith('@');
+}
+
 // Chat History Functions
 async function openChatHistory(uid, item) {
   const actualUid = item?.actualUid || item?.uid || uid;
@@ -942,4 +947,8 @@ onUnmounted(() => {
   100% { transform: scale(1); opacity: 1; }
 }
 
+.edit-input.unsaved-owner {
+  color: #facc15 !important;
+  font-weight: 700;
+}
 </style>

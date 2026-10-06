@@ -122,7 +122,7 @@
         <div v-if="cancelledItems.has(i) && !getStockItem(i).owner" class="stock-status cancelled-name">
           ❌ {{ cancelledItems.get(i) }}
         </div>
-        <div v-else :class="['stock-status', { empty: !getStockItem(i).owner }]">
+        <div v-else :class="['stock-status', { empty: !getStockItem(i).owner, 'unsaved-owner': isUnsavedOwner(getStockItem(i).owner) }]">
           {{ getStockItem(i).owner || "ว่าง" }}
         </div>
         <div
@@ -219,6 +219,7 @@
                       type="text"
                       v-model="person.owner"
                       class="queue-input"
+                      :class="{ 'unsaved-owner': isUnsavedOwner(person.owner) }"
                       :ref="el => setQueueInputRef(el, index)"
                       @input="onAutocompleteInput(index)"
                       @focus="onAutocompleteFocus(index)"
@@ -674,6 +675,11 @@ const uniqueBuyerNames = computed(() => {
 
 function getStockItem(num) {
   return stockStore.stockData[num] || {};
+}
+
+// 🏷️ ตรวจสอบชื่อลูกค้าที่ยังไม่ถูกบันทึก (มี @ นำหน้า)
+function isUnsavedOwner(name) {
+  return typeof name === "string" && name.trim().startsWith("@");
 }
 
 // 🛢 นับจำนวนสินค้าต่อ owner (แสดงเฉพาะ >= 2 ชิ้น)
@@ -1224,8 +1230,25 @@ function openQueueModal(num) {
   if (item.queue) {
     tempQueue.value.push(...JSON.parse(JSON.stringify(item.queue)));
   }
+
+  // 🟢 หากรายการว่าง (ไม่มีการจอง) ให้เพิ่มรายการใหม่ทันทีเพื่อให้พิมพ์ได้เลย
+  if (tempQueue.value.length === 0) {
+    tempQueue.value.push({
+      owner: "",
+      uid: "manual-" + Date.now(),
+      time: Date.now(),
+      source: "manual",
+      backdated: systemStore.isLiveFinished ? true : null,
+    });
+  }
+
   showModal.value = true;
-  nextTick(() => { if (queueInputRefs.value[0]) queueInputRefs.value[0].focus(); });
+  nextTick(() => {
+    if (queueInputRefs.value[0]) {
+      queueInputRefs.value[0].focus();
+      queueInputRefs.value[0].select();
+    }
+  });
 }
 
 function closeModal() {
@@ -1326,22 +1349,40 @@ function selectSuggestion(name, index) {
   highlightedSuggestionIdx.value = -1;
 }
 
+function scrollActiveSuggestionIntoView() {
+  nextTick(() => {
+    const el = document.querySelector(".autocomplete-dropdown .autocomplete-item.active");
+    if (el) {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  });
+}
+
 function handleAutocompleteKeydown(event, index) {
   const suggestions = filteredSuggestions.value;
-  if (suggestions.length === 0) return;
 
   if (event.key === "ArrowDown") {
+    if (suggestions.length === 0) return;
     event.preventDefault();
     highlightedSuggestionIdx.value = Math.min(
       highlightedSuggestionIdx.value + 1,
       suggestions.length - 1,
     );
+    scrollActiveSuggestionIntoView();
   } else if (event.key === "ArrowUp") {
+    if (suggestions.length === 0) return;
     event.preventDefault();
     highlightedSuggestionIdx.value = Math.max(highlightedSuggestionIdx.value - 1, 0);
-  } else if (event.key === "Enter" && highlightedSuggestionIdx.value >= 0) {
-    event.preventDefault();
-    selectSuggestion(suggestions[highlightedSuggestionIdx.value], index);
+    scrollActiveSuggestionIntoView();
+  } else if (event.key === "Enter") {
+    if (highlightedSuggestionIdx.value >= 0 && suggestions.length > 0) {
+      event.preventDefault();
+      selectSuggestion(suggestions[highlightedSuggestionIdx.value], index);
+    } else {
+      // User pressed Enter to save
+      event.preventDefault();
+      saveQueueChanges();
+    }
   } else if (event.key === "Escape") {
     activeAutocompleteIdx.value = null;
     highlightedSuggestionIdx.value = -1;
@@ -1363,14 +1404,19 @@ async function saveQueueChanges(preventClose = false) {
   const num = editingId.value;
   // Re-fetch latest state at save time to prevent race conditions
   const currentDbItem = getStockItem(num);
-  const newOwnerName =
-    tempQueue.value.length > 0 ? tempQueue.value[0].owner : null;
+
+  // กรองรายการที่มีชื่อจริง ไม่บันทึกช่องว่างเปล่าๆ
+  const validQueue = tempQueue.value.filter(
+    (item) => item && typeof item.owner === "string" && item.owner.trim().length > 0
+  );
+
+  const newOwnerName = validQueue.length > 0 ? validQueue[0].owner.trim() : null;
   const oldOwnerName = currentDbItem.owner;
 
   let newData = null;
-  if (tempQueue.value.length > 0) {
-    const first = tempQueue.value[0];
-    const rest = tempQueue.value.slice(1);
+  if (validQueue.length > 0) {
+    const first = validQueue[0];
+    const rest = validQueue.slice(1);
 
     // Determine if the owner booking is new or changed (and not a typo fix)
     let isOwnerChanged = false;
@@ -1388,7 +1434,7 @@ async function saveQueueChanges(preventClose = false) {
     }
 
     newData = {
-      owner: first.owner,
+      owner: first.owner.trim(),
       uid: first.uid,
       time: first.time || Date.now(),
       source: first.source || "manual",
@@ -2143,6 +2189,17 @@ watch(
   color: #64748b;
   font-weight: 400;
   font-size: 0.9em;
+}
+
+.stock-status.unsaved-owner {
+  color: #facc15 !important;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.45);
+}
+
+.queue-input.unsaved-owner {
+  color: #facc15 !important;
+  font-weight: 700;
 }
 
 /* ... */

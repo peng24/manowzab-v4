@@ -287,9 +287,13 @@
 
             <div class="chat-bubble">
               <div class="chat-text">
+                <!-- 🌟 Highlight proxy customer name in admin message -->
+                <template v-if="getAdminProxyCustomerName(chat)">
+                  <span v-html="renderAdminProxyText(chat)" @click="handleChatTextClick($event, chat)"></span>
+                </template>
                 <!-- ✅ Render message with emoji support -->
                 <template
-                  v-if="chat.messageRuns && chat.messageRuns.length > 0"
+                  v-else-if="chat.messageRuns && chat.messageRuns.length > 0"
                 >
                   <template v-for="(run, idx) in chat.messageRuns" :key="idx">
                     <span v-if="run.text">{{ run.text }}</span>
@@ -343,7 +347,8 @@ import CustomerQuickEditModal from "./CustomerQuickEditModal.vue";
 import { ref as dbRef, update, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
-import { sanitizeDbKey } from "../utils/dbUtils";
+import { sanitizeDbKey, escapeHtml } from "../utils/dbUtils";
+import { extractAdminCustomerName, getCustomerColorTheme } from "../utils/chatParserUtils";
 import { logger } from "../utils/logger";
 import { normalizeName } from "../utils/addressParser";
 
@@ -449,19 +454,34 @@ function selectActiveBuyers() {
   });
 }
 
+// 👤 ดึงชื่อลูกค้าเป้าหมายสำหรับข้อความที่ admin จองให้/สั่งส่งให้
+function getAdminProxyCustomerName(chat) {
+  if (!chat) return null;
+  if (chat.proxyCustomerName) return chat.proxyCustomerName;
+  const isMsgAdmin =
+    chat.isAdmin ||
+    /admin|แอดมิน/i.test(chat.displayName || chat.authorName || "");
+  if (isMsgAdmin && chat.text) {
+    return extractAdminCustomerName(chat.text);
+  }
+  return null;
+}
+
 // 🏷️ Customer Metadata (Address, Channel, Payment) Fast O(1) Lookup
 function getCustomerMeta(chat) {
   if (!chat) return null;
-  const rawName = chat.displayName || chat.authorName || "";
+  const proxyName = getAdminProxyCustomerName(chat);
+  const rawName = proxyName || chat.displayName || chat.authorName || "";
   const normName = normalizeName(rawName).replace(/[.#$[\]/]/g, "_");
-  const normReal = chat.realName ? normalizeName(chat.realName).replace(/[.#$[\]/]/g, "_") : "";
+  const normReal = !proxyName && chat.realName ? normalizeName(chat.realName).replace(/[.#$[\]/]/g, "_") : "";
 
   // 1. Check address_book
   const book = (normName && addressBook.value[normName]) || (normReal && addressBook.value[normReal]);
 
   // 2. Check delivery_customers fallback
+  const targetUid = proxyName ? (chat.proxyUid || null) : chat.uid;
   const deliv =
-    (chat.uid && deliveryCustomers.value[chat.uid]) ||
+    (targetUid && deliveryCustomers.value[targetUid]) ||
     (normName && deliveryCustomers.value[normName]) ||
     (normReal && deliveryCustomers.value[normReal]);
 
@@ -484,8 +504,9 @@ function getCustomerMeta(chat) {
 
 function getCustomerMetaKey(chat) {
   const meta = getCustomerMeta(chat);
-  if (!meta) return "";
-  return `${meta.hasAddress ? 1 : 0}_${meta.contactChannel}_${meta.paymentType}`;
+  const proxyName = getAdminProxyCustomerName(chat) || "";
+  if (!meta) return proxyName;
+  return `${proxyName}_${meta.hasAddress ? 1 : 0}_${meta.contactChannel}_${meta.paymentType}`;
 }
 
 function getChannelLabel(channel) {
@@ -613,10 +634,55 @@ function formatTime(timestamp) {
   });
 }
 
+// ✏️ เปิด Modal แก้ไขข้อมูลลูกค้าของ proxy customer
+function editProxyCustomer(chat) {
+  const proxyName = getAdminProxyCustomerName(chat);
+  if (!proxyName) return;
+  if (quickEditModalRef.value) {
+    quickEditModalRef.value.open({
+      displayName: proxyName,
+      realName: proxyName,
+      authorName: proxyName,
+      uid: chat.proxyUid || null,
+    });
+  }
+}
+
 // ✅ Edit Customer Info Logic (ชื่อเล่น, ที่อยู่, ช่องทางติดต่อ)
 function editNickname(chat) {
+  const proxyName = getAdminProxyCustomerName(chat);
+  if (proxyName) {
+    editProxyCustomer(chat);
+    return;
+  }
   if (quickEditModalRef.value) {
     quickEditModalRef.value.open(chat);
+  }
+}
+
+// 🌟 เรนเดอร์ข้อความแชทพร้อมไฮไลต์ชื่อลูกค้าที่ admin จองให้
+function renderAdminProxyText(chat) {
+  const text = chat?.text || "";
+  const proxyName = getAdminProxyCustomerName(chat);
+  if (!proxyName || !text) return escapeHtml(text);
+
+  const escapedText = escapeHtml(text);
+  const escapedName = escapeHtml(proxyName);
+  const themeIdx = getCustomerColorTheme(proxyName);
+
+  // ป้องกัน regex special characters ในชื่อ
+  const regexSafe = escapedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${regexSafe})`, "gi");
+  return escapedText.replace(
+    regex,
+    `<span class="chat-highlight-name theme-${themeIdx}" title="คลิกเพื่อแก้ไขข้อมูลลูกค้า: $1"><i class="fa-solid fa-user-tag name-icon"></i>$1</span>`
+  );
+}
+
+function handleChatTextClick(event, chat) {
+  if (event?.target && event.target.closest(".chat-highlight-name")) {
+    event.stopPropagation();
+    editProxyCustomer(chat);
   }
 }
 
@@ -1725,6 +1791,172 @@ async function refreshChat() {
   background: rgba(245, 158, 11, 0.2);
   color: #fbbf24;
   border: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+/* 🌟 Customer Name Highlight in Chat Bubble Text (Deep selector for v-html) */
+:deep(.chat-highlight-name) {
+  display: inline-flex !important;
+  align-items: center !important;
+  font-weight: 700 !important;
+  padding: 2px 9px !important;
+  margin: 0 3px !important;
+  border-radius: 8px !important;
+  font-size: 0.95em !important;
+  line-height: 1.35 !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  vertical-align: middle !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+:deep(.chat-highlight-name .name-icon) {
+  font-size: 0.78em !important;
+  margin-right: 5px !important;
+  opacity: 0.9 !important;
+  vertical-align: middle !important;
+}
+
+:deep(.chat-highlight-name:hover) {
+  transform: translateY(-1px) scale(1.03) !important;
+  filter: brightness(1.2) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 🎨 12 Distinct High-Contrast Customer Color Themes */
+/* 0. Emerald Green */
+:deep(.chat-highlight-name.theme-0) {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.28), rgba(5, 150, 105, 0.15)) !important;
+  border: 1.5px solid #10b981 !important;
+  color: #a7f3d0 !important;
+}
+:deep(.chat-highlight-name.theme-0:hover) {
+  border-color: #34d399 !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.5) !important;
+}
+
+/* 1. Sky Blue */
+:deep(.chat-highlight-name.theme-1) {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.28), rgba(2, 132, 199, 0.15)) !important;
+  border: 1.5px solid #0ea5e9 !important;
+  color: #bae6fd !important;
+}
+:deep(.chat-highlight-name.theme-1:hover) {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 14px rgba(14, 165, 233, 0.5) !important;
+}
+
+/* 2. Amber / Gold */
+:deep(.chat-highlight-name.theme-2) {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.15)) !important;
+  border: 1.5px solid #f59e0b !important;
+  color: #fde68a !important;
+}
+:deep(.chat-highlight-name.theme-2:hover) {
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.5) !important;
+}
+
+/* 3. Violet / Purple */
+:deep(.chat-highlight-name.theme-3) {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.28), rgba(124, 58, 237, 0.15)) !important;
+  border: 1.5px solid #8b5cf6 !important;
+  color: #ddd6fe !important;
+}
+:deep(.chat-highlight-name.theme-3:hover) {
+  border-color: #a78bfa !important;
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.5) !important;
+}
+
+/* 4. Rose / Crimson Pink */
+:deep(.chat-highlight-name.theme-4) {
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.28), rgba(225, 29, 72, 0.15)) !important;
+  border: 1.5px solid #f43f5e !important;
+  color: #fecdd3 !important;
+}
+:deep(.chat-highlight-name.theme-4:hover) {
+  border-color: #fb7185 !important;
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.5) !important;
+}
+
+/* 5. Mint / Teal */
+:deep(.chat-highlight-name.theme-5) {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.28), rgba(13, 148, 136, 0.15)) !important;
+  border: 1.5px solid #14b8a6 !important;
+  color: #99f6e4 !important;
+}
+:deep(.chat-highlight-name.theme-5:hover) {
+  border-color: #2dd4bf !important;
+  box-shadow: 0 0 14px rgba(20, 184, 166, 0.5) !important;
+}
+
+/* 6. Lime Green */
+:deep(.chat-highlight-name.theme-6) {
+  background: linear-gradient(135deg, rgba(132, 204, 22, 0.28), rgba(101, 163, 13, 0.15)) !important;
+  border: 1.5px solid #84cc16 !important;
+  color: #d9f99d !important;
+}
+:deep(.chat-highlight-name.theme-6:hover) {
+  border-color: #a3e635 !important;
+  box-shadow: 0 0 14px rgba(132, 204, 22, 0.5) !important;
+}
+
+/* 7. Fuchsia / Magenta */
+:deep(.chat-highlight-name.theme-7) {
+  background: linear-gradient(135deg, rgba(217, 70, 239, 0.28), rgba(192, 38, 211, 0.15)) !important;
+  border: 1.5px solid #d946ef !important;
+  color: #f5d0fe !important;
+}
+:deep(.chat-highlight-name.theme-7:hover) {
+  border-color: #e879f9 !important;
+  box-shadow: 0 0 14px rgba(217, 70, 239, 0.5) !important;
+}
+
+/* 8. Coral / Orange */
+:deep(.chat-highlight-name.theme-8) {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.28), rgba(234, 88, 12, 0.15)) !important;
+  border: 1.5px solid #f97316 !important;
+  color: #fed7aa !important;
+}
+:deep(.chat-highlight-name.theme-8:hover) {
+  border-color: #fb923c !important;
+  box-shadow: 0 0 14px rgba(249, 115, 22, 0.5) !important;
+}
+
+/* 9. Indigo / Blue */
+:deep(.chat-highlight-name.theme-9) {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.28), rgba(79, 70, 229, 0.15)) !important;
+  border: 1.5px solid #6366f1 !important;
+  color: #c7d2fe !important;
+}
+:deep(.chat-highlight-name.theme-9:hover) {
+  border-color: #818cf8 !important;
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.5) !important;
+}
+
+/* 10. Cyan / Electric Blue */
+:deep(.chat-highlight-name.theme-10) {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.28), rgba(8, 145, 178, 0.15)) !important;
+  border: 1.5px solid #06b6d4 !important;
+  color: #a5f3fc !important;
+}
+:deep(.chat-highlight-name.theme-10:hover) {
+  border-color: #22d3ee !important;
+  box-shadow: 0 0 14px rgba(6, 182, 212, 0.5) !important;
+}
+
+/* 11. Pink / Pastel Rose */
+:deep(.chat-highlight-name.theme-11) {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.28), rgba(219, 39, 119, 0.15)) !important;
+  border: 1.5px solid #ec4899 !important;
+  color: #fbcfe8 !important;
+}
+:deep(.chat-highlight-name.theme-11:hover) {
+  border-color: #f472b6 !important;
+  box-shadow: 0 0 14px rgba(236, 72, 153, 0.5) !important;
 }
 
 /* 🎯 Instant 1-Click Filter Button on Chat Row */

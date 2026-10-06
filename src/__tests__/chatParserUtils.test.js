@@ -20,6 +20,8 @@ import {
   resolveShippingCycleDate,
   formatDateToYYYYMMDD,
   formatShippingCycleLabel,
+  extractAdminCustomerName,
+  getCustomerColorTheme,
 } from "../utils/chatParserUtils";
 
 describe("chatParserUtils", () => {
@@ -43,6 +45,35 @@ describe("chatParserUtils", () => {
       const col2 = stringToColor("คุณมะนาว");
       expect(col1).toBe(col2);
       expect(col1).toMatch(/^hsl\(\d+, 85%, 75%\)$/);
+    });
+  });
+
+  describe("getCustomerColorTheme()", () => {
+    it("returns consistent theme index 0-11 for same customer name", () => {
+      const idx1 = getCustomerColorTheme("กุญสิญา");
+      const idx2 = getCustomerColorTheme("กุญสิญา");
+      expect(idx1).toBe(idx2);
+      expect(idx1).toBeGreaterThanOrEqual(0);
+      expect(idx1).toBeLessThan(12);
+    });
+
+    it("ignores leading @ and whitespace differences", () => {
+      expect(getCustomerColorTheme("@กุญสิญา")).toBe(getCustomerColorTheme("กุญสิญา"));
+      expect(getCustomerColorTheme(" กุญสิญา ")).toBe(getCustomerColorTheme("กุญสิญา"));
+    });
+
+    it("assigns different themes for different customers", () => {
+      const theme1 = getCustomerColorTheme("กุญสิญา");
+      const theme2 = getCustomerColorTheme("วาศินา");
+      const theme3 = getCustomerColorTheme("ตุ๊ก บำรุงรัตน์");
+      expect(theme1).not.toBe(theme2);
+      expect(theme2).not.toBe(theme3);
+    });
+
+    it("handles empty or invalid values safely", () => {
+      expect(getCustomerColorTheme("")).toBe(0);
+      expect(getCustomerColorTheme(null)).toBe(0);
+      expect(getCustomerColorTheme(undefined)).toBe(0);
     });
   });
 
@@ -441,6 +472,40 @@ describe("chatParserUtils", () => {
     });
   });
 
+  describe("👤 extractAdminCustomerName — Extract Customer Name from Admin Messages", () => {
+    it("extracts customer name from single-buy number-first pattern", () => {
+      expect(extractAdminCustomerName("18 ตุ๊ก บำรุงรัตน์")).toBe("ตุ๊ก บำรุงรัตน์");
+      expect(extractAdminCustomerName("28 วาศินา")).toBe("วาศินา");
+      expect(extractAdminCustomerName("32 กุญสิญา")).toBe("กุญสิญา");
+      expect(extractAdminCustomerName("52 กุญสิญา")).toBe("กุญสิญา");
+      expect(extractAdminCustomerName("58 กุญสิญา")).toBe("กุญสิญา");
+      expect(extractAdminCustomerName("50 ,tit")).toBe("tit");
+    });
+
+    it("extracts customer name from name-first pattern", () => {
+      expect(extractAdminCustomerName("ตุ๊ก บำรุงรัตน์ 18")).toBe("ตุ๊ก บำรุงรัตน์");
+      expect(extractAdminCustomerName("วาศินา 28")).toBe("วาศินา");
+      expect(extractAdminCustomerName("พี่อ้อย 20")).toBe("พี่อ้อย");
+    });
+
+    it("extracts customer name from multi-buy pattern", () => {
+      expect(extractAdminCustomerName("3 4 วาศินา")).toBe("วาศินา");
+      expect(extractAdminCustomerName("15 25 วาศินา")).toBe("วาศินา");
+      expect(extractAdminCustomerName("26 38 74 มะระ")).toBe("มะระ");
+    });
+
+    it("extracts customer name from admin shipping commands", () => {
+      expect(extractAdminCustomerName("กุญสิญา ส่งเลย")).toBe("กุญสิญา");
+      expect(extractAdminCustomerName("ตุ๊ก บำรุงรัตน์ ส่งวันนี้")).toBe("ตุ๊ก บำรุงรัตน์");
+      expect(extractAdminCustomerName("พัชราวัน ส่งเลย")).toBe("พัชราวัน");
+    });
+
+    it("returns null for non-admin customer or general chat messages", () => {
+      expect(extractAdminCustomerName("สวัสดีค่ะ")).toBeNull();
+      expect(extractAdminCustomerName("มีสีอะไรบ้าง")).toBeNull();
+      expect(extractAdminCustomerName("")).toBeNull();
+    });
+  });
 });
 
 

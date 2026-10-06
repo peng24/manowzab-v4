@@ -20,6 +20,10 @@ description: How to update Patch Notes and version after making code changes
      - Date (current date in YYYY-MM-DD format)
      - List of changes made
 
-3. **Verify** that `src/stores/system.js` reads version from `package.json` correctly
+3. **Update & Prune `src/data/changelog.js` (Changelog Pruning Policy)**
+   - Add the structured change record (added / improved / fixed / removed)
+   - **กฎการตัด Changelog เก่าออก**: ตรวจสอบและคงเหลือเฉพาะ **15–20 เวอร์ชันล่าสุด** เท่านั้น หากเกินให้ตัดเวอร์ชันเก่าท้ายไฟล์ออกเสมอ เพื่อไม่ให้ไฟล์ใหญ่และลดขนาด Bundle
 
-4. **Run `/verify` workflow** to ensure no checklist items were broken
+4. **Verify** that `src/stores/system.js` reads version from `package.json` correctly
+
+5. **Run `/verify` workflow** to ensure no checklist items were broken

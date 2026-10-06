@@ -103,6 +103,22 @@ export function stringToColor(str) {
   return color;
 }
 
+/**
+ * Deterministic color theme index (0-11) based on customer name
+ * @param {string} name 
+ * @returns {number} Theme index between 0 and 11
+ */
+export function getCustomerColorTheme(name) {
+  if (!name || typeof name !== "string") return 0;
+  const clean = name.trim().toLowerCase().replace(/^@+/, "");
+  if (!clean) return 0;
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) {
+    hash = clean.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % 12;
+}
+
 // Module-scoped compiled regex instance
 const ADMIN_REGEX = /admin|แอดมิน/i;
 
@@ -114,6 +130,72 @@ const ADMIN_REGEX = /admin|แอดมิน/i;
  */
 export function isAdminUser(displayName = "", realName = "") {
   return ADMIN_REGEX.test(displayName) || ADMIN_REGEX.test(realName);
+}
+
+/**
+ * Extracts target customer name from admin messages (admin booking or shipping proxy)
+ * e.g. "18 ตุ๊ก บำรุงรัตน์" -> "ตุ๊ก บำรุงรัตน์"
+ *      "28 วาศินา" -> "วาศินา"
+ *      "32 กุญสิญา" -> "กุญสิญา"
+ *      "กุญสิญา ส่งเลย" -> "กุญสิญา"
+ *      "3 4 วาศินา" -> "วาศินา"
+ *      "วาศินา 28" -> "วาศินา"
+ *      "50 ,tit" -> "tit"
+ * @param {string} text
+ * @returns {string|null}
+ */
+export function extractAdminCustomerName(text) {
+  if (!text || typeof text !== "string") return null;
+  const raw = text.trim();
+  const normalized = thaiToArabic(raw);
+
+  // 1. Multi-buy: e.g. "3 4 วาศินา" or "วาศินา 3 4" or "26 38 74 มะระ"
+  const mb = normalized.match(multiBuyRegex);
+  if (mb) {
+    const p1 = mb[1]?.trim();
+    const p3 = mb[3]?.trim();
+    const candidate = p1 || p3;
+    if (candidate && !isAdminUser(candidate)) {
+      const clean = candidate.replace(/^[^\u0E00-\u0E7Fa-zA-Z]+|[^\w\u0E00-\u0E7F]+$/g, "").trim();
+      if (clean && !isAdminUser(clean)) return clean;
+    }
+  }
+
+  // 2. Admin num first: e.g. "18 ตุ๊ก บำรุงรัตน์", "28 วาศินา", "50 ,tit"
+  const numFirst = normalized.match(/^(\d+)\s*[,.\/;:\-_=]*\s*([ก-๛a-zA-Z].*)$/);
+  if (numFirst) {
+    const candidate = numFirst[2].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+|[^\w\u0E00-\u0E7F]+$/g, "").trim();
+    if (candidate && !isAdminUser(candidate)) return candidate;
+  }
+
+  // 3. Admin name first: e.g. "ตุ๊ก บำรุงรัตน์ 18", "พี่อ้อย 20", "วาศินา 28"
+  const nameFirst = normalized.match(/^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s*[-_:=]?\s*(\d+)$/);
+  if (nameFirst) {
+    const candidate = nameFirst[1].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+|[^\w\u0E00-\u0E7F]+$/g, "").trim();
+    if (candidate && !isAdminUser(candidate)) return candidate;
+  }
+
+  // 4. Shipping command: e.g. "กุญสิญา ส่งเลย", "ตุ๊ก บำรุงรัตน์ ส่งวันนี้", "พัชราวัน ส่งเลย"
+  if (shippingRegex.test(normalized)) {
+    const cleaned = normalized
+      .replace(/ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้|ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|ส่ง(?:วัน)?\s*(?:อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)|ส่ง/gi, "")
+      .replace(/โอนแล้ว|แจ้งโอน|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม|รอบส่ง|พัสดุ|flash|kerry|j&t|jt/gi, "")
+      .replace(/^(?:ของพี่|ของ|พี่)\s*/, "")
+      .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
+      .trim();
+    if (cleaned.length > 0 && !isAdminUser(cleaned) && !/^\d+$/.test(cleaned)) {
+      return cleaned;
+    }
+  }
+
+  // 5. Dash buy: e.g. "ตุ๊ก-18"
+  const dashMatch = normalized.match(dashBuyRegex);
+  if (dashMatch) {
+    const candidate = dashMatch[1].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+|[^\w\u0E00-\u0E7F]+$/g, "").trim();
+    if (candidate && !isAdminUser(candidate)) return candidate;
+  }
+
+  return null;
 }
 
 /**

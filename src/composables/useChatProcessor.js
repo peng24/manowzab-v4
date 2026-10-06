@@ -51,6 +51,7 @@ import {
   stringToColor,
   isAdminUser,
   isDateMismatch,
+  extractAdminCustomerName,
 } from "../utils/chatParserUtils";
 
 // ✅ Toast Notification Mixin
@@ -336,12 +337,15 @@ export function useChatProcessor() {
         });
 
         // ✅ Push message to Firebase (Listener will update UI)
+        const isProxyMulti = Boolean(proxyName && isAdmin);
         chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
           id: item.id,
           text: msg,
           messageRuns: extractMessageRuns(item),
           authorName: realName,
           displayName,
+          proxyCustomerName: isProxyMulti ? ownerName : null,
+          proxyUid: isProxyMulti ? ownerUid : null,
           phoneticName,
           realName: realName,
           uid: uid,
@@ -746,6 +750,8 @@ export function useChatProcessor() {
           messageRuns: extractMessageRuns(item),
           authorName: realName,
           displayName: isProxyBooking ? `${ownerName} (โดย ${displayName})` : displayName,
+          proxyCustomerName: isProxyBooking ? ownerName : null,
+          proxyUid: isProxyBooking ? ownerUid : null,
           phoneticName: effectivePhoneticName,
           realName: realName,
           uid: uid,
@@ -910,12 +916,14 @@ export function useChatProcessor() {
         }
       }
 
+      const proxyCustomerName = isAdmin ? extractAdminCustomerName(msg) : null;
       await chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
         id: item.id,
         text: msg,
         messageRuns: extractMessageRuns(item),
         authorName: realName,
         displayName,
+        proxyCustomerName,
         phoneticName,
         realName: realName,
         uid: uid,

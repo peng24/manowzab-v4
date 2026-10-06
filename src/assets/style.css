@@ -1216,6 +1216,7 @@ body {
   -webkit-backdrop-filter: blur(16px);
   width: 520px;
   max-width: 92%;
+  min-height: 420px;
   max-height: 90vh;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1263,6 +1264,7 @@ body {
   padding: 16px 20px;
   overflow-y: auto;
   flex: 1;
+  min-height: 280px;
 }
 
 /* ✅ Prominent Price Input Section */
@@ -1507,18 +1509,36 @@ body {
 
 .autocomplete-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 4px);
   left: 0;
   right: 0;
   z-index: 10010;
-  background: #1e1e1e;
-  border: 1px solid #555;
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  max-height: 200px;
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  max-height: 220px;
   overflow-y: auto;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  overscroll-behavior: contain;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
   animation: dropdownFadeIn 0.15s ease-out;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 @keyframes dropdownFadeIn {
@@ -1534,10 +1554,10 @@ body {
 
 .autocomplete-item {
   padding: 10px 14px;
-  color: #ccc;
+  color: #e4e4e7;
   cursor: pointer;
   font-size: 0.95em;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   transition:
     background 0.15s,
     color 0.15s;
@@ -1545,12 +1565,16 @@ body {
 
 .autocomplete-item:last-child {
   border-bottom: none;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 10px 10px;
+}
+
+.autocomplete-item:first-child {
+  border-radius: 10px 10px 0 0;
 }
 
 .autocomplete-item:hover,
 .autocomplete-item.active {
-  background: rgba(0, 230, 118, 0.15);
+  background: rgba(16, 185, 129, 0.2);
   color: #fff;
 }
 
@@ -1560,7 +1584,7 @@ body {
 }
 
 .autocomplete-highlight {
-  color: #00e676;
+  color: #34d399;
   font-weight: 700;
 }
 

@@ -382,8 +382,8 @@ async function open(chat) {
   }
 }
 
-function close() {
-  if (isSaving.value) return;
+function close(force = false) {
+  if (isSaving.value && !force) return;
   isOpen.value = false;
   currentChat.value = null;
 }
@@ -669,7 +669,8 @@ async function save() {
       showConfirmButton: false,
       timer: 1800,
     });
-    close();
+    isSaving.value = false;
+    close(true);
   } catch (err) {
     console.error("CustomerQuickEditModal save error:", err);
     Swal.fire({

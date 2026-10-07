@@ -1,5 +1,6 @@
 import { useSystemStore } from "../stores/system";
 import { logger } from "../utils/logger";
+import { stripYouTubeEmotes } from "../data/youtubeEmotes";
 
 // ✅ Global Storage to Prevent Garbage Collection
 if (typeof window !== "undefined") {
@@ -152,6 +153,9 @@ export class TextToSpeech {
 
     // Replace emoji with empty string
     let cleanText = text.replace(emojiRegex, "");
+
+    // ✅ Remove YouTube custom emote shortcodes (e.g. :yt:, :face-blue-smiling:)
+    cleanText = stripYouTubeEmotes(cleanText);
 
     // Remove specific special chars that might annoy TTS (optional)
     cleanText = cleanText.replace(/[#*~_]/g, "");

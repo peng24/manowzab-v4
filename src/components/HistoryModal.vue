@@ -1644,22 +1644,27 @@ async function openCleanupModal() {
 
 <style scoped>
 .history-modal-container {
-  background: var(--bg-panel, #0f172a);
+  background: rgba(11, 15, 23, 0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   width: 95%;
   max-width: 1100px;
   height: 85vh;
-  border-radius: 12px;
-  border: 1px solid var(--border-color, #334155);
+  border-radius: 20px;
+  border: 1px solid rgba(251, 191, 36, 0.22);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 32px 100px rgba(0, 0, 0, 0.8),
+    0 0 50px rgba(16, 185, 129, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .modal-header {
   padding: 15px 20px;
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
+  background: linear-gradient(180deg, rgba(16, 22, 38, 0.95), rgba(11, 15, 23, 0.95));
+  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1668,7 +1673,8 @@ async function openCleanupModal() {
 .modal-header h2 {
   margin: 0;
   font-size: 1.25rem;
-  color: #fff;
+  color: #fbbf24;
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1680,8 +1686,12 @@ async function openCleanupModal() {
   color: #94a3b8;
   font-size: 1.5rem;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
-.btn-close:hover { color: #fff; }
+.btn-close:hover {
+  color: #fff;
+  transform: rotate(90deg);
+}
 
 .modal-body {
   display: flex;
@@ -1692,11 +1702,12 @@ async function openCleanupModal() {
 /* Sidebar */
 .sidebar {
   width: 300px;
-  background: #1e293b;
-  border-right: 1px solid #334155;
+  background: rgba(13, 17, 28, 0.92);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
 }
+
 
 .sidebar-header {
   padding: 10px 15px;

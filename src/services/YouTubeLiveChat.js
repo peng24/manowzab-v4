@@ -1,4 +1,5 @@
 import { logger } from "../utils/logger";
+import { parseYouTubeEmotesToRuns, hasYouTubeEmotes } from "../data/youtubeEmotes";
 
 export class YouTubeLiveChat {
   constructor(apiKeys, initialKeyIndex = 0) {
@@ -287,25 +288,28 @@ export function extractMessageRuns(item) {
   if (item.snippet?.textMessageDetails?.messageText) {
     const messageText = item.snippet.textMessageDetails.messageText;
 
-    // Case A: Simple string → wrap in a single text run
+    // Case A: Simple string → parse YouTube emotes if present, otherwise single text run
     if (typeof messageText === 'string') {
-      return [{ text: messageText }];
+      return parseYouTubeEmotesToRuns(messageText);
     }
 
     // Case B: Array of runs (text + emojis)
     if (Array.isArray(messageText)) {
-      return messageText.map(run => {
+      return messageText.flatMap(run => {
         if (run.text) {
-          return { text: run.text };
+          if (hasYouTubeEmotes(run.text)) {
+            return parseYouTubeEmotesToRuns(run.text);
+          }
+          return [{ text: run.text }];
         } else if (run.emoji) {
-          return {
+          return [{
             emoji: {
               emojiId: run.emoji.emojiId,
               image: run.emoji.image
             }
-          };
+          }];
         }
-        return { text: '' };
+        return [{ text: '' }];
       });
     }
   }

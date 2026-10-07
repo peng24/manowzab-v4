@@ -66,9 +66,10 @@
     <!-- 🏷️ Chat Intent Filter Tabs -->
     <div class="chat-intent-tabs">
       <button class="chat-tab" :class="{ active: selectedChatTab === 'all' }" @click="selectedChatTab = 'all'">ทั้งหมด</button>
-      <button class="chat-tab tab-cf" :class="{ active: selectedChatTab === 'buy' }" @click="selectedChatTab = 'buy'">🛒 เฉพาะ CF</button>
+      <button class="chat-tab tab-cf" :class="{ active: selectedChatTab === 'buy' }" @click="selectedChatTab = 'buy'">🛒 จอง (CF)</button>
+      <button class="chat-tab tab-shipping" :class="{ active: selectedChatTab === 'shipping' }" @click="selectedChatTab = 'shipping'">🚚 ส่ง</button>
       <button class="chat-tab tab-cancel" :class="{ active: selectedChatTab === 'cancel' }" @click="selectedChatTab = 'cancel'">❌ ยกเลิก</button>
-      <button class="chat-tab tab-admin" :class="{ active: selectedChatTab === 'admin' }" @click="selectedChatTab = 'admin'">⚡ ระบบ/แอดมิน</button>
+      <button class="chat-tab tab-admin" :class="{ active: selectedChatTab === 'admin' }" @click="selectedChatTab = 'admin'">⚡ แอดมิน</button>
       <button
         type="button"
         class="chat-tab tab-author"
@@ -80,6 +81,7 @@
         <span>{{ selectedAuthors.length > 0 ? `กรองชื่อ (${selectedAuthors.length})` : 'กรองตามชื่อ' }}</span>
       </button>
     </div>
+
 
     <!-- 🎯 Active Author Filter Bar -->
     <div v-if="selectedAuthors.length > 0" class="active-author-bar">
@@ -200,22 +202,41 @@
           :key="chat.id"
           v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color, isAuthorFiltered(chat), getCustomerMetaKey(chat)]"
           :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type]"
+          :style="getChatRowStyle(chat)"
         >
-          <!-- Avatar Left -->
-          <div class="avatar-container">
-            <img
-              :src="chat.avatar"
-              class="avatar"
-              loading="lazy"
-              decoding="async"
-              @error="(e) => (e.target.style.display = 'none')"
-            />
-            <div
-              class="avatar-fallback"
-              :style="{ backgroundColor: chat.color }"
-            >
-              {{ chat.displayName?.[0] || "?" }}
+
+          <!-- Avatar Left Column (Avatar + Action Badge under it) -->
+          <div class="avatar-col">
+            <div class="avatar-container">
+              <img
+                :src="chat.avatar"
+                class="avatar"
+                loading="lazy"
+                decoding="async"
+                @error="(e) => (e.target.style.display = 'none')"
+              />
+              <div
+                class="avatar-fallback"
+                :style="{ backgroundColor: chat.color }"
+              >
+                {{ chat.displayName?.[0] || "?" }}
+              </div>
             </div>
+
+            <!-- 🏷️ Intent Action Badge Under Profile Avatar (จอง / ส่ง / ยกเลิก) -->
+            <span
+              v-if="getIntentBadge(chat.type)"
+              class="status-badge-under"
+              :class="getIntentBadge(chat.type).class"
+            >
+              {{ getIntentBadge(chat.type).icon }} {{ getIntentBadge(chat.type).label }}
+            </span>
+            <span
+              v-else-if="chat.type === 'spam'"
+              class="status-badge-under badge-spam status-emoji-only"
+            >
+              💬
+            </span>
           </div>
 
           <!-- Message Bubble Right -->
@@ -231,34 +252,39 @@
                 {{ chat.displayName }}
               </span>
 
-              <!-- 🏷️ Customer Status Micro-Badges (Address, Channel, Payment) -->
-              <span
-                v-if="getCustomerMeta(chat)?.hasAddress"
-                class="cust-mini-badge addr"
-                title="📍 มีที่อยู่จัดส่งแล้ว"
+              <!-- 🏷️ Customer Status Micro-Badges Cluster (Address, Channel, Payment) -->
+              <div
+                v-if="getCustomerMeta(chat)?.hasAddress || getCustomerMeta(chat)?.contactChannel || getCustomerMeta(chat)?.paymentType"
+                class="cust-meta-cluster"
               >
-                <i class="fa-solid fa-location-dot"></i>
-              </span>
+                <span
+                  v-if="getCustomerMeta(chat)?.hasAddress"
+                  class="cust-mini-badge addr"
+                  title="📍 มีที่อยู่จัดส่งแล้ว"
+                >
+                  <i class="fa-solid fa-location-dot"></i>
+                </span>
 
-              <span
-                v-if="getCustomerMeta(chat)?.contactChannel"
-                class="cust-mini-badge channel"
-                :class="getCustomerMeta(chat).contactChannel"
-                :title="`ช่องทางติดต่อ: ${getChannelLabel(getCustomerMeta(chat).contactChannel)}`"
-              >
-                <i :class="getChannelIcon(getCustomerMeta(chat).contactChannel)"></i>
-                <span class="mini-txt">{{ getChannelShortText(getCustomerMeta(chat).contactChannel) }}</span>
-              </span>
+                <span
+                  v-if="getCustomerMeta(chat)?.contactChannel"
+                  class="cust-mini-badge channel"
+                  :class="getCustomerMeta(chat).contactChannel"
+                  :title="`ช่องทางติดต่อ: ${getChannelLabel(getCustomerMeta(chat).contactChannel)}`"
+                >
+                  <i :class="getChannelIcon(getCustomerMeta(chat).contactChannel)"></i>
+                  <span class="mini-txt">{{ getChannelShortText(getCustomerMeta(chat).contactChannel) }}</span>
+                </span>
 
-              <span
-                v-if="getCustomerMeta(chat)?.paymentType"
-                class="cust-mini-badge pay"
-                :class="getCustomerMeta(chat).paymentType"
-                :title="`การจัดส่ง/ชำระเงิน: ${getCustomerMeta(chat).paymentType === 'cod' ? 'COD (เก็บปลายทาง)' : 'โอนเงิน'}`"
-              >
-                <i :class="getCustomerMeta(chat).paymentType === 'cod' ? 'fa-solid fa-box' : 'fa-solid fa-money-bill-transfer'"></i>
-                <span class="mini-txt">{{ getCustomerMeta(chat).paymentType === 'cod' ? 'COD' : 'โอน' }}</span>
-              </span>
+                <span
+                  v-if="getCustomerMeta(chat)?.paymentType"
+                  class="cust-mini-badge pay"
+                  :class="getCustomerMeta(chat).paymentType"
+                  :title="`การจัดส่ง/ชำระเงิน: ${getCustomerMeta(chat).paymentType === 'cod' ? 'COD (เก็บปลายทาง)' : 'โอนเงิน'}`"
+                >
+                  <i :class="getCustomerMeta(chat).paymentType === 'cod' ? 'fa-solid fa-box' : 'fa-solid fa-money-bill-transfer'"></i>
+                  <span class="mini-txt">{{ getCustomerMeta(chat).paymentType === 'cod' ? 'COD' : 'โอน' }}</span>
+                </span>
+              </div>
 
               <!-- 🎯 Instant 1-Click Filter Button -->
               <button
@@ -270,20 +296,8 @@
               >
                 <i class="fa-solid fa-filter"></i>
               </button>
-
-              <!-- ✅ Intent Badge Separated (ยกเว้น buy/เอฟ ซ่อนไว้ตามต้องการ) -->
-              <span
-                v-if="getIntentBadge(chat.type)"
-                class="status-badge"
-                :class="getIntentBadge(chat.type).class"
-              >
-                {{ getIntentBadge(chat.type).icon }}
-                {{ getIntentBadge(chat.type).label }}
-              </span>
-              <span v-else-if="chat.type === 'spam'" class="status-emoji-only"
-                >💬</span
-              >
             </div>
+
 
             <div class="chat-bubble">
               <div class="chat-text">
@@ -291,11 +305,11 @@
                 <template v-if="getAdminProxyCustomerName(chat)">
                   <span v-html="renderAdminProxyText(chat)" @click="handleChatTextClick($event, chat)"></span>
                 </template>
-                <!-- ✅ Render message with emoji support -->
+                <!-- ✅ Render message with emoji & YouTube custom emote support -->
                 <template
-                  v-else-if="chat.messageRuns && chat.messageRuns.length > 0"
+                  v-else-if="getChatRuns(chat)"
                 >
-                  <template v-for="(run, idx) in chat.messageRuns" :key="idx">
+                  <template v-for="(run, idx) in getChatRuns(chat)" :key="idx">
                     <span v-if="run.text">{{ run.text }}</span>
                     <img
                       v-else-if="run.emoji && run.emoji.image"
@@ -349,6 +363,7 @@ import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import { sanitizeDbKey, escapeHtml } from "../utils/dbUtils";
 import { extractAdminCustomerName, getCustomerColorTheme } from "../utils/chatParserUtils";
+import { parseYouTubeEmotesToRuns, hasYouTubeEmotes } from "../data/youtubeEmotes";
 import { logger } from "../utils/logger";
 import { normalizeName } from "../utils/addressParser";
 
@@ -597,8 +612,9 @@ const filteredVisibleMessages = computed(() => {
     if (
       tab === "all" ||
       (tab === "buy" && m.type === "buy") ||
+      (tab === "shipping" && m.type === "shipping") ||
       (tab === "cancel" && m.type === "cancel") ||
-      (tab === "admin" && (m.isAdmin || m.type === "shipping" || m.type === "question"))
+      (tab === "admin" && (m.isAdmin || m.type === "question"))
     ) {
       result.unshift(m);
     }
@@ -615,15 +631,64 @@ const hasMoreMessages = computed(() => {
 function getIntentBadge(type) {
   switch (type) {
     case "buy":
-    case "cancel":
+      return { icon: "🛒", label: "จอง", class: "badge-buy" };
     case "shipping":
-      return null; // ✅ ซ่อนแบดจ์ "เอฟ", "ยกเลิก", และ "ส่ง" ตามที่ผู้ใช้ต้องการ
+      return { icon: "🚚", label: "ส่ง", class: "badge-shipping" };
+    case "cancel":
+      return { icon: "❌", label: "ยกเลิก", class: "badge-cancel" };
     case "question":
       return { icon: "💬", label: "ถาม", class: "badge-question" };
     default:
-      return null; // Return null so we can fallback to just 💬 for spam
+      return null;
   }
 }
+
+// 🎨 Helper: Generate vibrant, unified background tint and accent border from customer signature color
+function getChatRowStyle(chat) {
+  if (!chat) return {};
+  // Priority actions use dedicated class themes (buy, shipping, cancel, admin)
+  if (chat.type === "buy" || chat.type === "shipping" || chat.type === "cancel" || chat.isAdmin) {
+    return {};
+  }
+
+  const rawColor = chat.color;
+  if (!rawColor) return {};
+
+  let tint25 = "rgba(56, 189, 248, 0.25)";
+  let tint30 = "rgba(56, 189, 248, 0.30)";
+  let tint55 = "rgba(56, 189, 248, 0.55)";
+  let tint22 = "rgba(56, 189, 248, 0.22)";
+
+  if (rawColor.startsWith("hsl")) {
+    tint25 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.25)");
+    tint30 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.30)");
+    tint55 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.55)");
+    tint22 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.22)");
+  } else if (rawColor.startsWith("#")) {
+    const hex = rawColor.replace("#", "");
+    if (hex.length === 6) {
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      tint25 = `rgba(${r}, ${g}, ${b}, 0.25)`;
+      tint30 = `rgba(${r}, ${g}, ${b}, 0.30)`;
+      tint55 = `rgba(${r}, ${g}, ${b}, 0.55)`;
+      tint22 = `rgba(${r}, ${g}, ${b}, 0.22)`;
+    }
+  }
+
+  return {
+    borderLeft: `4.5px solid ${rawColor}`,
+    borderColor: tint55,
+    background: `linear-gradient(135deg, ${tint25} 0%, rgba(15, 23, 42, 0.75) 100%)`,
+    boxShadow: `0 4px 16px ${tint22}`,
+    "--bubble-bg": tint30,
+    "--bubble-border": tint55,
+    "--bubble-glow": tint22,
+  };
+}
+
+
 
 function formatTime(timestamp) {
   if (!timestamp) return "";
@@ -684,6 +749,26 @@ function handleChatTextClick(event, chat) {
     event.stopPropagation();
     editProxyCustomer(chat);
   }
+}
+
+// 🌟 Helper: Resolves message runs with automatic detection of YouTube official custom emotes
+function getChatRuns(chat) {
+  if (!chat) return null;
+  if (chat.messageRuns && chat.messageRuns.length > 0) {
+    if (chat.messageRuns.some((r) => r.text && hasYouTubeEmotes(r.text))) {
+      return chat.messageRuns.flatMap((run) => {
+        if (run.text && hasYouTubeEmotes(run.text)) {
+          return parseYouTubeEmotesToRuns(run.text);
+        }
+        return [run];
+      });
+    }
+    return chat.messageRuns;
+  }
+  if (chat.text && hasYouTubeEmotes(chat.text)) {
+    return parseYouTubeEmotesToRuns(chat.text);
+  }
+  return null;
 }
 
 // ตรวจจับการ Scroll
@@ -1017,13 +1102,13 @@ async function refreshChat() {
 </script>
 
 <style scoped>
-/* Dark Blue Theme */
+/* Dark Obsidian Theme */
 .chat-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #0f172a; /* Deep Blue Background */
-  border-left: 1px solid #1e293b;
+  background-color: #0b0f17; /* Deep Obsidian Background */
+  border-left: 1px solid rgba(251, 191, 36, 0.12);
   position: relative;
 }
 
@@ -1034,7 +1119,7 @@ async function refreshChat() {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  background: linear-gradient(180deg, rgba(13, 17, 28, 0.95) 0%, rgba(11, 15, 23, 0.98) 100%);
   transition: height 0.3s ease-out;
   color: #64748b;
   font-size: 0.9em;
@@ -1048,7 +1133,7 @@ async function refreshChat() {
 
 .pull-indicator.pulling i {
   transform: rotate(180deg);
-  color: #3b82f6;
+  color: #38bdf8;
 }
 
 .pull-indicator.refreshing i {
@@ -1073,15 +1158,16 @@ async function refreshChat() {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, rgba(11, 15, 23, 0.98) 0%, rgba(13, 17, 28, 0.95) 100%);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   position: relative;
   z-index: 20;
   gap: 8px;
   min-height: 46px;
   box-sizing: border-box;
 }
+
 
 .chat-header-left {
   display: flex;
@@ -1314,16 +1400,17 @@ async function refreshChat() {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* 🛒 Neon Emerald Glass Card (Buy / CF) */
+/* 🛒 Luxury Emerald Glass Card (Buy / CF) */
 .chat-row.buy {
-  background: linear-gradient(135deg, rgba(0, 230, 118, 0.16) 0%, rgba(0, 200, 83, 0.06) 100%);
-  border: 1.5px solid rgba(0, 230, 118, 0.4);
-  box-shadow: 0 4px 15px rgba(0, 230, 118, 0.14);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(245, 158, 11, 0.08) 100%) !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.6) !important;
+  border-left: 4.5px solid #10b981 !important;
+  box-shadow: 0 4px 18px rgba(16, 185, 129, 0.22) !important;
 }
 
 .chat-row.buy .chat-bubble {
-  background: rgba(0, 200, 83, 0.18);
-  border: 1px solid rgba(0, 230, 118, 0.3);
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
   color: #ffffff;
   font-weight: 600;
   font-size: 1.02em;
@@ -1331,42 +1418,46 @@ async function refreshChat() {
 
 /* ❌ Coral Amber Glass Card (Cancel) */
 .chat-row.cancel {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(185, 28, 28, 0.06) 100%);
-  border: 1.5px solid rgba(239, 68, 68, 0.4);
-  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.14);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(220, 38, 38, 0.08) 100%) !important;
+  border: 1.5px solid rgba(239, 68, 68, 0.6) !important;
+  border-left: 4.5px solid #ef4444 !important;
+  box-shadow: 0 4px 18px rgba(239, 68, 68, 0.22) !important;
 }
 
 .chat-row.cancel .chat-bubble {
-  background: rgba(185, 28, 28, 0.18);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
   color: #ffffff;
 }
 
-/* 📦 Shipping Message */
+/* 📦 Shipping Message (Royal Violet) */
 .chat-row.shipping {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(126, 34, 206, 0.06) 100%);
-  border: 1.5px solid rgba(168, 85, 247, 0.4);
-  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.14);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(126, 34, 206, 0.08) 100%) !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.6) !important;
+  border-left: 4.5px solid #a855f7 !important;
+  box-shadow: 0 4px 18px rgba(168, 85, 247, 0.22) !important;
 }
 
 .chat-row.shipping .chat-bubble {
-  background: rgba(126, 34, 206, 0.25);
+  background: rgba(168, 85, 247, 0.18);
   border: 1px solid rgba(168, 85, 247, 0.35);
   color: #ffffff;
 }
 
 /* 👑 Admin / Proxy Message */
 .chat-row.admin {
-  background: linear-gradient(135deg, rgba(124, 77, 255, 0.18) 0%, rgba(81, 45, 168, 0.06) 100%);
-  border: 1.5px solid rgba(124, 77, 255, 0.4);
-  box-shadow: 0 4px 15px rgba(124, 77, 255, 0.14);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(124, 77, 255, 0.08) 100%) !important;
+  border: 1.5px solid rgba(245, 158, 11, 0.5) !important;
+  border-left: 4.5px solid #fbbf24 !important;
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.18) !important;
 }
 
 .chat-row.admin .chat-bubble {
-  background: rgba(81, 45, 168, 0.2);
-  border: 1px solid rgba(124, 77, 255, 0.3);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
   color: #ffffff;
 }
+
 
 /* ✅ TransitionGroup Animations */
 .chat-list-enter-active {
@@ -1387,6 +1478,36 @@ async function refreshChat() {
   transform: translateX(-15px);
 }
 
+.avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 48px;
+  gap: 4px;
+}
+
+.status-badge-under {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 2.5px 6px;
+  border-radius: 8px;
+  font-size: 0.68em;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  line-height: 1.2;
+  letter-spacing: -0.2px;
+}
+
+.status-badge-under.badge-spam {
+  background: rgba(100, 116, 139, 0.4);
+  color: #94a3b8;
+  padding: 1px 4px;
+}
+
 .avatar-container {
   flex-shrink: 0;
   position: relative;
@@ -1404,14 +1525,25 @@ async function refreshChat() {
 }
 
 .chat-row.buy .avatar {
-  border-color: #00e676;
-  box-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
+  border-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.chat-row.shipping .avatar {
+  border-color: #a855f7;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+}
+
+.chat-row.cancel .avatar {
+  border-color: #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
 }
 
 .chat-row.admin .avatar {
-  border-color: #7c4dff;
-  box-shadow: 0 0 8px rgba(124, 77, 255, 0.4);
+  border-color: #fbbf24;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
 }
+
 
 /* ✅ Avatar Fallback (Letter Avatar) */
 .avatar-fallback {
@@ -1451,31 +1583,39 @@ async function refreshChat() {
 .chat-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 4px;
   margin-bottom: 5px;
   font-size: 0.85em;
+  min-width: 0;
+  width: 100%;
 }
 
 .chat-time {
   color: #94a3b8;
-  font-size: 0.88em;
+  font-size: 0.85em;
   font-family: monospace;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .chat-name {
   font-weight: 700;
   color: #000;
-  padding: 2px 10px;
-  border-radius: 14px;
+  padding: 1.5px 8px;
+  border-radius: 12px;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   transition: transform 0.2s ease, opacity 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .chat-name:hover {
-  transform: scale(1.05);
+  transform: scale(1.03);
   opacity: 0.95;
 }
 
@@ -1496,15 +1636,33 @@ async function refreshChat() {
 }
 
 .chat-bubble {
-  background-color: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  color: #f8fafc;
+  background-color: var(--bubble-bg, rgba(20, 27, 45, 0.75));
+  border: 1.5px solid var(--bubble-border, rgba(255, 255, 255, 0.12));
+  color: #ffffff;
   padding: 10px 14px;
   border-radius: 4px 14px 14px 14px;
   font-size: 0.98em;
   line-height: 1.45;
   position: relative;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 14px var(--bubble-glow, rgba(0, 0, 0, 0.2));
+  backdrop-filter: blur(8px);
+}
+
+.chat-text {
+  color: #ffffff;
+  font-weight: 600;
+  text-shadow:
+    -1px -1px 0 #000000,
+     0px -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  0px 0 #000000,
+     1px  0px 0 #000000,
+    -1px  1px 0 #000000,
+     0px  1px 0 #000000,
+     1px  1px 0 #000000,
+     0px  2px 4px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.3px;
+  word-break: break-word;
 }
 
 /* ✅ Status Badges (Independent) */
@@ -1521,23 +1679,27 @@ async function refreshChat() {
 }
 
 .badge-buy {
-  background: #00e676;
-  color: #000;
-  box-shadow: 0 2px 8px rgba(0, 230, 118, 0.4);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.45);
 }
 
 .badge-cancel {
-  background: #ef4444;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.45);
 }
 
 .badge-shipping {
-  background: linear-gradient(135deg, #a855f7, #7c3aed);
-  color: #fff;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #ffffff;
+  border: 1px solid rgba(192, 132, 252, 0.5);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.45);
 }
+
 
 .badge-question {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
@@ -1552,37 +1714,13 @@ async function refreshChat() {
 
 /* ✅ YouTube Emoji Styling */
 .emoji-image {
-  height: 1.5em;
+  height: 1.45em;
   width: auto;
-  vertical-align: middle;
+  vertical-align: -0.22em;
   display: inline-block;
-  margin: 0 2px;
+  margin: 0 2.5px;
   object-fit: contain;
-}
-
-/* Special Types */
-.chat-row.buy .chat-bubble {
-  background-color: rgba(16, 185, 129, 0.12);
-  border: 1.5px solid rgba(16, 185, 129, 0.5);
-  border-left: 3px solid #10b981;
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
-  color: #f1f5f9;
-}
-
-.chat-row.cancel .chat-bubble {
-  background-color: rgba(244, 63, 94, 0.12);
-  border: 1.5px solid rgba(244, 63, 94, 0.5);
-  border-left: 3px solid #f43f5e;
-  box-shadow: 0 0 12px rgba(244, 63, 94, 0.15);
-  color: #f1f5f9;
-}
-
-.chat-row.shipping .chat-bubble {
-  background-color: rgba(168, 85, 247, 0.12);
-  border: 1.5px solid rgba(168, 85, 247, 0.5);
-  border-left: 3px solid #a855f7;
-  box-shadow: 0 0 12px rgba(168, 85, 247, 0.15);
-  color: #f1f5f9;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
 }
 
 .chat-row.admin .chat-bubble {
@@ -1640,23 +1778,27 @@ async function refreshChat() {
   margin: 0 auto; /* ✅ Center alignment magic */
   width: fit-content; /* ✅ Prevent full width */
 
-  background-color: #3b82f6;
-  color: white;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 25px;
-  font-weight: 600;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(245, 158, 11, 0.95) 100%);
+  color: #ffffff;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  padding: 8px 20px;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 0.9em;
+  letter-spacing: 0.3px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-  z-index: 20;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 16px rgba(16, 185, 129, 0.4);
+  z-index: 50;
   animation: bounce 2s infinite;
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(8px);
 }
 
 .new-msg-btn:hover {
   transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.6);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 22px rgba(251, 191, 36, 0.6);
 }
+
 
 @keyframes bounce {
   0%,
@@ -1735,19 +1877,30 @@ async function refreshChat() {
    🏷️ Customer Micro-Badges & Author Filter Styles
    ======================================================== */
 
+/* 🏷️ Customer Metadata Badges Cluster (Address, Channel, Payment) */
+.cust-meta-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* 🏷️ Customer Micro-Badges in chat-meta */
 .cust-mini-badge {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 0.72em;
-  padding: 1px 6px;
+  gap: 2.5px;
+  font-size: 0.70em;
+  padding: 1px 5px;
   border-radius: 4px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
   vertical-align: middle;
   letter-spacing: 0.2px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .cust-mini-badge .mini-txt {
@@ -1759,6 +1912,7 @@ async function refreshChat() {
   background: rgba(16, 185, 129, 0.2);
   color: #34d399;
   border: 1px solid rgba(16, 185, 129, 0.45);
+  padding: 1px 4px;
 }
 
 /* 💬 Contact Channel Badges */
@@ -1782,9 +1936,9 @@ async function refreshChat() {
 
 /* 💳 Payment / Delivery Type Badges */
 .cust-mini-badge.pay.transfer {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: rgba(147, 51, 234, 0.22);
+  color: #c084fc;
+  border: 1px solid rgba(147, 51, 234, 0.55);
 }
 
 .cust-mini-badge.pay.cod {
@@ -1826,137 +1980,137 @@ async function refreshChat() {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* 🎨 12 Distinct High-Contrast Customer Color Themes */
-/* 0. Emerald Green */
+/* 🎨 12 Distinct Customer Themes (Reserved exclusively to Blues, Cyans, Magentas, and Pinks) */
+/* 0. Pure Neon Cyan */
 :deep(.chat-highlight-name.theme-0) {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.28), rgba(5, 150, 105, 0.15)) !important;
-  border: 1.5px solid #10b981 !important;
-  color: #a7f3d0 !important;
-}
-:deep(.chat-highlight-name.theme-0:hover) {
-  border-color: #34d399 !important;
-  box-shadow: 0 0 14px rgba(16, 185, 129, 0.5) !important;
-}
-
-/* 1. Sky Blue */
-:deep(.chat-highlight-name.theme-1) {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.28), rgba(2, 132, 199, 0.15)) !important;
-  border: 1.5px solid #0ea5e9 !important;
-  color: #bae6fd !important;
-}
-:deep(.chat-highlight-name.theme-1:hover) {
-  border-color: #38bdf8 !important;
-  box-shadow: 0 0 14px rgba(14, 165, 233, 0.5) !important;
-}
-
-/* 2. Amber / Gold */
-:deep(.chat-highlight-name.theme-2) {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.15)) !important;
-  border: 1.5px solid #f59e0b !important;
-  color: #fde68a !important;
-}
-:deep(.chat-highlight-name.theme-2:hover) {
-  border-color: #fbbf24 !important;
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.5) !important;
-}
-
-/* 3. Violet / Purple */
-:deep(.chat-highlight-name.theme-3) {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.28), rgba(124, 58, 237, 0.15)) !important;
-  border: 1.5px solid #8b5cf6 !important;
-  color: #ddd6fe !important;
-}
-:deep(.chat-highlight-name.theme-3:hover) {
-  border-color: #a78bfa !important;
-  box-shadow: 0 0 14px rgba(139, 92, 246, 0.5) !important;
-}
-
-/* 4. Rose / Crimson Pink */
-:deep(.chat-highlight-name.theme-4) {
-  background: linear-gradient(135deg, rgba(244, 63, 94, 0.28), rgba(225, 29, 72, 0.15)) !important;
-  border: 1.5px solid #f43f5e !important;
-  color: #fecdd3 !important;
-}
-:deep(.chat-highlight-name.theme-4:hover) {
-  border-color: #fb7185 !important;
-  box-shadow: 0 0 14px rgba(244, 63, 94, 0.5) !important;
-}
-
-/* 5. Mint / Teal */
-:deep(.chat-highlight-name.theme-5) {
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.28), rgba(13, 148, 136, 0.15)) !important;
-  border: 1.5px solid #14b8a6 !important;
-  color: #99f6e4 !important;
-}
-:deep(.chat-highlight-name.theme-5:hover) {
-  border-color: #2dd4bf !important;
-  box-shadow: 0 0 14px rgba(20, 184, 166, 0.5) !important;
-}
-
-/* 6. Lime Green */
-:deep(.chat-highlight-name.theme-6) {
-  background: linear-gradient(135deg, rgba(132, 204, 22, 0.28), rgba(101, 163, 13, 0.15)) !important;
-  border: 1.5px solid #84cc16 !important;
-  color: #d9f99d !important;
-}
-:deep(.chat-highlight-name.theme-6:hover) {
-  border-color: #a3e635 !important;
-  box-shadow: 0 0 14px rgba(132, 204, 22, 0.5) !important;
-}
-
-/* 7. Fuchsia / Magenta */
-:deep(.chat-highlight-name.theme-7) {
-  background: linear-gradient(135deg, rgba(217, 70, 239, 0.28), rgba(192, 38, 211, 0.15)) !important;
-  border: 1.5px solid #d946ef !important;
-  color: #f5d0fe !important;
-}
-:deep(.chat-highlight-name.theme-7:hover) {
-  border-color: #e879f9 !important;
-  box-shadow: 0 0 14px rgba(217, 70, 239, 0.5) !important;
-}
-
-/* 8. Coral / Orange */
-:deep(.chat-highlight-name.theme-8) {
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.28), rgba(234, 88, 12, 0.15)) !important;
-  border: 1.5px solid #f97316 !important;
-  color: #fed7aa !important;
-}
-:deep(.chat-highlight-name.theme-8:hover) {
-  border-color: #fb923c !important;
-  box-shadow: 0 0 14px rgba(249, 115, 22, 0.5) !important;
-}
-
-/* 9. Indigo / Blue */
-:deep(.chat-highlight-name.theme-9) {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.28), rgba(79, 70, 229, 0.15)) !important;
-  border: 1.5px solid #6366f1 !important;
-  color: #c7d2fe !important;
-}
-:deep(.chat-highlight-name.theme-9:hover) {
-  border-color: #818cf8 !important;
-  box-shadow: 0 0 14px rgba(99, 102, 241, 0.5) !important;
-}
-
-/* 10. Cyan / Electric Blue */
-:deep(.chat-highlight-name.theme-10) {
   background: linear-gradient(135deg, rgba(6, 182, 212, 0.28), rgba(8, 145, 178, 0.15)) !important;
   border: 1.5px solid #06b6d4 !important;
   color: #a5f3fc !important;
 }
-:deep(.chat-highlight-name.theme-10:hover) {
+:deep(.chat-highlight-name.theme-0:hover) {
   border-color: #22d3ee !important;
   box-shadow: 0 0 14px rgba(6, 182, 212, 0.5) !important;
 }
 
-/* 11. Pink / Pastel Rose */
-:deep(.chat-highlight-name.theme-11) {
+/* 1. Hot Magenta Pink */
+:deep(.chat-highlight-name.theme-1) {
   background: linear-gradient(135deg, rgba(236, 72, 153, 0.28), rgba(219, 39, 119, 0.15)) !important;
   border: 1.5px solid #ec4899 !important;
   color: #fbcfe8 !important;
 }
-:deep(.chat-highlight-name.theme-11:hover) {
+:deep(.chat-highlight-name.theme-1:hover) {
   border-color: #f472b6 !important;
   box-shadow: 0 0 14px rgba(236, 72, 153, 0.5) !important;
+}
+
+/* 2. Sky Azure Blue */
+:deep(.chat-highlight-name.theme-2) {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.28), rgba(3, 105, 161, 0.15)) !important;
+  border: 1.5px solid #0284c7 !important;
+  color: #bae6fd !important;
+}
+:deep(.chat-highlight-name.theme-2:hover) {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 14px rgba(2, 132, 199, 0.5) !important;
+}
+
+/* 3. Vibrant Fuchsia */
+:deep(.chat-highlight-name.theme-3) {
+  background: linear-gradient(135deg, rgba(217, 70, 239, 0.28), rgba(192, 38, 211, 0.15)) !important;
+  border: 1.5px solid #d946ef !important;
+  color: #f5d0fe !important;
+}
+:deep(.chat-highlight-name.theme-3:hover) {
+  border-color: #e879f9 !important;
+  box-shadow: 0 0 14px rgba(217, 70, 239, 0.5) !important;
+}
+
+/* 4. Cobalt Blue */
+:deep(.chat-highlight-name.theme-4) {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.28), rgba(29, 78, 216, 0.15)) !important;
+  border: 1.5px solid #2563eb !important;
+  color: #bfdbfe !important;
+}
+:deep(.chat-highlight-name.theme-4:hover) {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 14px rgba(37, 99, 235, 0.5) !important;
+}
+
+/* 5. Electric Rose */
+:deep(.chat-highlight-name.theme-5) {
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.28), rgba(219, 39, 119, 0.15)) !important;
+  border: 1.5px solid #f472b6 !important;
+  color: #fce7f3 !important;
+}
+:deep(.chat-highlight-name.theme-5:hover) {
+  border-color: #fbcfe8 !important;
+  box-shadow: 0 0 14px rgba(244, 114, 182, 0.5) !important;
+}
+
+/* 6. Turquoise Aqua */
+:deep(.chat-highlight-name.theme-6) {
+  background: linear-gradient(135deg, rgba(8, 145, 178, 0.28), rgba(14, 116, 144, 0.15)) !important;
+  border: 1.5px solid #0891b2 !important;
+  color: #cffafe !important;
+}
+:deep(.chat-highlight-name.theme-6:hover) {
+  border-color: #22d3ee !important;
+  box-shadow: 0 0 14px rgba(8, 145, 178, 0.5) !important;
+}
+
+/* 7. Deep Sapphire Indigo */
+:deep(.chat-highlight-name.theme-7) {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.28), rgba(67, 56, 202, 0.15)) !important;
+  border: 1.5px solid #4f46e5 !important;
+  color: #e0e7ff !important;
+}
+:deep(.chat-highlight-name.theme-7:hover) {
+  border-color: #818cf8 !important;
+  box-shadow: 0 0 14px rgba(79, 70, 229, 0.5) !important;
+}
+
+/* 8. Neon Deep Pink */
+:deep(.chat-highlight-name.theme-8) {
+  background: linear-gradient(135deg, rgba(219, 39, 119, 0.28), rgba(190, 24, 93, 0.15)) !important;
+  border: 1.5px solid #db2777 !important;
+  color: #fce7f3 !important;
+}
+:deep(.chat-highlight-name.theme-8:hover) {
+  border-color: #f472b6 !important;
+  box-shadow: 0 0 14px rgba(219, 39, 119, 0.5) !important;
+}
+
+/* 9. Electric Dodger Blue */
+:deep(.chat-highlight-name.theme-9) {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.28), rgba(2, 132, 199, 0.15)) !important;
+  border: 1.5px solid #0ea5e9 !important;
+  color: #bae6fd !important;
+}
+:deep(.chat-highlight-name.theme-9:hover) {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 14px rgba(14, 165, 233, 0.5) !important;
+}
+
+/* 10. Bubblegum Pink */
+:deep(.chat-highlight-name.theme-10) {
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.28), rgba(225, 29, 72, 0.15)) !important;
+  border: 1.5px solid #f472b6 !important;
+  color: #fdf2f8 !important;
+}
+:deep(.chat-highlight-name.theme-10:hover) {
+  border-color: #fbcfe8 !important;
+  box-shadow: 0 0 14px rgba(244, 114, 182, 0.5) !important;
+}
+
+/* 11. Royal Blue */
+:deep(.chat-highlight-name.theme-11) {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.28), rgba(37, 99, 235, 0.15)) !important;
+  border: 1.5px solid #3b82f6 !important;
+  color: #dbeafe !important;
+}
+:deep(.chat-highlight-name.theme-11:hover) {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.5) !important;
 }
 
 /* 🎯 Instant 1-Click Filter Button on Chat Row */
@@ -1964,16 +2118,17 @@ async function refreshChat() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
   color: #64748b;
-  font-size: 0.78em;
+  font-size: 0.74em;
   cursor: pointer;
   transition: all 0.2s ease;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .btn-author-filter:hover {

@@ -80,21 +80,40 @@ export function thaiToArabic(text) {
 // 🚀 Performance: In-Memory Memoization Map for user colors (capped at 500 users)
 const USER_COLOR_CACHE = new Map();
 
+// 🌈 12 distinct customer hues strictly reserved away from:
+// - Green 90°-165° (Reserved exclusively for 🛒 จอง / Buy)
+// - Red/Crimson 350°-25° (Reserved exclusively for ❌ ยกเลิก / Cancel)
+// - Royal Purple 265°-295° (Reserved exclusively for 🚚 ส่ง / Shipping)
+// - Gold/Amber/Yellow 35°-60° (Reserved exclusively for 👑 Admin)
+// Focuses exclusively on vibrant Blues, Cyans, Magentas, and Pinks:
+const DISTINCT_HUES = [
+  180, // 0: Pure Neon Cyan
+  325, // 1: Hot Magenta Pink
+  200, // 2: Sky Azure Blue
+  310, // 3: Vibrant Fuchsia
+  220, // 4: Cobalt Blue
+  335, // 5: Electric Rose
+  190, // 6: Turquoise Aqua
+  242, // 7: Deep Sapphire Indigo
+  318, // 8: Neon Deep Pink
+  210, // 9: Electric Dodger Blue
+  342, // 10: Bubblegum Pink
+  230, // 11: Royal Blue
+];
+
 /**
  * Deterministic color generation based on user name string (Memoized)
  * @param {string} str 
  * @returns {string} HSL color string
  */
 export function stringToColor(str) {
-  if (!str) return "hsl(0, 85%, 75%)";
+  if (!str) return "hsl(180, 85%, 75%)";
   if (USER_COLOR_CACHE.has(str)) {
     return USER_COLOR_CACHE.get(str);
   }
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const color = `hsl(${Math.abs(hash) % 360}, 85%, 75%)`;
+  const idx = getCustomerColorTheme(str);
+  const hue = DISTINCT_HUES[idx];
+  const color = `hsl(${hue}, 85%, 75%)`;
   if (USER_COLOR_CACHE.size >= 500) {
     const oldest = USER_COLOR_CACHE.keys().next().value;
     USER_COLOR_CACHE.delete(oldest);
@@ -102,6 +121,7 @@ export function stringToColor(str) {
   USER_COLOR_CACHE.set(str, color);
   return color;
 }
+
 
 /**
  * Deterministic color theme index (0-11) based on customer name

@@ -1326,11 +1326,11 @@ function deleteCustomer(id, name) {
 
 <style scoped>
 .sm-content {
-  background: rgba(18, 18, 18, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 15, 23, 0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 20px;
+  border: 1px solid rgba(251, 191, 36, 0.22);
   max-width: 95%;
   width: 950px;
   max-height: 90vh;
@@ -1339,8 +1339,9 @@ function deleteCustomer(id, name) {
   flex-direction: column;
   padding: 20px;
   box-shadow: 
-    0 24px 80px rgba(0, 0, 0, 0.6), 
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+    0 32px 100px rgba(0, 0, 0, 0.8),
+    0 0 50px rgba(16, 185, 129, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .sm-header {
@@ -1348,40 +1349,48 @@ function deleteCustomer(id, name) {
   justify-content: space-between;
   align-items: center;
   padding-bottom: 12px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
 }
 
-.sm-title { font-size: 1.3em; font-weight: bold; color: #fff; }
+.sm-title { font-size: 1.3em; font-weight: bold; color: #fbbf24; text-shadow: 0 0 12px rgba(251, 191, 36, 0.3); }
 
 /* Stats */
 .sm-stats {
   display: flex;
   gap: 10px;
   padding: 14px 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .sm-stat {
   flex: 1;
-  background: #1e1e1e;
-  border-radius: 8px;
+  background: rgba(15, 21, 36, 0.8);
+  border-radius: 12px;
   padding: 10px 12px;
   text-align: center;
-  border: 1px solid #333;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
 }
 
-.sm-stat.urgent { border-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
-.sm-stat.warn { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
-.sm-stat.unassigned { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.08); }
+.sm-stat:hover {
+  border-color: rgba(251, 191, 36, 0.35);
+  transform: translateY(-1px);
+}
+
+.sm-stat.urgent { border-color: #ef4444; background: rgba(239, 68, 68, 0.12); }
+.sm-stat.warn { border-color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
+.sm-stat.unassigned { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.12); }
 .sm-stat.unassigned .sm-stat-num { color: #a78bfa; }
 .sm-stat.pack-tonight {
   border-color: #f97316;
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(234, 88, 12, 0.06));
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(234, 88, 12, 0.08));
   animation: pack-glow 2.5s ease-in-out infinite;
 }
 .sm-stat.active {
-  box-shadow: 0 0 0 2px #3b82f6;
+  box-shadow: 0 0 0 2px #10b981;
+  border-color: #10b981;
 }
+
 
 .sm-stat-num {
   display: block;

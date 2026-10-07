@@ -1392,7 +1392,7 @@ html, body, #address-app {
   width: fit-content;
 }
 
-.pill.pay.transfer { background: rgba(59, 130, 246, 0.18); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); }
+.pill.pay.transfer { background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.45); }
 .pill.pay.cod { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
 .pill.pay.unset { color: #64748b; }
 

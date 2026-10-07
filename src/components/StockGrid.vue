@@ -166,20 +166,37 @@
       >
         <div class="queue-modal">
           <div class="queue-header">
-            <h3 class="text-success">
-              <i class="fa-solid fa-list-ol"></i> รายการที่ {{ editingId }}
-            </h3>
-            <div style="display: flex; gap: 8px; align-items: center">
-              <button class="btn btn-dark btn-sm" @click="saveAndNavigate('prev')" title="บันทึกและไปรายการก่อนหน้า (ลูกศรซ้าย)">
-                <i class="fa-solid fa-chevron-left"></i>
+            <div class="queue-header-left">
+              <div class="queue-title-badge">
+                <i class="fa-solid fa-list-ol"></i>
+                <span>รายการที่ {{ editingId }}</span>
+              </div>
+              <div
+                class="queue-status-pill"
+                :class="{
+                  'status-empty': tempQueue.length === 0,
+                  'status-owner': tempQueue.length === 1,
+                  'status-backup': tempQueue.length > 1
+                }"
+              >
+                <span class="status-dot"></span>
+                <span>{{ tempQueue.length === 0 ? 'ว่าง' : tempQueue.length === 1 ? 'ได้ของ 1 คน' : `ได้ของ 1 + สำรอง ${tempQueue.length - 1}` }}</span>
+              </div>
+            </div>
+            <div class="queue-header-actions">
+              <div class="queue-nav-group">
+                <button class="btn-queue-nav" @click="saveAndNavigate('prev')" title="บันทึกและไปรายการก่อนหน้า (ลูกศรซ้าย)">
+                  <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button class="btn-queue-nav" @click="saveAndNavigate('next')" title="บันทึกและไปรายการถัดไป (ลูกศรขวา)">
+                  <i class="fa-solid fa-chevron-right"></i>
+                </button>
+              </div>
+              <button class="btn-queue-clear" @click="clearItemData" title="ล้างข้อมูลรายการนี้">
+                <i class="fa-solid fa-broom"></i>
+                <span>ล้าง</span>
               </button>
-              <button class="btn btn-dark btn-sm" @click="saveAndNavigate('next')" title="บันทึกและไปรายการถัดไป (ลูกศรขวา)">
-                <i class="fa-solid fa-chevron-right"></i>
-              </button>
-              <button class="btn btn-danger btn-sm" @click="clearItemData" title="ล้างข้อมูล">
-                <i class="fa-solid fa-eraser"></i> ล้าง
-              </button>
-              <button class="btn btn-dark" @click="closeModal">
+              <button class="btn-queue-close" @click="closeModal" title="ปิดหน้าต่าง">
                 <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -190,8 +207,11 @@
                 v-if="tempQueue.length === 0"
                 class="queue-empty-state"
               >
-                <i class="fa-solid fa-inbox" style="font-size: 1.8em; opacity: 0.3; margin-bottom: 4px"></i>
-                ไม่มีการจอง
+                <div class="queue-empty-icon">
+                  <i class="fa-solid fa-inbox"></i>
+                </div>
+                <div class="queue-empty-title">ไม่มีการจองในรายการนี้</div>
+                <div class="queue-empty-desc">คลิกปุ่ม "+ เพิ่มชื่อ" ด้านล่างเพื่อเพิ่มการจองด้วยตนเอง</div>
               </div>
               <div
                 v-for="(person, index) in tempQueue"
@@ -203,8 +223,8 @@
                 @dragover.prevent
                 @drop="drop(index)"
               >
-                <div class="flex-center gap-10" style="flex: 1">
-                  <div class="drag-handle">
+                <div class="queue-item-left">
+                  <div class="drag-handle" title="ลากเพื่อสลับลำดับคิว">
                     <i class="fa-solid fa-grip-vertical"></i>
                   </div>
                   <span class="queue-rank" :class="{ 'queue-rank--owner': index === 0 }">#{{ index + 1 }}</span>
@@ -212,7 +232,7 @@
                     <i class="fa-solid fa-crown"></i> ได้ของ
                   </span>
                   <span v-else class="backup-badge">
-                    สำรอง
+                    สำรอง {{ index }}
                   </span>
                   <div class="autocomplete-wrapper">
                     <input
@@ -226,6 +246,7 @@
                       @blur="onAutocompleteBlur"
                       @keydown="handleAutocompleteKeydown($event, index)"
                       autocomplete="off"
+                      placeholder="พิมพ์ชื่อลูกค้า..."
                     />
                     <div
                       v-if="activeAutocompleteIdx === index && filteredSuggestions.length > 0"
@@ -238,10 +259,44 @@
                         :class="{ active: sIdx === highlightedSuggestionIdx }"
                         @mousedown.prevent="selectSuggestion(suggestion, index)"
                       >
-                        <span v-html="highlightMatch(suggestion, person.owner)"></span>
+                        <span class="autocomplete-avatar">{{ suggestion?.[0] || '?' }}</span>
+                        <span class="autocomplete-text" v-html="highlightMatch(suggestion, person.owner)"></span>
                       </div>
                     </div>
                   </div>
+
+                  <!-- 🏷️ Customer Status Micro-Badges (Address, Channel, Payment) -->
+                  <div
+                    v-if="getCustomerMeta(person.owner)"
+                    class="queue-cust-meta"
+                  >
+                    <span
+                      v-if="getCustomerMeta(person.owner).hasAddress"
+                      class="cust-mini-badge addr"
+                      title="📍 มีที่อยู่จัดส่งแล้ว"
+                    >
+                      <i class="fa-solid fa-location-dot"></i>
+                    </span>
+                    <span
+                      v-if="getCustomerMeta(person.owner).contactChannel"
+                      class="cust-mini-badge channel"
+                      :class="getCustomerMeta(person.owner).contactChannel"
+                      :title="`ช่องทางติดต่อ: ${getChannelLabel(getCustomerMeta(person.owner).contactChannel)}`"
+                    >
+                      <i :class="getChannelIcon(getCustomerMeta(person.owner).contactChannel)"></i>
+                      <span class="mini-txt">{{ getChannelShortText(getCustomerMeta(person.owner).contactChannel) }}</span>
+                    </span>
+                    <span
+                      v-if="getCustomerMeta(person.owner).paymentType"
+                      class="cust-mini-badge pay"
+                      :class="getCustomerMeta(person.owner).paymentType"
+                      :title="`การจัดส่ง/ชำระเงิน: ${getCustomerMeta(person.owner).paymentType === 'cod' ? 'COD (เก็บปลายทาง)' : 'โอนเงิน'}`"
+                    >
+                      <i :class="getCustomerMeta(person.owner).paymentType === 'cod' ? 'fa-solid fa-box' : 'fa-solid fa-money-bill-transfer'"></i>
+                      <span class="mini-txt">{{ getCustomerMeta(person.owner).paymentType === 'cod' ? 'COD' : 'โอน' }}</span>
+                    </span>
+                  </div>
+
                   <!-- 🕒 เวลาจอง / จองย้อนหลัง -->
                   <div
                     v-if="person.time"
@@ -255,25 +310,29 @@
                 </div>
                 <div class="queue-actions">
                   <button
-                    class="btn btn-dark btn-sm"
+                    class="btn-queue-delete"
                     @click="removeQueueItem(index)"
-                    title="ลบ"
+                    title="ลบรายการนี้"
                   >
-                    <i class="fa-solid fa-trash text-error"></i>
+                    <i class="fa-solid fa-trash-can"></i>
                   </button>
                 </div>
               </div>
             </div>
           </div>
-          <div
-            class="queue-footer"
-          >
-            <button class="btn btn-dark" @click="manualReserve">
-              <i class="fa-solid fa-plus"></i> เพิ่มชื่อ
-            </button>
-            <button class="btn btn-success" @click="saveQueueChanges">
-              <i class="fa-solid fa-save"></i> บันทึกการแก้ไข
-            </button>
+          <div class="queue-footer">
+            <div class="queue-footer-tip">
+              <i class="fa-solid fa-keyboard"></i>
+              <span>กด Enter หรือ Ctrl+S เพื่อบันทึก</span>
+            </div>
+            <div class="queue-footer-actions">
+              <button class="btn-queue-add" @click="manualReserve">
+                <i class="fa-solid fa-user-plus"></i> เพิ่มชื่อ
+              </button>
+              <button class="btn-queue-save" @click="saveQueueChanges">
+                <i class="fa-solid fa-check-double"></i> บันทึกการแก้ไข
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -382,8 +441,9 @@ const visibleItemIds = computed(() => {
 const cancelledItems = ref(new Map());
 const cancelledTimers = {};
 
-// 📦 Delivery Strip State
+// 📦 Delivery Strip & Customer Meta State
 const deliveryCustomers = ref([]);
+const addressBook = ref({});
 const cleanupFns = [];
 
 const thaiMonths = [
@@ -521,6 +581,12 @@ onMounted(() => {
     }));
   });
   cleanupFns.push(unsubDelivery);
+
+  // 📍 Listen address_book for customer micro-badges
+  const unsubAddressBook = onValue(dbRef(db, "address_book"), (snapshot) => {
+    addressBook.value = snapshot.val() || {};
+  });
+  cleanupFns.push(unsubAddressBook);
 
   window.addEventListener('keydown', handleGlobalKeydown);
 });
@@ -680,6 +746,61 @@ function getStockItem(num) {
 // 🏷️ ตรวจสอบชื่อลูกค้าที่ยังไม่ถูกบันทึก (มี @ นำหน้า)
 function isUnsavedOwner(name) {
   return typeof name === "string" && name.trim().startsWith("@");
+}
+
+// 🏷️ Customer Metadata (Address, Channel, Payment) Fast Lookup
+function getCustomerMeta(ownerName) {
+  if (!ownerName || typeof ownerName !== "string") return null;
+  const rawName = ownerName.trim();
+  if (!rawName) return null;
+  const normName = normalizeCustomerName(rawName).replace(/[.#$[\]/]/g, "_");
+
+  // 1. Check address_book
+  const book = normName && addressBook.value?.[normName];
+
+  // 2. Check delivery_customers fallback
+  const deliv = deliveryCustomers.value.find((c) => {
+    if (!c) return false;
+    const cNorm = normalizeCustomerName(c.name || c.displayName || "").replace(/[.#$[\]/]/g, "_");
+    return cNorm === normName || c.uid === normName || c.id === normName;
+  });
+
+  const hasAddress = Boolean(
+    (book?.address && book.address.trim()) ||
+    (deliv?.address && deliv.address.trim()) ||
+    (Array.isArray(book?.addresses) && book.addresses.some((a) => a && a.address && a.address.trim()))
+  );
+  const contactChannel = book?.contactChannel || deliv?.contactChannel || "";
+  const paymentType = book?.paymentType || deliv?.paymentType || "";
+
+  if (!hasAddress && !contactChannel && !paymentType) return null;
+
+  return {
+    hasAddress,
+    contactChannel,
+    paymentType,
+  };
+}
+
+function getChannelLabel(channel) {
+  if (channel === "line") return "Line";
+  if (channel === "lineoa") return "OA";
+  if (channel === "phone") return "โทรศัพท์";
+  return channel;
+}
+
+function getChannelIcon(channel) {
+  if (channel === "line") return "fa-brands fa-line";
+  if (channel === "lineoa") return "fa-solid fa-comment-dots";
+  if (channel === "phone") return "fa-solid fa-phone";
+  return "fa-solid fa-comment";
+}
+
+function getChannelShortText(channel) {
+  if (channel === "line") return "Line";
+  if (channel === "lineoa") return "OA";
+  if (channel === "phone") return "โทร";
+  return channel;
 }
 
 // 🛢 นับจำนวนสินค้าต่อ owner (แสดงเฉพาะ >= 2 ชิ้น)
@@ -1659,7 +1780,7 @@ watch(
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid rgba(251, 191, 36, 0.1);
   overflow: hidden;
 }
 
@@ -1670,9 +1791,9 @@ watch(
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(180deg, #252525 0%, #1a1a1a 100%);
+  background: linear-gradient(180deg, rgba(13, 17, 28, 0.95) 0%, rgba(11, 15, 23, 0.98) 100%);
   transition: height 0.3s ease-out;
-  color: #999;
+  color: #64748b;
   font-size: 0.9em;
   gap: 8px;
 }
@@ -1684,7 +1805,7 @@ watch(
 
 .pull-indicator.pulling i {
   transform: rotate(180deg);
-  color: #3b82f6;
+  color: #38bdf8;
 }
 
 .pull-indicator.refreshing i {
@@ -1703,11 +1824,13 @@ watch(
 
 .stock-header {
   position: relative;
-  padding: 4px 10px;
-  background: #252525;
-  border-bottom: 1px solid var(--border-color);
+  padding: 6px 12px;
+  background: linear-gradient(180deg, rgba(11, 15, 23, 0.98) 0%, rgba(13, 17, 28, 0.95) 100%);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.12);
   min-height: 40px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
+
 
 .header-main-row {
   display: flex;
@@ -2038,11 +2161,11 @@ watch(
 
 .stock-item {
   aspect-ratio: 1.35;
-  background: rgba(22, 26, 36, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
+  background: rgba(13, 17, 28, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px dashed rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2056,7 +2179,7 @@ watch(
   backface-visibility: hidden;
   will-change: transform;
   transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.03);
 }
 
 .grid-load-more {
@@ -2064,10 +2187,10 @@ watch(
   text-align: center;
   padding: 12px;
   cursor: pointer;
-  color: #94a3b8;
-  background: rgba(255, 255, 255, 0.04);
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.02);
   border-radius: 8px;
-  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
   font-size: 0.9em;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -2075,25 +2198,25 @@ watch(
 }
 
 .grid-load-more:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f1f5f9;
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.35);
 }
 
 
 @media (hover: hover) {
   .stock-item:hover {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(30, 35, 48, 0.9);
+    border-color: rgba(16, 185, 129, 0.45);
+    background: rgba(16, 185, 129, 0.06);
     transform: translateY(-2px) translateZ(0);
     z-index: 10;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(16, 185, 129, 0.2);
   }
 
   .stock-item.sold:hover {
-    background: linear-gradient(145deg, rgba(239, 68, 68, 0.35) 0%, rgba(185, 28, 28, 0.55) 100%);
-    border-color: #f87171;
-    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.28) 0%, rgba(5, 150, 105, 0.45) 100%);
+    border-color: #34d399;
+    box-shadow: 0 8px 28px rgba(16, 185, 129, 0.35), 0 0 0 1px rgba(52, 211, 153, 0.4);
   }
 }
 
@@ -2101,11 +2224,11 @@ watch(
   transform: scale(0.97) translateZ(0);
 }
 
-/* 🛑 High-Visibility Red Theme for Sold Items */
+/* 🟢 Luxury Emerald Theme for Sold Items (replaces old red) */
 .stock-item.sold {
-  background: linear-gradient(145deg, rgba(220, 38, 38, 0.22) 0%, rgba(139, 0, 0, 0.4) 100%);
-  border: 2px solid #ef4444;
-  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.17) 0%, rgba(5, 150, 105, 0.30) 100%);
+  border: 1.5px solid rgba(16, 185, 129, 0.6);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .stock-item.sold.new-order {
@@ -2116,60 +2239,68 @@ watch(
 .stock-item.highlight {
   animation: highlightBox 1s ease-out;
   z-index: 5;
-  border-color: #ffd700 !important;
+  border-color: #fbbf24 !important;
 }
 
 @keyframes newOrderBlink {
   0%,
   100% {
-    border-color: #ffd700;
-    box-shadow: 0 0 15px #ffd700;
-    background-color: rgba(255, 215, 0, 0.3);
+    border-color: #fbbf24;
+    box-shadow: 0 0 18px rgba(251, 191, 36, 0.6);
+    background: linear-gradient(145deg, rgba(251, 191, 36, 0.2) 0%, rgba(16, 185, 129, 0.15) 100%);
   }
   50% {
-    border-color: #ef4444;
-    box-shadow: none;
-    background-color: rgba(220, 38, 38, 0.22);
-  }
-}
-@keyframes highlightBox {
-  0% {
-    transform: scale(1.15);
-    box-shadow: 0 0 25px #ffeb3b;
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    border-color: #10b981;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.17) 0%, rgba(5, 150, 105, 0.30) 100%);
   }
 }
 
-/* 🔢 High-Visibility Item Number Badge */
+@keyframes highlightBox {
+  0% {
+    transform: scale(1.15);
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+  }
+}
+
+/* 🔢 High-Visibility Item Number Badge — Amber Gold */
 .stock-num {
-  font-size: 1.15em;
+  font-size: 1.1em;
   font-weight: 800;
   font-family: var(--font-main);
-  color: #ffffff;
-  background: rgba(0, 0, 0, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fbbf24;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(251, 191, 36, 0.35);
   padding: 1px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   position: absolute;
   top: 5px;
   left: 5px;
   line-height: 1;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   letter-spacing: 0.3px;
+  z-index: 1; /* Keep behind customer name when long */
+}
+
+/* Empty state: dim gold number */
+.stock-item:not(.sold) .stock-num {
+  color: #64748b;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .stock-price {
   font-size: 0.75em;
-  color: #ffd700;
+  color: #fbbf24;
   font-weight: bold;
 }
 
 .stock-status {
   font-size: 1em;
-  color: #ffffff;
+  color: #e2e8f0;
   font-weight: 600;
   text-align: center;
   width: 100%;
@@ -2182,20 +2313,44 @@ watch(
   text-overflow: ellipsis;
   white-space: normal;
   line-height: 1.25;
-  margin-top: 10px;
+  margin-top: 8px;
+  position: relative;
+  z-index: 2;
+}
+
+/* 🏷️ Customer Name on Sold Items: White text with crisp 8-way black outline, overlays item number if long */
+.stock-item.sold .stock-status {
+  color: #ffffff !important;
+  font-weight: 700;
+  text-shadow:
+    -1px -1px 0 #000000,
+     0px -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  0px 0 #000000,
+     1px  0px 0 #000000,
+    -1px  1px 0 #000000,
+     0px  1px 0 #000000,
+     1px  1px 0 #000000,
+     0px  2px 4px rgba(0, 0, 0, 0.95);
+  letter-spacing: 0.2px;
+  position: relative;
+  z-index: 3; /* Overlays item number badge when name is long */
+  margin-top: 4px;
 }
 
 .stock-status.empty {
-  color: #64748b;
+  color: var(--status-empty-color);
   font-weight: 400;
-  font-size: 0.9em;
+  font-size: 0.88em;
+  letter-spacing: 0.2px;
 }
 
 .stock-status.unsaved-owner {
-  color: #facc15 !important;
+  color: #fbbf24 !important;
   font-weight: 700;
-  text-shadow: 0 0 10px rgba(250, 204, 21, 0.45);
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.45);
 }
+
 
 .queue-input.unsaved-owner {
   color: #facc15 !important;
@@ -2260,7 +2415,11 @@ watch(
 
   .stock-status {
     font-size: 0.9em;
-    margin-top: 10px;
+    margin-top: 6px;
+  }
+
+  .stock-item.sold .stock-status {
+    margin-top: 3px;
   }
 
   .stock-price {

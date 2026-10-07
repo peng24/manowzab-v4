@@ -18,6 +18,20 @@
 export const changelog = [
   // ─── 5.0.x ───────────────────────────────────────────
   {
+    version: '5.0.1',
+    date: '2026-10-07',
+    changes: {
+      added: [
+        'เอฟเฟกต์การจองใหม่แบบพรีเมียม VIP Shimmer Beam (Luxury New Order Visual Alert) — ยกระดับการ์ดสินค้าที่เพิ่งจองใหม่ด้วยลำแสงประกายแก้วสีทอง-ขาววิ่งพาดเฉียงผ่านตัวการ์ดอย่างนุ่มนวลและต่อเนื่อง (Diagonal Shimmer Sweep) สวยงามสะดุดตาชัดเจนในทุกระยะสายตา',
+      ],
+      improved: [
+        'แสงออร่าทองคำและมรกต 3 มิติ (3D Breathing Halo & Rhythmic Pulse) — ขยายความหนาขอบการ์ดเป็น 2.5px เต้นจังหวะขยายตัวขึ้นเล็กน้อย (scale 1.04) พร้อมยกลอยเด่นเหนือตารางการ์ดอื่นด้วย z-index: 10 และวงแหวนแสงคู่หนา 3px แผ่กว้าง 55px',
+        'ป้ายตัวเลขรายการสลับสีทองคำแท่งสะท้อนแสง (Inverted Number Flash) — ป้ายเลขรายการกระพริบสลับเป็นพื้นหลังสีทองสว่าง-ตัวเลขสีดำ มองเห็นหมายเลขสินค้าได้ทันทีจากระยะไกล',
+        'คลื่นเรดาร์แผ่วงระลอก (Expanding Radar Ripple Ring) — คลื่นวงแหวนเรดาร์บางใสแผ่กระจายออกจากตัวการ์ด ช่วยดึงดูดสายตาอย่างมีสไตล์โดยไม่เกะกะข้อมูลบนหน้าจอ',
+      ],
+    },
+  },
+  {
     version: '5.0.0',
     date: '2026-10-07',
     changes: {
@@ -285,25 +299,6 @@ export const changelog = [
         'แปลง console.log ทั้งหมด (37 จุด) ในทุก component และ composable ให้ผ่านระบบ logger มาตรฐาน — ปิดการแสดง debug log ใน production โดยอัตโนมัติ',
         'ปรับ ChangelogModal ให้โหลดข้อมูล Changelog แบบ Lazy Load (Dynamic Import) — ลดขนาด Initial Bundle ลง ~155KB ช่วยให้แอปโหลดหน้าแรกเร็วขึ้น',
         'เพิ่ม JSDoc ให้ useGemini.js — ระบุวัตถุประสงค์, ขอบเขตความปลอดภัย และ security warning อย่างชัดเจน',
-      ],
-    },
-  },
-  // ─── 4.86.x ───────────────────────────────────────────
-  {
-    version: '4.86.0',
-    date: '2026-09-09',
-    changes: {
-      added: [
-        'เพิ่มชุด Agent Skill เฉพาะทาง Manowzab Command Center (.agents/skills/manowzab-core) — รวมมาตรฐานสถาปัตยกรรม, กฎเหล็ก Invariants, ผังฐานข้อมูล Firebase RTDB และขั้นตอนการตรวจสอบความปลอดภัยของระบบสด',
-        'เพิ่มชุดทดสอบ Unit Tests สำหรับระบบเสียง TTS (ttsStore.test.js) — ทดสอบความถูกต้องของการสลับโหมด 2 สถานะ, การไมเกรตค่าเก่าจาก localStorage และการทำงานของ Fallback',
-      ],
-      improved: [
-        'ปรับให้ Google Cloud Standard (th-TH-Standard-A) เป็นเสียงหลักของระบบ (Primary Default Voice) — ตอบสนองรวดเร็ว ประหยัดโควตา และคงประสิทธิภาพเสียงภาษาไทยคมชัด',
-        'ปรับปุ่มสลับเสียงบน Header เป็น 2 สถานะมาตรฐาน (2-State TTS Switcher) — สลับวนลูประหว่าง Google Cloud Standard (ป้าย S) 🔁 Native TTS ออฟไลน์ (🤖) พร้อมประกาศเสียงภาษาไทยชัดเจน',
-        'คงระบบความคงทนสมบูรณ์ 100% — Zero-Stall Fallback สลับไป Native TTS อัตโนมัติเมื่อ Google API ขัดข้อง, In-Memory LRU Cache 0ms สำหรับข้อความซ้ำ, และระบบหมุนเวียน API Key',
-      ],
-      removed: [
-        'ถอดตัวเลือกเสียง Google Cloud Neural2 (th-TH-Neural2-C) ออกจากระบบทั้งหมด — ลดความซับซ้อนและไมเกรตค่าคอนฟิกเดิมในเครื่องผู้ใช้กลับมาเป็น Standard อัตโนมัติ',
       ],
     },
   },

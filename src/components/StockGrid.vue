@@ -145,6 +145,9 @@
         <div v-if="getQueueLength(i) > 0" class="queue-badge">
           +{{ getQueueLength(i) }}
         </div>
+
+        <!-- 🌟 VIP Shimmer Beam (ลำแสงเพชรพาดผ่านตัวการ์ด) -->
+        <div v-if="isNewOrder(i)" class="new-order-shimmer"></div>
       </div>
 
 
@@ -2231,28 +2234,122 @@ watch(
   box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
+/* 🌟 High-Visibility VIP New Order Alert Effect (จองใหม่สไตล์ VIP Shimmer Beam & Badge) */
 .stock-item.sold.new-order {
-  animation: newOrderBlink 1s infinite;
+  animation: newOrderBlink 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  border-width: 2.5px !important;
+  z-index: 10 !important;
+}
+
+/* 💎 VIP Shimmer Light Sweep (ลำแสงเพชรพาดผ่านตัวการ์ด) */
+.new-order-shimmer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
   z-index: 2;
 }
 
-.stock-item.highlight {
-  animation: highlightBox 1s ease-out;
-  z-index: 5;
-  border-color: #fbbf24 !important;
+.new-order-shimmer::before {
+  content: "";
+  position: absolute;
+  top: -60%;
+  left: -120%;
+  width: 60%;
+  height: 220%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 20%,
+    rgba(254, 240, 138, 0.55) 50%,
+    rgba(255, 255, 255, 0.4) 75%,
+    transparent 100%
+  );
+  transform: rotate(25deg);
+  animation: vipShimmerSweep 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes vipShimmerSweep {
+  0% {
+    left: -120%;
+  }
+  55%, 100% {
+    left: 170%;
+  }
+}
+
+/* 📡 Expanding Radar Pulse Wave for New Order */
+.stock-item.sold.new-order::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: calc(var(--radius-md) + 4px);
+  border: 1.5px solid #fbbf24;
+  pointer-events: none;
+  animation: newOrderRadar 1.8s ease-out infinite;
+  z-index: -1;
+}
+
+/* 🔢 Synchronized High-Contrast Number Flash */
+.stock-item.sold.new-order .stock-num {
+  animation: newOrderNumBlink 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  z-index: 3;
 }
 
 @keyframes newOrderBlink {
   0%,
   100% {
-    border-color: #fbbf24;
-    box-shadow: 0 0 18px rgba(251, 191, 36, 0.6);
-    background: linear-gradient(145deg, rgba(251, 191, 36, 0.2) 0%, rgba(16, 185, 129, 0.15) 100%);
+    border-color: #fbbf24 !important;
+    background: linear-gradient(145deg, rgba(251, 191, 36, 0.42) 0%, rgba(245, 158, 11, 0.28) 100%) !important;
+    box-shadow:
+      0 0 0 3px rgba(251, 191, 36, 0.55),
+      0 0 30px rgba(251, 191, 36, 0.95),
+      0 0 55px rgba(245, 158, 11, 0.45),
+      inset 0 0 18px rgba(251, 191, 36, 0.4) !important;
+    transform: scale(1.04) translateZ(0);
   }
   50% {
-    border-color: #10b981;
-    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
-    background: linear-gradient(145deg, rgba(16, 185, 129, 0.17) 0%, rgba(5, 150, 105, 0.30) 100%);
+    border-color: #10b981 !important;
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.34) 100%) !important;
+    box-shadow:
+      0 0 0 1px rgba(16, 185, 129, 0.4),
+      0 0 14px rgba(16, 185, 129, 0.35),
+      inset 0 0 8px rgba(16, 185, 129, 0.2) !important;
+    transform: scale(1.0) translateZ(0);
+  }
+}
+
+@keyframes newOrderNumBlink {
+  0%,
+  100% {
+    color: #000000 !important;
+    background: #fbbf24 !important;
+    border-color: #fef08a !important;
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.95);
+    transform: scale(1.06);
+  }
+  50% {
+    color: #fbbf24 !important;
+    background: rgba(0, 0, 0, 0.85) !important;
+    border-color: rgba(251, 191, 36, 0.35) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    transform: scale(1.0);
+  }
+}
+
+@keyframes newOrderRadar {
+  0% {
+    transform: scale(0.96);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.22);
+    opacity: 0;
   }
 }
 

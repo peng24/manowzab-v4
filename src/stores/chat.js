@@ -7,6 +7,7 @@ import { logger } from "../utils/logger";
 import { useNicknameStore } from "./nickname";
 import { useSystemStore } from "./system";
 import { archiveChatEntries, getAllChatEntries, clearChatEntries } from "../utils/chatIdb";
+import { extractAdminCustomerName } from "../utils/chatParserUtils";
 
 export const useChatStore = defineStore("chat", () => {
   const MAX_MESSAGES = 500;
@@ -45,6 +46,14 @@ export const useChatStore = defineStore("chat", () => {
       }
     } catch (e) {
       // Store not ready
+    }
+
+    // ✅ Sanitize proxyCustomerName if it accidentally contains action command phrases
+    if (message.proxyCustomerName) {
+      const cleaned = extractAdminCustomerName(message.proxyCustomerName);
+      if (cleaned) {
+        message.proxyCustomerName = cleaned;
+      }
     }
 
     seenMessageIds.value[message.id] = true;

@@ -498,12 +498,27 @@ describe("chatParserUtils", () => {
       expect(extractAdminCustomerName("กุญสิญา ส่งเลย")).toBe("กุญสิญา");
       expect(extractAdminCustomerName("ตุ๊ก บำรุงรัตน์ ส่งวันนี้")).toBe("ตุ๊ก บำรุงรัตน์");
       expect(extractAdminCustomerName("พัชราวัน ส่งเลย")).toBe("พัชราวัน");
+      expect(extractAdminCustomerName("วาศินา ส่งเลย")).toBe("วาศินา");
+      expect(extractAdminCustomerName("พี่อ้อย ส่งเลย")).toBe("พี่อ้อย");
+      expect(extractAdminCustomerName("ของพี่อ้อย ส่งเลย")).toBe("พี่อ้อย");
+    });
+
+    it("extracts customer name from admin hold and consign commands (เอาไปฝากคนอื่นด้วย, ฝากไว้ก่อน, ฝากของ)", () => {
+      expect(extractAdminCustomerName("วาศินา เอาไปฝากคนอื่นด้วย")).toBe("วาศินา");
+      expect(extractAdminCustomerName("เอาไปฝากคนอื่นด้วย วาศินา")).toBe("วาศินา");
+      expect(extractAdminCustomerName("วาศินา ฝากไว้ก่อน")).toBe("วาศินา");
+      expect(extractAdminCustomerName("วาศินา ฝากของ")).toBe("วาศินา");
+      expect(extractAdminCustomerName("วาศินา ฝาก")).toBe("วาศินา");
+      expect(extractAdminCustomerName("วาศินา ฝากคนอื่นด้วย")).toBe("วาศินา");
     });
 
     it("returns null for non-admin customer or general chat messages", () => {
       expect(extractAdminCustomerName("สวัสดีค่ะ")).toBeNull();
       expect(extractAdminCustomerName("มีสีอะไรบ้าง")).toBeNull();
       expect(extractAdminCustomerName("")).toBeNull();
+      expect(extractAdminCustomerName("พร้อมส่งนะคะ")).toBeNull();
+      expect(extractAdminCustomerName("แอดมินพาลูกนอนแล้ว ฝากดูแลแชทด้วยนะคะ")).toBeNull();
+      expect(extractAdminCustomerName("ฝากดูแลแชทด้วยนะคะ")).toBeNull();
     });
   });
 });

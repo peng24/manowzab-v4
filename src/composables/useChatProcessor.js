@@ -463,13 +463,17 @@ export function useChatProcessor() {
       else if (shipNowMatch) matchedKeyword = shipNowMatch[0];
       else matchedKeyword = "ส่ง";
 
-      if (isAdmin && matchedKeyword) {
-        // Clean Name Logic (same robust fallback used in chat buying)
-        let cleanName = normalizedMsg
-          .replace(matchedKeyword, "")
-          .replace(/^(?:ของพี่|ของ|พี่)\s*/, "")
-          .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
-          .trim();
+      if (isAdmin) {
+        // ✅ สกัดชื่อลูกค้าเป้าหมายจากข้อความคำสั่งแอดมิน (เช่น "วาศินา เอาไปฝากคนอื่นด้วย", "กุญสิญา ส่งเลย")
+        const proxyTarget = extractAdminCustomerName(normalizedMsg);
+        let cleanName = proxyTarget || "";
+        if (!cleanName && matchedKeyword) {
+          cleanName = normalizedMsg
+            .replace(matchedKeyword, "")
+            .replace(/^(?:ของพี่|ของ|พี่)\s*/, "")
+            .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
+            .trim();
+        }
 
         if (cleanName.length > 0 && !isAdminUser(cleanName)) {
           autoShipName = cleanName;

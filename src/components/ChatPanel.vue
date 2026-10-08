@@ -472,10 +472,18 @@ function selectActiveBuyers() {
 // 👤 ดึงชื่อลูกค้าเป้าหมายสำหรับข้อความที่ admin จองให้/สั่งส่งให้
 function getAdminProxyCustomerName(chat) {
   if (!chat) return null;
-  if (chat.proxyCustomerName) return chat.proxyCustomerName;
   const isMsgAdmin =
     chat.isAdmin ||
     /admin|แอดมิน/i.test(chat.displayName || chat.authorName || "");
+
+  // 1. ตรวจสอบ proxyCustomerName ที่บันทึกไว้ (พร้อมทำความสะอาดหากบันทึกคำสั่งติดไปด้วย เช่น "วาศินา เอาไปฝากคนอื่นด้วย")
+  if (chat.proxyCustomerName) {
+    const cleaned = extractAdminCustomerName(chat.proxyCustomerName);
+    if (cleaned) return cleaned;
+    return chat.proxyCustomerName;
+  }
+
+  // 2. หากยังไม่มี proxyCustomerName ให้สกัดจากข้อความแอดมิน
   if (isMsgAdmin && chat.text) {
     return extractAdminCustomerName(chat.text);
   }

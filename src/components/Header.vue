@@ -352,13 +352,17 @@ watch(
 );
 
 // ✅ Watcher: เมื่อจบไลฟ์ อ่านรายชื่อลูกค้าที่ให้จัดส่ง (รอ 5s) โดยไม่เด้งหน้าต่างสรุปอัตโนมัติ (สามารถกดดูเองได้จากปุ่มบน Header)
+let announceTimer = null;
+
 watch(
   () => systemStore.isLiveFinished,
   (isFinished, oldVal) => {
     if (isFinished && !oldVal) {
       logger.log("🎉 Stream finished detected!");
-      setTimeout(() => {
+      if (announceTimer) clearTimeout(announceTimer);
+      announceTimer = setTimeout(() => {
         announceShippingCustomers(systemStore.currentVideoId);
+        announceTimer = null;
       }, CONSTANTS.YOUTUBE.ANNOUNCE_SHIPPING_DELAY_MS);
     }
   },
@@ -735,6 +739,13 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   logger.log("👋 Header unmounting");
+  if (announceTimer) {
+    clearTimeout(announceTimer);
+    announceTimer = null;
+  }
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
+  }
   cleanupFns.forEach(fn => {
     if (typeof fn === 'function') {
       fn();

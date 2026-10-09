@@ -359,12 +359,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName } from "../utils/addressParser";
 import CustomerAddressModal from "./CustomerAddressModal.vue";
 import Swal from "sweetalert2";
+
+let printTimeout = null;
 
 const props = defineProps({
   customers: {
@@ -1222,7 +1224,8 @@ function handlePrint() {
   `);
   doc.close();
 
-  setTimeout(async () => {
+  if (printTimeout) clearTimeout(printTimeout);
+  printTimeout = setTimeout(async () => {
     try {
       if (iframe.contentWindow && iframe.contentWindow.document.fonts) {
         await iframe.contentWindow.document.fonts.ready;
@@ -1245,8 +1248,23 @@ function handlePrint() {
     } catch (err) {
       console.error("Error auto-updating labelPrinted status:", err);
     }
+    printTimeout = null;
   }, 250);
 }
+
+onUnmounted(() => {
+  if (printTimeout) {
+    clearTimeout(printTimeout);
+    printTimeout = null;
+  }
+  const oldIframe = document.getElementById("manowzab-label-print-frame");
+  if (oldIframe) {
+    oldIframe.remove();
+  }
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
+  }
+});
 
 // 📊 Export to CSV / Excel for Thermal Printer Apps (e.g. Print Master, Niimbot, Phomemo, Flash)
 function exportExcelForApp() {

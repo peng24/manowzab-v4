@@ -341,13 +341,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from "vue";
 import { useAuthStore } from "../stores/auth";
-import AuthGate from "../components/AuthGate.vue";
+const AuthGate = defineAsyncComponent(() => import("../components/AuthGate.vue"));
 import { ref as dbRef, onValue, update, remove, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import ThaiDatePicker from "../components/ThaiDatePicker.vue";
+
+let refreshTimer = null;
 
 // 🚀 Performance: Lazy load modals on demand
 const ShippingLabelModal = defineAsyncComponent(() => import("../components/ShippingLabelModal.vue"));
@@ -398,6 +400,14 @@ async function handleLogout() {
   });
 
   if (res.isConfirmed) {
+    cleanupListeners();
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+    if (typeof Swal !== "undefined" && Swal.isVisible()) {
+      Swal.close();
+    }
     authStore.logout();
     Swal.fire({
       toast: true,
@@ -495,7 +505,15 @@ function onNewDateInput(e) {
 }
 
 // ====== Firebase Listener ======
-onMounted(() => {
+function cleanupListeners() {
+  cleanupFns.forEach((fn) => {
+    if (typeof fn === "function") fn();
+  });
+  cleanupFns.length = 0;
+}
+
+function initListeners() {
+  cleanupListeners();
   const customersRef = dbRef(db, "delivery_customers");
   const unsubListener = onValue(customersRef, (snapshot) => {
     const data = snapshot.val() || {};
@@ -519,11 +537,41 @@ onMounted(() => {
     shippingCycle.value = snapshot.val() || "today";
   });
   cleanupFns.push(unsubCycle);
+}
+
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth) => {
+    if (isAuth) {
+      initListeners();
+    } else {
+      cleanupListeners();
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+      if (typeof Swal !== "undefined" && Swal.isVisible()) {
+        Swal.close();
+      }
+    }
+  }
+);
+
+onMounted(() => {
+  if (authStore.isAuthenticated) {
+    initListeners();
+  }
 });
 
 onUnmounted(() => {
-  cleanupFns.forEach(fn => { if (typeof fn === 'function') fn(); });
-  cleanupFns.length = 0;
+  cleanupListeners();
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
+  }
 });
 
 // ====== Address Helpers ======
@@ -743,7 +791,11 @@ function getSessionBreakdown(customer) {
 
 function refreshData() {
   isRefreshing.value = true;
-  setTimeout(() => { isRefreshing.value = false; }, 800);
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => {
+    isRefreshing.value = false;
+    refreshTimer = null;
+  }, 800);
 }
 
 // ====== CRUD ======

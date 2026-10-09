@@ -386,6 +386,7 @@ const pullDistance = ref(0);
 const pullThreshold = 80; // Minimum pull distance to trigger refresh
 let touchStartY = 0;
 let canPull = false;
+let pullResetTimer = null;
 
 const selectedChatTab = ref("all");
 const showNewMsgPill = ref(false);
@@ -903,6 +904,13 @@ onUnmounted(() => {
     chatUnsubscribe();
     chatUnsubscribe = null;
   }
+  if (pullResetTimer) {
+    clearTimeout(pullResetTimer);
+    pullResetTimer = null;
+  }
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
+  }
 });
 
 // ✅ Watch for Video ID changes to re-sync
@@ -1077,9 +1085,11 @@ async function handleTouchEnd() {
     await refreshChat();
 
     // Reset after delay
-    setTimeout(() => {
+    if (pullResetTimer) clearTimeout(pullResetTimer);
+    pullResetTimer = setTimeout(() => {
       isRefreshing.value = false;
       pullDistance.value = 0;
+      pullResetTimer = null;
     }, 500);
   } else {
     // Spring back

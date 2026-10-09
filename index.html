@@ -2,20 +2,6 @@
 <html lang="th">
   <head>
     <meta charset="UTF-8" />
-    <script>
-      // Clear old service workers once to break the PWA caching loop
-      if ('serviceWorker' in navigator) {
-        if (!localStorage.getItem('sw_reset_v4_36_5')) {
-          navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for(let registration of registrations) {
-              registration.unregister();
-            }
-            localStorage.setItem('sw_reset_v4_36_5', '1');
-            window.location.reload();
-          });
-        }
-      }
-    </script>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="mask-icon" href="/masked-icon.svg" color="#3b82f6" />
@@ -28,25 +14,58 @@
     />
     <title>Manowzab Command Center</title>
 
-    <!-- ✅ Google Thai Fonts: Noto Sans Thai & Sarabun -->
+    <!-- ✅ Google Thai Fonts: Kanit, Noto Sans Thai & Sarabun -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
+    />
+    <link
       rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
     />
 
-    <!-- Font Awesome -->
+    <!-- Font Awesome (Non-blocking for instant LCP) -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      />
+    </noscript>
   </head>
 
   <body>
     <noscript>กรุณาเปิดใช้งาน JavaScript เพื่อใช้ระบบ Manowzab Command Center</noscript>
     <div id="app"></div>
+    <script>
+      // Clear old service workers once to break the PWA caching loop (non-blocking)
+      if ('serviceWorker' in navigator && !localStorage.getItem('sw_reset_v4_36_5')) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+          localStorage.setItem('sw_reset_v4_36_5', '1');
+          window.location.reload();
+        });
+      }
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -67,7 +67,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, provide, watch, defineAsyncComponent } from "vue";
 import { useAuthStore } from "./stores/auth";
-import AuthGate from "./components/AuthGate.vue";
+import Swal from "sweetalert2";
 import { useSystemStore } from "./stores/system";
 import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
@@ -90,7 +90,8 @@ import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import { useVoiceLearningStore } from "./stores/voiceLearning";
 import { useChatProcessor } from "./composables/useChatProcessor";
 
-// 🚀 Performance: Lazy load heavy modals on demand via defineAsyncComponent
+// 🚀 Performance: Lazy load AuthGate & heavy modals on demand via defineAsyncComponent
+const AuthGate = defineAsyncComponent(() => import("./components/AuthGate.vue"));
 const Dashboard = defineAsyncComponent(() => import("./components/Dashboard.vue"));
 const HistoryModal = defineAsyncComponent(() => import("./components/HistoryModal.vue"));
 const ShippingManager = defineAsyncComponent(() => import("./components/ShippingManager.vue"));
@@ -200,7 +201,8 @@ onMounted(async () => {
   const unsubShippingCycle = systemStore.initShippingCycleListener(); // ✅ Init Shipping Cycle Listener
   if (unsubShippingCycle) cleanupFns.push(unsubShippingCycle);
 
-  voiceLearningStore.initVoicePatterns(); // ✅ Init Voice Patterns Self-Learning
+  const unsubVoiceLearning = voiceLearningStore.initVoicePatterns(); // ✅ Init Voice Patterns Self-Learning
+  if (unsubVoiceLearning) cleanupFns.push(unsubVoiceLearning);
 
 
   // ✅ Reset Connection State (Ensure YouTube starts disconnected)
@@ -363,7 +365,45 @@ onUnmounted(() => {
     voiceListenerUnsub = null;
   }
   cleanupFns.forEach((fn) => fn && fn());
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
+  }
 });
+
+// ✅ Watcher: เมื่อผู้ใช้ Logout ให้ล้าง presence, modals, audio queue, และสถานะการเชื่อมต่อทันที
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth) => {
+    if (!isAuth) {
+      logger.info("🚪 User logged out: Cleaning up presence, modals, audio, and live state...");
+      // 1. ปลด Presence ออกจาก Firebase
+      try {
+        const myConnectionRef = dbRef(db, `presence/${systemStore.myDeviceId}`);
+        set(myConnectionRef, { online: false, lastSeen: Date.now() }).catch(() => {});
+      } catch (e) {}
+
+      // 2. ปิด Modal ทั้งหมด และปิด SweetAlert2 ทันที
+      showDashboard.value = false;
+      showHistory.value = false;
+      showShippingManager.value = false;
+      showPhoneticManager.value = false;
+      if (typeof Swal !== "undefined" && Swal.isVisible()) {
+        Swal.close();
+      }
+
+      // 3. รีเซ็ตเสียงพูดที่ค้างอยู่
+      try {
+        const { resetVoice } = useAudio();
+        resetVoice();
+      } catch (e) {}
+
+      // 4. รีเซ็ตสถานะ YouTube Live
+      systemStore.isConnected = false;
+      systemStore.statusApi = "idle";
+      systemStore.statusChat = "idle";
+    }
+  }
+);
 
 // ✅ Centralized Delivery Customer Sync Watcher (Debounced for performance)
 let lastSessionCounts = {};

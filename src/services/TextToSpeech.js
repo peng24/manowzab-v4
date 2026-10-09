@@ -37,7 +37,15 @@ export class TextToSpeech {
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.onvoiceschanged = this.loadVoices;
       this.loadVoices();
-      this.poller = setInterval(this.loadVoices, 500);
+      let pollAttempts = 0;
+      this.poller = setInterval(() => {
+        this.loadVoices();
+        pollAttempts++;
+        if (pollAttempts >= 20 && this.poller) {
+          clearInterval(this.poller);
+          this.poller = null;
+        }
+      }, 500);
     }
   }
 

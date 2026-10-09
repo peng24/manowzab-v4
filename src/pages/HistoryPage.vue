@@ -40,9 +40,9 @@
 </template>
 
 <script setup>
-import { onMounted } from "vue";
+import { onMounted, onUnmounted, watch, defineAsyncComponent } from "vue";
 import { useAuthStore } from "../stores/auth";
-import AuthGate from "../components/AuthGate.vue";
+const AuthGate = defineAsyncComponent(() => import("../components/AuthGate.vue"));
 import { useNicknameStore } from "../stores/nickname";
 import HistoryModalContent from "../components/HistoryModal.vue";
 import Swal from "sweetalert2";
@@ -50,6 +50,13 @@ import Swal from "sweetalert2";
 const baseUrl = import.meta.env.BASE_URL || "/";
 const authStore = useAuthStore();
 const nicknameStore = useNicknameStore();
+let unsubNickname = null;
+
+function setupNicknameListener() {
+  if (authStore.isAuthenticated && !unsubNickname) {
+    unsubNickname = nicknameStore.initNicknameListener();
+  }
+}
 
 async function handleLogout() {
   const res = await Swal.fire({
@@ -64,6 +71,13 @@ async function handleLogout() {
   });
 
   if (res.isConfirmed) {
+    if (unsubNickname) {
+      unsubNickname();
+      unsubNickname = null;
+    }
+    if (typeof Swal !== "undefined" && Swal.isVisible()) {
+      Swal.close();
+    }
     authStore.logout();
     Swal.fire({
       toast: true,
@@ -76,9 +90,32 @@ async function handleLogout() {
   }
 }
 
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth) => {
+    if (isAuth) {
+      setupNicknameListener();
+    } else if (unsubNickname) {
+      unsubNickname();
+      unsubNickname = null;
+      if (typeof Swal !== "undefined" && Swal.isVisible()) {
+        Swal.close();
+      }
+    }
+  }
+);
+
 onMounted(() => {
-  if (authStore.isAuthenticated) {
-    nicknameStore.initNicknameListener();
+  setupNicknameListener();
+});
+
+onUnmounted(() => {
+  if (unsubNickname) {
+    unsubNickname();
+    unsubNickname = null;
+  }
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
   }
 });
 </script>

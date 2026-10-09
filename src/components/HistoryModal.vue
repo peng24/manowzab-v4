@@ -444,6 +444,8 @@ function setQueueInputRef(el, index) {
 // Active dynamic listeners cleanup references
 const pageListeners = [];
 const sessionListeners = [];
+let cleanupHistoryOwnerModal = null;
+let autocompleteTimer = null;
 
 function cleanupSessionListeners() {
   sessionListeners.forEach(unsub => {
@@ -474,6 +476,17 @@ onUnmounted(() => {
   pageListeners.forEach(unsub => {
     if (typeof unsub === "function") unsub();
   });
+  if (cleanupHistoryOwnerModal) {
+    cleanupHistoryOwnerModal();
+    cleanupHistoryOwnerModal = null;
+  }
+  if (autocompleteTimer) {
+    clearTimeout(autocompleteTimer);
+    autocompleteTimer = null;
+  }
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
+  }
   window.removeEventListener('keydown', handleGlobalKeydown);
 });
 
@@ -773,9 +786,11 @@ function onAutocompleteFocus(index) {
 }
 
 function onAutocompleteBlur() {
-  setTimeout(() => {
+  if (autocompleteTimer) clearTimeout(autocompleteTimer);
+  autocompleteTimer = setTimeout(() => {
     activeAutocompleteIdx.value = null;
     highlightedSuggestionIdx.value = -1;
+    autocompleteTimer = null;
   }, 150);
 }
 
@@ -1372,6 +1387,9 @@ async function showOwnerItems(ownerName) {
     confirmButtonColor: '#374151',
     showCloseButton: true,
     width: 420,
+    willClose: () => {
+      if (cleanupHistoryOwnerModal) cleanupHistoryOwnerModal();
+    },
     didOpen: () => {
       const handler = async (e) => {
         const [numStr, vid] = e.detail.split('|');
@@ -1418,11 +1436,21 @@ async function showOwnerItems(ownerName) {
       document.addEventListener('remove-owner-item-history', handler);
       
       const swalEl = Swal.getPopup();
-      const observer = new MutationObserver(() => {
-        if (!document.contains(swalEl)) {
-          document.removeEventListener('remove-owner-item-history', handler);
-          activeOwnerName.value = null;
+      let observer = null;
+
+      cleanupHistoryOwnerModal = () => {
+        document.removeEventListener('remove-owner-item-history', handler);
+        activeOwnerName.value = null;
+        if (observer) {
           observer.disconnect();
+          observer = null;
+        }
+        cleanupHistoryOwnerModal = null;
+      };
+
+      observer = new MutationObserver(() => {
+        if (!document.contains(swalEl)) {
+          if (cleanupHistoryOwnerModal) cleanupHistoryOwnerModal();
         }
       });
       observer.observe(document.body, { childList: true, subtree: true });

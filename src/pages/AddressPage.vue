@@ -312,15 +312,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from "vue";
 import { useAuthStore } from "../stores/auth";
-import AuthGate from "../components/AuthGate.vue";
-import CustomerQuickEditModal from "../components/CustomerQuickEditModal.vue";
-import AddressImportModal from "../components/AddressImportModal.vue";
+const AuthGate = defineAsyncComponent(() => import("../components/AuthGate.vue"));
+const CustomerQuickEditModal = defineAsyncComponent(() => import("../components/CustomerQuickEditModal.vue"));
+const AddressImportModal = defineAsyncComponent(() => import("../components/AddressImportModal.vue"));
 import { ref as dbRef, onValue, remove, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName } from "../utils/addressParser";
 import Swal from "sweetalert2";
+
+let refreshTimer = null;
 
 const baseUrl = import.meta.env.BASE_URL || "/";
 const authStore = useAuthStore();
@@ -726,8 +728,10 @@ function exportCSV() {
 
 function refreshData() {
   isRefreshing.value = true;
-  setTimeout(() => {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => {
     isRefreshing.value = false;
+    refreshTimer = null;
     Swal.fire({
       toast: true,
       position: "top-end",
@@ -763,9 +767,37 @@ async function handleLogout() {
   });
 
   if (res.isConfirmed) {
+    cleanupFns.forEach((fn) => {
+      if (typeof fn === "function") fn();
+    });
+    cleanupFns.length = 0;
+    if (typeof Swal !== "undefined" && Swal.isVisible()) {
+      Swal.close();
+    }
     authStore.logout();
   }
 }
+
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth) => {
+    if (isAuth) {
+      initListeners();
+    } else {
+      cleanupFns.forEach((fn) => {
+        if (typeof fn === "function") fn();
+      });
+      cleanupFns.length = 0;
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+      if (typeof Swal !== "undefined" && Swal.isVisible()) {
+        Swal.close();
+      }
+    }
+  }
+);
 
 onMounted(() => {
   if (authStore.isAuthenticated) {
@@ -775,6 +807,13 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
+  }
   cleanupFns.forEach((fn) => {
     if (typeof fn === "function") fn();
   });

@@ -111,6 +111,13 @@ export function useAwayMode() {
     onUnmounted(() => {
         if (awayInterval) {
             clearInterval(awayInterval);
+            awayInterval = null;
+        }
+        if (activeAwayUnsubscribe) {
+            try {
+                activeAwayUnsubscribe();
+            } catch (e) {}
+            activeAwayUnsubscribe = null;
         }
     });
 

@@ -18,6 +18,21 @@
 export const changelog = [
   // ─── 5.0.x ───────────────────────────────────────────
   {
+    version: '5.0.3',
+    date: '2026-10-09',
+    changes: {
+      improved: [
+        'เพิ่มประสิทธิภาพความเร็ว LCP (Largest Contentful Paint Optimization) — เพิ่ม Resource Hints Preconnect และ DNS-Prefetch สำหรับ Google Fonts และ CDN, นำการโหลดฟอนต์ผ่าน CSS @import ออกเพื่อตัด Request Waterfall, และปรับการโหลด Font Awesome เป็นแบบ Asynchronous',
+        'การแยกส่วนโมดูลอัจฉริยะ (On-Demand Code Splitting via defineAsyncComponent) — ปรับปรุงการโหลด AuthGate, CustomerQuickEditModal, AddressImportModal, ShippingLabelModal, และ HistoryModal เป็น Lazy Loading แบบไดนามิก ส่งผลให้ Main Bundle เบาลงอย่างเห็นได้ชัดและลดเวลา Total Blocking Time (TBT)',
+      ],
+      fixed: [
+        'กำจัดความเสี่ยง Memory Leaks จาก SweetAlert2 และ Unmounted Components — บังคับปิดหน้าต่างป๊อปอัป Swal.close() อัตโนมัติเมื่อคอมโพเนนต์ถูก Unmount ป้องกันการรั่วไหลของ DOM และ Event Listener',
+        'ระบบทำความสะอาดตัวจับเวลาและ Listeners เมื่อออกจากระบบ (Complete Timer & Auth Lifecycle Cleanup) — ตรวจสอบและเคลียร์ setTimeout/setInterval ที่ตกหล่นทั้งหมด (pulsing percent, new orders timers, highlight timeout, autocomplete blur, pull-to-refresh reset, chat scroll) พร้อมตัดการเชื่อมต่อ Firebase Listeners และรีเซ็ตสถานะ Presence ทันทีเมื่อผู้ใช้กด Log out',
+        'ปรับปรุงประสิทธิภาพแคชข้อความแชท (FIFO Key Trimming Queue) — เปลี่ยนการตัด ID แชทที่ซ้ำซ้อนใน chat.js ให้เป็นระบบคิว FIFO ลดภาระการสร้างอาร์เรย์ Object.keys() ซ้ำๆ เพื่อกำจัด GC (Garbage Collection) Thrashing',
+      ],
+    },
+  },
+  {
     version: '5.0.2',
     date: '2026-10-08',
     changes: {
@@ -282,20 +297,6 @@ export const changelog = [
     changes: {
       improved: [
         'ปิดการเปิดหน้าต่างสรุปผลการขาย (Live Summary Modal) อัตโนมัติเมื่อจบไลฟ์หรือตัดการเชื่อมต่อ — ยกเลิกการเด้งป๊อปอัปสรุปผลอัตโนมัติ เพื่อไม่ให้บดบังการทำงานบนหน้าแดชบอร์ด โดยยังคงให้ผู้ดูแลระบบกดเปิดดูสรุปได้เองทุกเมื่อผ่านปุ่ม "🔴 ไลฟ์จบแล้ว (ดูสรุป)" บนแถบ Header และเมนูเครื่องมือ',
-      ],
-    },
-  },
-  // ─── 4.88.x ───────────────────────────────────────────
-  {
-    version: '4.88.0',
-    date: '2026-09-17',
-    changes: {
-      added: [
-        'ระบบจดจำและบันทึกรูปแบบการชำระเงินถาวรลงสมุดที่อยู่ (Persistent Payment Type Sync) — เมื่อกำหนดหรือสลับรูปแบบส่ง (โอน / COD) ในรายการจัดส่งหรือใบปะหน้า ระบบจะบันทึกค่าลงในฐานข้อมูลกลาง address_book ทันที ทำให้ลูกค้าเดิมที่ชอบโอนหรือเก็บปลายทางถูกจดจำไว้ตลอดไป',
-        'ระบบดึงรูปแบบการชำระเงินเดิมอัตโนมัติ (Payment Type Fallback & Prefill) — แสดงรูปแบบชำระเงินเดิมของลูกค้าจาก address_book และที่อยู่จัดส่งให้อัตโนมัติแม้ในรอบจัดส่งใหม่ยังไม่ได้ระบุ พร้อม prefill ให้อัตโนมัติเมื่อลูกค้า CF สินค้าข้ามไลฟ์สด',
-      ],
-      improved: [
-        'เพิ่มการตรวจจับรูปแบบการชำระเงินอัจฉริยะจากโน้ต — เมื่อแอดมินพิมพ์ระบุคำว่า COD, ปลายทาง หรือ โอน ในช่องโน้ต ระบบจะอัปเดตและบันทึกรูปแบบการชำระเงินของลูกค้าลง address_book โดยอัตโนมัติ',
       ],
     },
   },

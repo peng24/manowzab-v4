@@ -50,7 +50,7 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
     isInitialized.value = true;
 
     const patternsRef = dbRef(db, "settings/voice_patterns");
-    onValue(patternsRef, (snapshot) => {
+    const unsubscribe = onValue(patternsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         // Automatically merge new system defaults if they are missing
@@ -83,6 +83,7 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
         }).catch((err) => logger.error("VoiceLearning: Failed to set defaults:", err));
       }
     });
+    return unsubscribe;
   }
 
   /**

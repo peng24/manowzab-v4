@@ -440,9 +440,15 @@ const visibleItemIds = computed(() => {
 
 
 
-// ✅ Cancelled Items Blink Effect (15 seconds)
+// ✅ Cancelled & New Items Timers & Lifecycle Tracking
 const cancelledItems = ref(new Map());
 const cancelledTimers = {};
+const newOrdersTimers = {};
+let pulsingPercentTimer = null;
+let highlightTimeout = null;
+let autocompleteTimer = null;
+let pullResetTimer = null;
+
 
 // 📦 Delivery Strip & Customer Meta State
 const deliveryCustomers = ref([]);
@@ -572,6 +578,8 @@ const deliveryCountsMap = computed(() => {
   return counts;
 });
 
+// Reference สำหรับ cleanup listener & observer ของ modal
+let cleanupOwnerModal = null;
 
 onMounted(() => {
   // 📦 Listen delivery_customers for badge count + strip
@@ -686,7 +694,11 @@ watch(soldPercentage, (newVal, oldVal) => {
   isPulsingPercent.value = false;
   void document.body.offsetWidth; // force reflow
   isPulsingPercent.value = true;
-  setTimeout(() => { isPulsingPercent.value = false; }, 600);
+  if (pulsingPercentTimer) clearTimeout(pulsingPercentTimer);
+  pulsingPercentTimer = setTimeout(() => {
+    isPulsingPercent.value = false;
+    pulsingPercentTimer = null;
+  }, 600);
   pctAnimFrame = animateValue(from, newVal, 500, (v) => {
     animatedPercentage.value = v;
   });
@@ -703,8 +715,23 @@ const percentColorClass = computed(() => {
 onUnmounted(() => {
   if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
   if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
-  // ✅ Cleanup cancelled item timers
+  // ✅ Cleanup cancelled & new item timers
   Object.values(cancelledTimers).forEach(t => clearTimeout(t));
+  Object.values(newOrdersTimers).forEach(t => clearTimeout(t));
+  if (pulsingPercentTimer) clearTimeout(pulsingPercentTimer);
+  if (highlightTimeout) clearTimeout(highlightTimeout);
+  if (autocompleteTimer) clearTimeout(autocompleteTimer);
+  if (pullResetTimer) clearTimeout(pullResetTimer);
+
+  // ✅ Force-close SweetAlert2 modal if still active on unmount
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
+  }
+
+  if (cleanupOwnerModal) {
+    cleanupOwnerModal();
+    cleanupOwnerModal = null;
+  }
   cleanupFns.forEach(fn => {
     if (typeof fn === 'function') {
       fn();
@@ -1006,7 +1033,7 @@ async function showOwnerItems(ownerName) {
   pastItems.value = [];
 
   // ✅ Phase 4.1: Reference สำหรับ cleanup listener & observer
-  let cleanupOwnerModal = null;
+  cleanupOwnerModal = null;
 
   // เปิด Swal ขึ้นมาพร้อมหน้าตา Loading หรือข้อมูลเริ่มต้นทันที
   Swal.fire({
@@ -1261,6 +1288,11 @@ watch(
         clearTimeout(cancelledTimers[key]);
         delete cancelledTimers[key];
       });
+      newOrders.value.clear();
+      Object.keys(newOrdersTimers).forEach((key) => {
+        clearTimeout(newOrdersTimers[key]);
+        delete newOrdersTimers[key];
+      });
       return;
     }
 
@@ -1269,6 +1301,11 @@ watch(
       Object.keys(cancelledTimers).forEach((key) => {
         clearTimeout(cancelledTimers[key]);
         delete cancelledTimers[key];
+      });
+      newOrders.value.clear();
+      Object.keys(newOrdersTimers).forEach((key) => {
+        clearTimeout(newOrdersTimers[key]);
+        delete newOrdersTimers[key];
       });
       return;
     }
@@ -1286,7 +1323,11 @@ watch(
           cancelledItems.value.delete(num);
         }
         newOrders.value.add(num);
-        setTimeout(() => newOrders.value.delete(num), 15000);
+        if (newOrdersTimers[num]) clearTimeout(newOrdersTimers[num]);
+        newOrdersTimers[num] = setTimeout(() => {
+          newOrders.value.delete(num);
+          delete newOrdersTimers[num];
+        }, 15000);
         scrollToItem(num);
       }
     });
@@ -1329,8 +1370,10 @@ function scrollToItem(num) {
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         highlightedId.value = num;
-        setTimeout(() => {
+        if (highlightTimeout) clearTimeout(highlightTimeout);
+        highlightTimeout = setTimeout(() => {
           if (highlightedId.value === num) highlightedId.value = null;
+          highlightTimeout = null;
         }, 10000);
       }
     });
@@ -1461,9 +1504,11 @@ function onAutocompleteFocus(index) {
 
 function onAutocompleteBlur() {
   // Delay to allow mousedown on suggestion
-  setTimeout(() => {
+  if (autocompleteTimer) clearTimeout(autocompleteTimer);
+  autocompleteTimer = setTimeout(() => {
     activeAutocompleteIdx.value = null;
     highlightedSuggestionIdx.value = -1;
+    autocompleteTimer = null;
   }, 150);
 }
 
@@ -1713,9 +1758,11 @@ async function handleTouchEnd() {
     await refreshStock();
 
     // Reset after delay
-    setTimeout(() => {
+    if (pullResetTimer) clearTimeout(pullResetTimer);
+    pullResetTimer = setTimeout(() => {
       isRefreshing.value = false;
       pullDistance.value = 0;
+      pullResetTimer = null;
     }, 500);
   } else {
     // Spring back

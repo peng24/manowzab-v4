@@ -251,6 +251,7 @@ const deliveryCustomers = ref({}); // 🆕 ข้อมูลลูกค้า�
 const selectedChatUid = ref(null);
 const selectedChatUser = ref({});
 const userChatHistory = ref([]);
+let historyScrollTimer = null;
 
 // Calculate customer orders (Unify by normalized customer name so mixed proxy/UID bookings merge into 1 customer)
 const customerOrders = computed(() => {
@@ -670,9 +671,11 @@ async function openChatHistory(uid, item) {
     }
 
     // Auto scroll down
-    setTimeout(() => {
+    if (historyScrollTimer) clearTimeout(historyScrollTimer);
+    historyScrollTimer = setTimeout(() => {
       const body = document.getElementById("history-body");
       if (body) body.scrollTop = body.scrollHeight;
+      historyScrollTimer = null;
     }, 100);
   } catch (error) {
     console.error("Error loading chat history:", error);
@@ -767,6 +770,13 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  if (historyScrollTimer) {
+    clearTimeout(historyScrollTimer);
+    historyScrollTimer = null;
+  }
+  if (typeof Swal !== "undefined" && Swal.isVisible()) {
+    Swal.close();
+  }
   cleanupFns.forEach(fn => {
     if (typeof fn === 'function') {
       fn();

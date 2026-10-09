@@ -164,7 +164,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useSystemStore } from '../stores/system'
 import { escapeHtml } from '../utils/dbUtils'
 
@@ -340,6 +340,10 @@ watch(isOpen, (val) => {
   } else {
     window.removeEventListener('keydown', handleKeydown)
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 
 // Expose open() for parent component

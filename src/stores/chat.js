@@ -16,6 +16,7 @@ export const useChatStore = defineStore("chat", () => {
 
   const messages = reactive([]); // ✅ reactive array สำหรับแสดงผล UI
   const seenMessageIds = ref({});
+  const seenKeyQueue = []; // ✅ FIFO Queue สำหรับ tracking key โดยไม่ต้องเรียก Object.keys() ซ้ำๆ
   const fullChatLog = ref([]);
   const streamStartTime = ref(null);
   const unreadCollapsedCount = ref(0); // ✅ จำนวนข้อความใหม่ขณะซ่อนช่องแชท
@@ -57,12 +58,14 @@ export const useChatStore = defineStore("chat", () => {
     }
 
     seenMessageIds.value[message.id] = true;
+    seenKeyQueue.push(message.id);
 
-    // ✅ Memory safety: trim seen IDs cache periodically
-    const seenKeys = Object.keys(seenMessageIds.value);
-    if (seenKeys.length > MAX_SEEN_IDS) {
-      const keysToRemove = seenKeys.slice(0, seenKeys.length - MAX_SEEN_IDS);
-      keysToRemove.forEach(key => delete seenMessageIds.value[key]);
+    // ✅ Memory safety: trim seen IDs cache without expensive Object.keys allocations
+    if (seenKeyQueue.length > MAX_SEEN_IDS + 200) {
+      const keysToRemove = seenKeyQueue.splice(0, seenKeyQueue.length - MAX_SEEN_IDS);
+      for (let i = 0; i < keysToRemove.length; i++) {
+        delete seenMessageIds.value[keysToRemove[i]];
+      }
     }
 
     messages.push(message); // ✅ Push เข้า reactive array
@@ -136,6 +139,7 @@ export const useChatStore = defineStore("chat", () => {
   function clearChat() {
     messages.splice(0); // Clear UI messages
     seenMessageIds.value = {}; // Clear deduplication cache
+    seenKeyQueue.length = 0; // Clear FIFO tracking queue
     fullChatLog.value = []; // ✅ Clear RAM log
     streamStartTime.value = null; // ✅ Reset Timer
 

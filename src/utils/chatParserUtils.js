@@ -155,6 +155,27 @@ export function isAdminUser(displayName = "", realName = "") {
 // 🚚 Shipping, Hold & Payment action keywords to strip when extracting customer name from admin proxy messages
 export const adminShippingActionRegex = /(?:เอาไปฝาก(?:รวม)?(?:กับ)?(?:คนอื่น)?(?:ด้วย)?|ฝากส่ง(?:รวม)?(?:กับ)?(?:คนอื่น)?(?:ด้วย)?|ฝากรวม(?:กับ)?(?:คนอื่น)?(?:ด้วย)?|ฝากคนอื่น(?:ด้วย)?|ฝากไว้ก่อน(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝากไว้(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝากก่อน(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝากของ(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ยังไม่(?:ต้อง)?ส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝากด้วย(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝาก(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ|โลด|เลย)?|ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้|ส่งเลย(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ส่งวันนี้(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ส่งของ(?:วันนี้|พรุ่งนี้|เลย)?|ส่ง(?:วัน)?\s*(?:อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)|ส่ง(?:วันที่\s*)?\d{1,2}(?:\s*(?:ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม))?|ส่งด้วย(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|ส่งให้(?:ด้วย)?|ส่งมา(?:เลย)?|พร้อมส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|ขอส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|แจ้งส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|รวมส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|ส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ|โลด)?|โอนแล้ว(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|แจ้งโอน(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ส่งสลิป(?:แล้ว)?|มีสลิป|สลิป|เก็บปลายทาง|ปลายทาง|เช็คยอด|คิดยอด|ยอดโอน|ยอด|เช็คเลข|ขอเลข|เลขพัสดุ|พัสดุ|flash|kerry|j&t|jt|ขนส่ง|เคอรี่|แฟลช|ไปรษณีย์|ค่าส่ง)/gi;
 
+// Module-scoped compiled regexes for performance
+const ADMIN_NUM_FIRST_REGEX = /^(\d+)\s*[,.\/;:\-_=]*\s*([ก-๛a-zA-Z].*)$/;
+const ADMIN_NAME_FIRST_REGEX = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s*[-_:=]?\s*(\d+)$/;
+const STRIP_PUNCT_EDGES_REGEX = /^[^\u0E00-\u0E7Fa-zA-Z]+|[^\w\u0E00-\u0E7F]+$/g;
+const STRIP_POLITE_TAIL_REGEX = /(?:นะครับ|นะคะ|ครับ|ค่ะ|จ้า|จ้ะ|นะ|คะ|ขา|ด้วย)+$/g;
+const PURE_POLITE_OR_CHAT_REGEX = /^(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|นะคะ|นะครับ|คะ|ขา|โลด|เลย|ด้วย|ของ|คนอื่น|ฝาก|ส่ง)+$/;
+const SENTENCE_FRAGMENT_REGEX = /(?:แชท|นอน|พาลูก|ร้าน|โปรโมชั่น|ขอบคุณ|เข้าแล้ว|เรียบร้อย|ฟรี|รอบบ่าย|ทัก|ติดต่อ)/;
+const OF_PREFIX_REGEX = /^(?:ของ)\s*/;
+const CLEAN_PUNCT_REGEX = /^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g;
+
+// Module-scoped date parsing regexes
+const DATE_MISMATCH_REGEX = /(?:วันที่|วันที|รอบวันที่|รอบวันที|รอบ)\s*(\d{1,2})\s*(?:[\/\.-]|\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|\d{1,2})?(?:\s*(?:[\/\.-]|\s*)\s*(\d{2,4}))?/i;
+const DIGITS_1_OR_2_REGEX = /^\d{1,2}$/;
+const DOT_REGEX = /\./g;
+const DIGITS_ONLY_REGEX = /^\d+$/;
+const DIGITS_GLOBAL_REGEX = /\d+/;
+
+// ⚡ Fast-path detection patterns
+const PURE_DIGITS_FAST_REGEX = /^\d+$/;
+const INTENT_KEYWORD_FAST_CHECK = /(?:f|cf|รับ|เอา|เิา|เค|จอง|ok|cc|cancel|ยก|ผ่าน|ถอน|สละ|หลุด|เปลี่ยนใจ|ไม่เอา|ไม่รับ|ส่ง|โอน|สลิป|ยอด|ที่อยู่|ปลายทาง|รอบ|พัสดุ|ขนส่ง|เคอรี่|แฟลช|flash|kerry|j&t|jt|ฝาก|ลอง|ดู|ทาบ|รีวิว|อก|เอว|สะโพก|ยาว|ราคา|เท่า|กี่|แบบ|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ว่าง|เหลือ|อยู่|ไซส์|ขนาด|\d)/i;
+
 /**
  * Extracts target customer name from admin messages (admin booking or shipping proxy)
  * e.g. "18 ตุ๊ก บำรุงรัตน์" -> "ตุ๊ก บำรุงรัตน์"
@@ -181,22 +202,22 @@ export function extractAdminCustomerName(text) {
     const p3 = mb[3]?.trim();
     const candidate = p1 || p3;
     if (candidate && !isAdminUser(candidate)) {
-      const clean = candidate.replace(/^[^\u0E00-\u0E7Fa-zA-Z]+|[^\w\u0E00-\u0E7F]+$/g, "").trim();
+      const clean = candidate.replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
       if (clean && !isAdminUser(clean)) return clean;
     }
   }
 
   // 2. Admin num first: e.g. "18 ตุ๊ก บำรุงรัตน์", "28 วาศินา", "50 ,tit"
-  const numFirst = normalized.match(/^(\d+)\s*[,.\/;:\-_=]*\s*([ก-๛a-zA-Z].*)$/);
+  const numFirst = normalized.match(ADMIN_NUM_FIRST_REGEX);
   if (numFirst) {
-    const candidate = numFirst[2].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+|[^\w\u0E00-\u0E7F]+$/g, "").trim();
+    const candidate = numFirst[2].replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
     if (candidate && !isAdminUser(candidate)) return candidate;
   }
 
   // 3. Admin name first: e.g. "ตุ๊ก บำรุงรัตน์ 18", "พี่อ้อย 20", "วาศินา 28"
-  const nameFirst = normalized.match(/^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s*[-_:=]?\s*(\d+)$/);
+  const nameFirst = normalized.match(ADMIN_NAME_FIRST_REGEX);
   if (nameFirst) {
-    const candidate = nameFirst[1].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+|[^\w\u0E00-\u0E7F]+$/g, "").trim();
+    const candidate = nameFirst[1].replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
     if (candidate && !isAdminUser(candidate)) return candidate;
   }
 
@@ -204,19 +225,19 @@ export function extractAdminCustomerName(text) {
   if (shippingRegex.test(normalized) || holdRegex.test(normalized)) {
     const cleaned = normalized
       .replace(adminShippingActionRegex, "")
-      .replace(/^(?:ของ)\s*/, "")
-      .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
-      .replace(/(?:นะครับ|นะคะ|ครับ|ค่ะ|จ้า|จ้ะ|นะ|คะ|ขา|ด้วย)+$/g, "")
+      .replace(OF_PREFIX_REGEX, "")
+      .replace(CLEAN_PUNCT_REGEX, "")
+      .replace(STRIP_POLITE_TAIL_REGEX, "")
       .trim();
 
-    const isPurePoliteOrChat = /^(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|นะคะ|นะครับ|คะ|ขา|โลด|เลย|ด้วย|ของ|คนอื่น|ฝาก|ส่ง)+$/.test(cleaned);
-    const isSentenceFragment = /(?:แชท|นอน|พาลูก|ร้าน|โปรโมชั่น|ขอบคุณ|เข้าแล้ว|เรียบร้อย|ฟรี|รอบบ่าย|ทัก|ติดต่อ)/.test(cleaned);
+    const isPurePoliteOrChat = PURE_POLITE_OR_CHAT_REGEX.test(cleaned);
+    const isSentenceFragment = SENTENCE_FRAGMENT_REGEX.test(cleaned);
 
     if (
       cleaned.length >= 2 &&
       cleaned.length <= 40 &&
       !isAdminUser(cleaned) &&
-      !/^\d+$/.test(cleaned) &&
+      !DIGITS_ONLY_REGEX.test(cleaned) &&
       !isPurePoliteOrChat &&
       !isSentenceFragment
     ) {
@@ -227,7 +248,7 @@ export function extractAdminCustomerName(text) {
   // 5. Dash buy: e.g. "ตุ๊ก-18"
   const dashMatch = normalized.match(dashBuyRegex);
   if (dashMatch) {
-    const candidate = dashMatch[1].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+|[^\w\u0E00-\u0E7F]+$/g, "").trim();
+    const candidate = dashMatch[1].replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
     if (candidate && !isAdminUser(candidate)) return candidate;
   }
 
@@ -245,9 +266,7 @@ export function isDateMismatch(text, liveTimestamp = Date.now()) {
   const normalized = thaiToArabic(text);
 
   // Match patterns like "วันที่ 1 ส.ค. 69", "วันที่ 1 ส.ค.", "วันที่ 1/8/69", "1 ส.ค. 69"
-  const dateRegex = /(?:วันที่|วันที|รอบวันที่|รอบวันที|รอบ)\s*(\d{1,2})\s*(?:[\/\.-]|\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|\d{1,2})?(?:\s*(?:[\/\.-]|\s*)\s*(\d{2,4}))?/i;
-
-  const match = normalized.match(dateRegex);
+  const match = normalized.match(DATE_MISMATCH_REGEX);
   if (!match) return false;
 
   const day = parseInt(match[1], 10);
@@ -268,10 +287,10 @@ export function isDateMismatch(text, liveTimestamp = Date.now()) {
   const monthStr = match[2];
   if (monthStr) {
     let monthNum = null;
-    if (/^\d{1,2}$/.test(monthStr)) {
+    if (DIGITS_1_OR_2_REGEX.test(monthStr)) {
       monthNum = parseInt(monthStr, 10);
     } else {
-      const cleanMonth = monthStr.replace(/\./g, "");
+      const cleanMonth = monthStr.replace(DOT_REGEX, "");
       const mNamesShort = ["มค", "กพ", "มีค", "เมย", "พค", "มิย", "กค", "สค", "กย", "ตค", "พย", "ธค"];
       const mNamesFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
       let idx = mNamesShort.indexOf(cleanMonth);
@@ -310,6 +329,30 @@ export function isDateMismatch(text, liveTimestamp = Date.now()) {
 export function parseIntentDetails(text, liveTimestamp = Date.now()) {
   const normalizedMsg = thaiToArabic(text || "").trim();
   if (!normalizedMsg) return { type: "EMPTY" };
+
+  // ⚡ Fast-Path 1: Pure digits (e.g. "25", "42", "1") — matches the vast majority of live CF comments instantly
+  if (PURE_DIGITS_FAST_REGEX.test(normalizedMsg)) {
+    const itemId = parseInt(normalizedMsg, 10);
+    if (itemId > 0 && itemId <= MAX_ITEM_ID) {
+      return { type: "SINGLE_BUY", itemId, method: "pure-number" };
+    }
+  }
+
+  // ⚡ Fast-Path 2: General long comments (>120 chars) that have no buying intention
+  if (normalizedMsg.length > 120) {
+    if (shippingRegex.test(normalizedMsg)) {
+      return { type: "SHIPPING" };
+    }
+    if (questionRegex.test(normalizedMsg)) {
+      return { type: "QUESTION" };
+    }
+    return { type: "UNKNOWN" };
+  }
+
+  // ⚡ Fast-Path 3: Text with no digits and no relevant intent keywords
+  if (!INTENT_KEYWORD_FAST_CHECK.test(normalizedMsg)) {
+    return { type: "UNKNOWN" };
+  }
 
   if (isDateMismatch(normalizedMsg, liveTimestamp)) {
     return { type: "DATE_MISMATCH" };
@@ -357,7 +400,7 @@ export function parseIntentDetails(text, liveTimestamp = Date.now()) {
 
   // 3. Try / Fit check request
   if (tryRegex.test(normalizedMsg)) {
-    const matchNum = normalizedMsg.match(/\d+/);
+    const matchNum = normalizedMsg.match(DIGITS_GLOBAL_REGEX);
     if (matchNum) {
       const itemId = parseInt(matchNum[0], 10);
       if (itemId > 0 && itemId <= MAX_ITEM_ID) {
@@ -382,7 +425,7 @@ export function parseIntentDetails(text, liveTimestamp = Date.now()) {
     if (standalonePassRegex.test(normalizedMsg)) {
       return { type: "CANCEL_LATEST", method: "auto-pass-latest" };
     }
-    const matchNum = normalizedMsg.match(/\d+/);
+    const matchNum = normalizedMsg.match(DIGITS_GLOBAL_REGEX);
     if (matchNum) {
       const itemId = parseInt(matchNum[0], 10);
       return { type: "CANCEL_ITEM", itemId };

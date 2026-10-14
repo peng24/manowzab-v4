@@ -20,10 +20,19 @@ export const useNicknameStore = defineStore("nickname", () => {
   const TITLES_LIST = ["คุณ", "พี่", "น้อง", "เฮีย", "เจ๊", "ป้า", "น้า", "อา", "ลุง", "ตา", "ยาย", "แม่", "พ่อ", "ดร.", "หมอ", "ครู", "ซ้อ", "เสี่ย"];
   const EMOJI_REGEX = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]|\uD83F[\uDC00-\uDFFF]|[\u2000-\u26FF])/g;
 
+  // 🚀 Performance: Memoization Cache for resolved phonetic customer names
+  const phoneticCache = new Map();
+
+  function clearPhoneticCache() {
+    phoneticCache.clear();
+    logger.debug("🧹 Nickname store: Phonetic cache cleared");
+  }
+
   function initNicknameListener() {
     return onValue(dbRef(db, "nicknames"), (snapshot) => {
       const data = snapshot.val() || {};
       nicknames.value = data;
+      clearPhoneticCache(); // Invalidate memoized cache when nicknames change
       logger.debug("📝 Nicknames updated:", Object.keys(data).length);
     });
   }
@@ -63,11 +72,33 @@ export const useNicknameStore = defineStore("nickname", () => {
     return realName;
   }
 
-  // 🔊 สำหรับเสียงอ่าน (เอาชื่อเต็มยศ)
+  // 🔊 สำหรับเสียงอ่าน (เอาชื่อเต็มยศ) — Memoized
+  const MAX_PHONETIC_CACHE_SIZE = 500;
+
+  function setPhoneticCache(key, val) {
+    if (phoneticCache.has(key)) {
+      phoneticCache.delete(key);
+    } else if (phoneticCache.size >= MAX_PHONETIC_CACHE_SIZE) {
+      const oldestKey = phoneticCache.keys().next().value;
+      phoneticCache.delete(oldestKey);
+    }
+    phoneticCache.set(key, val);
+  }
+
   function getPhoneticName(uid, displayName) {
+    const cacheKey = `${uid || ""}:::${displayName || ""}`;
+    if (phoneticCache.has(cacheKey)) {
+      const cached = phoneticCache.get(cacheKey);
+      phoneticCache.delete(cacheKey);
+      phoneticCache.set(cacheKey, cached);
+      return cached;
+    }
+
     // 1. เช็คชื่อพิเศษ (ถ้าเจอ ให้เปลี่ยนเป็นชื่อยาวทันที)
     if (SPECIAL_NAMES_TTS[displayName]) {
-      return SPECIAL_NAMES_TTS[displayName];
+      const specialResult = SPECIAL_NAMES_TTS[displayName];
+      setPhoneticCache(cacheKey, specialResult);
+      return specialResult;
     }
 
     // 2. ถ้าไม่มีในรายการพิเศษ ค่อยไปดูใน Firebase
@@ -91,6 +122,8 @@ export const useNicknameStore = defineStore("nickname", () => {
       }
     }
 
+    setPhoneticCache(cacheKey, nameToRead);
+
     return nameToRead;
   }
 
@@ -100,5 +133,6 @@ export const useNicknameStore = defineStore("nickname", () => {
     hasNickname,
     getNickname,
     getPhoneticName,
+    clearPhoneticCache,
   };
 });

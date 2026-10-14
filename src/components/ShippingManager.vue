@@ -960,38 +960,37 @@ function updateField(id, field, value) {
   }
 
   // 💳 Auto-sync paymentType to address_book if note specifies payment intent
+  let paymentTypeChange = null;
+  const cust = allCustomers.value.find((c) => c.id === id);
+  const normKey = cust ? normalizeName(cust.name).replace(/[.#$[\]/]/g, "_") : "";
+
   if (field === "note" && typeof value === "string") {
     const noteLower = value.toLowerCase();
-    const cust = allCustomers.value.find((c) => c.id === id);
-    const normKey = cust ? normalizeName(cust.name).replace(/[.#$[\]/]/g, "_") : "";
     if (noteLower.includes("cod") || noteLower.includes("ปลายทาง") || noteLower.includes("เก็บเงิน")) {
       updates.paymentType = "cod";
       if (cust) cust.paymentType = "cod";
-      if (normKey) {
-        update(dbRef(db, `address_book/${normKey}`), {
-          paymentType: "cod",
-          updatedAt: Date.now(),
-        });
-        if (addressBook.value && addressBook.value[normKey]) {
-          addressBook.value[normKey].paymentType = "cod";
-        }
-      }
+      paymentTypeChange = "cod";
     } else if (noteLower.includes("โอน") || noteLower.includes("transfer")) {
       updates.paymentType = "transfer";
       if (cust) cust.paymentType = "transfer";
-      if (normKey) {
-        update(dbRef(db, `address_book/${normKey}`), {
-          paymentType: "transfer",
-          updatedAt: Date.now(),
-        });
-        if (addressBook.value && addressBook.value[normKey]) {
-          addressBook.value[normKey].paymentType = "transfer";
-        }
-      }
+      paymentTypeChange = "transfer";
     }
   }
 
-  update(dbRef(db, `delivery_customers/${id}`), updates);
+  if (paymentTypeChange && normKey) {
+    if (addressBook.value && addressBook.value[normKey]) {
+      addressBook.value[normKey].paymentType = paymentTypeChange;
+    }
+    const multiPathUpdates = {};
+    Object.entries(updates).forEach(([k, v]) => {
+      multiPathUpdates[`delivery_customers/${id}/${k}`] = v;
+    });
+    multiPathUpdates[`address_book/${normKey}/paymentType`] = paymentTypeChange;
+    multiPathUpdates[`address_book/${normKey}/updatedAt`] = Date.now();
+    update(dbRef(db), multiPathUpdates);
+  } else {
+    update(dbRef(db, `delivery_customers/${id}`), updates);
+  }
 }
 
 function markDone(customer) {

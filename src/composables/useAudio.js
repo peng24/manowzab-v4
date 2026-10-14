@@ -44,30 +44,56 @@ let activeAudioNodes = []; // { osc: OscillatorNode, gain: GainNode }[]
 
 
 let sleepAudioBuffer = null;
+let sleepAudioLoadingPromise = null;
 let activeSleepSources = [];
 let activeHtmlAudios = [];
 
 function getSleepAudioPath() {
   const base = import.meta.env.BASE_URL || "/";
-  return `${base.endsWith("/") ? base : base + "/"}PP_SP_sleep.wav`;
+  return `${base.endsWith("/") ? base : base + "/"}PP_SP_sleep.mp3`;
 }
 
-async function preloadSleepAudio() {
-  try {
-    if (!audioCtx) return;
-    const audioPath = getSleepAudioPath();
-    const response = await fetch(audioPath);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    const arrayBuffer = await response.arrayBuffer();
-    sleepAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    logger.debug("💤 Sleep mode audio preloaded successfully!");
-  } catch (err) {
-    logger.warn("⚠️ Failed to preload sleep mode audio:", err);
+/**
+ * 💤 Lazy Load sleep mode audio buffer (unblocks initial app boot)
+ * Loaded when browser is idle via requestIdleCallback, or on first playSleepAudio call
+ */
+async function ensureSleepAudioLoaded() {
+  if (sleepAudioBuffer) return sleepAudioBuffer;
+  if (sleepAudioLoadingPromise) return sleepAudioLoadingPromise;
+
+  sleepAudioLoadingPromise = (async () => {
+    try {
+      if (!audioCtx) return null;
+      const audioPath = getSleepAudioPath();
+      const response = await fetch(audioPath);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const arrayBuffer = await response.arrayBuffer();
+      sleepAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      logger.debug("💤 Sleep mode audio lazy loaded successfully!");
+      return sleepAudioBuffer;
+    } catch (err) {
+      logger.warn("⚠️ Failed to lazy load sleep mode audio:", err);
+      return null;
+    } finally {
+      sleepAudioLoadingPromise = null;
+    }
+  })();
+
+  return sleepAudioLoadingPromise;
+}
+
+// 💤 Schedule background lazy load during browser idle time (or fallback after 3s delay)
+if (typeof window !== "undefined") {
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(() => {
+      ensureSleepAudioLoaded().catch(() => {});
+    }, { timeout: 6000 });
+  } else {
+    setTimeout(() => {
+      ensureSleepAudioLoaded().catch(() => {});
+    }, 3000);
   }
 }
-
-// Start preloading immediately in the background
-preloadSleepAudio();
 
 async function waitForSpeechToFinish() {
   const maxWait = 10000; // 10s max wait
@@ -258,6 +284,10 @@ export function useAudio() {
           return;
         }
 
+        if (!sleepAudioBuffer) {
+          await ensureSleepAudioLoaded().catch(() => {});
+        }
+
         if (sleepAudioBuffer) {
           const source = audioCtx.createBufferSource();
           source.buffer = sleepAudioBuffer;
@@ -273,6 +303,10 @@ export function useAudio() {
           source.onended = () => {
             const idx = activeSleepSources.indexOf(source);
             if (idx > -1) activeSleepSources.splice(idx, 1);
+            try {
+              source.disconnect();
+              gainNode.disconnect();
+            } catch (e) {}
             resolve();
           };
           

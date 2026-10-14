@@ -380,6 +380,10 @@ async function savePhonetic() {
     // ✅ ใช้ update เพื่อไม่ลบ key อื่นๆ ที่อาจมีอยู่ใน nicknames/${safeUid}
     await update(dbRef(db, `nicknames/${safeUid}`), { nick, phonetic, realName: uid });
 
+    // 🚀 Invalidate memoized phonetic and TTS caches
+    nicknameStore.clearPhoneticCache?.();
+    ttsService.clearCache?.();
+
     Swal.fire({
       icon: "success",
       title: editingUid.value ? "อัปเดตสำเร็จ!" : "บันทึกสำเร็จ!",
@@ -435,6 +439,11 @@ function deleteItem(uid, name) {
         if (safeUid !== uid) {
           await remove(dbRef(db, `nicknames/${uid}`)).catch(() => {});
         }
+
+        // 🚀 Invalidate memoized phonetic and TTS caches
+        nicknameStore.clearPhoneticCache?.();
+        ttsService.clearCache?.();
+
         Swal.fire({
           icon: "success",
           title: "ลบแล้ว!",

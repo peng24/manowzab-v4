@@ -3,7 +3,7 @@ import { ref as dbRef, onValue, set } from "firebase/database";
 import { db } from "./useFirebase";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "./useAudio";
-import { AWAY_END_MESSAGES } from "../constants";
+import { AWAY_END_MESSAGES } from "../config/constants";
 import { logger } from "../utils/logger";
 
 let activeAwayUnsubscribe = null;

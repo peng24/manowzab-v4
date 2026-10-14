@@ -20,6 +20,14 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
   const candidates = ref({});
   const isInitialized = ref(false);
 
+  // 🚀 Performance: Memoization Cache for learned keyword matches
+  const patternMemoCache = new Map();
+
+  function clearCache() {
+    patternMemoCache.clear();
+    logger.debug("🧹 VoiceLearning: Pattern cache cleared");
+  }
+
   // 🚀 Performance: O(1) Set lookup for known keywords
   const allKnownKeywordsSet = computed(() => {
     return new Set([
@@ -231,6 +239,8 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
     unitKeywords,
     candidates,
     compiledVoiceRegex, // 🚀 Phase 2.2: Cached compiled regex — recompiles only when keywords change
+    patternMemoCache,
+    clearCache,
     initVoicePatterns,
     triggerSelfLearning,
     resetLearnedPatterns

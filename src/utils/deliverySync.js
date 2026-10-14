@@ -1,4 +1,4 @@
-import { ref as dbRef, get, update, remove } from "firebase/database";
+import { ref as dbRef, get, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "./logger";
 import { isAdminUser } from "./chatParserUtils";
@@ -167,71 +167,81 @@ export async function syncDeliveryCustomerForOwner(
     const customerSnap = await get(customerRef);
     const existing = customerSnap.val();
 
+    // Guard: If customer has 0 items and does not exist in delivery_customers, no write needed
+    if (count === 0 && !existing) {
+      return;
+    }
+
+    // 4. Calculate total itemCount and totalPrice across active sessions
+    const currentSessions = { ...(existing?.sessions || {}) };
     if (count > 0) {
-      if (!existing) {
-        // Look up central address_book to prefill customer's saved paymentType
-        let prefilledPaymentType = "";
+      currentSessions[videoId] = { count, totalPrice, status: "pending" };
+    } else {
+      delete currentSessions[videoId];
+    }
+
+    const activeSessions = Object.values(currentSessions).filter(
+      (s) => s && s.status !== "done"
+    );
+    const newTotalCount = activeSessions.reduce((sum, s) => sum + (s.count || 0), 0);
+    const newTotalPrice = activeSessions.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+    const now = Date.now();
+
+    if (count > 0) {
+      let prefilledPaymentType = "";
+      if (!existing || !existing.paymentType) {
         try {
           const normKey = normName.replace(/[.#$[\]/]/g, "_");
           const bookSnap = await get(dbRef(db, `address_book/${normKey}`));
-          if (bookSnap.exists()) {
-            const bookData = bookSnap.val();
-            prefilledPaymentType = bookData.paymentType || "";
+          if (bookSnap.exists() && bookSnap.val()?.paymentType) {
+            prefilledPaymentType = bookSnap.val().paymentType;
           }
         } catch (e) {
           logger.warn("deliverySync address_book lookup error:", e);
         }
-
-        // Create new delivery customer
-        await update(customerRef, {
-          name: ownerName.trim(),
-          deliveryDate: null,
-          note: "",
-          paymentType: prefilledPaymentType,
-          status: "pending",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-      } else {
-        const updates = { name: ownerName.trim(), updatedAt: Date.now() };
-        if (!existing.paymentType) {
-          try {
-            const normKey = normName.replace(/[.#$[\]/]/g, "_");
-            const bookSnap = await get(dbRef(db, `address_book/${normKey}`));
-            if (bookSnap.exists() && bookSnap.val()?.paymentType) {
-              updates.paymentType = bookSnap.val().paymentType;
-            }
-          } catch (e) {
-            logger.warn("deliverySync address_book lookup error:", e);
-          }
-        }
-        if (existing.status === "done") {
-          updates.status = "pending";
-          updates.deliveryDate = null; // ✅ Clear old delivery date so customer goes to "ฝากสินค้า" tab, not "แจ้งส่ง"
-          updates.labelPrinted = false; // ✅ Reset print status for new round
-          updates.labelPrintedAt = null;
-        }
-        await update(customerRef, updates);
       }
 
-      // Update session info
-      await update(
-        dbRef(db, `delivery_customers/${deliveryUid}/sessions/${videoId}`),
-        {
+      // Single atomic multi-path update for customer info + session info + item counts
+      const multiUpdates = {
+        name: ownerName.trim(),
+        itemCount: newTotalCount,
+        totalPrice: newTotalPrice,
+        updatedAt: now,
+        [`sessions/${videoId}`]: {
           count,
           totalPrice,
           status: "pending",
         },
-      );
-    } else {
-      // Count is 0 for this session: remove session entry if it exists
-      await remove(
-        dbRef(db, `delivery_customers/${deliveryUid}/sessions/${videoId}`),
-      );
-    }
+      };
 
-    // 4. Recalculate overall totals across all active sessions
-    await recalcItemCount(deliveryUid);
+      if (!existing) {
+        multiUpdates.deliveryDate = null;
+        multiUpdates.note = "";
+        multiUpdates.paymentType = prefilledPaymentType;
+        multiUpdates.status = "pending";
+        multiUpdates.createdAt = now;
+      } else {
+        if (!existing.paymentType && prefilledPaymentType) {
+          multiUpdates.paymentType = prefilledPaymentType;
+        }
+        if (existing.status === "done") {
+          multiUpdates.status = "pending";
+          multiUpdates.deliveryDate = null; // ✅ Clear old delivery date
+          multiUpdates.labelPrinted = false; // ✅ Reset print status for new round
+          multiUpdates.labelPrintedAt = null;
+        }
+      }
+
+      await update(customerRef, multiUpdates);
+    } else {
+      // Count is 0 for this session: atomic multi-path update to remove session and update totals
+      await update(customerRef, {
+        itemCount: newTotalCount,
+        totalPrice: newTotalPrice,
+        updatedAt: now,
+        [`sessions/${videoId}`]: null,
+      });
+    }
   } catch (e) {
     logger.error("syncDeliveryCustomerForOwner error:", e);
   }

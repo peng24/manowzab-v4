@@ -71,6 +71,13 @@ const Toast = Swal.mixin({
 const processingLocks = new Set();
 let _lastVideoId = null; // ✅ Track current session for auto-clear
 
+// 🚀 Micro-Batching: Queue incoming messages within 80-100ms window
+// to reduce Pinia reactivity churn and batch database transactions when chats flood in
+const incomingBatchQueue = [];
+let isBatchProcessing = false;
+let batchFlushTimer = null;
+const MICRO_BATCH_DELAY_MS = 80;
+
 export function useChatProcessor() {
   const stockStore = useStockStore();
   const chatStore = useChatStore();
@@ -94,12 +101,67 @@ export function useChatProcessor() {
     return map;
   });
 
+  let batchSeqCounter = 0;
 
-  async function processMessage(item) {
+  function processMessage(item) {
+    return new Promise((resolve, reject) => {
+      batchSeqCounter++;
+      const timestamp = item?.snippet?.publishedAt
+        ? new Date(item.snippet.publishedAt).getTime()
+        : Date.now();
+
+      incomingBatchQueue.push({
+        item,
+        resolve,
+        reject,
+        timestamp,
+        seq: batchSeqCounter,
+      });
+
+      if (!isBatchProcessing && !batchFlushTimer) {
+        batchFlushTimer = setTimeout(() => {
+          batchFlushTimer = null;
+          drainIncomingBatch();
+        }, MICRO_BATCH_DELAY_MS);
+      }
+    });
+  }
+
+  async function drainIncomingBatch() {
+    if (isBatchProcessing || incomingBatchQueue.length === 0) return;
+    isBatchProcessing = true;
+
+    try {
+      // ✅ Strict FIFO / Timestamp Ordering: Sort batch by publishedAt timestamp, then arrival sequence
+      incomingBatchQueue.sort((a, b) => a.timestamp - b.timestamp || a.seq - b.seq);
+
+      while (incomingBatchQueue.length > 0) {
+        const { item, resolve, reject } = incomingBatchQueue.shift();
+        try {
+          // ✅ Step-by-step Synchronous execution: await each message to completely finish stock booking transactions before next
+          const res = await processSingleMessage(item);
+          resolve(res);
+        } catch (err) {
+          reject(err);
+        }
+      }
+    } finally {
+      isBatchProcessing = false;
+      if (incomingBatchQueue.length > 0 && !batchFlushTimer) {
+        batchFlushTimer = setTimeout(() => {
+          batchFlushTimer = null;
+          drainIncomingBatch();
+        }, MICRO_BATCH_DELAY_MS);
+      }
+    }
+  }
+
+  async function processSingleMessage(item) {
     // ✅ Auto-clear session state when video changes
     if (systemStore.currentVideoId !== _lastVideoId) {
       _lastVideoId = systemStore.currentVideoId;
       processingLocks.clear();
+      incomingBatchQueue.length = 0;
       logger.log(`🔄 Session state cleared for new video: ${_lastVideoId}`);
     }
 

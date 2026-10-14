@@ -95,60 +95,36 @@
       @touchmove="handleTouchMove"
       @touchend="handleTouchEnd"
     >
-      <div
+      <StockItemCard
         v-for="i in visibleItemIds"
         :key="i"
         v-memo="[
           getStockItem(i).owner,
           getStockItem(i).price,
+          getStockItem(i).backdated,
+          getStockItem(i).time,
           getOwnerCount(getStockItem(i).owner, getStockItem(i).uid),
-          getQueueLength(i),
+          getQueueFingerprint(i),
+          nicknameStore.getNickname(getStockItem(i).uid, getStockItem(i).owner),
           highlightedId === i,
           cancelledItems.has(i),
-          newOrders.has(i),
+          cancelledItems.get(i),
+          isNewOrder(i),
           activeFilter
         ]"
-        :class="[
-          'stock-item',
-          getStockItem(i).owner ? 'sold' : '',
-          isNewOrder(i) ? 'new-order' : '',
-          highlightedId === i ? 'highlight' : '',
-          cancelledItems.has(i) ? 'cancelled-blink' : '',
-        ]"
-        @click="openQueueModal(i)"
-        :id="`stock-${i}`"
-      >
-        <div class="stock-num">{{ i }}</div>
-        <div v-if="cancelledItems.has(i) && !getStockItem(i).owner" class="stock-status cancelled-name">
-          ❌ {{ cancelledItems.get(i) }}
-        </div>
-        <div v-else :class="['stock-status', { empty: !getStockItem(i).owner, 'unsaved-owner': isUnsavedOwner(getStockItem(i).owner) }]">
-          {{ getStockItem(i).owner || "ว่าง" }}
-        </div>
-        <div
-          v-if="getStockItem(i).owner && getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) >= 1"
-          class="owner-count-badge"
-          :title="`${getStockItem(i).owner} จองทั้งหมด ${getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)} ชิ้น — คลิกเพื่อจัดการ`"
-          @click.stop="showOwnerItems(getStockItem(i).owner)"
-        >👗 {{ getOwnerCount(getStockItem(i).owner, getStockItem(i).uid) }} ตัว</div>
-
-        <div
-          v-if="getStockItem(i).owner && getStockItem(i).backdated"
-          class="backdated-time"
-          :title="`จองย้อนหลัง: ${formatTime(getStockItem(i).time)}`"
-        >
-          🕒 {{ formatTime(getStockItem(i).time) }}
-        </div>
-        <!-- <div v-if="getStockItem(i).price" class="stock-price">
-          {{ getStockItem(i).price }} บาท
-        </div> -->
-        <div v-if="getQueueLength(i) > 0" class="queue-badge">
-          +{{ getQueueLength(i) }}
-        </div>
-
-        <!-- 🌟 VIP Shimmer Beam (ลำแสงเพชรพาดผ่านตัวการ์ด) -->
-        <div v-if="isNewOrder(i)" class="new-order-shimmer"></div>
-      </div>
+        :index="i"
+        :item="getStockItem(i)"
+        :owner-count="getOwnerCount(getStockItem(i).owner, getStockItem(i).uid)"
+        :queue-length="getQueueLength(i)"
+        :queue-fingerprint="getQueueFingerprint(i)"
+        :nickname="nicknameStore.getNickname(getStockItem(i).uid, getStockItem(i).owner)"
+        :is-highlighted="highlightedId === i"
+        :is-cancelled="cancelledItems.has(i)"
+        :cancelled-name="cancelledItems.get(i) || ''"
+        :is-new-order="isNewOrder(i)"
+        @select="openQueueModal(i)"
+        @show-owner="showOwnerItems"
+      />
 
 
       <!-- 📦 Window Capping Load More Indicator -->
@@ -345,8 +321,10 @@
 
 <script setup>
 import { computed, ref, watch, nextTick, inject, onMounted, onUnmounted } from "vue";
+import StockItemCard from "./StockItemCard.vue";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
+import { useNicknameStore } from "../stores/nickname";
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, get, remove, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
@@ -360,6 +338,7 @@ const logger = { log: (...args) => DEBUG_MODE && console.log(...args) };
 
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
+const nicknameStore = useNicknameStore();
 const { playSfx, queueAudio } = useAudio();
 const openShippingManager = inject("openShippingManager");
 const gridContainer = ref(null);
@@ -1234,6 +1213,14 @@ async function showOwnerItems(ownerName) {
 
 function getQueueLength(num) {
   return queueLengthsMap.value[num] || 0;
+}
+
+function getQueueFingerprint(num) {
+  const item = getStockItem(num);
+  if (!item?.queue || !Array.isArray(item.queue) || item.queue.length === 0) return "";
+  return item.queue
+    .map((q) => (typeof q === "object" ? `${q.uid || ""}:${q.name || q.owner || ""}` : String(q)))
+    .join(",");
 }
 function getSourceIcon(source) {
   if (source === "ai") return "fa-solid fa-robot";
@@ -2210,6 +2197,8 @@ watch(
 }
 
 .stock-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 110px 85px;
   aspect-ratio: 1.35;
   background: rgba(13, 17, 28, 0.65);
   backdrop-filter: blur(10px);

@@ -2,6 +2,12 @@ import { useSystemStore } from "../stores/system";
 import { logger } from "../utils/logger";
 import { stripYouTubeEmotes } from "../data/youtubeEmotes";
 
+// Module-scoped compiled regexes to prevent recreation in TTS sanitize loop
+const TTS_EMOJI_REGEX = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]|\uD83F[\uDC00-\uDFFF]|[\u2000-\u26FF])/g;
+const SPECIAL_CHARS_REGEX = /[#*~_]/g;
+const JONG_FIX_REGEX = /จอง/g;
+const MULTI_SPACE_REGEX = /\s+/g;
+
 // ✅ Global Storage to Prevent Garbage Collection
 if (typeof window !== "undefined") {
   window.ttsActiveUtterances = window.ttsActiveUtterances || [];
@@ -28,6 +34,8 @@ export class TextToSpeech {
     this.speakingCheckRetries = 0; // ✅ Track retries when waiting for native speaking state
     this.cachedBestVoice = null; // 🚀 O(1) Cached Thai Voice reference
     this.audioCache = new Map(); // 🚀 LRU In-Memory Audio Buffer Cache (Max 50 items)
+    this.sanitizeCache = new Map(); // 🚀 LRU Memoization Cache for text sanitization (Max 300 items)
+    this.phoneticCache = new Map(); // 🚀 LRU Memoization Cache for phonetic customer names (Max 500 items)
 
     // Bind methods
     this.processQueue = this.processQueue.bind(this);
@@ -149,34 +157,54 @@ export class TextToSpeech {
   }
 
   /**
-   * Sanitize text for TTS: Remove Emojis and Symbols
+   * Clear all in-memory TTS caches (sanitize cache, phonetic cache, audio buffer cache)
+   */
+  clearCache() {
+    if (this.sanitizeCache) this.sanitizeCache.clear();
+    if (this.phoneticCache) this.phoneticCache.clear();
+    if (this.audioCache) this.audioCache.clear();
+    logger.debug("🧹 TTS Service: All in-memory caches cleared");
+  }
+
+  /**
+   * Sanitize text for TTS: Remove Emojis and Symbols (Memoized)
    */
   sanitize(text) {
     if (!text) return "";
 
-    // ✅ Regex to remove ALL Emojis (Surrogates, Dingbats, Transport, etc.)
-    // This covers: 🎄, 🥳, 🙏, etc.
-    const emojiRegex =
-      /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]|\uD83F[\uDC00-\uDFFF]|[\u2000-\u26FF])/g;
+    if (this.sanitizeCache && this.sanitizeCache.has(text)) {
+      const cached = this.sanitizeCache.get(text);
+      this.sanitizeCache.delete(text);
+      this.sanitizeCache.set(text, cached);
+      return cached;
+    }
 
     // Replace emoji with empty string
-    let cleanText = text.replace(emojiRegex, "");
+    let cleanText = text.replace(TTS_EMOJI_REGEX, "");
 
     // ✅ Remove YouTube custom emote shortcodes (e.g. :yt:, :face-blue-smiling:)
     cleanText = stripYouTubeEmotes(cleanText);
 
     // Remove specific special chars that might annoy TTS (optional)
-    cleanText = cleanText.replace(/[#*~_]/g, "");
+    cleanText = cleanText.replace(SPECIAL_CHARS_REGEX, "");
 
     // ✅ แก้ไขปัญหาการอ่านออกเสียงเพี้ยน (เช่น คำว่า "จอง" อ่านเป็น "จอ ออ งอ" โดยเปลี่ยนเป็น "จอร์ง" เพื่อให้ออกเสียง "จอง" ได้ถูกต้อง)
-    cleanText = cleanText.replace(/จอง/g, "จอร์ง");
+    cleanText = cleanText.replace(JONG_FIX_REGEX, "จอร์ง");
 
     // Clean up double spaces
-    cleanText = cleanText.replace(/\s+/g, " ").trim();
+    cleanText = cleanText.replace(MULTI_SPACE_REGEX, " ").trim();
 
     // Limit length (prevent too long speech)
     if (cleanText.length > 500) {
       cleanText = cleanText.substring(0, 500);
+    }
+
+    if (this.sanitizeCache) {
+      if (this.sanitizeCache.size >= 300) {
+        const oldestKey = this.sanitizeCache.keys().next().value;
+        this.sanitizeCache.delete(oldestKey);
+      }
+      this.sanitizeCache.set(text, cleanText);
     }
 
     return cleanText;

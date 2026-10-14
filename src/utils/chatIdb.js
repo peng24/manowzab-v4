@@ -17,6 +17,13 @@ const DB_VERSION = 1;
 
 let _db = null;
 
+// 🚀 Write Buffer Configuration for high-frequency chat streams
+const BUFFER_MAX_SIZE = 20;
+const BUFFER_FLUSH_INTERVAL_MS = 1500;
+
+let _writeBuffer = [];
+let _flushTimer = null;
+
 /**
  * Open (or reuse) the IndexedDB connection.
  * @returns {Promise<IDBDatabase>}
@@ -53,8 +60,56 @@ function getDb() {
 }
 
 /**
- * Archive a batch of chat entries to IndexedDB (non-blocking, fire-and-forget safe).
- * Uses `put` so duplicate IDs are safely overwritten.
+ * Flushes all pending write buffer entries to IndexedDB in a single transaction.
+ * @returns {Promise<void>}
+ */
+export async function flushChatArchiveBuffer() {
+  if (_flushTimer) {
+    clearTimeout(_flushTimer);
+    _flushTimer = null;
+  }
+
+  if (_writeBuffer.length === 0) return;
+
+  const entriesToFlush = _writeBuffer.splice(0);
+
+  try {
+    const db = await getDb();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+
+    entriesToFlush.forEach(({ entry, videoId }) => {
+      if (entry && entry.id) {
+        store.put({ ...entry, videoId });
+      }
+    });
+
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = (e) => reject(e.target.error);
+      tx.onabort = (e) => reject(e.target.error);
+    });
+  } catch (e) {
+    console.warn("[ChatIdb] flushChatArchiveBuffer failed:", e);
+  }
+}
+
+// 🛡️ Automatic flush on page visibility change or tab close to prevent data loss
+if (typeof window !== "undefined") {
+  window.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      flushChatArchiveBuffer().catch(() => {});
+    }
+  });
+
+  window.addEventListener("pagehide", () => {
+    flushChatArchiveBuffer().catch(() => {});
+  });
+}
+
+/**
+ * Archive chat entries to Write Buffer and batch insert to IndexedDB.
+ * Batches inserts every 1.5s or when buffer reaches 20 entries.
  *
  * @param {string} videoId - Current video session ID
  * @param {Array<Object>} entries - fullChatLog entries to persist
@@ -62,23 +117,19 @@ function getDb() {
  */
 export async function archiveChatEntries(videoId, entries) {
   if (!videoId || !entries || entries.length === 0) return;
-  try {
-    const db = await getDb();
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    entries.forEach((entry) => {
-      if (entry.id) {
-        store.put({ ...entry, videoId });
-      }
-    });
-    await new Promise((resolve, reject) => {
-      tx.oncomplete = resolve;
-      tx.onerror = (e) => reject(e.target.error);
-      tx.onabort = (e) => reject(e.target.error);
-    });
-  } catch (e) {
-    // IDB failures must never crash the app — log and continue
-    console.warn("[ChatIdb] archiveChatEntries failed:", e);
+
+  for (const entry of entries) {
+    if (entry && entry.id) {
+      _writeBuffer.push({ videoId, entry });
+    }
+  }
+
+  if (_writeBuffer.length >= BUFFER_MAX_SIZE) {
+    await flushChatArchiveBuffer();
+  } else if (!_flushTimer) {
+    _flushTimer = setTimeout(() => {
+      flushChatArchiveBuffer().catch(() => {});
+    }, BUFFER_FLUSH_INTERVAL_MS);
   }
 }
 
@@ -91,6 +142,8 @@ export async function archiveChatEntries(videoId, entries) {
  */
 export async function getAllChatEntries(videoId) {
   if (!videoId) return [];
+  // Ensure any pending buffered entries are flushed before reading
+  await flushChatArchiveBuffer();
   try {
     const db = await getDb();
     const tx = db.transaction(STORE_NAME, "readonly");
@@ -116,6 +169,8 @@ export async function getAllChatEntries(videoId) {
  */
 export async function clearChatEntries(videoId) {
   if (!videoId) return;
+  // Clear any pending entries for this videoId from the in-memory write buffer
+  _writeBuffer = _writeBuffer.filter((item) => item.videoId !== videoId);
   try {
     const db = await getDb();
     const tx = db.transaction(STORE_NAME, "readwrite");

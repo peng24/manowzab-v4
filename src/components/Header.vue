@@ -273,7 +273,7 @@
 </template>
 
 <script setup>
-import { ref, inject, provide, computed, onMounted, onBeforeUnmount, watch } from "vue"; // ✅ เพิ่ม watch
+import { ref, inject, provide, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from "vue"; // ✅ เพิ่ม watch
 import { useSystemStore } from "../stores/system";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
@@ -283,8 +283,10 @@ import { ref as dbRef, onValue, update, set } from "firebase/database";
 import { db } from "../composables/useFirebase"; // เช็ค path ให้ตรงกับเครื่องคุณ
 import Swal from "sweetalert2";
 import NoteEditor from "./NoteEditor.vue"; // ✅ Import Note Editor
-import ChangelogModal from "./ChangelogModal.vue"; // ✅ Import Changelog Modal
-import LiveSummaryModal from "./LiveSummaryModal.vue"; // ✅ Import Live Summary Modal
+
+// 🚀 Performance: Lazy load modals on demand via defineAsyncComponent
+const ChangelogModal = defineAsyncComponent(() => import("./ChangelogModal.vue"));
+const LiveSummaryModal = defineAsyncComponent(() => import("./LiveSummaryModal.vue"));
 import { useAuthStore } from "../stores/auth";
 import { announceShippingCustomers } from "../utils/deliverySync";
 import { CONSTANTS } from "../config/constants";

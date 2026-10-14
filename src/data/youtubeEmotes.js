@@ -107,8 +107,11 @@ export const YOUTUBE_EMOTES = {
   ":shelterin:": "https://yt3.ggpht.com/gjC5x98J4BoVSEPfFJaoLtc4tSBGSEdIlfL2FV4iJG9uGNykDP9oJC_QxAuBTJy6dakPxVeC=w24-h24-c-k-nd"
 };
 
+// ⚡ Single-Pass Lookup Map for O(1) instantaneous access
+export const YOUTUBE_EMOTES_MAP = new Map(Object.entries(YOUTUBE_EMOTES));
+
 // ⚡ Compile single optimized Regular Expression matching all known YouTube emotes
-const escapedCodes = Object.keys(YOUTUBE_EMOTES)
+const escapedCodes = Array.from(YOUTUBE_EMOTES_MAP.keys())
   .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
   .join("|");
 
@@ -116,32 +119,33 @@ export const YOUTUBE_EMOTE_REGEX = new RegExp(`(${escapedCodes})`, "g");
 
 /**
  * Check if a string contains any YouTube emote shortcode
+ * Fast O(1) colon guard skips 99% of general text immediately
  * @param {string} text
  * @returns {boolean}
  */
 export function hasYouTubeEmotes(text) {
-  if (!text || typeof text !== "string") return false;
+  if (!text || typeof text !== "string" || !text.includes(":")) return false;
   YOUTUBE_EMOTE_REGEX.lastIndex = 0;
   return YOUTUBE_EMOTE_REGEX.test(text);
 }
 
 /**
- * Get the CDN URL for a given emote shortcode
+ * Get the CDN URL for a given emote shortcode (O(1) Map lookup)
  * @param {string} code e.g. ":yt:"
  * @returns {string|null}
  */
 export function getYouTubeEmoteUrl(code) {
-  return YOUTUBE_EMOTES[code] || null;
+  return YOUTUBE_EMOTES_MAP.get(code) || null;
 }
 
 /**
- * Parse plain text string into an array of message runs (text chunks and YouTube emote image objects)
+ * Parse plain text string into an array of message runs using single-pass regex matching with Map lookup
  * @param {string} text
  * @returns {Array<{text?: string, emoji?: {emojiId: string, image: {url: string}}}>}
  */
 export function parseYouTubeEmotesToRuns(text) {
   if (!text || typeof text !== "string") return [{ text: "" }];
-  if (!hasYouTubeEmotes(text)) {
+  if (!text.includes(":") || !hasYouTubeEmotes(text)) {
     return [{ text }];
   }
 
@@ -153,25 +157,27 @@ export function parseYouTubeEmotesToRuns(text) {
   while ((match = YOUTUBE_EMOTE_REGEX.exec(text)) !== null) {
     const matchIndex = match.index;
     const emoteCode = match[0];
+    const url = YOUTUBE_EMOTES_MAP.get(emoteCode);
 
-    // Push preceding text if not empty
-    if (matchIndex > lastIndex) {
-      runs.push({ text: text.substring(lastIndex, matchIndex) });
-    }
-
-    // Push emote run
-    const url = YOUTUBE_EMOTES[emoteCode];
-    runs.push({
-      emoji: {
-        emojiId: emoteCode,
-        image: {
-          url,
-          thumbnails: [{ url }]
-        }
+    if (url) {
+      // Push preceding text if not empty
+      if (matchIndex > lastIndex) {
+        runs.push({ text: text.substring(lastIndex, matchIndex) });
       }
-    });
 
-    lastIndex = matchIndex + emoteCode.length;
+      // Push emote run
+      runs.push({
+        emoji: {
+          emojiId: emoteCode,
+          image: {
+            url,
+            thumbnails: [{ url }]
+          }
+        }
+      });
+
+      lastIndex = matchIndex + emoteCode.length;
+    }
   }
 
   // Push remaining trailing text
@@ -189,5 +195,7 @@ export function parseYouTubeEmotesToRuns(text) {
  */
 export function stripYouTubeEmotes(text) {
   if (!text || typeof text !== "string") return "";
+  if (!text.includes(":")) return text.trim();
+  YOUTUBE_EMOTE_REGEX.lastIndex = 0;
   return text.replace(YOUTUBE_EMOTE_REGEX, "").trim();
 }

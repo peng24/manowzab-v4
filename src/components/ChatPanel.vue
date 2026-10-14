@@ -342,7 +342,7 @@
       </TransitionGroup>
     </div>
 
-    <button v-if="showScrollButton" class="new-msg-btn" @click="scrollToBottom">
+    <button v-if="showScrollButton" class="new-msg-btn" @click="scrollToBottom(false)">
       ข้อความใหม่ ⬇
     </button>
 
@@ -350,14 +350,15 @@
     <CustomerQuickEditModal ref="quickEditModalRef" />
   </div>
 </template>
-
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from "vue";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "../composables/useAudio";
-import CustomerQuickEditModal from "./CustomerQuickEditModal.vue";
+
+// 🚀 Performance: Lazy load CustomerQuickEditModal on demand
+const CustomerQuickEditModal = defineAsyncComponent(() => import("./CustomerQuickEditModal.vue"));
 import { ref as dbRef, update, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
@@ -796,12 +797,20 @@ function handleScroll() {
 // จะถูก coalesce เป็น 1 scroll call แทนที่จะ force layout ทุกครั้ง
 let scrollAnimFrame = null;
 let scrollPending = false; // ✅ pending flag — ป้องกัน RAF stack ซ้อน
+let lastSmoothScrollTime = 0;
 
 function scrollToBottom(isSmooth = false) {
   const el = chatViewport.value;
   if (!el) return;
 
-  if (isSmooth) {
+  const now = performance.now();
+  // ป้องกันกรณีส่ง PointerEvent เข้ามา หรือสั่ง smooth scroll ซ้อนกันถี่เกินไป (ต้องห่างกันอย่างน้อย 300ms)
+  const useSmooth = (isSmooth === true) && (now - lastSmoothScrollTime > 300);
+  if (isSmooth === true) {
+    lastSmoothScrollTime = now;
+  }
+
+  if (useSmooth) {
     // Smooth scroll: execute immediately (user-initiated, no coalescing needed)
     if (scrollAnimFrame) {
       cancelAnimationFrame(scrollAnimFrame);
@@ -1402,6 +1411,8 @@ async function refreshChat() {
 }
 
 .chat-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 55px;
   display: flex;
   align-items: flex-start;
   gap: 10px;

@@ -46,6 +46,7 @@ src/_backup*
 .cursor/
 .copilot/
 .aider*
+.archify/
 
 # Editor / IDE
 .vscode/*

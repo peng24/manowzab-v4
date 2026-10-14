@@ -487,7 +487,32 @@ function getAdminProxyCustomerName(chat) {
 
   // 2. หากยังไม่มี proxyCustomerName ให้สกัดจากข้อความแอดมิน
   if (isMsgAdmin && chat.text) {
-    return extractAdminCustomerName(chat.text);
+    const extracted = extractAdminCustomerName(chat.text);
+    if (extracted) return extracted;
+
+    // 3. Fallback: ตรวจสอบคำแรกๆ ของข้อความแอดมินเทียบกับฐานข้อมูลลูกค้า (addressBook หรือ deliveryCustomers)
+    const text = chat.text.trim();
+    const words = text.split(/\s+/);
+    if (words.length > 0) {
+      if (words.length >= 2) {
+        const candidate2 = words.slice(0, 2).join(" ");
+        const norm2 = normalizeName(candidate2).replace(/[.#$[\]/]/g, "_");
+        if (
+          (addressBook.value && addressBook.value[norm2]) ||
+          (deliveryCustomers.value && deliveryCustomers.value[norm2])
+        ) {
+          return candidate2;
+        }
+      }
+      const candidate1 = words[0];
+      const norm1 = normalizeName(candidate1).replace(/[.#$[\]/]/g, "_");
+      if (
+        (addressBook.value && addressBook.value[norm1]) ||
+        (deliveryCustomers.value && deliveryCustomers.value[norm1])
+      ) {
+        return candidate1;
+      }
+    }
   }
   return null;
 }

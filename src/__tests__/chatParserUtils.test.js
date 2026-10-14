@@ -466,9 +466,39 @@ describe("chatParserUtils", () => {
       expect(m[3]).toBe("วาศินา");
     });
 
+    it("matches 'หนิง เมื่อวาน 41 43' — customer name + backdated keyword + multi items", () => {
+      const m = "หนิง เมื่อวาน 41 43".match(multiBuyRegex);
+      expect(m).not.toBeNull();
+      expect(m[1]).toBe("หนิง");
+      expect(m[2]).toBe("41 43");
+    });
+
     it("still matches legacy multi-buy patterns", () => {
       expect(multiBuyRegex.test("26 38 74")).toBe(true);
       expect(multiBuyRegex.test("มะระ เอา 19 13 10")).toBe(true);
+    });
+  });
+
+  describe("👑 adminProxyNameFirstRegex — Name-First Admin Proxy Orders", () => {
+    it("matches 'ตุ๊ก บำรุงรัตน์ 18' (standard name first)", () => {
+      const m = "ตุ๊ก บำรุงรัตน์ 18".match(adminProxyNameFirstRegex);
+      expect(m).not.toBeNull();
+      expect(m[1].trim()).toBe("ตุ๊ก บำรุงรัตน์");
+      expect(m[2]).toBe("18");
+    });
+
+    it("matches 'อิ๋ว เอา 22' (name + action verb + item ID)", () => {
+      const m = "อิ๋ว เอา 22".match(adminProxyNameFirstRegex);
+      expect(m).not.toBeNull();
+      expect(m[1].trim()).toBe("อิ๋ว");
+      expect(m[2]).toBe("22");
+    });
+
+    it("matches 'ตุ๊ก บำรุงรัตน์ เมือวาน 32' (name + backdated keyword + item ID)", () => {
+      const m = "ตุ๊ก บำรุงรัตน์ เมือวาน 32".match(adminProxyNameFirstRegex);
+      expect(m).not.toBeNull();
+      expect(m[1].trim()).toBe("ตุ๊ก บำรุงรัตน์");
+      expect(m[2]).toBe("32");
     });
   });
 
@@ -480,27 +510,37 @@ describe("chatParserUtils", () => {
       expect(extractAdminCustomerName("52 กุญสิญา")).toBe("กุญสิญา");
       expect(extractAdminCustomerName("58 กุญสิญา")).toBe("กุญสิญา");
       expect(extractAdminCustomerName("50 ,tit")).toBe("tit");
+      expect(extractAdminCustomerName("12 มะระ")).toBe("มะระ");
+      expect(extractAdminCustomerName("13 มะระ")).toBe("มะระ");
+      expect(extractAdminCustomerName("22 เอาให้อิ๋ว")).toBe("อิ๋ว");
     });
 
     it("extracts customer name from name-first pattern", () => {
       expect(extractAdminCustomerName("ตุ๊ก บำรุงรัตน์ 18")).toBe("ตุ๊ก บำรุงรัตน์");
       expect(extractAdminCustomerName("วาศินา 28")).toBe("วาศินา");
       expect(extractAdminCustomerName("พี่อ้อย 20")).toBe("พี่อ้อย");
+      expect(extractAdminCustomerName("อิ๋ว เอา 22")).toBe("อิ๋ว");
+      expect(extractAdminCustomerName("ตุ๊ก บำรุงรัตน์ เมือวาน 32")).toBe("ตุ๊ก บำรุงรัตน์");
     });
 
     it("extracts customer name from multi-buy pattern", () => {
       expect(extractAdminCustomerName("3 4 วาศินา")).toBe("วาศินา");
       expect(extractAdminCustomerName("15 25 วาศินา")).toBe("วาศินา");
       expect(extractAdminCustomerName("26 38 74 มะระ")).toBe("มะระ");
+      expect(extractAdminCustomerName("หนิง เมื่อวาน 41 43")).toBe("หนิง");
     });
 
     it("extracts customer name from admin shipping commands", () => {
       expect(extractAdminCustomerName("กุญสิญา ส่งเลย")).toBe("กุญสิญา");
       expect(extractAdminCustomerName("ตุ๊ก บำรุงรัตน์ ส่งวันนี้")).toBe("ตุ๊ก บำรุงรัตน์");
+      expect(extractAdminCustomerName("ตุ๊ก บำรุงรัตน์ ส่งเลย")).toBe("ตุ๊ก บำรุงรัตน์");
       expect(extractAdminCustomerName("พัชราวัน ส่งเลย")).toBe("พัชราวัน");
       expect(extractAdminCustomerName("วาศินา ส่งเลย")).toBe("วาศินา");
       expect(extractAdminCustomerName("พี่อ้อย ส่งเลย")).toBe("พี่อ้อย");
       expect(extractAdminCustomerName("ของพี่อ้อย ส่งเลย")).toBe("พี่อ้อย");
+      expect(extractAdminCustomerName("บุญญาภา ส่งเลย")).toBe("บุญญาภา");
+      expect(extractAdminCustomerName("เจเจ ส่งเลย")).toBe("เจเจ");
+      expect(extractAdminCustomerName("พรจันทร์ ส่งเลย")).toBe("พรจันทร์");
     });
 
     it("extracts customer name from admin hold and consign commands (เอาไปฝากคนอื่นด้วย, ฝากไว้ก่อน, ฝากของ)", () => {
@@ -510,6 +550,13 @@ describe("chatParserUtils", () => {
       expect(extractAdminCustomerName("วาศินา ฝากของ")).toBe("วาศินา");
       expect(extractAdminCustomerName("วาศินา ฝาก")).toBe("วาศินา");
       expect(extractAdminCustomerName("วาศินา ฝากคนอื่นด้วย")).toBe("วาศินา");
+    });
+
+    it("extracts customer name from admin action notes (พรจันทร์ รับ, พรจันทร์ เอา, พรจันทร์ สีฟ้า)", () => {
+      expect(extractAdminCustomerName("พรจันทร์ รับ")).toBe("พรจันทร์");
+      expect(extractAdminCustomerName("พรจันทร์ เอา")).toBe("พรจันทร์");
+      expect(extractAdminCustomerName("พรจันทร์ สีฟ้า")).toBe("พรจันทร์");
+      expect(extractAdminCustomerName("หนิง เมื่อวาน")).toBe("หนิง");
     });
 
     it("returns null for non-admin customer or general chat messages", () => {

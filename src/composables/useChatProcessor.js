@@ -52,6 +52,7 @@ import {
   isAdminUser,
   isDateMismatch,
   extractAdminCustomerName,
+  sanitizeAdminCustomerName,
 } from "../utils/chatParserUtils";
 
 // ✅ Toast Notification Mixin
@@ -357,10 +358,12 @@ export function useChatProcessor() {
         let ownerName = displayName;
         let ownerUid = uid;
 
+        const isBackdatedOrder = /เมื่อวาน|เมือวาน|ย้อนหลัง|รอบเมื่อวาน/i.test(normalizedMsg);
+
         if (proxyName && isAdmin) {
           // Admin Proxy Mode
-          // 🆕 v4.67.0: Sanitize proxy name — strip leading punctuation
-          ownerName = proxyName.replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
+          // 🆕 v4.67.0: Sanitize proxy name — strip leading punctuation and action words
+          ownerName = sanitizeAdminCustomerName(proxyName) || proxyName.replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
           ownerUid =
             "multi-proxy-" +
             Date.now() +
@@ -386,6 +389,7 @@ export function useChatProcessor() {
               "chat",
               null, // No price for multi-buy
               "multi-buy",
+              isBackdatedOrder,
             );
           } finally {
             processingLocks.delete(itemId);
@@ -400,15 +404,20 @@ export function useChatProcessor() {
 
         // ✅ Push message to Firebase (Listener will update UI)
         const isProxyMulti = Boolean(proxyName && isAdmin);
+        const effectivePhoneticName =
+          isProxyMulti && ownerName
+            ? nicknameStore.getPhoneticName(ownerUid, ownerName)
+            : phoneticName;
+
         chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
           id: item.id,
           text: msg,
           messageRuns: extractMessageRuns(item),
           authorName: realName,
-          displayName,
+          displayName: isProxyMulti ? `${ownerName} (โดย ${displayName})` : displayName,
           proxyCustomerName: isProxyMulti ? ownerName : null,
           proxyUid: isProxyMulti ? ownerUid : null,
-          phoneticName,
+          phoneticName: effectivePhoneticName,
           realName: realName,
           uid: uid,
           avatar,
@@ -669,7 +678,7 @@ export function useChatProcessor() {
       ) {
         intent = "buy";
         targetId = parseInt(matchAdminNameFirst[2]);
-        forcedOwnerName = matchAdminNameFirst[1].trim();
+        forcedOwnerName = sanitizeAdminCustomerName(matchAdminNameFirst[1]) || matchAdminNameFirst[1].trim();
         method = "admin-proxy-name-first";
       } else if (
         matchAdminNumFirst &&
@@ -677,8 +686,7 @@ export function useChatProcessor() {
       ) {
         intent = "buy";
         targetId = parseInt(matchAdminNumFirst[1]);
-        // 🆕 v4.67.0: Sanitize owner name — strip leading punctuation e.g. "50 ,tit" → "tit"
-        forcedOwnerName = matchAdminNumFirst[2].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
+        forcedOwnerName = sanitizeAdminCustomerName(matchAdminNumFirst[2]) || matchAdminNumFirst[2].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
         method = "admin-proxy-num-first";
       } else if (matchPure && parseInt(matchPure[1]) <= MAX_ITEM_ID) {
         intent = "buy";
@@ -843,6 +851,7 @@ export function useChatProcessor() {
         processingLocks.add(targetId);
         lockAcquired = true;
 
+        const isBackdatedOrder = /เมื่อวาน|เมือวาน|ย้อนหลัง|รอบเมื่อวาน/i.test(normalizedMsg);
         // ✅ Try to process order (auto-queues if item is taken)
         const result = await stockStore.processOrder(
           targetId,
@@ -851,6 +860,7 @@ export function useChatProcessor() {
           "chat",
           targetPrice,
           method,
+          isBackdatedOrder,
         );
 
         // ✅ ยังอ่านข้อความแม้ซื้อซ้ำ/อยู่ในคิวแล้ว

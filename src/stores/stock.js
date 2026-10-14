@@ -148,6 +148,7 @@ export const useStockStore = defineStore("stock", () => {
     source = "manual",
     price = null,
     method = "manual",
+    isBackdated = false,
   ) {
     const itemRef = dbRef(db, `stock/${systemStore.currentVideoId}/${num}`);
 
@@ -155,6 +156,7 @@ export const useStockStore = defineStore("stock", () => {
       let action = "unknown";
 
       await runTransaction(itemRef, (currentData) => {
+        const markBackdated = (isBackdated || systemStore.isLiveFinished) ? true : null;
         if (currentData === null) {
           // Create new item if not exists
           action = "claimed";
@@ -165,7 +167,7 @@ export const useStockStore = defineStore("stock", () => {
             queue: [],
             source: method,
             price: price || null,
-            backdated: systemStore.isLiveFinished ? true : null,
+            backdated: markBackdated,
           };
         } else if (!currentData.owner) {
           // Claim empty item
@@ -176,7 +178,7 @@ export const useStockStore = defineStore("stock", () => {
           currentData.source = method;
           if (price) currentData.price = price;
           if (!currentData.queue) currentData.queue = [];
-          if (systemStore.isLiveFinished) {
+          if (markBackdated) {
             currentData.backdated = true;
           }
           return currentData;
@@ -196,7 +198,7 @@ export const useStockStore = defineStore("stock", () => {
             owner,
             uid,
             time: Date.now(),
-            backdated: systemStore.isLiveFinished ? true : null,
+            backdated: markBackdated,
           });
           currentData.queue = queue;
           return currentData;

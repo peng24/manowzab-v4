@@ -7,9 +7,11 @@
 export const MAX_ITEM_ID = 300;
 
 // 🚀 Regex patterns enhanced from real live stream CSV logs (v4.67.0)
-export const multiBuyRegex = /^(?:([ก-๙a-zA-Z]{2,})\s+)?(?:F|f|cf|CF|รับ|เอา|เิา|จอง)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
+export const multiBuyRegex = /^(?:([ก-๙a-zA-Z][ก-๙a-zA-Z\s]*?)\s+)?(?:F|f|cf|CF|รับ|เอา|เิา|จอง|เมื่อวาน|เมือวาน|ย้อนหลัง)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
 export const adminProxyNumFirstRegex = /^(\d+)\s+([ก-๛a-zA-Z].*)$/;
-export const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z]{2,})\s*(\d+)$/; // Supports "พี่อ้อย20" without spaces
+export const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s*(?:[-_:=]|\s*(?:เอา|รับ|จอง|cf|CF|เิา|เค|ok|เมื่อวาน|เมือวาน|ย้อนหลัง|ของ)\s*)?\s*(\d+)(?:\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ))?$/i; // Supports "พี่อ้อย20", "อิ๋ว เอา 22", "ตุ๊ก บำรุงรัตน์ เมือวาน 32"
+export const adminActionNoteRegex = /^([ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา|cf|CF|จอง|เิา|เค|ok|สี|ไซส์|ขนาด|อยากได้|อยสกได้|เพิ่ม|ลด|เปลี่ยน|เลือก|เมื่อวาน|เมือวาน|ย้อนหลัง)/i;
+export const nonNameNounsRegex = /^(?:เสื้อ|กางเกง|ชุด|เดรส|กระโปรง|ผ้า|สี|ไซส์|เบอร์|ตัว|งาน|แบบ|แอดมิน|ลูกค้า|ร้าน|ของ|คน|พี่นาว|น้องนาว|นาว)$/;
 export const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม|รอบส่ง|พัสดุ|เลขพัสดุ|เช็คเลข|แจ้งโอน|ขนส่ง|เคอรี่|แฟลช|ไปรษณีย์|ค่าส่ง|โอนแล้ว|flash|kerry|j&t|jt|ส่งเลย|ส่งวันนี้|ส่งของ|ส่งให้|ส่งมา|ฝากไว้ก่อน|ฝากไว้|ฝาก/i;
 export const holdRegex = /ฝากไว้ก่อน|ฝากไว้|ฝากก่อน|ฝากของ|ยังไม่ส่ง|ฝาก/i;
 export const questionRegex = /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|อยู่มั๊ย|อยู่ไหม|มีไหม|มีมั้ย|เสื้ออะไร|ตัวอะไร|เป็นแบบ|คือแบบ|ไซส์|ใหม|หรอ|ปะ|ยังไง|อะไร|กี่|นิ้ว|เซน|เซนติเมตร|โล|กิโล|ชิ้น|ตัว|แพ็ค|แพค|ขนาด|ความยาว|กว้าง|สูง|หนัก/;
@@ -190,38 +192,59 @@ const INTENT_KEYWORD_FAST_CHECK = /(?:f|cf|รับ|เอา|เิา|เค|
  * @param {string} text
  * @returns {string|null}
  */
+/**
+ * Sanitizes and validates an extracted admin customer name candidate.
+ * @param {string} name
+ * @returns {string|null}
+ */
+export function sanitizeAdminCustomerName(name) {
+  if (!name || typeof name !== "string") return null;
+  let clean = name.replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
+  clean = clean.replace(/^(?:เอาให้|ใหั|ให้|ของ|เอา)\s*/i, "").trim();
+  clean = clean.replace(/\s*(?:เอา|รับ|จอง|cf|CF|เิา|เค|เมื่อวาน|เมือวาน|ย้อนหลัง|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)$/i, "").trim();
+  clean = clean.replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
+  if (
+    clean.length >= 2 &&
+    clean.length <= 40 &&
+    !isAdminUser(clean) &&
+    !DIGITS_ONLY_REGEX.test(clean) &&
+    !nonNameNounsRegex.test(clean) &&
+    !PURE_POLITE_OR_CHAT_REGEX.test(clean) &&
+    !SENTENCE_FRAGMENT_REGEX.test(clean)
+  ) {
+    return clean;
+  }
+  return null;
+}
+
 export function extractAdminCustomerName(text) {
   if (!text || typeof text !== "string") return null;
   const raw = text.trim();
   const normalized = thaiToArabic(raw);
 
-  // 1. Multi-buy: e.g. "3 4 วาศินา" or "วาศินา 3 4" or "26 38 74 มะระ"
+  // 1. Multi-buy: e.g. "3 4 วาศินา" or "วาศินา 3 4" or "26 38 74 มะระ" or "หนิง เมื่อวาน 41 43"
   const mb = normalized.match(multiBuyRegex);
   if (mb) {
-    const p1 = mb[1]?.trim();
-    const p3 = mb[3]?.trim();
-    const candidate = p1 || p3;
-    if (candidate && !isAdminUser(candidate)) {
-      const clean = candidate.replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
-      if (clean && !isAdminUser(clean)) return clean;
-    }
+    const candidate = mb[1]?.trim() || mb[3]?.trim();
+    const clean = sanitizeAdminCustomerName(candidate);
+    if (clean) return clean;
   }
 
-  // 2. Admin num first: e.g. "18 ตุ๊ก บำรุงรัตน์", "28 วาศินา", "50 ,tit"
+  // 2. Admin name first: e.g. "ตุ๊ก บำรุงรัตน์ 18", "พี่อ้อย 20", "วาศินา 28", "อิ๋ว เอา 22", "ตุ๊ก บำรุงรัตน์ เมือวาน 32"
+  const nameFirst = normalized.match(adminProxyNameFirstRegex);
+  if (nameFirst) {
+    const clean = sanitizeAdminCustomerName(nameFirst[1]);
+    if (clean) return clean;
+  }
+
+  // 3. Admin num first: e.g. "18 ตุ๊ก บำรุงรัตน์", "28 วาศินา", "50 ,tit", "22 เอาให้อิ๋ว"
   const numFirst = normalized.match(ADMIN_NUM_FIRST_REGEX);
   if (numFirst) {
-    const candidate = numFirst[2].replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
-    if (candidate && !isAdminUser(candidate)) return candidate;
+    const clean = sanitizeAdminCustomerName(numFirst[2]);
+    if (clean) return clean;
   }
 
-  // 3. Admin name first: e.g. "ตุ๊ก บำรุงรัตน์ 18", "พี่อ้อย 20", "วาศินา 28"
-  const nameFirst = normalized.match(ADMIN_NAME_FIRST_REGEX);
-  if (nameFirst) {
-    const candidate = nameFirst[1].replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
-    if (candidate && !isAdminUser(candidate)) return candidate;
-  }
-
-  // 4. Shipping / Hold / Transfer command: e.g. "กุญสิญา ส่งเลย", "ตุ๊ก บำรุงรัตน์ ส่งวันนี้", "วาศินา เอาไปฝากคนอื่นด้วย", "วาศินา ฝากไว้ก่อน"
+  // 4. Shipping / Hold / Transfer command: e.g. "กุญสิญา ส่งเลย", "ตุ๊ก บำรุงรัตน์ ส่งวันนี้", "วาศินา เอาไปฝากคนอื่นด้วย", "วาศินา ฝากไว้ก่อน", "เจเจ ส่งเลย"
   if (shippingRegex.test(normalized) || holdRegex.test(normalized)) {
     const cleaned = normalized
       .replace(adminShippingActionRegex, "")
@@ -238,6 +261,7 @@ export function extractAdminCustomerName(text) {
       cleaned.length <= 40 &&
       !isAdminUser(cleaned) &&
       !DIGITS_ONLY_REGEX.test(cleaned) &&
+      !nonNameNounsRegex.test(cleaned) &&
       !isPurePoliteOrChat &&
       !isSentenceFragment
     ) {
@@ -245,11 +269,18 @@ export function extractAdminCustomerName(text) {
     }
   }
 
-  // 5. Dash buy: e.g. "ตุ๊ก-18"
+  // 5. Admin Action note / Customer reference: e.g. "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า", "หนิง เมื่อวาน"
+  const actionNote = normalized.match(adminActionNoteRegex);
+  if (actionNote) {
+    const clean = sanitizeAdminCustomerName(actionNote[1]);
+    if (clean) return clean;
+  }
+
+  // 6. Dash buy: e.g. "ตุ๊ก-18"
   const dashMatch = normalized.match(dashBuyRegex);
   if (dashMatch) {
-    const candidate = dashMatch[1].replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
-    if (candidate && !isAdminUser(candidate)) return candidate;
+    const clean = sanitizeAdminCustomerName(dashMatch[1]);
+    if (clean) return clean;
   }
 
   return null;

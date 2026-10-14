@@ -363,7 +363,13 @@ import { ref as dbRef, update, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import { sanitizeDbKey, escapeHtml } from "../utils/dbUtils";
-import { extractAdminCustomerName, getCustomerColorTheme } from "../utils/chatParserUtils";
+import {
+  extractAdminCustomerName,
+  getCustomerColorTheme,
+  backdatedNoteRegex,
+  adminSizeSelectionNoteRegex,
+  shippingRegex,
+} from "../utils/chatParserUtils";
 import { parseYouTubeEmotesToRuns, hasYouTubeEmotes } from "../data/youtubeEmotes";
 import { logger } from "../utils/logger";
 import { normalizeName } from "../utils/addressParser";
@@ -768,7 +774,15 @@ function getAdminProxyPillCategory(chat) {
   if (chat.isAdminNote || chat.type === "note" || chat.noteCategory) {
     return "note";
   }
-  if (chat.type === "shipping" || (chat.text && /ส่ง|ที่อยู่|ฝาก/i.test(chat.text))) {
+  const text = chat.text || "";
+  if (
+    backdatedNoteRegex.test(text) ||
+    adminSizeSelectionNoteRegex.test(text) ||
+    /โน้ต|ฝากโน้ต|เมื่อวาน|เมือวาน|เมี่อวาน|ยอดเก่า|ค้าง|ติดไว้/i.test(text)
+  ) {
+    return "note";
+  }
+  if (chat.type === "shipping" || shippingRegex.test(text) || /ส่ง|ที่อยู่|ฝาก/i.test(text)) {
     return "shipping";
   }
   return "buy";
@@ -2038,192 +2052,178 @@ async function refreshChat() {
 :deep(.chat-highlight-name) {
   display: inline-flex !important;
   align-items: center !important;
-  font-weight: 700 !important;
-  padding: 2px 9px !important;
-  margin: 0 3px !important;
-  border-radius: 8px !important;
-  font-size: 0.95em !important;
-  line-height: 1.35 !important;
+  font-weight: 850 !important;
+  padding: 2.5px 10px 3.5px 9px !important;
+  margin: 0 4px !important;
+  border-radius: 9999px !important;
+  font-size: 1.05em !important;
+  line-height: 1.25 !important;
   cursor: pointer !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
   vertical-align: middle !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #ffffff !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+  text-shadow: none !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  user-select: none !important;
 }
 
 :deep(.chat-highlight-name .name-icon) {
-  font-size: 0.78em !important;
+  font-size: 0.82em !important;
   margin-right: 5px !important;
-  opacity: 0.9 !important;
+  color: currentColor !important;
+  opacity: 0.85 !important;
   vertical-align: middle !important;
 }
 
 :deep(.chat-highlight-name:hover) {
-  transform: translateY(-1px) scale(1.03) !important;
-  filter: brightness(1.2) !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+  transform: translateY(-1px) scale(1.04) !important;
+  filter: brightness(1.08) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
 }
 
-/* 🏷️ Proxy Pill Categories: Buy (Green/Gold), Shipping (Purple/Sky), Note (Amber) */
+/* 🏷️ Proxy Pill Categories: Buy (Green accent), Shipping (Purple accent), Note (Amber accent) */
 :deep(.chat-highlight-name.pill-buy) {
-  border-color: rgba(52, 211, 153, 0.7) !important;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4) !important;
-}
-:deep(.chat-highlight-name.pill-buy .name-icon) {
-  color: #34d399 !important;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(16, 185, 129, 0.4) !important;
 }
 
 :deep(.chat-highlight-name.pill-shipping) {
-  border-color: rgba(168, 85, 247, 0.7) !important;
-  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4) !important;
-}
-:deep(.chat-highlight-name.pill-shipping .name-icon) {
-  color: #c084fc !important;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(168, 85, 247, 0.4) !important;
 }
 
 :deep(.chat-highlight-name.pill-note) {
-  border-color: rgba(245, 158, 11, 0.75) !important;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.32), rgba(217, 119, 6, 0.18)) !important;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.45) !important;
-}
-:deep(.chat-highlight-name.pill-note .name-icon) {
-  color: #fbbf24 !important;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(245, 158, 11, 0.45) !important;
 }
 
-/* 🎨 12 Distinct Customer Themes (Reserved exclusively to Blues, Cyans, Magentas, and Pinks) */
+/* 🎨 12 Distinct Customer Themes (High-Luminance Solid Radiant Badges for Maximum Contrast) */
 /* 0. Pure Neon Cyan */
 :deep(.chat-highlight-name.theme-0) {
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.28), rgba(8, 145, 178, 0.15)) !important;
+  background: linear-gradient(135deg, #a5f3fc 0%, #38bdf8 100%) !important;
   border: 1.5px solid #06b6d4 !important;
-  color: #a5f3fc !important;
+  color: #083344 !important;
 }
 :deep(.chat-highlight-name.theme-0:hover) {
-  border-color: #22d3ee !important;
-  box-shadow: 0 0 14px rgba(6, 182, 212, 0.5) !important;
+  border-color: #0891b2 !important;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.6) !important;
 }
 
 /* 1. Hot Magenta Pink */
 :deep(.chat-highlight-name.theme-1) {
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.28), rgba(219, 39, 119, 0.15)) !important;
+  background: linear-gradient(135deg, #fbcfe8 0%, #f472b6 100%) !important;
   border: 1.5px solid #ec4899 !important;
-  color: #fbcfe8 !important;
+  color: #500724 !important;
 }
 :deep(.chat-highlight-name.theme-1:hover) {
-  border-color: #f472b6 !important;
-  box-shadow: 0 0 14px rgba(236, 72, 153, 0.5) !important;
+  border-color: #db2777 !important;
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.6) !important;
 }
 
 /* 2. Sky Azure Blue */
 :deep(.chat-highlight-name.theme-2) {
-  background: linear-gradient(135deg, rgba(2, 132, 199, 0.28), rgba(3, 105, 161, 0.15)) !important;
+  background: linear-gradient(135deg, #bae6fd 0%, #60a5fa 100%) !important;
   border: 1.5px solid #0284c7 !important;
-  color: #bae6fd !important;
+  color: #082f49 !important;
 }
 :deep(.chat-highlight-name.theme-2:hover) {
-  border-color: #38bdf8 !important;
-  box-shadow: 0 0 14px rgba(2, 132, 199, 0.5) !important;
+  border-color: #0369a1 !important;
+  box-shadow: 0 0 12px rgba(2, 132, 199, 0.6) !important;
 }
 
 /* 3. Vibrant Fuchsia */
 :deep(.chat-highlight-name.theme-3) {
-  background: linear-gradient(135deg, rgba(217, 70, 239, 0.28), rgba(192, 38, 211, 0.15)) !important;
+  background: linear-gradient(135deg, #f5d0fe 0%, #e879f9 100%) !important;
   border: 1.5px solid #d946ef !important;
-  color: #f5d0fe !important;
+  color: #4a044e !important;
 }
 :deep(.chat-highlight-name.theme-3:hover) {
-  border-color: #e879f9 !important;
-  box-shadow: 0 0 14px rgba(217, 70, 239, 0.5) !important;
+  border-color: #c026d3 !important;
+  box-shadow: 0 0 12px rgba(217, 70, 239, 0.6) !important;
 }
 
 /* 4. Cobalt Blue */
 :deep(.chat-highlight-name.theme-4) {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.28), rgba(29, 78, 216, 0.15)) !important;
-  border: 1.5px solid #2563eb !important;
-  color: #bfdbfe !important;
+  background: linear-gradient(135deg, #bfdbfe 0%, #818cf8 100%) !important;
+  border: 1.5px solid #3b82f6 !important;
+  color: #0f172a !important;
 }
 :deep(.chat-highlight-name.theme-4:hover) {
-  border-color: #60a5fa !important;
-  box-shadow: 0 0 14px rgba(37, 99, 235, 0.5) !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.6) !important;
 }
 
 /* 5. Electric Rose */
 :deep(.chat-highlight-name.theme-5) {
-  background: linear-gradient(135deg, rgba(244, 114, 182, 0.28), rgba(219, 39, 119, 0.15)) !important;
-  border: 1.5px solid #f472b6 !important;
-  color: #fce7f3 !important;
+  background: linear-gradient(135deg, #ffe4e6 0%, #fb7185 100%) !important;
+  border: 1.5px solid #f43f5e !important;
+  color: #4c0519 !important;
 }
 :deep(.chat-highlight-name.theme-5:hover) {
-  border-color: #fbcfe8 !important;
-  box-shadow: 0 0 14px rgba(244, 114, 182, 0.5) !important;
+  border-color: #e11d48 !important;
+  box-shadow: 0 0 12px rgba(244, 114, 182, 0.6) !important;
 }
 
 /* 6. Turquoise Aqua */
 :deep(.chat-highlight-name.theme-6) {
-  background: linear-gradient(135deg, rgba(8, 145, 178, 0.28), rgba(14, 116, 144, 0.15)) !important;
-  border: 1.5px solid #0891b2 !important;
-  color: #cffafe !important;
+  background: linear-gradient(135deg, #ccfbf1 0%, #2dd4bf 100%) !important;
+  border: 1.5px solid #0d9488 !important;
+  color: #042f2e !important;
 }
 :deep(.chat-highlight-name.theme-6:hover) {
-  border-color: #22d3ee !important;
-  box-shadow: 0 0 14px rgba(8, 145, 178, 0.5) !important;
+  border-color: #0f766e !important;
+  box-shadow: 0 0 12px rgba(13, 148, 136, 0.6) !important;
 }
 
 /* 7. Deep Sapphire Indigo */
 :deep(.chat-highlight-name.theme-7) {
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.28), rgba(67, 56, 202, 0.15)) !important;
-  border: 1.5px solid #4f46e5 !important;
-  color: #e0e7ff !important;
+  background: linear-gradient(135deg, #c7d2fe 0%, #a5b4fc 100%) !important;
+  border: 1.5px solid #6366f1 !important;
+  color: #1e1b4b !important;
 }
 :deep(.chat-highlight-name.theme-7:hover) {
-  border-color: #818cf8 !important;
-  box-shadow: 0 0 14px rgba(79, 70, 229, 0.5) !important;
+  border-color: #4f46e5 !important;
+  box-shadow: 0 0 12px rgba(79, 70, 229, 0.6) !important;
 }
 
 /* 8. Neon Deep Pink */
 :deep(.chat-highlight-name.theme-8) {
-  background: linear-gradient(135deg, rgba(219, 39, 119, 0.28), rgba(190, 24, 93, 0.15)) !important;
+  background: linear-gradient(135deg, #fce7f3 0%, #f472b6 100%) !important;
   border: 1.5px solid #db2777 !important;
-  color: #fce7f3 !important;
+  color: #500724 !important;
 }
 :deep(.chat-highlight-name.theme-8:hover) {
-  border-color: #f472b6 !important;
-  box-shadow: 0 0 14px rgba(219, 39, 119, 0.5) !important;
+  border-color: #be185d !important;
+  box-shadow: 0 0 12px rgba(219, 39, 119, 0.6) !important;
 }
 
 /* 9. Electric Dodger Blue */
 :deep(.chat-highlight-name.theme-9) {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.28), rgba(2, 132, 199, 0.15)) !important;
-  border: 1.5px solid #0ea5e9 !important;
-  color: #bae6fd !important;
+  background: linear-gradient(135deg, #bae6fd 0%, #38bdf8 100%) !important;
+  border: 1.5px solid #0284c7 !important;
+  color: #082f49 !important;
 }
 :deep(.chat-highlight-name.theme-9:hover) {
-  border-color: #38bdf8 !important;
-  box-shadow: 0 0 14px rgba(14, 165, 233, 0.5) !important;
+  border-color: #0369a1 !important;
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.6) !important;
 }
 
 /* 10. Bubblegum Pink */
 :deep(.chat-highlight-name.theme-10) {
-  background: linear-gradient(135deg, rgba(244, 114, 182, 0.28), rgba(225, 29, 72, 0.15)) !important;
-  border: 1.5px solid #f472b6 !important;
-  color: #fdf2f8 !important;
+  background: linear-gradient(135deg, #fdf2f8 0%, #f472b6 100%) !important;
+  border: 1.5px solid #ec4899 !important;
+  color: #700735 !important;
 }
 :deep(.chat-highlight-name.theme-10:hover) {
-  border-color: #fbcfe8 !important;
-  box-shadow: 0 0 14px rgba(244, 114, 182, 0.5) !important;
+  border-color: #db2777 !important;
+  box-shadow: 0 0 12px rgba(244, 114, 182, 0.6) !important;
 }
 
 /* 11. Royal Blue */
 :deep(.chat-highlight-name.theme-11) {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.28), rgba(37, 99, 235, 0.15)) !important;
+  background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%) !important;
   border: 1.5px solid #3b82f6 !important;
-  color: #dbeafe !important;
+  color: #172554 !important;
 }
 :deep(.chat-highlight-name.theme-11:hover) {
-  border-color: #60a5fa !important;
-  box-shadow: 0 0 14px rgba(59, 130, 246, 0.5) !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.6) !important;
 }
 
 /* 🎯 Instant 1-Click Filter Button on Chat Row */

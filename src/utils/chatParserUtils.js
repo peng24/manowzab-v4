@@ -7,11 +7,37 @@
 export const MAX_ITEM_ID = 300;
 
 // 🚀 Regex patterns enhanced from real live stream CSV logs (v4.67.0)
+// 🚀 Regex patterns enhanced from real live stream CSV logs (v5.2.0)
 export const multiBuyRegex = /^(?:([ก-๙a-zA-Z][ก-๙a-zA-Z\s]*?)\s+)?(?:F|f|cf|CF|รับ|เอา|เิา|จอง|เมื่อวาน|เมือวาน|ย้อนหลัง)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
 export const adminProxyNumFirstRegex = /^(\d+)\s+([ก-๛a-zA-Z].*)$/;
-export const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s*(?:[-_:=]|\s*(?:เอา|รับ|จอง|cf|CF|เิา|เค|ok|เมื่อวาน|เมือวาน|ย้อนหลัง|ของ)\s*)?\s*(\d+)(?:\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ))?$/i; // Supports "พี่อ้อย20", "อิ๋ว เอา 22", "ตุ๊ก บำรุงรัตน์ เมือวาน 32"
-export const adminActionNoteRegex = /^([ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา|cf|CF|จอง|เิา|เค|ok|สี|ไซส์|ขนาด|อยากได้|อยสกได้|เพิ่ม|ลด|เปลี่ยน|เลือก|เมื่อวาน|เมือวาน|ย้อนหลัง)/i;
+export const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s*(?:[-_:=]|\s*(?:เอา|รับ|จอง|เอฟ|cf|CF|เิา|เค|ok|ของ|เมื่อวาน|เมือวาน|เมี่อวาน|ย้อนหลัง)\s*)?\s*(\d+)(?:\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ))?$/i; // Supports "พี่อ้อย20", "อิ๋ว เอา 22", "ตุ๊ก บำรุงรัตน์ 18", "ตุ๊ก บำรุงรัตน์ เมือวาน 32"
+export const adminActionNoteRegex = /^([ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา|cf|CF|จอง|เิา|เค|ok|สี|ไซส์|ขนาด|อยากได้|อยสกได้|เพิ่ม|ลด|เปลี่ยน|เลือก|เมื่อวาน|เมือวาน|เมี่อวาน|ย้อนหลัง)/i;
 export const nonNameNounsRegex = /^(?:เสื้อ|กางเกง|ชุด|เดรส|กระโปรง|ผ้า|สี|ไซส์|เบอร์|ตัว|งาน|แบบ|แอดมิน|ลูกค้า|ร้าน|ของ|คน|พี่นาว|น้องนาว|นาว)$/;
+
+// 🚫 Non-name words: colors, pointer nouns, clothing types, buy verbs, polite endings
+export const nonNameWordsRegex = /^(?:สี(?:ฟ้า|แดง|ขาว|ดำ|ชมพู|เขียว|เหลือง|ส้ม|ม่วง|กรม|น้ำเงิน|ครีม|เทา|น้ำตาล|โอรส|บานเย็น|เลือดหมู|ทอง|เงิน|เนื้อ|ลาย|สด|เข้ม|อ่อน|[ก-๙a-zA-Z]+)|ตัวนี้|ตัวนั้น|ตัวโน้น|อันนี้|อันนั้น|แบบนี้|ชุดนี้|สีนี้|ตัวเมื่อกี้|เมื่อกี้|ตัวตะกี้|อันเมื่อกี้|เมื่อวาน|เมือวาน|เมี่อวาน|ย้อนหลัง|ของเก่า|รอบก่อน|ไลฟ์ก่อน|เสื้อ|กางเกง|ชุด|เดรส|กระโปรง|ผ้า|สี|ไซส์|เบอร์|ตัว|งาน|แบบ|ลาย|แอดมิน|ลูกค้า|ร้าน|ของ|คน|พี่นาว|น้องนาว|นาว|เอา|รับ|จอง|เอฟ|cf|CF|เิา|เค|ok|ตกลง|โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม|รอบส่ง|พัสดุ|เลขพัสดุ|เช็คเลข|แจ้งโอน|ขนส่ง|เคอรี่|แฟลช|ไปรษณีย์|ค่าส่ง|โอนแล้ว|flash|kerry|j&t|jt|ส่งเลย|ส่งวันนี้|ส่งของ|ส่งให้|ส่งมา|ฝากไว้ก่อน|ฝากไว้|ฝาก|ทักไลน์|แอดไลน์|ไลน์|ทักแชท|อินบ็อกซ์|ib|inbox|ขอบคุณ|สวัสดี|ยินดี|ขอโทษ|สาธุ|ตกลง|โอเค|พร้อม|รับทราบ|ใช่|ไม่ใช่|สวย|ชอบ|น่ารัก|ถูกใจ|พอดี|หลวม|คับ|ยาว|สั้น|บาง|หนา|นิ่ม|นุ่ม|ใส่ได้|ใส่ไม่ได้|ขอดู|ลอง|ถาม|อก|เอว|สะโพก|ราคา|กี่บาท|เท่าไหร่|เท่าไร|มีไหม|ว่างไหม|เหลือไหม|หลุด|ผ่าน|ยกเลิก|ไม่เอา|ไม่รับ|สละสิทธิ์|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|คะ่|เลย|โลด|ด้วย)$/i;
+
+// 💬 Live chat conversational fragments, opinions, and common expressions that are NOT customer names
+export const conversationalFragmentRegex = /(?:ทักไลน์|แอดไลน์|เรียบร้อย|ฝากไว้ก่อน|ฝากไว้|ฝากก่อน|ฝากของ|เนื้อผ้า|ชอบ|เห็น|เคย|สัก|เมื่อกี้|ตะกี้|ส่งเลย|ส่งวัน|โอนแล้ว|แจ้งโอน|สลิป|ขอดู|ลอง|รีวิว|กี่บาท|เท่าไหร่|เท่าไร|มีไหม|ว่างไหม|เหลือไหม|สวย|น่ารัก|ใส่ได้|ใส่ไม่ได้|ตัวนี้|ตัวนั้น|ตัวโน้น|ตัวเมื่อกี้|ไซส์|ขนาด|อก|เอว|สะโพก|ราคา|พี่นาว|น้องนาว|นาว|สีฟ้า|สีแดง|สีขาว|สีดำ|สีชมพู|สีเขียว|สีเหลือง|สีส้ม|สีม่วง|สีกรม|สีน้ำเงิน|สีครีม|สีเทา|สีน้ำตาล|สีโอรส|สีบานเย็น|สีเลือดหมู|สีทอง|สีเงิน|สีเนื้อ)/i;
+
+// 🛑 Admin Stopwords Guard: General chat from admin (do NOT extract as customer name or booking)
+export const adminStopwordsRegex = /^(?:กำลัง\s*รอ.*|รอแปป|รอแป๊บ|รอสักครู่|รอแปบ|รอแแแ|รอแป๊ป|เทส|ทดสอบ|สวัสดี.*|เริ่ม.*|ฮัลโหล.*|ขอบคุณ.*|ปิดไลฟ์.*|จบไลฟ์.*)$/i;
+
+// 🗓️ Backdated / Yesterday debt keywords (รวมคำพิมพ์ผิดที่พบบ่อย):
+export const backdatedNoteRegex = /(?:เมื่อวาน|เมือวาน|เมี่อวาน|ของเก่า|รอบก่อน|ไลฟ์ก่อน)/i;
+
+// 📝 Admin Note & Size Selection / Request keywords:
+export const adminSizeSelectionNoteRegex = /(?:อยสกได้|อยากได้|ไซส์|ขนาด|เพิ่มเป็น|เลือกให้|เล่นไลน์|ไม่เรื่องมาก|\d+\s*ตัว|ตัวไหนก็ได้|สีฟ้า|สีแดง|สีขาว|สีดำ|สีชมพู|สีเขียว|สีเหลือง|สีส้ม|สีม่วง|สีกรม)/i;
+
+// 📏 Chest/bust size range guard: e.g. "52-54", "50-52", "อก 42-44"
+export const sizeRangeRegex = /^\s*(?:อก|ไซส์|ขนาด)?\s*(\d{2})\s*[-/]\s*(\d{2})\s*(?:นิ้ว)?\s*$/i;
+
+// 📦 Quantity Unit pattern: e.g. "3ตัว", "2ตัว", "1 ตัว"
+export const quantityUnitRegex = /\d+\s*(?:ตัว|ชิ้น|ผืน|ชุด|ใบ|กล่อง|คู่|แพ็ค|แพค|รายการ)(?![\w\u0E00-\u0E7F])/;
+
+// 💰 Price pattern: e.g. "30บาท", "ใบละ200", "ตัวละ 150"
+export const pricePatternRegex = /(?:ใบละ|ตัวละ|ชิ้นละ|ราคา|ชุดละ)\s*\d+|\d+\s*(?:บาท|บ\.|ใบละ|ตัวละ|ชิ้นละ|฿)/;
+
 export const shippingRegex = /โอน|ส่ง|สลิป|ยอด|ที่อยู่|ปลายทาง|พร้อม|รอบส่ง|พัสดุ|เลขพัสดุ|เช็คเลข|แจ้งโอน|ขนส่ง|เคอรี่|แฟลช|ไปรษณีย์|ค่าส่ง|โอนแล้ว|flash|kerry|j&t|jt|ส่งเลย|ส่งวันนี้|ส่งของ|ส่งให้|ส่งมา|ฝากไว้ก่อน|ฝากไว้|ฝาก/i;
 export const holdRegex = /ฝากไว้ก่อน|ฝากไว้|ฝากก่อน|ฝากของ|ยังไม่ส่ง|ฝาก/i;
 export const questionRegex = /อก|เอว|สะโพก|ยาว|ราคา|เท่าไหร่|เท่าไร|ทไหร|กี่บาท|แบบไหน|ผ้า|สี|ตำหนิ|ไหม|มั้ย|ป่าว|ขอดู|รีวิว|ว่าง|เหลือ|ยังอยู่|อยู่มั๊ย|อยู่ไหม|มีไหม|มีมั้ย|เสื้ออะไร|ตัวอะไร|เป็นแบบ|คือแบบ|ไซส์|ใหม|หรอ|ปะ|ยังไง|อะไร|กี่|นิ้ว|เซน|เซนติเมตร|โล|กิโล|ชิ้น|ตัว|แพ็ค|แพค|ขนาด|ความยาว|กว้าง|สูง|หนัก/;
@@ -200,17 +226,22 @@ const INTENT_KEYWORD_FAST_CHECK = /(?:f|cf|รับ|เอา|เิา|เค|
 export function sanitizeAdminCustomerName(name) {
   if (!name || typeof name !== "string") return null;
   let clean = name.replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
-  clean = clean.replace(/^(?:เอาให้|ใหั|ให้|ของ|เอา)\s*/i, "").trim();
-  clean = clean.replace(/\s*(?:เอา|รับ|จอง|cf|CF|เิา|เค|เมื่อวาน|เมือวาน|ย้อนหลัง|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)$/i, "").trim();
+  clean = clean.replace(/^(?:เอาให้|ใหั|ให้|ของพี่|ของ|เอา|รับ|จอง|เอฟ|cf|CF)\s*/i, "").trim();
+  clean = clean.replace(/\s*(?:เอา|รับ|จอง|เอฟ|cf|CF|เิา|เค|เมื่อวาน|เมือวาน|เมี่อวาน|ย้อนหลัง|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ด้วย)$/i, "").trim();
   clean = clean.replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
   if (
     clean.length >= 2 &&
     clean.length <= 40 &&
     !isAdminUser(clean) &&
-    !DIGITS_ONLY_REGEX.test(clean) &&
+    !/\d/.test(clean) &&
     !nonNameNounsRegex.test(clean) &&
+    !quantityUnitRegex.test(clean) &&
+    !cancelKeywordRegex.test(clean) &&
+    !shippingRegex.test(clean) &&
+    !holdRegex.test(clean) &&
     !PURE_POLITE_OR_CHAT_REGEX.test(clean) &&
-    !SENTENCE_FRAGMENT_REGEX.test(clean)
+    !SENTENCE_FRAGMENT_REGEX.test(clean) &&
+    !adminStopwordsRegex.test(clean)
   ) {
     return clean;
   }
@@ -222,29 +253,42 @@ export function extractAdminCustomerName(text) {
   const raw = text.trim();
   const normalized = thaiToArabic(raw);
 
-  // 1. Multi-buy: e.g. "3 4 วาศินา" or "วาศินา 3 4" or "26 38 74 มะระ" or "หนิง เมื่อวาน 41 43"
-  const mb = normalized.match(multiBuyRegex);
-  if (mb) {
-    const candidate = mb[1]?.trim() || mb[3]?.trim();
-    const clean = sanitizeAdminCustomerName(candidate);
+  // 🛑 0. Admin Stopwords: General chat messages from admin (NOT a customer name)
+  if (adminStopwordsRegex.test(normalized)) {
+    return null;
+  }
+
+  // 🗓️ 1. Backdated / Yesterday Debt Note: e.g. "หนิง เมื่อวาน 41 43", "ตุ๊ก บำรุงรัตน์ เมือวาน 32", "หนิง เมื่อวาน"
+  if (backdatedNoteRegex.test(normalized)) {
+    const match = normalized.match(/^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s*(?:เมื่อวาน|เมือวาน|เมี่อวาน|ของเก่า|รอบก่อน|ไลฟ์ก่อน)/i);
+    if (match) {
+      const clean = sanitizeAdminCustomerName(match[1]);
+      if (clean) return clean;
+    }
+  }
+
+  // 📝 2. Admin Action Note / Size Selection Request: e.g. "พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล", "พรจันทร์ เพิ่มเป็น 4 ตัว ไซส์ 50-52 เลือกให้เลย", "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า"
+  const noteMatch = normalized.match(/^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,30}?)\s+(?:อยสกได้|อยากได้|ไซส์|ขนาด|เพิ่ม|เลือก|เล่นไลน์|ไม่เรื่องมาก|\d+\s*ตัว|ตัวไหนก็ได้|สี[ก-๙a-zA-Z]+|รับ|เอา)/i);
+  if (noteMatch) {
+    const clean = sanitizeAdminCustomerName(noteMatch[1]);
     if (clean) return clean;
   }
 
-  // 2. Admin name first: e.g. "ตุ๊ก บำรุงรัตน์ 18", "พี่อ้อย 20", "วาศินา 28", "อิ๋ว เอา 22", "ตุ๊ก บำรุงรัตน์ เมือวาน 32"
+  // 3. Admin name first: e.g. "ตุ๊ก บำรุงรัตน์ 18", "พี่อ้อย 20", "วาศินา 28", "อิ๋ว เอา 22"
   const nameFirst = normalized.match(adminProxyNameFirstRegex);
   if (nameFirst) {
     const clean = sanitizeAdminCustomerName(nameFirst[1]);
     if (clean) return clean;
   }
 
-  // 3. Admin num first: e.g. "18 ตุ๊ก บำรุงรัตน์", "28 วาศินา", "50 ,tit", "22 เอาให้อิ๋ว"
+  // 4. Admin num first: e.g. "18 ตุ๊ก บำรุงรัตน์", "28 วาศินา", "50 ,tit", "22 เอาให้อิ๋ว", "12 มะระ", "28 กนกวรรณ"
   const numFirst = normalized.match(ADMIN_NUM_FIRST_REGEX);
   if (numFirst) {
     const clean = sanitizeAdminCustomerName(numFirst[2]);
     if (clean) return clean;
   }
 
-  // 4. Shipping / Hold / Transfer command: e.g. "กุญสิญา ส่งเลย", "ตุ๊ก บำรุงรัตน์ ส่งวันนี้", "วาศินา เอาไปฝากคนอื่นด้วย", "วาศินา ฝากไว้ก่อน", "เจเจ ส่งเลย"
+  // 5. Shipping / Hold / Transfer command: e.g. "กุญสิญา ส่งเลย", "ตุ๊ก บำรุงรัตน์ ส่งวันนี้", "วาศินา เอาไปฝากคนอื่นด้วย", "วาศินา ฝากไว้ก่อน", "เจเจ ส่งเลย", "บุญญาภา ส่งเลย"
   if (shippingRegex.test(normalized) || holdRegex.test(normalized)) {
     const cleaned = normalized
       .replace(adminShippingActionRegex, "")
@@ -256,27 +300,21 @@ export function extractAdminCustomerName(text) {
     const isPurePoliteOrChat = PURE_POLITE_OR_CHAT_REGEX.test(cleaned);
     const isSentenceFragment = SENTENCE_FRAGMENT_REGEX.test(cleaned);
 
-    if (
-      cleaned.length >= 2 &&
-      cleaned.length <= 40 &&
-      !isAdminUser(cleaned) &&
-      !DIGITS_ONLY_REGEX.test(cleaned) &&
-      !nonNameNounsRegex.test(cleaned) &&
-      !isPurePoliteOrChat &&
-      !isSentenceFragment
-    ) {
-      return cleaned;
+    const clean = sanitizeAdminCustomerName(cleaned);
+    if (clean) {
+      return clean;
     }
   }
 
-  // 5. Admin Action note / Customer reference: e.g. "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า", "หนิง เมื่อวาน"
-  const actionNote = normalized.match(adminActionNoteRegex);
-  if (actionNote) {
-    const clean = sanitizeAdminCustomerName(actionNote[1]);
+  // 6. Multi-buy: e.g. "3 4 วาศินา" or "วาศินา 3 4" or "26 38 74 มะระ"
+  const mb = normalized.match(multiBuyRegex);
+  if (mb) {
+    const candidate = mb[1]?.trim() || mb[3]?.trim();
+    const clean = sanitizeAdminCustomerName(candidate);
     if (clean) return clean;
   }
 
-  // 6. Dash buy: e.g. "ตุ๊ก-18"
+  // 7. Dash buy: e.g. "ตุ๊ก-18"
   const dashMatch = normalized.match(dashBuyRegex);
   if (dashMatch) {
     const clean = sanitizeAdminCustomerName(dashMatch[1]);
@@ -352,14 +390,211 @@ export function isDateMismatch(text, liveTimestamp = Date.now()) {
 }
 
 /**
- * Extract intent details from message text (Pure function)
+ * Checks if a customer display name is a YouTube handle or non-Thai account name.
+ * e.g. "@bunyabaaubonwirattana6307", "@user-1234", "john123"
+ * @param {string} name
+ * @returns {boolean}
+ */
+export function isHandleOrNonThaiName(name) {
+  if (!name || typeof name !== "string") return false;
+  const trimmed = name.trim();
+  if (trimmed.startsWith("@")) return true;
+  if (!/[\u0E00-\u0E7F]/.test(trimmed)) return true;
+  if (/[a-zA-Z]/.test(trimmed) && /\d/.test(trimmed)) return true;
+  return false;
+}
+
+/**
+ * Extracts customer self-introduction name from chat message or order text.
+ * Strictly guards against verbs, polite particles, colors, sizes, and conversational phrases.
+ * @param {string} text
+ * @returns {string|null} Clean customer name or null if invalid
+ */
+export function extractCustomerSelfName(text) {
+  if (!text || typeof text !== "string") return null;
+  const raw = text.trim();
+  const normalized = thaiToArabic(raw);
+
+  // 1. If text starts with item number (e.g. "40 บุญญาภา", "40 บุญญาภาค่ะ")
+  const numNameMatch = normalized.match(/^(\d+)\s+(.+)$/);
+  if (numNameMatch) {
+    const rawCandidate = numNameMatch[2].trim();
+    // Strip polite tail: e.g. "บุญญาภาค่ะ" -> "บุญญาภา"
+    let candidate = rawCandidate.replace(/(?:นะคะ|นะครับ|ค่ะ|คะ|ครับ|จ้า|จ้ะ|นะ|คะ่|ขา|เลย|โลด|ด้วย)+$/g, "").trim();
+    candidate = candidate.replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
+
+    // Must be a valid human name, not a verb, color, size, polite phrase, or conversation fragment
+    if (
+      candidate.length >= 2 &&
+      candidate.length <= 25 &&
+      !/\d/.test(candidate) &&
+      !nonNameWordsRegex.test(candidate) &&
+      !conversationalFragmentRegex.test(candidate) &&
+      !conversationalFragmentRegex.test(rawCandidate) &&
+      !nonNameNounsRegex.test(candidate) &&
+      !quantityUnitRegex.test(candidate) &&
+      !pricePatternRegex.test(candidate) &&
+      !shippingRegex.test(candidate) &&
+      !holdRegex.test(candidate) &&
+      !cancelKeywordRegex.test(candidate) &&
+      !questionRegex.test(candidate) &&
+      !explicitBuyRegex.test(candidate) &&
+      !adminStopwordsRegex.test(candidate) &&
+      !PURE_POLITE_OR_CHAT_REGEX.test(candidate) &&
+      !SENTENCE_FRAGMENT_REGEX.test(candidate) &&
+      !isAdminUser(candidate)
+    ) {
+      return candidate;
+    }
+    return null;
+  }
+
+  // 2. If text contains any numbers (e.g. "50จองค่ะ", "24 ค่ะ", "15รับ", "4รับคะ", "41คะ") → NOT a standalone self-intro
+  if (/\d/.test(normalized)) {
+    return null;
+  }
+
+  // 3. Fast guard against live chat conversation, shipping, hold, cancel, questions, buy verbs on the whole message
+  if (
+    shippingRegex.test(normalized) ||
+    holdRegex.test(normalized) ||
+    cancelKeywordRegex.test(normalized) ||
+    questionRegex.test(normalized) ||
+    explicitBuyRegex.test(normalized) ||
+    adminStopwordsRegex.test(normalized) ||
+    conversationalFragmentRegex.test(normalized) ||
+    quantityUnitRegex.test(normalized) ||
+    pricePatternRegex.test(normalized)
+  ) {
+    return null;
+  }
+
+  // 4. Standalone self-introduction: e.g. "บุญญาภาค่ะ", "บุญญาภาครับ", "บุญญาภา"
+  let candidate = normalized.replace(/(?:นะคะ|นะครับ|ค่ะ|คะ|ครับ|จ้า|จ้ะ|นะ|คะ่|ขา|เลย|โลด|ด้วย)+$/g, "").trim();
+  candidate = candidate.replace(STRIP_PUNCT_EDGES_REGEX, "").trim();
+
+  // Rule 2 for standalone intro:
+  // - 2-12 characters
+  // - No spaces allowed (!/\s/.test(candidate))
+  // - No digits (!/\d/.test(candidate))
+  // - Must not match nonNameWordsRegex, conversationalFragmentRegex, polite particles, etc.
+  if (
+    candidate.length >= 2 &&
+    candidate.length <= 12 &&
+    !/\s/.test(candidate) &&
+    !/\d/.test(candidate) &&
+    !nonNameWordsRegex.test(candidate) &&
+    !conversationalFragmentRegex.test(candidate) &&
+    !nonNameNounsRegex.test(candidate) &&
+    !PURE_POLITE_OR_CHAT_REGEX.test(candidate) &&
+    !SENTENCE_FRAGMENT_REGEX.test(candidate) &&
+    !isAdminUser(candidate)
+  ) {
+    return candidate;
+  }
+
+  return null;
+}
+
+/**
+ * Attaches extractedSelfName to an intent result object.
+ * If selfName is provided, it is set as an enumerable property.
+ * If null/undefined, it is set as a non-enumerable property returning null.
+ * This ensures expect(res.extractedSelfName).toBeNull() works, while
+ * preserving backward-compatibility with expect(res).toEqual({...}) in existing tests.
+ * @param {Object} res
+ * @param {string|null} [selfName=null]
+ * @returns {Object}
+ */
+export function withSelfName(res, selfName = null) {
+  if (!res || typeof res !== "object") return res;
+  if (selfName) {
+    res.extractedSelfName = selfName;
+  } else {
+    Object.defineProperty(res, "extractedSelfName", {
+      value: null,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
+  }
+  return res;
+}
+
+/**
+ * Internal intent details extractor
  * @param {string} text Raw message text
  * @param {number|Date} [liveTimestamp=Date.now()] Target live stream timestamp
  * @returns {Object} Parsed intent details
  */
-export function parseIntentDetails(text, liveTimestamp = Date.now()) {
+function _parseIntentDetails(text, liveTimestamp = Date.now()) {
   const normalizedMsg = thaiToArabic(text || "").trim();
   if (!normalizedMsg) return { type: "EMPTY" };
+
+  // 🛑 Admin Stopwords Fast-Check
+  if (adminStopwordsRegex.test(normalizedMsg)) {
+    return { type: "ADMIN_STOPWORD", method: "admin-stopword" };
+  }
+
+  // ⚡ Fast-Path: Chest size range guard (e.g. "52-54", "50-52", "อก 42-44")
+  const sizeRangeMatch = normalizedMsg.match(sizeRangeRegex);
+  if (sizeRangeMatch) {
+    const n1 = parseInt(sizeRangeMatch[1], 10);
+    const n2 = parseInt(sizeRangeMatch[2], 10);
+    if (n1 >= 32 && n1 <= 65 && n2 >= 32 && n2 <= 65 && Math.abs(n1 - n2) <= 6) {
+      return { type: "QUESTION", method: "size-range-guard" };
+    }
+  }
+
+  // ⚡ Check: Shipping or Hold (Priority over buy and notes when quantity numbers or hold requests are mentioned e.g. "เอฟใหม่3ตัวฝากไว้ก่อน", "นาวของพี่ส่งเลยของพี่ได้2ตัวใช่ไหม")
+  if (shippingRegex.test(normalizedMsg) || holdRegex.test(normalizedMsg)) {
+    const customerName = extractAdminCustomerName(normalizedMsg);
+    return {
+      type: "SHIPPING",
+      customerName,
+      method: holdRegex.test(normalizedMsg) ? "hold-keyword" : "shipping-keyword",
+    };
+  }
+
+  // ⚡ Check: Backdated / Yesterday debt note (e.g. "หนิง เมื่อวาน", "หนิง เมื่อวาน 41 43", "ตุ๊ก บำรุงรัตน์ เมือวาน 32")
+  if (backdatedNoteRegex.test(normalizedMsg) && !tryRegex.test(normalizedMsg)) {
+    const customerName = extractAdminCustomerName(normalizedMsg);
+    return {
+      type: "ADMIN_NOTE",
+      noteCategory: "yesterday",
+      customerName,
+      method: "admin-yesterday-note",
+    };
+  }
+
+  // ⚡ Check: Admin note / size selection request (e.g. "พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล", "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า")
+  if (
+    adminSizeSelectionNoteRegex.test(normalizedMsg) ||
+    /^(?:[ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา)$/i.test(normalizedMsg)
+  ) {
+    const customerName = extractAdminCustomerName(normalizedMsg);
+    if (customerName) {
+      return {
+        type: "ADMIN_NOTE",
+        noteCategory: "size-selection",
+        customerName,
+        method: "admin-note",
+      };
+    }
+  }
+
+  // 💡 Check: Standalone Customer Self-Introduction (e.g. "บุญญาภาค่ะ", "บุญญาภาครับ")
+  if (!/\d/.test(normalizedMsg)) {
+    const selfName = extractCustomerSelfName(normalizedMsg);
+    if (selfName) {
+      return {
+        type: "SELF_INTRO",
+        customerName: selfName,
+        extractedSelfName: selfName,
+        method: "self-intro",
+      };
+    }
+  }
 
   // ⚡ Fast-Path 1: Pure digits (e.g. "25", "42", "1") — matches the vast majority of live CF comments instantly
   if (PURE_DIGITS_FAST_REGEX.test(normalizedMsg)) {
@@ -398,7 +633,8 @@ export function parseIntentDetails(text, liveTimestamp = Date.now()) {
       .map((n) => parseInt(n, 10))
       .filter((n) => !isNaN(n) && n > 0 && n <= MAX_ITEM_ID);
     if (itemIds.length > 0) {
-      return { type: "MULTI_BUY", itemIds, description: multiMatch[3] || multiMatch[1] || "" };
+      const customerName = extractAdminCustomerName(normalizedMsg);
+      return { type: "MULTI_BUY", itemIds, description: multiMatch[3] || multiMatch[1] || "", customerName };
     }
   }
 
@@ -419,6 +655,16 @@ export function parseIntentDetails(text, liveTimestamp = Date.now()) {
     }
   }
 
+  // 2.3. Guard: Number followed by unit quantity (e.g. "2ตัว", "1ตัว") without buy command
+  if (quantityUnitRegex.test(normalizedMsg) && !explicitBuyRegex.test(normalizedMsg)) {
+    return { type: "UNKNOWN", method: "quantity-unit-guard" };
+  }
+
+  // 2.4. Guard: Price with unit (e.g. "ใบละ200", "30บาท") without try/buy
+  if (pricePatternRegex.test(normalizedMsg) && !tryRegex.test(normalizedMsg) && !explicitBuyRegex.test(normalizedMsg)) {
+    return { type: "UNKNOWN", method: "price-guard" };
+  }
+
   // 2.5. Guard: Number + Question keyword (e.g. "32อกเท่าไร", "48ราคา") → QUESTION, not BUY
   if (numberWithQuestionRegex.test(normalizedMsg)) {
     return { type: "QUESTION", method: "number-with-question-guard" };
@@ -429,9 +675,10 @@ export function parseIntentDetails(text, liveTimestamp = Date.now()) {
     return { type: "NEGATION", method: "negation-guard" };
   }
 
-  // 3. Try / Fit check request
+  // 3. Try / Fit check request (e.g. "ลอง50ให้ดูด้วยค่ะ", "ลองเสี้อกล้าม30บาทให้ดูหน่อยนาว")
   if (tryRegex.test(normalizedMsg)) {
-    const matchNum = normalizedMsg.match(DIGITS_GLOBAL_REGEX);
+    const withoutPrice = normalizedMsg.replace(pricePatternRegex, "");
+    const matchNum = withoutPrice.match(/\d+/);
     if (matchNum) {
       const itemId = parseInt(matchNum[0], 10);
       if (itemId > 0 && itemId <= MAX_ITEM_ID) {
@@ -441,17 +688,7 @@ export function parseIntentDetails(text, liveTimestamp = Date.now()) {
     return { type: "TRY_ITEM", method: "try-general" };
   }
 
-  // 4. Explicit buy keyword
-  const explicitMatch = normalizedMsg.match(explicitBuyRegex);
-  if (explicitMatch) {
-    const itemIdStr = explicitMatch[1] || explicitMatch[2];
-    const itemId = parseInt(itemIdStr, 10);
-    if (itemId > 0 && itemId <= MAX_ITEM_ID) {
-      return { type: "SINGLE_BUY", itemId, method: "explicit-keyword" };
-    }
-  }
-
-  // 5. Cancel
+  // 4. Cancel
   if (cancelKeywordRegex.test(normalizedMsg)) {
     if (standalonePassRegex.test(normalizedMsg)) {
       return { type: "CANCEL_LATEST", method: "auto-pass-latest" };
@@ -464,17 +701,86 @@ export function parseIntentDetails(text, liveTimestamp = Date.now()) {
     return { type: "CANCEL_LATEST", method: "auto-cancel-latest" };
   }
 
-  // 6. Shipping
-  if (shippingRegex.test(normalizedMsg)) {
-    return { type: "SHIPPING" };
+  // 5. Admin Proxy Name-First (e.g. "อิ๋ว เอา 22", "ตุ๊ก บำรุงรัตน์ 18")
+  const matchAdminNameFirst = normalizedMsg.match(adminProxyNameFirstRegex);
+  if (matchAdminNameFirst) {
+    const itemId = parseInt(matchAdminNameFirst[2], 10);
+    if (itemId > 0 && itemId <= MAX_ITEM_ID) {
+      const customerName = sanitizeAdminCustomerName(matchAdminNameFirst[1]);
+      if (customerName) {
+        return { type: "SINGLE_BUY", itemId, method: "admin-proxy-name-first", customerName };
+      }
+    }
   }
 
-  // 7. Question
+  // 5.1. Number + Name / Description (e.g. "12 มะระ", "40 บุญญาภา", "22 เอาให้อิ๋ว")
+  const matchNumName = normalizedMsg.match(/^(\d+)\s+([ก-๛a-zA-Z\s]+)$/);
+  if (matchNumName) {
+    const itemId = parseInt(matchNumName[1], 10);
+    const rawName = matchNumName[2].trim();
+    if (
+      itemId > 0 &&
+      itemId <= MAX_ITEM_ID &&
+      !questionRegex.test(rawName) &&
+      !shippingRegex.test(rawName) &&
+      !quantityUnitRegex.test(rawName) &&
+      !pricePatternRegex.test(rawName)
+    ) {
+      const selfName = extractCustomerSelfName(normalizedMsg);
+      const adminCustomerName = sanitizeAdminCustomerName(rawName);
+      const customerName = selfName || adminCustomerName;
+      if (customerName) {
+        return {
+          type: "SINGLE_BUY",
+          itemId,
+          method: "num-and-name",
+          customerName,
+          extractedSelfName: selfName || null,
+        };
+      }
+      if (PURE_POLITE_OR_CHAT_REGEX.test(rawName)) {
+        return {
+          type: "SINGLE_BUY",
+          itemId,
+          method: "polite-number",
+        };
+      }
+      return {
+        type: "SINGLE_BUY",
+        itemId,
+        method: "num-and-desc",
+        description: rawName,
+      };
+    }
+  }
+
+  // 5.2. Explicit buy keyword
+  const explicitMatch = normalizedMsg.match(explicitBuyRegex);
+  if (explicitMatch) {
+    const itemIdStr = explicitMatch[1] || explicitMatch[2];
+    const itemId = parseInt(itemIdStr, 10);
+    if (itemId > 0 && itemId <= MAX_ITEM_ID) {
+      return { type: "SINGLE_BUY", itemId, method: "explicit-keyword" };
+    }
+  }
+
+  // 6. Question
   if (questionRegex.test(normalizedMsg)) {
     return { type: "QUESTION" };
   }
 
   return { type: "UNKNOWN" };
+}
+
+/**
+ * Extract intent details from message text (Pure function)
+ * @param {string} text Raw message text
+ * @param {number|Date} [liveTimestamp=Date.now()] Target live stream timestamp
+ * @returns {Object} Parsed intent details
+ */
+export function parseIntentDetails(text, liveTimestamp = Date.now()) {
+  const res = _parseIntentDetails(text, liveTimestamp);
+  return withSelfName(res, res.extractedSelfName || null);
 }
 
 /**

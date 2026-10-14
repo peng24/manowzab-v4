@@ -21,13 +21,19 @@ import Swal from "sweetalert2";
 import { watch } from "vue";
 import { logger } from "../utils/logger";
 import { resolveDeliveryUid } from "../utils/deliverySync";
-
+import { sanitizeDbKey } from "../utils/dbUtils";
 
 import {
   MAX_ITEM_ID,
   multiBuyRegex,
   adminProxyNumFirstRegex,
   adminProxyNameFirstRegex,
+  adminStopwordsRegex,
+  backdatedNoteRegex,
+  adminSizeSelectionNoteRegex,
+  sizeRangeRegex,
+  quantityUnitRegex,
+  pricePatternRegex,
   shippingRegex,
   holdRegex,
   questionRegex,
@@ -53,6 +59,8 @@ import {
   isDateMismatch,
   extractAdminCustomerName,
   sanitizeAdminCustomerName,
+  extractCustomerSelfName,
+  isHandleOrNonThaiName,
 } from "../utils/chatParserUtils";
 
 // ✅ Toast Notification Mixin
@@ -311,7 +319,111 @@ export function useChatProcessor() {
 
     // 6. Cancel Logic (Refined - supports dash)
 
+    // 💡 Auto-learn nickname from customer self-introduction (e.g. "บุญญาภาค่ะ", "บุญญาภาครับ")
+    if (!isAdmin && uid) {
+      const selfName = extractCustomerSelfName(normalizedMsg);
+      if (selfName) {
+        const hasExistingNick =
+          nicknameStore.hasNickname(uid, realName) ||
+          nicknameStore.hasNickname(uid, displayName);
+
+        // Rule 1: Never overwrite existing nickname (respect CUSTOM_NICKNAME_OVERRIDE.md)
+        if (!hasExistingNick) {
+          const safeUid = sanitizeDbKey(uid);
+          update(dbRef(db, `nicknames/${safeUid}`), {
+            nick: selfName,
+            phonetic: selfName,
+            realName: realName,
+          }).catch((e) => logger.warn("Auto-learn nickname error:", e));
+          displayName = selfName;
+        }
+      }
+    }
+
     // --- Execution ---
+
+    // 🛑 Admin Stopwords Guard: (e.g. "กำลัง รอแแแ", "รอแปป", "เทส")
+    if (isAdmin && adminStopwordsRegex.test(normalizedMsg)) {
+      chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+        id: item.id,
+        text: msg,
+        messageRuns: extractMessageRuns(item),
+        authorName: realName,
+        displayName,
+        phoneticName,
+        realName,
+        uid,
+        avatar,
+        color: stringToColor(uid),
+        isAdmin: true,
+        type: "general",
+        sfxType: null,
+        ttsText: "",
+        detectionMethod: "admin-stopword",
+        timestamp: new Date(item.snippet.publishedAt).getTime(),
+      });
+      return;
+    }
+
+    // 🗓️ Admin Yesterday / Backdated Debt Note (e.g. "หนิง เมื่อวาน", "หนิง เมื่อวาน 41 43", "ตุ๊ก บำรุงรัตน์ เมือวาน 32")
+    if (isAdmin && backdatedNoteRegex.test(normalizedMsg) && !tryRegex.test(normalizedMsg)) {
+      const customerName = extractAdminCustomerName(normalizedMsg);
+      chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+        id: item.id,
+        text: msg,
+        messageRuns: extractMessageRuns(item),
+        authorName: realName,
+        displayName: customerName ? `${customerName} (โน้ตเมื่อวานโดย ${displayName})` : displayName,
+        proxyCustomerName: customerName,
+        phoneticName: customerName ? nicknameStore.getPhoneticName(null, customerName) : phoneticName,
+        realName,
+        uid,
+        avatar,
+        color: stringToColor(uid),
+        isAdmin: true,
+        isAdminNote: true,
+        noteCategory: "yesterday",
+        type: "note",
+        sfxType: null,
+        ttsText: "",
+        detectionMethod: "admin-yesterday-note",
+        timestamp: new Date(item.snippet.publishedAt).getTime(),
+      });
+      return;
+    }
+
+    // 📝 Admin Size Selection / Request Note (e.g. "พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล", "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า")
+    if (
+      isAdmin &&
+      (adminSizeSelectionNoteRegex.test(normalizedMsg) ||
+       /^(?:[ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา)$/i.test(normalizedMsg))
+    ) {
+      const customerName = extractAdminCustomerName(normalizedMsg);
+      if (customerName) {
+        chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+          id: item.id,
+          text: msg,
+          messageRuns: extractMessageRuns(item),
+          authorName: realName,
+          displayName: `${customerName} (โน้ตโดย ${displayName})`,
+          proxyCustomerName: customerName,
+          phoneticName: nicknameStore.getPhoneticName(null, customerName),
+          realName,
+          uid,
+          avatar,
+          color: stringToColor(uid),
+          isAdmin: true,
+          isAdminNote: true,
+          noteCategory: "size-selection",
+          type: "note",
+          sfxType: null,
+          ttsText: "",
+          detectionMethod: "admin-note",
+          timestamp: new Date(item.snippet.publishedAt).getTime(),
+        });
+        return;
+      }
+    }
 
     // 🔥 HIGHEST PRIORITY: Multi-Buy Logic (before all other checks)
     // Handles "26 38 74", "26 38 74 ClientName", or "มะระ เอา 19 13 10"
@@ -652,8 +764,8 @@ export function useChatProcessor() {
         });
       }
       // --- END AUTO SHIP LOGIC ---
-    } else if (questionRegex.test(normalizedMsg) || tryRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || negationGuardRegex.test(normalizedMsg)) {
-      method = questionRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) ? "question-skip" : negationGuardRegex.test(normalizedMsg) ? "negation-skip" : "try-skip";
+    } else if (questionRegex.test(normalizedMsg) || tryRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || negationGuardRegex.test(normalizedMsg) || sizeRangeRegex.test(normalizedMsg)) {
+      method = questionRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || sizeRangeRegex.test(normalizedMsg) ? "question-skip" : negationGuardRegex.test(normalizedMsg) ? "negation-skip" : "try-skip";
     } else {
       // 🟢 Regex Matching
       const matchPure = normalizedMsg.match(pureNumberRegex);
@@ -707,7 +819,7 @@ export function useChatProcessor() {
         intent = "buy";
         targetId = parseInt(matchPolite[1]);
         method = "regex-polite";
-      } else if (matchDash && parseInt(matchDash[2]) <= MAX_ITEM_ID) {
+      } else if (matchDash && !/^\d+$/.test(matchDash[1].trim()) && !sizeRangeRegex.test(normalizedMsg) && parseInt(matchDash[2]) <= MAX_ITEM_ID) {
         intent = "buy";
         targetId = parseInt(matchDash[2]);
         method = "regex-dash";
@@ -737,6 +849,26 @@ export function useChatProcessor() {
             method = "admin-proxy-num-desc";
           } else {
             method = "regex-num-desc";
+            // Auto-learn customer nickname if not admin and desc is customer name (e.g. "40 บุญญาภา")
+            const cleanSelfName = extractCustomerSelfName(normalizedMsg);
+            if (cleanSelfName) {
+              forcedOwnerName = cleanSelfName;
+              const hasExistingNick =
+                nicknameStore.hasNickname(uid, realName) ||
+                nicknameStore.hasNickname(uid, displayName);
+              const shouldAutoLearn =
+                !hasExistingNick &&
+                (isHandleOrNonThaiName(displayName) || isHandleOrNonThaiName(realName));
+
+              if (shouldAutoLearn) {
+                const safeUid = sanitizeDbKey(uid);
+                update(dbRef(db, `nicknames/${safeUid}`), {
+                  nick: cleanSelfName,
+                  phonetic: cleanSelfName,
+                  realName: realName,
+                }).catch((e) => logger.warn("Auto-learn customer name error:", e));
+              }
+            }
           }
         }
       }

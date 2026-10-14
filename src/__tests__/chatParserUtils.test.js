@@ -22,6 +22,14 @@ import {
   formatShippingCycleLabel,
   extractAdminCustomerName,
   getCustomerColorTheme,
+  adminStopwordsRegex,
+  backdatedNoteRegex,
+  adminSizeSelectionNoteRegex,
+  sizeRangeRegex,
+  quantityUnitRegex,
+  pricePatternRegex,
+  extractCustomerSelfName,
+  isHandleOrNonThaiName,
 } from "../utils/chatParserUtils";
 
 describe("chatParserUtils", () => {
@@ -559,7 +567,12 @@ describe("chatParserUtils", () => {
       expect(extractAdminCustomerName("หนิง เมื่อวาน")).toBe("หนิง");
     });
 
-    it("returns null for non-admin customer or general chat messages", () => {
+    it("returns null for admin stopwords and general admin chat", () => {
+      expect(extractAdminCustomerName("กำลัง รอแแแ")).toBeNull();
+      expect(extractAdminCustomerName("รอแปป")).toBeNull();
+      expect(extractAdminCustomerName("รอแป๊บ")).toBeNull();
+      expect(extractAdminCustomerName("เทส")).toBeNull();
+      expect(extractAdminCustomerName("ทดสอบ")).toBeNull();
       expect(extractAdminCustomerName("สวัสดีค่ะ")).toBeNull();
       expect(extractAdminCustomerName("มีสีอะไรบ้าง")).toBeNull();
       expect(extractAdminCustomerName("")).toBeNull();
@@ -568,7 +581,202 @@ describe("chatParserUtils", () => {
       expect(extractAdminCustomerName("ฝากดูแลแชทด้วยนะคะ")).toBeNull();
     });
   });
+
+  describe("🛑 Admin Stopwords & Regex Guards", () => {
+    it("identifies admin stopwords correctly with adminStopwordsRegex", () => {
+      expect(adminStopwordsRegex.test("กำลัง รอแแแ")).toBe(true);
+      expect(adminStopwordsRegex.test("รอแปป")).toBe(true);
+      expect(adminStopwordsRegex.test("รอแป๊บ")).toBe(true);
+      expect(adminStopwordsRegex.test("เทส")).toBe(true);
+      expect(adminStopwordsRegex.test("ทดสอบ")).toBe(true);
+      expect(adminStopwordsRegex.test("สวัสดีรอบห้อง")).toBe(true);
+      expect(adminStopwordsRegex.test("ปิดไลฟ์แล้วจ้า")).toBe(true);
+    });
+
+    it("parses admin stopwords in parseIntentDetails()", () => {
+      expect(parseIntentDetails("กำลัง รอแแแ")).toEqual({
+        type: "ADMIN_STOPWORD",
+        method: "admin-stopword",
+      });
+      expect(parseIntentDetails("รอแปป")).toEqual({
+        type: "ADMIN_STOPWORD",
+        method: "admin-stopword",
+      });
+      expect(parseIntentDetails("เทส")).toEqual({
+        type: "ADMIN_STOPWORD",
+        method: "admin-stopword",
+      });
+    });
+  });
+
+  describe("🗓️ Admin Yesterday / Backdated Debt Notes", () => {
+    it("identifies backdated keywords including typos with backdatedNoteRegex", () => {
+      expect(backdatedNoteRegex.test("หนิง เมื่อวาน")).toBe(true);
+      expect(backdatedNoteRegex.test("ตุ๊ก บำรุงรัตน์ เมือวาน 32")).toBe(true);
+      expect(backdatedNoteRegex.test("รอบก่อน")).toBe(true);
+      expect(backdatedNoteRegex.test("ของเก่า 14")).toBe(true);
+    });
+
+    it("parses yesterday debt notes in parseIntentDetails() without cutting stock", () => {
+      expect(parseIntentDetails("หนิง เมื่อวาน 41 43")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "yesterday",
+        customerName: "หนิง",
+        method: "admin-yesterday-note",
+      });
+
+      expect(parseIntentDetails("ตุ๊ก บำรุงรัตน์ เมือวาน 32")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "yesterday",
+        customerName: "ตุ๊ก บำรุงรัตน์",
+        method: "admin-yesterday-note",
+      });
+
+      expect(parseIntentDetails("หนิง เมื่อวาน")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "yesterday",
+        customerName: "หนิง",
+        method: "admin-yesterday-note",
+      });
+    });
+  });
+
+  describe("📝 Admin Size Selection & Custom Request Notes", () => {
+    it("parses size selection requests as ADMIN_NOTE in parseIntentDetails()", () => {
+      expect(parseIntentDetails("พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "size-selection",
+        customerName: "พรจันทร์",
+        method: "admin-note",
+      });
+
+      expect(parseIntentDetails("พรจันทร์ เพิ่มเป็น 4 ตัว ไซส์ 50-52 เลือกให้เลย")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "size-selection",
+        customerName: "พรจันทร์",
+        method: "admin-note",
+      });
+
+      expect(parseIntentDetails("พรจันทร์ รับ")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "size-selection",
+        customerName: "พรจันทร์",
+        method: "admin-note",
+      });
+    });
+  });
+
+  describe("🛡️ Customer False-Positive Guards & Self-Name Extraction", () => {
+    it("parses customer CF with self-name (40 บุญญาภา) and extracts selfName", () => {
+      const res = parseIntentDetails("40 บุญญาภา");
+      expect(res.type).toBe("SINGLE_BUY");
+      expect(res.itemId).toBe(40);
+      expect(res.customerName).toBe("บุญญาภา");
+      expect(res.extractedSelfName).toBe("บุญญาภา");
+      expect(res.method).toBe("num-and-name");
+    });
+
+    it("parses try item requests correctly (ลอง50ให้ดูด้วยค่ะ, ลองเสี้อกล้าม30บาทให้ดูหน่อยนาว)", () => {
+      expect(parseIntentDetails("ลอง50ให้ดูด้วยค่ะ")).toEqual({
+        type: "TRY_ITEM",
+        itemId: 50,
+        method: "try-keyword",
+      });
+
+      // 30 is followed by บาท (price), so it shouldn't extract 30 as an itemId
+      const tryRes = parseIntentDetails("ลองเสี้อกล้าม30บาทให้ดูหน่อยนาว");
+      expect(tryRes.type).toBe("TRY_ITEM");
+      expect(tryRes.itemId).toBeUndefined();
+    });
+
+    it("parses shipping and hold requests prioritizing over number extraction (เอฟใหม่3ตัวฝากไว้ก่อน, นาวของพี่ส่งเลยของพี่ได้2ตัวใช่ไหม)", () => {
+      const holdRes = parseIntentDetails("เอฟใหม่3ตัวฝากไว้ก่อน");
+      expect(holdRes.type).toBe("SHIPPING");
+      expect(holdRes.method).toBe("hold-keyword");
+
+      const shipRes = parseIntentDetails("นาวของพี่ส่งเลยของพี่ได้2ตัวใช่ไหม");
+      expect(shipRes.type).toBe("SHIPPING");
+      expect(shipRes.method).toBe("shipping-keyword");
+    });
+
+    it("guards chest size ranges like '52-54' from being misidentified as item orders", () => {
+      expect(parseIntentDetails("52-54")).toEqual({
+        type: "QUESTION",
+        method: "size-range-guard",
+      });
+      expect(parseIntentDetails("อก 42-44")).toEqual({
+        type: "QUESTION",
+        method: "size-range-guard",
+      });
+      expect(parseIntentDetails("50-52")).toEqual({
+        type: "QUESTION",
+        method: "size-range-guard",
+      });
+    });
+  });
+
+  describe("💡 Auto-Learn Nickname & Self-Name Extraction (v5.2.0 Hardening)", () => {
+    it("extracts selfName for '40 บุญญาภา' and 'บุญญาภาค่ะ'", () => {
+      expect(parseIntentDetails("40 บุญญาภา").extractedSelfName).toBe("บุญญาภา");
+      expect(parseIntentDetails("บุญญาภาค่ะ").extractedSelfName).toBe("บุญญาภา");
+
+      expect(extractCustomerSelfName("40 บุญญาภา")).toBe("บุญญาภา");
+      expect(extractCustomerSelfName("บุญญาภาค่ะ")).toBe("บุญญาภา");
+      expect(extractCustomerSelfName("บุญญาภาครับ")).toBe("บุญญาภา");
+    });
+
+    it("returns null extractedSelfName for non-name and conversational patterns", () => {
+      // Prompt required test cases:
+      expect(parseIntentDetails("24 ค่ะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("50จองค่ะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("ตัวเมื่อกี้ค่ะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("ทักไลน์เรียบร้อยค่ะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("ฝากไว้ก่อนนะคะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("เคยสักจ้า").extractedSelfName).toBeNull();
+
+      // Additional live chat edge cases:
+      expect(parseIntentDetails("15รับ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("4รับคะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("41คะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("40 สีฟ้า").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("40 ตัวนี้").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("40 ส่งเลย").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("เอาค่ะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("รับค่ะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("เห็นเนื้อผ้าแล้วชอบค่ะ").extractedSelfName).toBeNull();
+      expect(parseIntentDetails("ส่งเลยนะนาว").extractedSelfName).toBeNull();
+    });
+
+    it("extractCustomerSelfName directly filters non-names strictly", () => {
+      expect(extractCustomerSelfName("24 ค่ะ")).toBeNull();
+      expect(extractCustomerSelfName("50จองค่ะ")).toBeNull();
+      expect(extractCustomerSelfName("ตัวเมื่อกี้ค่ะ")).toBeNull();
+      expect(extractCustomerSelfName("ทักไลน์เรียบร้อยค่ะ")).toBeNull();
+      expect(extractCustomerSelfName("ฝากไว้ก่อนนะคะ")).toBeNull();
+      expect(extractCustomerSelfName("เคยสักจ้า")).toBeNull();
+      expect(extractCustomerSelfName("เอาค่ะ")).toBeNull();
+      expect(extractCustomerSelfName("รับค่ะ")).toBeNull();
+      expect(extractCustomerSelfName("40 สีฟ้า")).toBeNull();
+      expect(extractCustomerSelfName("40 ตัวนี้")).toBeNull();
+      expect(extractCustomerSelfName("40 ส่งเลย")).toBeNull();
+      expect(extractCustomerSelfName("เห็นเนื้อผ้าแล้วชอบค่ะ")).toBeNull();
+      expect(extractCustomerSelfName("ส่งเลยนะนาว")).toBeNull();
+    });
+
+    it("isHandleOrNonThaiName identifies YouTube handles and English/numeric accounts", () => {
+      expect(isHandleOrNonThaiName("@bunyabaaubonwirattana6307")).toBe(true);
+      expect(isHandleOrNonThaiName("bunyabaaubonwirattana6307")).toBe(true);
+      expect(isHandleOrNonThaiName("@user-xyz123")).toBe(true);
+      expect(isHandleOrNonThaiName("john123")).toBe(true);
+      expect(isHandleOrNonThaiName("@ลักษิกาศิลารัตน์-ญ9ญ")).toBe(true);
+
+      expect(isHandleOrNonThaiName("ศิรประภาหาญพันธ์พงษ์")).toBe(false);
+      expect(isHandleOrNonThaiName("วิภาวดีแก้วประจักษ์-ค6จ")).toBe(false);
+      expect(isHandleOrNonThaiName("บุญญาภา")).toBe(false);
+    });
+  });
 });
+
 
 
 

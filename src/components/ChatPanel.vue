@@ -200,7 +200,7 @@
         <div
           v-for="chat in filteredVisibleMessages"
           :key="chat.id"
-          v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color, isAuthorFiltered(chat), getCustomerMetaKey(chat)]"
+          v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color, isAuthorFiltered(chat), getCustomerMetaKey(chat), chat.proxyCustomerName, chat.noteCategory, chat.isAdminNote]"
           :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type]"
           :style="getChatRowStyle(chat)"
         >
@@ -673,6 +673,8 @@ function getIntentBadge(type) {
       return { icon: "❌", label: "ยกเลิก", class: "badge-cancel" };
     case "question":
       return { icon: "💬", label: "ถาม", class: "badge-question" };
+    case "note":
+      return { icon: "📝", label: "โน้ต", class: "badge-note" };
     default:
       return null;
   }
@@ -682,7 +684,7 @@ function getIntentBadge(type) {
 function getChatRowStyle(chat) {
   if (!chat) return {};
   // Priority actions use dedicated class themes (buy, shipping, cancel, admin)
-  if (chat.type === "buy" || chat.type === "shipping" || chat.type === "cancel" || chat.isAdmin) {
+  if (chat.type === "buy" || chat.type === "shipping" || chat.type === "cancel" || chat.type === "note" || chat.isAdmin) {
     return {};
   }
 
@@ -760,7 +762,19 @@ function editNickname(chat) {
   }
 }
 
-// 🌟 เรนเดอร์ข้อความแชทพร้อมไฮไลต์ชื่อลูกค้าที่ admin จองให้
+// 🏷️ แยกประเภท Pill ไฮไลต์ชื่อลูกค้าตามบริบท (จองให้, สั่งส่ง, โน้ต/ยอดเมื่อวาน)
+function getAdminProxyPillCategory(chat) {
+  if (!chat) return "buy";
+  if (chat.isAdminNote || chat.type === "note" || chat.noteCategory) {
+    return "note";
+  }
+  if (chat.type === "shipping" || (chat.text && /ส่ง|ที่อยู่|ฝาก/i.test(chat.text))) {
+    return "shipping";
+  }
+  return "buy";
+}
+
+// 🌟 เรนเดอร์ข้อความแชทพร้อมไฮไลต์ชื่อลูกค้าที่ admin จองให้ / สั่งส่ง / บันทึกโน้ต
 function renderAdminProxyText(chat) {
   const text = chat?.text || "";
   const proxyName = getAdminProxyCustomerName(chat);
@@ -769,13 +783,24 @@ function renderAdminProxyText(chat) {
   const escapedText = escapeHtml(text);
   const escapedName = escapeHtml(proxyName);
   const themeIdx = getCustomerColorTheme(proxyName);
+  const pillCategory = getAdminProxyPillCategory(chat);
+
+  let iconClass = "fa-cart-shopping";
+  let titlePrefix = "จองให้ลูกค้า";
+  if (pillCategory === "shipping") {
+    iconClass = "fa-truck-fast";
+    titlePrefix = "สั่งส่งให้ลูกค้า";
+  } else if (pillCategory === "note") {
+    iconClass = "fa-note-sticky";
+    titlePrefix = "โน้ตลูกค้า";
+  }
 
   // ป้องกัน regex special characters ในชื่อ
   const regexSafe = escapedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp(`(${regexSafe})`, "gi");
   return escapedText.replace(
     regex,
-    `<span class="chat-highlight-name theme-${themeIdx}" title="คลิกเพื่อแก้ไขข้อมูลลูกค้า: $1"><i class="fa-solid fa-user-tag name-icon"></i>$1</span>`
+    `<span class="chat-highlight-name pill-${pillCategory} theme-${themeIdx}" title="${titlePrefix}: $1 (คลิกเพื่อแก้ไข)"><i class="fa-solid ${iconClass} name-icon"></i>$1</span>`
   );
 }
 
@@ -1762,6 +1787,14 @@ async function refreshChat() {
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
 }
 
+.badge-note {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.45);
+}
+
 .status-emoji-only {
   font-size: 0.9em;
 }
@@ -2032,6 +2065,32 @@ async function refreshChat() {
   transform: translateY(-1px) scale(1.03) !important;
   filter: brightness(1.2) !important;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 🏷️ Proxy Pill Categories: Buy (Green/Gold), Shipping (Purple/Sky), Note (Amber) */
+:deep(.chat-highlight-name.pill-buy) {
+  border-color: rgba(52, 211, 153, 0.7) !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4) !important;
+}
+:deep(.chat-highlight-name.pill-buy .name-icon) {
+  color: #34d399 !important;
+}
+
+:deep(.chat-highlight-name.pill-shipping) {
+  border-color: rgba(168, 85, 247, 0.7) !important;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4) !important;
+}
+:deep(.chat-highlight-name.pill-shipping .name-icon) {
+  color: #c084fc !important;
+}
+
+:deep(.chat-highlight-name.pill-note) {
+  border-color: rgba(245, 158, 11, 0.75) !important;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.32), rgba(217, 119, 6, 0.18)) !important;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.45) !important;
+}
+:deep(.chat-highlight-name.pill-note .name-icon) {
+  color: #fbbf24 !important;
 }
 
 /* 🎨 12 Distinct Customer Themes (Reserved exclusively to Blues, Cyans, Magentas, and Pinks) */

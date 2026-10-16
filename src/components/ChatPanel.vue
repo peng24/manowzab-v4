@@ -765,6 +765,25 @@ function editNickname(chat) {
   }
 }
 
+const PILL_NOTE_FALLBACK_REGEX = /โน้ต|ฝากโน้ต|เมื่อวาน|เมือวาน|เมี่อวาน|ยอดเก่า|ค้าง|ติดไว้/i;
+const PILL_SHIPPING_FALLBACK_REGEX = /ส่ง|ที่อยู่|ฝาก/i;
+const REGEX_ESCAPE_CHARS = /[.*+?^${}()|[\]\\]/g;
+const proxyHighlightRegexCache = new Map();
+
+function getProxyHighlightRegex(escapedName) {
+  let cached = proxyHighlightRegexCache.get(escapedName);
+  if (!cached) {
+    if (proxyHighlightRegexCache.size >= 200) {
+      const oldestKey = proxyHighlightRegexCache.keys().next().value;
+      proxyHighlightRegexCache.delete(oldestKey);
+    }
+    const regexSafe = escapedName.replace(REGEX_ESCAPE_CHARS, "\\$&");
+    cached = new RegExp(`(${regexSafe})`, "gi");
+    proxyHighlightRegexCache.set(escapedName, cached);
+  }
+  return cached;
+}
+
 // 🏷️ แยกประเภท Pill ไฮไลต์ชื่อลูกค้าตามบริบท (จองให้, สั่งส่ง, โน้ต/ยอดเมื่อวาน)
 function getAdminProxyPillCategory(chat) {
   if (!chat) return "buy";
@@ -775,11 +794,11 @@ function getAdminProxyPillCategory(chat) {
   if (
     backdatedNoteRegex.test(text) ||
     adminSizeSelectionNoteRegex.test(text) ||
-    /โน้ต|ฝากโน้ต|เมื่อวาน|เมือวาน|เมี่อวาน|ยอดเก่า|ค้าง|ติดไว้/i.test(text)
+    PILL_NOTE_FALLBACK_REGEX.test(text)
   ) {
     return "note";
   }
-  if (chat.type === "shipping" || shippingRegex.test(text) || /ส่ง|ที่อยู่|ฝาก/i.test(text)) {
+  if (chat.type === "shipping" || shippingRegex.test(text) || PILL_SHIPPING_FALLBACK_REGEX.test(text)) {
     return "shipping";
   }
   return "buy";
@@ -806,9 +825,7 @@ function renderAdminProxyText(chat) {
     titlePrefix = "โน้ตลูกค้า";
   }
 
-  // ป้องกัน regex special characters ในชื่อ
-  const regexSafe = escapedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`(${regexSafe})`, "gi");
+  const regex = getProxyHighlightRegex(escapedName);
   return escapedText.replace(
     regex,
     `<span class="chat-highlight-name pill-${pillCategory} theme-${themeIdx}" title="${titlePrefix}: $1 (คลิกเพื่อแก้ไข)"><i class="fa-solid ${iconClass} name-icon"></i>$1</span>`

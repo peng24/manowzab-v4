@@ -24,6 +24,11 @@
 3. **Shared `AudioContext` & Service Worker Bypass**:
    - Share a single `AudioContext` (`ttsService.getAudioContext()`) across `TextToSpeech.js`, `useAudio.js`, and `celebration.js`, and preload celebration audio via `requestIdleCallback`.
    - Workbox `runtimeCaching` in `vite.config.js` must exclude `/liveChat/messages` and `texttospeech.googleapis.com`.
+4. **Chat Intent Accuracy & Regex Optimization Invariant (v5.4.0)**:
+   - Handle Admin Proxy Cancel (`cancelNumFirstRegex`, `cancelNameKeywordNumRegex`, `cancelWithNumRegex`) and protect against false-positive cancels (`conditionalCancelGuardRegex`).
+   - Disambiguate buying from questions, try requests, size complaints (`negationGuardRegex`), classifiers/pricing (`pricePatternRegex`), and quantity units (`quantityUnitRegex`).
+   - Extract clean customer names on shipping (`extractAdminCustomerName`) and strictly filter conversational non-names in self-name learning (`extractCustomerSelfName`).
+   - Eliminate nested quantifiers (`*?\s*`) to prevent catastrophic backtracking (ReDoS) and pre-compile regexes at module scope.
 
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:

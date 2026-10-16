@@ -775,6 +775,151 @@ describe("chatParserUtils", () => {
       expect(isHandleOrNonThaiName("บุญญาภา")).toBe(false);
     });
   });
+
+  // ==========================================
+  // 🎯 5-Pillar Real CSV Chat Log Accuracy Suite (v5.4.0)
+  // ==========================================
+
+  describe("🎯 Pillar 1: Cancel & Admin Proxy Cancel (CSV Logs)", () => {
+    it("parses Admin Proxy Number-First Cancel ('12 มะระ ยกเลิก', '19 กนกวรรณ ยกเลิก')", () => {
+      expect(parseIntentDetails("12 มะระ ยกเลิก")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 12,
+        customerName: "มะระ",
+      });
+      expect(parseIntentDetails("19 กนกวรรณ ยกเลิก")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 19,
+        customerName: "กนกวรรณ",
+      });
+    });
+
+    it("parses Admin Proxy Keyword-First & Name-Keyword-Num Cancel ('ยกเลิก 12 มะระ', 'มะระ ยกเลิก 12')", () => {
+      expect(parseIntentDetails("ยกเลิก 12 มะระ")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 12,
+        customerName: "มะระ",
+      });
+      expect(parseIntentDetails("มะระ ยกเลิก 12")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 12,
+        customerName: "มะระ",
+      });
+    });
+
+    it("guards conditional cancel notes and conversational words ('อำไพ ถ้าใส่ไม่ได้ก็ไม่เอา', 'ผ่านใหญ่ๆ', 'เมื่อคืน')", () => {
+      const condNote = parseIntentDetails("อำไพ ถ้าใส่ไม่ได้ก็ไม่เอา");
+      expect(condNote.type).toBe("ADMIN_NOTE");
+      expect(condNote.customerName).toBe("อำไพ");
+
+      expect(parseIntentDetails("ผ่านใหญ่ๆ").type).toBe("UNKNOWN");
+      expect(parseIntentDetails("เมื่อคืน").type).toBe("UNKNOWN");
+    });
+  });
+
+  describe("🎯 Pillar 2: Buy vs. Question / Try / Complaint Disambiguation (CSV Logs)", () => {
+    it("unblocks valid buys with color attributes or praise ('สีขาว34ค่ะพี่นัน', 'ไม่ต้องลองก็ได้12', 'ถูกใจมาก13ลายถูกใจ')", () => {
+      const buyColor = parseIntentDetails("สีขาว34ค่ะพี่นัน");
+      expect(buyColor.type).toBe("SINGLE_BUY");
+      expect(buyColor.itemId).toBe(34);
+
+      const buyNoTry = parseIntentDetails("ไม่ต้องลองก็ได้12");
+      expect(buyNoTry.type).toBe("SINGLE_BUY");
+      expect(buyNoTry.itemId).toBe(12);
+
+      const buyPraise = parseIntentDetails("ถูกใจมาก13ลายถูกใจ");
+      expect(buyPraise.type).toBe("SINGLE_BUY");
+      expect(buyPraise.itemId).toBe(13);
+    });
+
+    it("blocks size complaints ('40 ใส่ไม่ได้', '42 คับไปค่ะ') as NEGATION", () => {
+      expect(parseIntentDetails("40 ใส่ไม่ได้").type).toBe("NEGATION");
+      expect(parseIntentDetails("42 คับไปค่ะ").type).toBe("NEGATION");
+    });
+
+    it("blocks price/classifier queries ('ตัว 100') from falsely matching as customer name 'ตัว'", () => {
+      const priceQuery = parseIntentDetails("ตัว 100");
+      expect(priceQuery.type).toBe("UNKNOWN");
+    });
+
+    it("blocks quantity unit phrases ('ได้4ชิ้นจ้า', 'เสื้อยืด3สีออะ') from falsely booking items", () => {
+      expect(parseIntentDetails("ได้4ชิ้นจ้า").type).toBe("UNKNOWN");
+      expect(parseIntentDetails("เสื้อยืด3สีออะ").type).toBe("UNKNOWN");
+    });
+
+    it("catches keyboard typo '7บอง' as TRY_ITEM and sleeve/shoulder/code questions as QUESTION", () => {
+      expect(parseIntentDetails("7บอง")).toEqual({
+        type: "TRY_ITEM",
+        itemId: 7,
+        method: "try-keyword",
+      });
+      expect(parseIntentDetails("วงแขนกว้างไหมคะ").type).toBe("QUESTION");
+      expect(parseIntentDetails("ไซร์อะไรคะ").type).toBe("QUESTION");
+      expect(parseIntentDetails("ระหัสอะไรคะ").type).toBe("QUESTION");
+    });
+  });
+
+  describe("🎯 Pillar 3: Admin Shipping, Proxy Order & Admin Notes (CSV Logs)", () => {
+    it("extracts clean customer name from 'วิระวัลย์ รวมยอด' and marks as SHIPPING", () => {
+      expect(parseIntentDetails("วิระวัลย์ รวมยอด")).toEqual({
+        type: "SHIPPING",
+        method: "shipping-keyword",
+        customerName: "วิระวัลย์",
+      });
+      expect(extractAdminCustomerName("วิระวัลย์ รวมยอด")).toBe("วิระวัลย์");
+    });
+
+    it("parses Admin Notes from CSV ('อำไพ เอาตัวอก56', '3xl อำไพ', 'เสื้อเชิ้ต อก56 สมฤทธิ์', 'ของมะระ ตัวที่13เมื่อวาน ได้สีอะไร')", () => {
+      const note1 = parseIntentDetails("อำไพ เอาตัวอก56");
+      expect(note1.type).toBe("ADMIN_NOTE");
+      expect(note1.customerName).toBe("อำไพ");
+
+      const note2 = parseIntentDetails("3xl อำไพ");
+      expect(note2.type).toBe("ADMIN_NOTE");
+      expect(note2.customerName).toBe("อำไพ");
+
+      const note3 = parseIntentDetails("เสื้อเชิ้ต อก56 สมฤทธิ์");
+      expect(note3.type).toBe("ADMIN_NOTE");
+      expect(note3.customerName).toBe("สมฤทธิ์");
+
+      const note4 = parseIntentDetails("ของมะระ ตัวที่13เมื่อวาน ได้สีอะไร");
+      expect(note4.type).toBe("ADMIN_NOTE");
+      expect(note4.customerName).toBe("มะระ");
+    });
+  });
+
+  describe("🎯 Pillar 4: Strict Self-Name Auto-Learn Hardening (CSV Logs)", () => {
+    it("blocks all 15 false-positive self-names discovered in CSV logs", () => {
+      const falsePositives = [
+        "สวัดดีค่ะ",
+        "ใข่ค่ะ",
+        "เก่าค่ะ",
+        "สบายดีค่ะ",
+        "ลายดอก",
+        "ดำลายดอก",
+        "คลุม",
+        "แขนกุด",
+        "ส้มแปร้ด",
+        "ลินิลรับ",
+        "ตัวเล็กๆ",
+        "ฝนตกๆ",
+        "ชื้อไห้หล่น",
+        "ได้",
+        "บ่",
+      ];
+      for (const msg of falsePositives) {
+        expect(extractCustomerSelfName(msg)).toBeNull();
+      }
+    });
+
+    it("preserves all genuine self-introductions from CSV logs", () => {
+      expect(extractCustomerSelfName("บุญญาภาค่ะ")).toBe("บุญญาภา");
+      expect(extractCustomerSelfName("แอนนันทนาค่ะ")).toBe("แอนนันทนา");
+      expect(extractCustomerSelfName("พี่มอเเละดอ")).toBe("พี่มอเเละดอ");
+      expect(extractCustomerSelfName("ต่าย")).toBe("ต่าย");
+      expect(extractCustomerSelfName("40 บุญญาภา")).toBe("บุญญาภา");
+    });
+  });
 });
 
 

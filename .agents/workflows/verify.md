@@ -27,6 +27,10 @@ description: Mandatory verification checklist after every code change
 | 2.2 | Regex Patterns (ทั้ง 9 แบบ) | `src/composables/useChatProcessor.js` | รองรับ: Multi-Buy, Pure Number, Explicit, Polite, Dash, Customer Name, Admin Proxy, Cancel, Implicit |
 | 2.3 | `thaiToArabic(text)` | `src/composables/useChatProcessor.js` | แปลงเลขไทย → อารบิก (เช่น "๕๖" → "56") |
 | 2.4 | Admin Proxy | `src/composables/useChatProcessor.js` | แอดมินจองให้ลูกค้าได้ ทั้ง "26 พี่อ้อย" และ "พี่อ้อย 26" |
+| 2.5 | Admin Proxy Cancel & Guard | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | รองรับยกเลิกแทนลูกค้า ("12 มะระ ยกเลิก", "19 กนกวรรณ ยกเลิก", "มะระ ยกเลิก 12", "ยกเลิก 12 มะระ") พร้อมบล็อกเงื่อนไขหลอก (`conditionalCancelGuardRegex` เช่น "อำไพ ถ้าใส่ไม่ได้ก็ไม่เอา") และคำทั่วไป ("ผ่านใหญ่ๆ", "เมื่อคืน") |
+| 2.6 | Buy vs Question/Try/Price Disambiguation | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | อนุญาตจองเมื่อระบุสีหรือคำชม ("สีขาว34ค่ะพี่นัน", "ไม่ต้องลองก็ได้12"), บล็อกคำบ่นไซส์ (`negationGuardRegex` เช่น "40 ใส่ไม่ได้"), บล็อกตัวระบุราคา/ลักษณนาม ("ตัว 100"), และบล็อกคำบอกจำนวน (`quantityUnitRegex` เช่น "4ชิ้น", "3สี") |
+| 2.7 | Admin Notes & Clean Shipping Name | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | สกัดชื่อลูกค้าสะอาดจากคำสั่งแจ้งส่ง ("วิระวัลย์ รวมยอด" ➡️ "วิระวัลย์"), รองรับ Admin Notes สำหรับแจ้งไซส์/ย้อนหลัง ("อำไพ เอาตัวอก56", "3xl อำไพ", "เสื้อเชิ้ต อก56 สมฤทธิ์") โดยไม่ตัดสต็อกผิดพลาด |
+| 2.8 | Strict Self-Name Auto-Learn Hardening (`extractCustomerSelfName`) | `src/utils/chatParserUtils.js` | บล็อกคำสนทนา/คำบ่น/คำทักทาย ("สวัดดีค่ะ", "ใข่ค่ะ", "เก่าค่ะ", "สบายดีค่ะ", "ลายดอก", "ตัวเล็กๆ", "เมื่อคืน", "บ่") ไม่ให้จำเข้าเป็นชื่อลูกค้า แต่ยังคงจำชื่อแนะนำตัวจริง ("บุญญาภาค่ะ", "40 บุญญาภา", "ต่าย") ได้แม่นยำ 100% |
 
 ---
 
@@ -180,6 +184,7 @@ description: Mandatory verification checklist after every code change
 | 13.10 | Lazy Short-Circuit Regex, Cached Runs & Bounded Voice Sync | `src/composables/useChatProcessor.js` | ประมวลผล 7 Buy Regex แบบ Lazy Short-Circuit (หยุดทันทีเมื่อเจอแพทเทิร์นที่ตรง), แคชผลลัพธ์ `getMessageRuns()`, และจำกัดการดึง `voice_chats/${videoId}` ด้วย `limitToLast(10)` |
 | 13.11 | Shared Singleton `AudioContext` & Idle Celebration Preload | `src/composables/useAudio.js`, `src/services/TextToSpeech.js`, `src/utils/celebration.js` | แชร์ `AudioContext` ตัวเดียวทั่วทั้งแอป และโหลดไฟล์เสียงพลุฉลองล่วงหน้าในช่วงเบราว์เซอร์ว่าง (`requestIdleCallback`) เพื่อไม่ให้แย่งแบนด์วิดท์ขณะเริ่มไลฟ์ |
 | 13.12 | Service Worker Real-Time API Bypass & GPU/Touch Hygiene | `vite.config.js`, `src/components/StockItemCard.vue`, `src/composables/usePullToRefresh.js` | ยกเว้น `/liveChat/messages` และ `texttospeech.googleapis.com` จาก Workbox `runtimeCaching`, เปิด `will-change` เฉพาะการ์ดที่กำลังแสดงแอนิเมชัน, และตัดจบ `touchstart` ทันทีเมื่อ `scrollTop > 5` |
+| 13.13 | Module Scope Regex, ReDoS Prevention & Unicode Property Escapes | `src/utils/addressParser.js`, `src/services/TextToSpeech.js`, `src/stores/voiceLearning.js`, `src/components/ChatPanel.vue` | รวม regex ทั้งหมดเป็นค่าคงที่ระดับ Module Scope, ใช้ Non-overlapping Token Partitioning ป้องกัน Catastrophic Backtracking (`adminProxyNameFirstRegex`), ใช้ LRU Cache สำหรับ Dynamic RegExp ใน `ChatPanel.vue` (`proxyHighlightRegexCache`), อัปเกรด `TTS_EMOJI_REGEX` ด้วย `\p{Extended_Pictographic}`, และเรียงความยาวคำค้นหาใน `voiceLearning.js` ก่อน compile |
 
 ---
 

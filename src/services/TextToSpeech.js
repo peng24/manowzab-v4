@@ -3,7 +3,7 @@ import { logger } from "../utils/logger";
 import { stripYouTubeEmotes } from "../data/youtubeEmotes";
 
 // Module-scoped compiled regexes to prevent recreation in TTS sanitize loop
-const TTS_EMOJI_REGEX = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD10-\uDDFF]|\uD83F[\uDC00-\uDFFF]|[\u2000-\u26FF])/g;
+const TTS_EMOJI_REGEX = /[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE00-\uFE0F\u200D\u20E3]/gu;
 const SPECIAL_CHARS_REGEX = /[#*~_]/g;
 const JONG_FIX_REGEX = /จอง/g;
 const MULTI_SPACE_REGEX = /\s+/g;

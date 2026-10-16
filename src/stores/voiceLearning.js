@@ -39,10 +39,19 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
 
   // 🚀 Phase 2.2: Compiled Regex Cache — recompile ONLY when keywords change
   // ป้องกัน new RegExp() ซ้ำในทุก voice message (ประหยัด CPU 80%)
+  // พร้อม escape special regex characters และเรียงความยาวจากมากไปน้อยเพื่อป้องกัน prefix-shadowing
+  const escapeRegExp = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const buildSortedAlternation = (arr) =>
+    [...arr]
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length)
+      .map(escapeRegExp)
+      .join("|");
+
   const compiledVoiceRegex = computed(() => {
-    const codePattern = codeKeywords.value.join("|");
-    const pricePattern = priceKeywords.value.join("|");
-    const unitPattern = unitKeywords.value.join("|");
+    const codePattern = buildSortedAlternation(codeKeywords.value);
+    const pricePattern = buildSortedAlternation(priceKeywords.value);
+    const unitPattern = buildSortedAlternation(unitKeywords.value);
     return {
       r1: new RegExp(`(?:${codePattern})\\s*(\\d+)\\s*(?:${pricePattern})?\\s*(\\d+)\\s*(?:${unitPattern})?`, "i"),
       r2: new RegExp(`(\\d+)\\s*(?:${pricePattern})\\s*(\\d+)\\s*(?:${unitPattern})?`, "i"),

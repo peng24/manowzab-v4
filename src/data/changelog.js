@@ -16,6 +16,26 @@
  */
 
 export const changelog = [
+  // ─── 5.4.x ───────────────────────────────────────────
+  {
+    version: '5.4.0',
+    date: '2026-10-16',
+    changes: {
+      added: [
+        'ระบบยกเลิกแทนลูกค้าสำหรับแอดมิน (Admin Proxy Cancel Engine) — รองรับการพิมพ์ยกเลิกทั้ง 4 รูปแบบจริงจากไลฟ์สด: "12 มะระ ยกเลิก", "19 กนกวรรณ ยกเลิก", "มะระ ยกเลิก 12", และ "ยกเลิก 12 มะระ" พร้อมดึงชื่อลูกค้าเป้าหมายและสลับคืนสต็อก/ขยับคิวคนถัดไปได้ทันที',
+        'ระบบตรวจสอบเงื่อนไขยกเลิกหลอก (Conditional Cancel Note Guard) — ป้องกันข้อความเงื่อนไขหรือคำถาม เช่น "อำไพ ถ้าใส่ไม่ได้ก็ไม่เอา" จากการถูกเข้าใจผิดว่าเป็นการขอยกเลิก โดยสลับไปบันทึกเป็น Admin Note ให้อัตโนมัติ',
+        'ระบบสกัดชื่อลูกค้าสะอาดจากคำสั่งแจ้งส่ง (Clean Shipping Extraction) — สกัดชื่อลูกค้าจริงออกจากคำสั่งแจ้งส่ง เช่น "วิระวัลย์ รวมยอด" สกัดได้ชื่อ "วิระวัลย์" ไม่ติดคำว่า "รวมยอด" ไปเป็นชื่อลูกค้า',
+        'ระบบบันทึกโน้ตแอดมินอัจฉริยะ (Contextual Admin Notes from Real Logs) — รองรับคำสั่งโน้ตแบบไม่มีรหัสสินค้า เช่น "อำไพ เอาตัวอก56", "3xl อำไพ", "เสื้อเชิ้ต อก56 สมฤทธิ์", "ของมะระ ตัวที่13เมื่อวาน ได้สีอะไร" โดยไม่ตัดสต็อกผิดพลาด',
+      ],
+      improved: [
+        'ขจัดปัญหา ReDoS และปรับปรุงความเร็ว Regex Engine (Zero-Allocation Module Scope) — รวม Regex ทั้งหมดใน addressParser.js, useChatProcessor.js, ChatPanel.vue เป็นค่าคงที่ระดับ Module Scope พร้อมออกแบบ Disjoint Token Partitioning ใน adminProxyNameFirstRegex ตัดปัญหา Catastrophic Backtracking 100%',
+        'แยกแยะคำสั่งซื้อจริงออกจากคำถาม/คำชม/ลองเสื้อ/ราคา — รองรับการจองพร้อมระบุสีหรือคำชม ("สีขาว34ค่ะพี่นัน", "ไม่ต้องลองก็ได้12", "ถูกใจมาก13ลายถูกใจ"), ป้องกันการบ่นไซส์ ("40 ใส่ไม่ได้", "42 คับไปค่ะ"), ป้องกันตัวระบุราคา/ลักษณนาม ("ตัว 100") จากการจองผิดพลาด, และตรวจจับคำบอกจำนวน ("4ชิ้น", "3สี") ด้วย quantityUnitRegex',
+        'ยกระดับการเรียนรู้ชื่อเล่นลูกค้าอัตโนมัติ (Strict Self-Name Auto-Learn Hardening) — กรองคำสนทนา/คำบ่น/คำทักทายในไลฟ์ ("สวัดดีค่ะ", "ใข่ค่ะ", "เก่าค่ะ", "สบายดีค่ะ", "ลายดอก", "ตัวเล็กๆ", "เมื่อคืน", "บ่") ไม่ให้ถูกจำเข้าสู่ระบบชื่อเล่น แต่ยังจำชื่อแนะนำตัวจริง ("บุญญาภาค่ะ", "40 บุญญาภา", "ต่าย") ได้แม่นยำ',
+        'อัปเกรด TTS Emoji Regex สู่ Modern Unicode Property Escapes — ใช้ /[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE00-\uFE0F\u200D\u20E3]/gu ลบอีโมจิและสติกเกอร์ครบถ้วน 100% โดยไม่ตัดทอนหรือทำลายสระ/วรรณยุกต์ภาษาไทย',
+        'แคชไฮไลต์ชื่อลูกค้าแบบ LRU ใน ChatPanel.vue — เพิ่ม proxyHighlightRegexCache ขนาด 200 รายการ ช่วยลดการสร้าง RegExp ซ้ำในการเรนเดอร์แชทสดที่มีข้อความไหลต่อเนื่อง',
+      ],
+    },
+  },
   // ─── 5.3.x ───────────────────────────────────────────
   {
     version: '5.3.2',
@@ -275,36 +295,6 @@ export const changelog = [
       ],
       fixed: [
         'แก้ไขการลบข้อมูลในหน้าสมุดที่อยู่ (/address/): ปรับปรุงให้ลบข้อมูลแบบ Atomic Multi-Path Update ทั้งใน address_book และ delivery_customers พร้อมกัน ทำให้ลบแล้วข้อมูลหายไปจากตารางทันที ไม่ตกค้าง',
-      ],
-    },
-  },
-  // ─── 4.91.x ───────────────────────────────────────────
-  {
-    version: '4.91.4',
-    date: '2026-09-28',
-    changes: {
-      fixed: [
-        'แก้ไขบั๊ก TypeError: Cannot read properties of null (reading \'Symbol(_vei)\') ใน StockGrid: ปรับโครงสร้างลูปในตารางสต็อกโดยย้าย v-for="i in visibleItemIds" และ v-memo ให้อยู่บน <div> element เดียวกันตามข้อกำหนดของ Vue 3 (ตัดการใช้ <template v-for> + <div v-if> ซ้อน v-memo ที่ทำให้เกิด Comment Node ใน VNode Cache)',
-      ],
-    },
-  },
-  {
-    version: '4.91.3',
-    date: '2026-09-28',
-    changes: {
-      improved: [
-        'Phase 4.1 — เพิ่ม Timeout Cleanup และ Teardown ให้กับ MutationObserver ใน Modal รายการลูกค้า: เพิ่ม willClose hook, ปลด event listener remove-owner-item, และตัดการทำงานของ MutationObserver พร้อมตั้ง Safety Timeout Fallback 5 นาที เพื่อป้องกัน Observer ค้างและลดภาระการตรวจสอบ DOM ทั่วทั้งแอปลงอย่างสมบูรณ์',
-      ],
-    },
-  },
-  {
-    version: '4.91.2',
-    date: '2026-09-28',
-    changes: {
-      improved: [
-        'Phase 3.1 — แยกการคำนวณ deliveryCountsMap เป็น 2 ชั้น: Pre-normalize current live counts และ Pre-aggregate past sessions แยกใน computed ช่วยลดความซับซ้อนจาก O(n × m) เหลือ O(n + m) ป้องกันกระตุกเมื่อมีสต็อกอัปเดต',
-        'Phase 3.2 — Throttle scrollToBottom ใน ChatPanel.vue ด้วย requestAnimationFrame: ป้องกัน Layout Thrashing โดย Coalesce คำสั่งเลื่อนหน้าจอที่เกิดซ้อนกันใน 1 Frame ให้รันรอบเดียว พร้อม Cleanup เมื่อ Unmount',
-        'Phase 3.3 — ปรับปรุง StockGrid.vue ด้วย v-if และ Window Capping: เปลี่ยนจากการซ่อนด้วย CSS (v-show) เป็นการใช้ v-if ร่วมกับ Window Capping (เริ่มต้น 120 รายการ) เพื่อลด DOM Nodes จาก 300+ รายการ เหลือเฉพาะที่ผู้ใช้กำลังดูอยู่ พร้อมระบบ Auto-Expand เมื่อเลื่อนจอหรือค้นหา/นำทาง',
       ],
     },
   },

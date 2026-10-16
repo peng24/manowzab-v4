@@ -1,5 +1,23 @@
 import { thaiToArabic } from './chatParserUtils';
 
+// 🚀 Module-scoped pre-compiled regexes for zero-allocation parsing
+const MULTI_SPACE_REGEX = /\s+/g;
+const NON_DIGIT_REGEX = /\D/g;
+const PHONE_REGEX = /(?<!\d)(?:(?:\+66\s*|0)[689]\d[-. ]?\d{3,4}[-. ]?\d{3,4}|(?:\+66\s*|0)[2-57]\d?[-. ]?\d{3}[-. ]?\d{3,4}|\b0[689]\d{8}\b|\b0[2-7]\d{7,8}\b)(?!\d)/;
+const PHONE_LABEL_CLEAN_REGEX = /(?:^|\s)(?:เบอร์(?:\s*โทร)?|โทร(?:\.)?|Tel(?:\.)?|Phone(?:\.)?)[:\s-]*/gi;
+const ZIP_REGEX = /\b[1-9]\d{4}\b(?!\/|\d)/;
+const LEADING_LIST_NUM_REGEX = /^\s*\d+[\.\)\-]\s*/;
+const ADDRESS_MARKER_REGEX = /^(?:\d+[\d\/\-\.]*|\b\d+\b(?=\s*(?:หมู่|ม\.|ซอย|ซ\.|ถนน|ถ\.|\/))|หมู่|ม\.|บ้านเลขที่|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|กทม|ถ\.|ถนน|ซ\.|ซอย)/i;
+const ADDRESS_PREFIX_LABEL_REGEX = /^(?:ที่อยู่|ที่อยู่จัดส่ง|ส่งที่|Address)[:\s-]*/i;
+const NAME_PREFIX_LABEL_REGEX = /^(?:ชื่อลูกค้า|ชื่อผู้รับ|ผู้รับ|ชื่อ|Name|Customer|To)\s*[:\-]\s*/i;
+const PHONE_LINE_PREFIX_REGEX = /^(?:เบอร์(?:โทร)?|โทร(?:\.)?|Tel(?:\.)?|Phone(?:\.)?)[:\s-]*/i;
+const SINGLE_LINE_ADDR_START_REGEX = /(?:\s|^)(?:\d+[\d\/\-\.]*|\b\d+\b(?=\s*(?:หมู่|ม\.|ซอย|ซ\.|ถนน|ถ\.|\/))|หมู่|ม\.|บ้านเลขที่|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|กทม|ถ\.|ถนน|ซ\.|ซอย)/i;
+const SINGLE_LINE_ADDR_LABEL_REGEX = /^(?:ที่อยู่|ส่งที่|Address)\s*[:\-]\s*/i;
+const NAME_EDGE_CLEAN_REGEX = /^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g;
+const BLOCK_SPLIT_REGEX = /(?:\r?\n\s*){2,}|(?:\r?\n[-=_*#]{3,}\r?\n)/;
+const NUMBERED_ITEM_TEST_REGEX = /^\s*\d+[\.\)]\s+/m;
+const NUMBERED_ITEM_SPLIT_REGEX = /(?=(?:^|\r?\n)\s*\d+[\.\)]\s+)/;
+
 /**
  * Normalizes customer name for flexible matching (case-insensitive, trim whitespace)
  * @param {string} name
@@ -7,7 +25,7 @@ import { thaiToArabic } from './chatParserUtils';
  */
 export function normalizeName(name) {
   if (!name) return '';
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+  return name.trim().toLowerCase().replace(MULTI_SPACE_REGEX, ' ');
 }
 
 /**
@@ -17,7 +35,7 @@ export function normalizeName(name) {
  */
 export function formatPhoneNumber(phone) {
   if (!phone) return '';
-  let cleaned = phone.replace(/\D/g, '');
+  let cleaned = phone.replace(NON_DIGIT_REGEX, '');
   if (cleaned.startsWith('66') && cleaned.length >= 11) {
     cleaned = '0' + cleaned.substring(2);
   }
@@ -40,8 +58,7 @@ export function extractPhone(text) {
 
   // Match Thai mobile (06x, 08x, 09x) & landline (02x, 03x, 04x, 05x, 07x) and +66 formats
   // Ensure we don't match across newlines and don't match sub-parts of zipcodes or house numbers
-  const phoneRegex = /(?<!\d)(?:(?:\+66\s*|0)[689]\d[-. ]?\d{3,4}[-. ]?\d{3,4}|(?:\+66\s*|0)[2-57]\d?[-. ]?\d{3}[-. ]?\d{3,4}|\b0[689]\d{8}\b|\b0[2-7]\d{7,8}\b)(?!\d)/;
-  const match = text.match(phoneRegex);
+  const match = text.match(PHONE_REGEX);
 
   if (match) {
     const rawPhone = match[0];
@@ -49,7 +66,7 @@ export function extractPhone(text) {
     // Remove the phone and labels from text to avoid picking it up as address/name
     const cleanedText = text
       .replace(rawPhone, '')
-      .replace(/(?:^|\s)(?:เบอร์(?:\s*โทร)?|โทร(?:\.)?|Tel(?:\.)?|Phone(?:\.)?)[:\s-]*/gi, ' ')
+      .replace(PHONE_LABEL_CLEAN_REGEX, ' ')
       .trim();
     return { phone, cleanedText };
   }
@@ -66,8 +83,7 @@ export function extractPostalCode(text) {
   if (!text) return { postalCode: '', cleanedText: '' };
 
   // 5-digit postal code (Thai postal codes are 10000 - 96000), not followed by fraction / or digits
-  const zipRegex = /\b[1-9]\d{4}\b(?!\/|\d)/;
-  const match = text.match(zipRegex);
+  const match = text.match(ZIP_REGEX);
 
   if (match) {
     return { postalCode: match[0], cleanedText: text };
@@ -86,7 +102,7 @@ export function parseSingleAddress(rawBlock) {
   let text = thaiToArabic(rawBlock).trim();
 
   // Strip leading list numbers like "1.", "1)", "1 - "
-  text = text.replace(/^\s*\d+[\.\)\-]\s*/, '');
+  text = text.replace(LEADING_LIST_NUM_REGEX, '');
 
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
@@ -103,21 +119,18 @@ export function parseSingleAddress(rawBlock) {
   const zipResult = extractPostalCode(text);
   postalCode = zipResult.postalCode;
 
-  // Address marker pattern for line detection
-  const addressMarkerRegex = /^(?:\d+[\d\/\-\.]*|\b\d+\b(?=\s*(?:หมู่|ม\.|ซอย|ซ\.|ถนน|ถ\.|\/))|หมู่|ม\.|บ้านเลขที่|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|กทม|ถ\.|ถนน|ซ\.|ซอย)/i;
-
   if (lines.length >= 2) {
     // Multi-line format:
     // Check if line 1 starts with address markers (e.g. 191 หมู่ 3, บ้านเลขที่, 123/45, ถ., ซ.)
     let firstLine = lines[0];
-    const isFirstLineAddress = addressMarkerRegex.test(
-      firstLine.replace(/^(?:ที่อยู่|ที่อยู่จัดส่ง|ส่งที่|Address)[:\s-]*/i, '').trim()
+    const isFirstLineAddress = ADDRESS_MARKER_REGEX.test(
+      firstLine.replace(ADDRESS_PREFIX_LABEL_REGEX, '').trim()
     );
 
     const addressParts = [];
 
     if (!isFirstLineAddress) {
-      firstLine = firstLine.replace(/^(?:ชื่อลูกค้า|ชื่อผู้รับ|ผู้รับ|ชื่อ|Name|Customer|To)\s*[:\-]\s*/i, '').trim();
+      firstLine = firstLine.replace(NAME_PREFIX_LABEL_REGEX, '').trim();
 
       // Check if first line contains phone
       const firstLinePhone = extractPhone(firstLine);
@@ -131,7 +144,7 @@ export function parseSingleAddress(rawBlock) {
       name = firstLine.trim();
     } else {
       // First line is part of the address
-      const cleanedFirst = firstLine.replace(/^(?:ที่อยู่|ที่อยู่จัดส่ง|ส่งที่|Address)[:\s-]*/i, '').trim();
+      const cleanedFirst = firstLine.replace(ADDRESS_PREFIX_LABEL_REGEX, '').trim();
       if (cleanedFirst) {
         addressParts.push(cleanedFirst);
       }
@@ -142,8 +155,8 @@ export function parseSingleAddress(rawBlock) {
 
     for (let line of remainingLines) {
       let cleaned = line
-        .replace(/^(?:ที่อยู่|ที่อยู่จัดส่ง|ส่งที่|Address)[:\s-]*/i, '')
-        .replace(/^(?:เบอร์(?:โทร)?|โทร(?:\.)?|Tel(?:\.)?|Phone(?:\.)?)[:\s-]*/i, '')
+        .replace(ADDRESS_PREFIX_LABEL_REGEX, '')
+        .replace(PHONE_LINE_PREFIX_REGEX, '')
         .trim();
 
       // Check if this line is purely a phone number
@@ -151,7 +164,7 @@ export function parseSingleAddress(rawBlock) {
       if (linePhone.phone && !phone) {
         phone = linePhone.phone;
         cleaned = linePhone.cleanedText;
-      } else if (linePhone.phone && cleaned.replace(/\D/g, '').length >= 9) {
+      } else if (linePhone.phone && cleaned.replace(NON_DIGIT_REGEX, '').length >= 9) {
         // Line was just phone number
         cleaned = linePhone.cleanedText;
       }
@@ -167,20 +180,20 @@ export function parseSingleAddress(rawBlock) {
     let singleLine = phoneResult.cleanedText.trim();
 
     // Detect Name at beginning (usually 1-3 words before house numbers / addresses)
-    const addressStartMatch = singleLine.match(/(?:\s|^)(?:\d+[\d\/\-\.]*|\b\d+\b(?=\s*(?:หมู่|ม\.|ซอย|ซ\.|ถนน|ถ\.|\/))|หมู่|ม\.|บ้านเลขที่|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|กทม|ถ\.|ถนน|ซ\.|ซอย)/i);
+    const addressStartMatch = singleLine.match(SINGLE_LINE_ADDR_START_REGEX);
 
     if (addressStartMatch) {
       if (addressStartMatch.index === 0) {
         // Entire single line is address (no name prefix)
         name = '';
-        address = singleLine.replace(/^(?:ที่อยู่|ส่งที่|Address)\s*[:\-]\s*/i, '').trim();
+        address = singleLine.replace(SINGLE_LINE_ADDR_LABEL_REGEX, '').trim();
       } else {
-        name = singleLine.substring(0, addressStartMatch.index).replace(/^(?:ชื่อลูกค้า|ชื่อผู้รับ|ผู้รับ|ชื่อ|Name|Customer|To)\s*[:\-]\s*/i, '').trim();
-        address = singleLine.substring(addressStartMatch.index).replace(/^(?:ที่อยู่|ส่งที่|Address)\s*[:\-]\s*/i, '').trim();
+        name = singleLine.substring(0, addressStartMatch.index).replace(NAME_PREFIX_LABEL_REGEX, '').trim();
+        address = singleLine.substring(addressStartMatch.index).replace(SINGLE_LINE_ADDR_LABEL_REGEX, '').trim();
       }
     } else {
       // Fallback: check if line has name + address or only address
-      const words = singleLine.split(/\s+/);
+      const words = singleLine.split(MULTI_SPACE_REGEX);
       if (words.length > 2) {
         name = words.slice(0, 2).join(' ');
         address = words.slice(2).join(' ');
@@ -192,8 +205,8 @@ export function parseSingleAddress(rawBlock) {
   }
 
   // Clean up address & name
-  address = address.replace(/\s+/g, ' ').trim();
-  name = name.replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, '').trim();
+  address = address.replace(MULTI_SPACE_REGEX, ' ').trim();
+  name = name.replace(NAME_EDGE_CLEAN_REGEX, '').trim();
 
   const fullAddress = [name, phone, address].filter(Boolean).join('\n');
 
@@ -225,14 +238,14 @@ export function parseMultipleAddresses(fullText) {
 
   // 1. First attempt: Split by double newlines or explicit divider lines
   let rawBlocks = normalized
-    .split(/(?:\r?\n\s*){2,}|(?:\r?\n[-=_*#]{3,}\r?\n)/)
+    .split(BLOCK_SPLIT_REGEX)
     .map(b => b.trim())
     .filter(Boolean);
 
   // 2. If only 1 huge block was found, check if it contains numbered items (e.g. "1.", "2.")
-  if (rawBlocks.length === 1 && /^\s*\d+[\.\)]\s+/m.test(rawBlocks[0])) {
+  if (rawBlocks.length === 1 && NUMBERED_ITEM_TEST_REGEX.test(rawBlocks[0])) {
     rawBlocks = rawBlocks[0]
-      .split(/(?=(?:^|\r?\n)\s*\d+[\.\)]\s+)/)
+      .split(NUMBERED_ITEM_SPLIT_REGEX)
       .map(b => b.trim())
       .filter(Boolean);
   }

@@ -30,6 +30,8 @@ import {
   multiBuyRegex,
   adminProxyNumFirstRegex,
   adminProxyNameFirstRegex,
+  nonNameNounsRegex,
+  nonNameWordsRegex,
   adminStopwordsRegex,
   backdatedNoteRegex,
   adminSizeSelectionNoteRegex,
@@ -48,6 +50,10 @@ import {
   customerNameNumRegex,
   numAndDescRegex,
   cancelKeywordRegex,
+  cancelWithNumRegex,
+  cancelNumFirstRegex,
+  cancelNameKeywordNumRegex,
+  conditionalCancelGuardRegex,
   standalonePassRegex,
   shipDayOfWeekRegex,
   calcNextDayOfWeekDate,
@@ -64,6 +70,21 @@ import {
   extractCustomerSelfName,
   isHandleOrNonThaiName,
 } from "../utils/chatParserUtils";
+
+// 🚀 Pre-compiled Module-Scoped Regexes (Zero allocation per chat message)
+const ADMIN_SHORT_NOTE_REGEX = /^(?:[ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา)$/i;
+const SPLIT_NUMS_REGEX = /[\s,_]+/;
+const BACKDATED_ORDER_REGEX = /เมื่อวาน|เมือวาน|ย้อนหลัง|รอบเมื่อวาน/i;
+const STRIP_LEADING_NON_LETTER_REGEX = /^[^\u0E00-\u0E7Fa-zA-Z]+/;
+const STRIP_EDGE_PUNCT_REGEX = /^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g;
+const SHIP_TMR_REGEX = /ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/;
+const SHIP_DATE_REGEX = /ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/;
+const SHIP_NOW_REGEX = /ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])ส่ง(?:$|[^\u0E00-\u0E7F\w])/;
+const TRANSFER_SLIP_REGEX = /โอนแล้ว|แจ้งโอน|สลิป/;
+const STRIP_PREFIX_OF_REGEX = /^(?:ของพี่|ของ|พี่)\s*/;
+const STRIP_BUY_VERB_REGEX = /f|cf|รับ|เอา|=/gi;
+const PURE_DIGITS_TEST_REGEX = /^\d+$/;
+const DOT_GLOBAL_REGEX = /\./g;
 
 // ✅ Toast Notification Mixin
 const Toast = Swal.mixin({
@@ -291,10 +312,7 @@ export function useChatProcessor() {
     // ✅ Get phonetic name for TTS (separate from display name)
     const phoneticName = nicknameStore.getPhoneticName(uid, displayName);
 
-    const isAdmin =
-      isVoiceChat ||
-      /admin|แอดมิน/i.test(displayName) ||
-      /admin|แอดมิน/i.test(realName);
+    const isAdmin = isVoiceChat || isAdminUser(displayName, realName);
 
     // ✅ Prepare TTS Message (เอาข้อความแนะนำยาวๆ ออก ไม่อ่านออกเสียงแล้ว)
     let ttsMessage = msg;
@@ -311,19 +329,6 @@ export function useChatProcessor() {
 
     // 0. Admin Proxy Logic (Highest Priority for Admin)
     let forcedOwnerName = null;
-
-    // 1. Shipping / Transfer (Highest Priority for flow control)
-
-    // 2. Questions (Preserve existing logic)
-
-    // 3. Strict "Pure Number" Logic (Pattern: just digits)
-
-    // 4. Explicit "Buy Pattern" Logic (Prefix + Number)
-    // Matches: F 50, cf 50, รับ 50, f50 (case insensitive)
-
-    // 5. Dash Buy Pattern (Name-Number)
-
-    // 6. Cancel Logic (Refined - supports dash)
 
     // 💡 Auto-learn nickname from customer self-introduction (e.g. "บุญญาภาค่ะ", "บุญญาภาครับ")
     if (!isAdmin && uid) {
@@ -398,11 +403,11 @@ export function useChatProcessor() {
       return;
     }
 
-    // 📝 Admin Size Selection / Request Note (e.g. "พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล", "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า")
+    // 📝 Admin Size Selection / Request Note (e.g. "พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล", "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า", "อำไพ เอาตัวอก56", "อำไพ ถ้าใส่ไม่ได้ก็ไม่เอา")
     if (
       isAdmin &&
       (adminSizeSelectionNoteRegex.test(normalizedMsg) ||
-       /^(?:[ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา)$/i.test(normalizedMsg))
+       ADMIN_SHORT_NOTE_REGEX.test(normalizedMsg))
     ) {
       const customerName = extractAdminCustomerName(normalizedMsg);
       if (customerName) {
@@ -445,7 +450,7 @@ export function useChatProcessor() {
 
       // Parse all IDs (Allow IDs > stockSize, but cap at MAX_ITEM_ID)
       const itemIds = numbersStr
-        .split(/[\s,_]+/)
+        .split(SPLIT_NUMS_REGEX)
         .map((n) => parseInt(n))
         .filter((n) => n > 0 && n <= MAX_ITEM_ID);
 
@@ -476,12 +481,12 @@ export function useChatProcessor() {
         let ownerName = displayName;
         let ownerUid = uid;
 
-        const isBackdatedOrder = /เมื่อวาน|เมือวาน|ย้อนหลัง|รอบเมื่อวาน/i.test(normalizedMsg);
+        const isBackdatedOrder = BACKDATED_ORDER_REGEX.test(normalizedMsg);
 
         if (proxyName && isAdmin) {
           // Admin Proxy Mode
           // 🆕 v4.67.0: Sanitize proxy name — strip leading punctuation and action words
-          ownerName = sanitizeAdminCustomerName(proxyName) || proxyName.replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
+          ownerName = sanitizeAdminCustomerName(proxyName) || proxyName.replace(STRIP_LEADING_NON_LETTER_REGEX, "").trim();
           ownerUid =
             "multi-proxy-" +
             Date.now() +
@@ -557,27 +562,41 @@ export function useChatProcessor() {
 
     // 🔴 CANCEL CHECK
     let isCancel = false;
+    let cancelTargetName = null;
 
-    {
-      // 1. Check cancel with number patterns (keyword first)
-      const matchWithNum = normalizedMsg.match(
-        /(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่านโลด|ผ่าน)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)/i,
-      );
-      if (matchWithNum && parseInt(matchWithNum[1]) <= MAX_ITEM_ID) {
+    if (!conditionalCancelGuardRegex.test(normalizedMsg)) {
+      // 1. Check number first patterns (e.g. "12 ยกเลิก", "12 มะระ ยกเลิก", "19 กนกวรรณ ยกเลิก")
+      const matchNumFirst = normalizedMsg.match(cancelNumFirstRegex);
+      if (matchNumFirst && parseInt(matchNumFirst[1]) <= MAX_ITEM_ID) {
         isCancel = true;
-        targetId = parseInt(matchWithNum[1]);
-        method = "regex-cancel-with-num";
+        targetId = parseInt(matchNumFirst[1]);
+        if (matchNumFirst[2]) {
+          cancelTargetName = sanitizeAdminCustomerName(matchNumFirst[2]);
+        }
+        method = "regex-cancel-num-first";
       }
 
-      // 2. Check number first patterns
+      // 2. Check name + cancel keyword + number (e.g. "มะระ ยกเลิก 12")
       if (!isCancel) {
-        const matchNumFirst = normalizedMsg.match(
-          /(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i,
-        );
-        if (matchNumFirst && parseInt(matchNumFirst[1]) <= MAX_ITEM_ID) {
+        const matchNameKeywordNum = normalizedMsg.match(cancelNameKeywordNumRegex);
+        if (matchNameKeywordNum && parseInt(matchNameKeywordNum[2]) <= MAX_ITEM_ID) {
           isCancel = true;
-          targetId = parseInt(matchNumFirst[1]);
-          method = "regex-cancel-num-first";
+          targetId = parseInt(matchNameKeywordNum[2]);
+          cancelTargetName = sanitizeAdminCustomerName(matchNameKeywordNum[1]);
+          method = "regex-cancel-name-first";
+        }
+      }
+
+      // 3. Check cancel with number patterns (keyword first, e.g. "ยกเลิก 12", "ยกเลิก 12 มะระ")
+      if (!isCancel) {
+        const matchWithNum = normalizedMsg.match(cancelWithNumRegex);
+        if (matchWithNum && parseInt(matchWithNum[1]) <= MAX_ITEM_ID) {
+          isCancel = true;
+          targetId = parseInt(matchWithNum[1]);
+          if (matchWithNum[2]) {
+            cancelTargetName = sanitizeAdminCustomerName(matchWithNum[2]);
+          }
+          method = "regex-cancel-with-num";
         }
       }
 
@@ -634,16 +653,10 @@ export function useChatProcessor() {
       let autoShipUid = uid;
       let isAutoShip = false;
 
-      const shipTmrMatch = normalizedMsg.match(
-        /ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/,
-      );
-      const shipDateMatch = normalizedMsg.match(
-        /ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/,
-      );
+      const shipTmrMatch = normalizedMsg.match(SHIP_TMR_REGEX);
+      const shipDateMatch = normalizedMsg.match(SHIP_DATE_REGEX);
       const shipDayOfWeekMatch = normalizedMsg.match(shipDayOfWeekRegex);
-      const shipNowMatch = normalizedMsg.match(
-        /ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])ส่ง(?:$|[^\u0E00-\u0E7F\w])/,
-      );
+      const shipNowMatch = normalizedMsg.match(SHIP_NOW_REGEX);
 
       let matchedKeyword = null;
       if (shipTmrMatch) matchedKeyword = shipTmrMatch[0];
@@ -653,14 +666,14 @@ export function useChatProcessor() {
       else matchedKeyword = "ส่ง";
 
       if (isAdmin) {
-        // ✅ สกัดชื่อลูกค้าเป้าหมายจากข้อความคำสั่งแอดมิน (เช่น "วาศินา เอาไปฝากคนอื่นด้วย", "กุญสิญา ส่งเลย")
+        // ✅ สกัดชื่อลูกค้าเป้าหมายจากข้อความคำสั่งแอดมิน (เช่น "วาศินา เอาไปฝากคนอื่นด้วย", "กุญสิญา ส่งเลย", "วิระวัลย์ รวมยอด")
         const proxyTarget = extractAdminCustomerName(normalizedMsg);
         let cleanName = proxyTarget || "";
         if (!cleanName && matchedKeyword) {
           cleanName = normalizedMsg
             .replace(matchedKeyword, "")
-            .replace(/^(?:ของพี่|ของ|พี่)\s*/, "")
-            .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
+            .replace(STRIP_PREFIX_OF_REGEX, "")
+            .replace(STRIP_EDGE_PUNCT_REGEX, "")
             .trim();
         }
 
@@ -729,7 +742,7 @@ export function useChatProcessor() {
             "พฤศจิกายน",
             "ธันวาคม",
           ];
-          const cleanMonth = monthStr.replace(/\./g, "");
+          const cleanMonth = monthStr.replace(DOT_GLOBAL_REGEX, "");
           let mIndex = mNamesShort.indexOf(cleanMonth);
           if (mIndex === -1) mIndex = mNamesFull.indexOf(cleanMonth);
           if (mIndex !== -1) {
@@ -739,7 +752,7 @@ export function useChatProcessor() {
         if (autoShipDate < new Date() && new Date().getDate() - day > 15) {
           autoShipDate.setMonth(autoShipDate.getMonth() + 1);
         }
-      } else if ((shipNowMatch || /โอนแล้ว|แจ้งโอน|สลิป/.test(normalizedMsg)) && !holdRegex.test(normalizedMsg)) {
+      } else if ((shipNowMatch || TRANSFER_SLIP_REGEX.test(normalizedMsg)) && !holdRegex.test(normalizedMsg)) {
         // Default to active Shipping Cycle (e.g. Thursday, Today, etc.) for explicit ship/transfer keywords AND NOT a hold request
         isAutoShip = true;
         autoShipDate = resolveShippingCycleDate(systemStore.shippingCycle);
@@ -770,19 +783,34 @@ export function useChatProcessor() {
         });
       }
       // --- END AUTO SHIP LOGIC ---
-    } else if (questionRegex.test(normalizedMsg) || tryRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || negationGuardRegex.test(normalizedMsg) || sizeRangeRegex.test(normalizedMsg)) {
-      method = questionRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || sizeRangeRegex.test(normalizedMsg) ? "question-skip" : negationGuardRegex.test(normalizedMsg) ? "negation-skip" : "try-skip";
+    } else if (
+      questionRegex.test(normalizedMsg) ||
+      tryRegex.test(normalizedMsg) ||
+      numberWithQuestionRegex.test(normalizedMsg) ||
+      negationGuardRegex.test(normalizedMsg) ||
+      sizeRangeRegex.test(normalizedMsg) ||
+      ((quantityUnitRegex.test(normalizedMsg) || pricePatternRegex.test(normalizedMsg)) && !explicitBuyRegex.test(normalizedMsg))
+    ) {
+      method =
+        questionRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || sizeRangeRegex.test(normalizedMsg)
+          ? "question-skip"
+          : negationGuardRegex.test(normalizedMsg)
+          ? "negation-skip"
+          : tryRegex.test(normalizedMsg)
+          ? "try-skip"
+          : "unit-or-price-skip";
     } else {
       // 🟢 Lazy Short-Circuit Regex Matching (evaluates regexes only when prior branches don't match)
       let m;
       if (
         isAdmin &&
         (m = normalizedMsg.match(adminProxyNameFirstRegex)) &&
-        parseInt(m[2]) <= MAX_ITEM_ID
+        parseInt(m[2]) <= MAX_ITEM_ID &&
+        sanitizeAdminCustomerName(m[1])
       ) {
         intent = "buy";
         targetId = parseInt(m[2]);
-        forcedOwnerName = sanitizeAdminCustomerName(m[1]) || m[1].trim();
+        forcedOwnerName = sanitizeAdminCustomerName(m[1]);
         method = "admin-proxy-name-first";
       } else if (
         isAdmin &&
@@ -791,7 +819,7 @@ export function useChatProcessor() {
       ) {
         intent = "buy";
         targetId = parseInt(m[1]);
-        forcedOwnerName = sanitizeAdminCustomerName(m[2]) || m[2].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
+        forcedOwnerName = sanitizeAdminCustomerName(m[2]) || m[2].replace(STRIP_LEADING_NON_LETTER_REGEX, "").trim();
         method = "admin-proxy-num-first";
       } else if (
         (m = normalizedMsg.match(pureNumberRegex)) &&
@@ -823,7 +851,7 @@ export function useChatProcessor() {
         method = "regex-polite";
       } else if (
         (m = normalizedMsg.match(dashBuyRegex)) &&
-        !/^\d+$/.test(m[1].trim()) &&
+        !PURE_DIGITS_TEST_REGEX.test(m[1].trim()) &&
         !sizeRangeRegex.test(normalizedMsg) &&
         parseInt(m[2]) <= MAX_ITEM_ID
       ) {
@@ -834,9 +862,14 @@ export function useChatProcessor() {
         (m = normalizedMsg.match(customerNameNumRegex)) &&
         parseInt(m[2]) <= MAX_ITEM_ID
       ) {
-        // Guard: ต้องไม่ใช่คำถาม/shipping keyword
+        // Guard: ต้องเป็นชื่อคนจริงๆ ไม่ใช่คำลักษณนาม (เช่น "ตัว 100") หรือคำถาม/shipping keyword
         const nameOnly = m[1].trim();
-        if (!questionRegex.test(nameOnly) && !shippingRegex.test(nameOnly)) {
+        if (
+          !nonNameNounsRegex.test(nameOnly) &&
+          !nonNameWordsRegex.test(nameOnly) &&
+          !questionRegex.test(nameOnly) &&
+          !shippingRegex.test(nameOnly)
+        ) {
           intent = "buy";
           targetId = parseInt(m[2]);
           forcedOwnerName = nameOnly;
@@ -881,17 +914,10 @@ export function useChatProcessor() {
       }
     }
 
-    // Safety Net: If intent is still null, but msg has numbers,
-    // OLD logic would sometimes extract them.
-    // NEW LOGIC: Rule 5 -> "Ignore it".
-    // So we do nothing.
-
     // ⚠️ Skip voice chat messages with no actionable intent
     if (isVoiceChat && !intent) {
       return;
     }
-
-
 
     // 5. Process Order & Audio Logic (Updated with SFX)
     if (intent === "buy" && targetId > 0) {
@@ -931,11 +957,11 @@ export function useChatProcessor() {
         // Clean Name Logic
         let cleanName = msg
           .replace(targetId.toString(), "")
-          .replace(/f|cf|รับ|เอา|=/gi, "");
+          .replace(STRIP_BUY_VERB_REGEX, "");
         if (targetPrice)
           cleanName = cleanName.replace(targetPrice.toString(), "");
         cleanName = cleanName
-          .replace(/^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g, "")
+          .replace(STRIP_EDGE_PUNCT_REGEX, "")
           .trim();
 
         if (cleanName.length > 0 && !isAdminUser(cleanName)) {
@@ -990,7 +1016,7 @@ export function useChatProcessor() {
         processingLocks.add(targetId);
         lockAcquired = true;
 
-        const isBackdatedOrder = /เมื่อวาน|เมือวาน|ย้อนหลัง|รอบเมื่อวาน/i.test(normalizedMsg);
+        const isBackdatedOrder = BACKDATED_ORDER_REGEX.test(normalizedMsg);
         // ✅ Try to process order (auto-queues if item is taken)
         const result = await stockStore.processOrder(
           targetId,
@@ -1053,8 +1079,16 @@ export function useChatProcessor() {
             (displayName && currentItem.owner === displayName));
 
         if (isAdmin || isUserOwner || isUserInQueue) {
-          const cancelUid = (isAdmin && !isUserOwner && !isUserInQueue) ? null : uid;
-          const cancelOwnerName = (isAdmin && !isUserOwner && !isUserInQueue) ? null : displayName;
+          const isAdminProxyCancel = isAdmin && !isUserOwner && !isUserInQueue;
+          const targetMatchesItemOrQueue =
+            cancelTargetName &&
+            currentItem &&
+            (currentItem.owner === cancelTargetName ||
+              (currentItem.queue && currentItem.queue.some((q) => q.owner === cancelTargetName)));
+          const cancelUid = isAdminProxyCancel ? null : uid;
+          const cancelOwnerName = isAdminProxyCancel
+            ? (targetMatchesItemOrQueue ? cancelTargetName : null)
+            : displayName;
           const result = await stockStore.processCancel(
             targetId,
             cancelUid,
@@ -1068,14 +1102,14 @@ export function useChatProcessor() {
             cancelSuccess = true;
 
             // ✅ Audit Log: Track admin cancel actions
-            if (isAdmin && !isUserOwner && !isUserInQueue) {
+            if (isAdminProxyCancel) {
               logger.log(
-                `🛡️ ADMIN CANCEL: ${displayName} (uid: ${uid}) cancelled item #${targetId} of ${result.previousOwner || "queue member"} via ${method}`,
+                `🛡️ ADMIN CANCEL: ${displayName} (uid: ${uid}) cancelled item #${targetId} of ${result.previousOwner || cancelTargetName || "queue member"} via ${method}`,
               );
             }
 
             // ✅ Toast: แจ้งยกเลิกสำเร็จ พร้อมระบุรหัส
-            const cancelledName = result.previousOwner || displayName;
+            const cancelledName = result.previousOwner || cancelTargetName || displayName;
             const isAutoResolved = method && method.includes("auto-latest");
             Toast.fire({
               icon: "warning",
@@ -1092,8 +1126,9 @@ export function useChatProcessor() {
         text: msg,
         messageRuns: getMessageRuns(),
         authorName: realName,
-        displayName,
-        phoneticName,
+        displayName: cancelTargetName && isAdmin ? `${cancelTargetName} (ยกเลิกโดย ${displayName})` : displayName,
+        proxyCustomerName: cancelTargetName && isAdmin ? cancelTargetName : null,
+        phoneticName: cancelTargetName && isAdmin ? nicknameStore.getPhoneticName(null, cancelTargetName) : phoneticName,
         realName: realName,
         uid: uid,
         avatar,

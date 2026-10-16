@@ -59,6 +59,9 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 ### 4. Thai Numeral & Intent Normalization
 - **Strict $O(1)$ Thai transcription**: Always route through `thaiToArabic()` using the static table lookup `THAI_TO_ARABIC_MAP`.
 - **Admin Proxy**: Support both `"26 พี่อ้อย"` and `"พี่อ้อย 26"` syntax; pronounce only the recipient customer's name during TTS.
+- **Admin Proxy Cancel**: Support `"12 มะระ ยกเลิก"`, `"19 กนกวรรณ ยกเลิก"`, `"มะระ ยกเลิก 12"`, and `"ยกเลิก 12 มะระ"` while guarding against conditional notes (`conditionalCancelGuardRegex`).
+- **Disambiguation Guards**: Guard buys against size complaints (`negationGuardRegex`), price classifiers (`pricePatternRegex`), and quantity units (`quantityUnitRegex`).
+- **Zero-Allocation Regex & ReDoS Hygiene**: Hoist regular expressions to module scope, avoid nested quantifiers (`*?\s*`), and use memoized regex pools for dynamic search strings.
 
 ### 5. UI & Alert Standards
 - **Toast vs Popup Separation**: SweetAlert toasts must not receive `heightAuto` or `returnFocus` options.

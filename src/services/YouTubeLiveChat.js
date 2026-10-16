@@ -216,6 +216,7 @@ export class YouTubeLiveChat {
           );
         });
 
+        const newItems = [];
         for (const item of data.items) {
           // 3. Deduplication: Check Message ID
           if (!this.seenIds.has(item.id)) {
@@ -230,14 +231,20 @@ export class YouTubeLiveChat {
               }
             }
 
-            // ✅ Sequential: await each message before processing next
-            // Prevents race conditions in processingLocks and ensures TTS order
-            if (this.onMessage) {
-              try {
-                await this.onMessage(item);
-              } catch (e) {
-                logger.error("Message processing error:", e);
-              }
+            newItems.push(item);
+          }
+        }
+
+        // ✅ Enqueue all new messages into useChatProcessor's micro-batch queue in the same tick
+        // useChatProcessor sorts the batch by publishedAt + arrival sequence and processes them strictly sequentially,
+        // eliminating the 80ms * N per-message artificial stall!
+        if (this.onMessage && newItems.length > 0) {
+          const results = await Promise.allSettled(
+            newItems.map((item) => Promise.resolve(this.onMessage(item))),
+          );
+          for (const res of results) {
+            if (res.status === "rejected") {
+              logger.error("Message processing error:", res.reason);
             }
           }
         }

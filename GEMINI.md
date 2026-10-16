@@ -9,20 +9,21 @@ These instructions help customize interactions with the Gemini agent for this sp
 - **Responsive Premium UI**: Ensure UI designs are modern, clean, and dynamic. All layouts must be responsive, accommodating all devices including portrait smartphone views.
 
 ## 🛠️ Technical Context & Architecture
-Manowzab Command Center (currently v4.31.2) coordinates live sales stream management. It utilizes the following stack and subsystems:
+Manowzab Command Center (currently v5.3.2+) coordinates live sales stream management. It utilizes the following stack and subsystems:
 
 ### 1. Frontend & State
 - **Framework**: Vue 3 (Composition API) + Vite.
 - **State Management**: Pinia (`src/stores/`).
-  - [stock.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/stores/stock.js): Inventory, queues, sales.
+  - [stock.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/stores/stock.js): Inventory, queues, sales, throttled & deduplicated history sync.
+  - [customer.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/stores/customer.js): Centralized reference-counted Firebase listeners for `delivery_customers` and `address_book`, $O(1)$ lookup index (`deliveryByNormKey`), and memoized reactive customer metadata (`getCustomerMetaByName`).
   - [system.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/stores/system.js): Connection statuses, active live stream, API key rotation, TTS settings.
   - [chat.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/stores/chat.js): Live chat log & Firebase sync.
   - [nickname.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/stores/nickname.js): Pronunciation overrides.
 - **Styling**: Custom Vanilla CSS. Avoid introducing external CSS frameworks.
 
 ### 2. Live Chat Sync & Processing
-- **YouTube Polling**: Polled in [YouTubeLiveChat.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/services/YouTubeLiveChat.js) using round-robin API key rotation via `systemStore.currentKeyIndex`.
-- **Intent Processor**: [useChatProcessor.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/composables/useChatProcessor.js) parses chats via advanced Regex patterns to detect buying (`CF`), cancelling, shipping updates, and admin proxy commands.
+- **YouTube Polling**: Polled in [YouTubeLiveChat.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/services/YouTubeLiveChat.js) using round-robin API key rotation via `systemStore.currentKeyIndex` and concurrent `Promise.allSettled` dispatch into the 80ms micro-batch window.
+- **Intent Processor**: [useChatProcessor.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/composables/useChatProcessor.js) parses chats via lazy short-circuit Regex patterns to detect buying (`CF`), cancelling, shipping updates, and admin proxy commands.
 - **Firebase Real-Time Sync**: Proccessed chat messages are written to Firebase `chats/{videoId}`. All clients listen and render reactively to maintain consistency.
 
 ### 3. Stock Management
@@ -32,11 +33,11 @@ Manowzab Command Center (currently v4.31.2) coordinates live sales stream manage
 
 ### 4. Audio & Text-to-Speech (TTS)
 - **Unified Audio Queue**: Managed in [useAudio.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/composables/useAudio.js). All audio events (SFX + TTS) must go through `queueAudio(sfxType, author, message)`. **Do not call TTS services directly** to prevent overlapping.
-- **Synthesized SFX**: Sound effects (`'success'`, `'error'`, `'cancel'`) are generated dynamically on-the-fly using the Web Audio API (zero latency, no external assets).
-- **TTS Engine**: [TextToSpeech.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/services/TextToSpeech.js) handles 2 TTS modes: `S` (Google Cloud Standard `th-TH-Standard-A` as primary default) and `🤖` (Native offline SpeechSynthesis as fallback/toggle). Includes multi-tier auto-fallback and `ensureAudioContextReady()` to recover from browser idle suspension.
+- **Synthesized SFX**: Sound effects (`'success'`, `'error'`, `'cancel'`) are generated dynamically on-the-fly using the shared singleton Web Audio API `AudioContext` (`ttsService.getAudioContext()`).
+- **TTS Engine**: [TextToSpeech.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/services/TextToSpeech.js) handles 2 TTS modes: `S` (Google Cloud Standard `th-TH-Standard-A` as primary default) and `🤖` (Native offline SpeechSynthesis as fallback/toggle). Includes multi-tier auto-fallback, LRU buffer cache, and `ensureAudioContextReady()` to recover from browser idle suspension.
 
 ### 5. Shipping & Lifetime Bookings
-- **Shipping Manager**: [ShippingManager.vue](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/components/ShippingManager.vue) manages delivery customers, relative dates, countdowns, and order status updates (`Pending` / `Done`).
+- **Shipping Manager**: [ShippingManager.vue](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/components/ShippingManager.vue) manages delivery customers, relative dates, countdowns, and order status updates (`Pending` / `Done`) backed by centralized `useCustomerStore`.
 - **Lifetime Purchase Stats**: Marking a delivery `Done` increments the customer's `totalBookings` on Firebase using transactions. If a `Done` customer books again, their status resets to `Pending` automatically.
 
 ### 6. Admin Utilities
@@ -48,14 +49,14 @@ Manowzab Command Center (currently v4.31.2) coordinates live sales stream manage
 ## ⚠️ Crucial Implementation Guidelines
 1. **Audio Sequencing**: Always await SFX completion before triggering TTS. Use the unified queue in `useAudio.js`.
 2. **Firebase Transactions**: Always use `runTransaction` for critical writes (stock claiming, queue adjustments, lifetime booking updates) to prevent concurrent writes from colliding.
-3. **Memory Management**: Keep track of all Firebase event listeners (`onValue`, `onChildAdded`) inside composables/components. Store unsubscribed functions in arrays and clean them up (`off(...)` / calling unsub functions) on component unmount to prevent leaks.
+3. **Memory Management & Centralized Listeners**: Keep track of all Firebase event listeners (`onValue`, `onChildAdded`) inside composables/components. Store unsubscribed functions in arrays and clean them up (`off(...)` / calling unsub functions) on component unmount to prevent leaks. Never create duplicate `delivery_customers` or `address_book` listeners in components—always use `useCustomerStore`.
 4. **Thai Number Conversion**: Preserve the numeric transcription capability (`thaiToArabic`) inside the chat processor.
 
 ---
 
 ## 📂 Reference Documentation
 Familiarize yourself with these root documentation files when working on relevant domains:
-- [AI_RULES.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/AI_RULES.md): Mandatory 7-item checklist and system limitations.
+- [AI_RULES.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/AI_RULES.md): Mandatory checklist and system invariants.
 - [FIREBASE_CHAT_SYNC_IMPLEMENTATION.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/FIREBASE_CHAT_SYNC_IMPLEMENTATION.md): Real-time chat database layout and sync details.
 - [SOUND_EFFECTS_IMPLEMENTATION.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/SOUND_EFFECTS_IMPLEMENTATION.md): Web Audio API synthesis logic and wave specifications.
 - [STOCK_SIZE_SYNC_SUMMARY.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/STOCK_SIZE_SYNC_SUMMARY.md): Sync flow of stock limits across admin panels.
@@ -90,6 +91,8 @@ We have adapted and installed developer-agent workflows from `9arm-skills` into 
 ---
 
 ## 🔄 Development Workflows
-- **Version Updates (`/update`)**: After completing code changes, use the `/update` workflow (see [.agents/workflows/update.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/.agents/workflows/update.md)) to bump the version in `package.json`, update patch notes inside [Header.vue](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/components/Header.vue), and update `src/data/changelog.js` (พร้อมตัด Changelog เก่าออกให้คงเหลือเฉพาะ 15–20 เวอร์ชันล่าสุดเสมอ เพื่อควบคุมขนาด Bundle).
-- **Mandatory Verification (`/verify`)**: Always run through the verification checklist in [.agents/workflows/verify.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/.agents/workflows/verify.md) before concluding your work to ensure critical paths (YouTube sync, queueing, key rotation) remain functional.
-- **Automated Deploy Command ("อัพเลย")**: When the user says **"อัพเลย"**, automatically run `/verify` -> `/update` -> Git Commit & Push to GitHub -> `npm run deploy` to GitHub Pages without stopping.
+- **Version Updates (`/update`)**: After completing code changes, use the `/update` workflow (see [.agents/workflows/update.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/.agents/workflows/update.md)) to bump the version in `package.json`, update `src/data/changelog.js` (พร้อมตัด Changelog เก่าออกให้คงเหลือเฉพาะ 15–20 เวอร์ชันล่าสุดเสมอ เพื่อควบคุมขนาด Bundle), and update [Header.vue](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/components/Header.vue) if needed.
+- **Mandatory Verification (`/verify`)**: Always run through the verification checklist in [.agents/workflows/verify.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/.agents/workflows/verify.md) before concluding your work to ensure critical paths (YouTube sync, queueing, key rotation, performance invariants) remain functional.
+- **Proactive Rule & `/verify` Auto-Evolution (คิดและอัปเดตกฎ + `/verify` อัตโนมัติทุกครั้ง)**: Every time you make code changes, **proactively evaluate** whether any project rules (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) or `/verify` items (`.agents/workflows/verify.md`) should be updated. If so, **update them immediately without waiting to be asked**, and **always report the rule/`/verify` updates to the user**.
+- **Automated Deploy Command ("อัพเลย")**: When the user says **"อัพเลย"**, automatically run `/verify` (including auto-updating rules/`/verify`) -> `/update` -> Git Commit & Push to GitHub -> `npm run deploy` to GitHub Pages without stopping.
+

@@ -24,8 +24,16 @@ export async function preloadCelebrationAudio() {
   }
 }
 
-// Start preloading in the background
-preloadCelebrationAudio();
+// Start preloading when browser is idle so it doesn't compete with initial app boot & Firebase sync
+if (typeof window !== "undefined") {
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(() => preloadCelebrationAudio(), {
+      timeout: 4000,
+    });
+  } else {
+    setTimeout(() => preloadCelebrationAudio(), 2000);
+  }
+}
 
 export function triggerCelebration(percentage) {
   const duration = 5000; // Celebration burst (5 seconds)

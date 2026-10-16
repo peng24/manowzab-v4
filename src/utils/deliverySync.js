@@ -29,12 +29,29 @@ export function normalizeCustomerName(name) {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-// 🚀 In-Memory Cache for delivery_customers snapshot (TTL: 3 seconds)
+// 🚀 In-Memory Cache for delivery_customers & address_book snapshots
+let _liveDeliveryCustomers = null;
+let _liveAddressBook = null;
 let _deliveryCustomersCache = null;
 let _cacheTimestamp = 0;
 const CACHE_TTL = 3000;
 
+export function setLiveDeliveryCustomersCache(data) {
+  _liveDeliveryCustomers = data || null;
+  if (data) {
+    _deliveryCustomersCache = data;
+    _cacheTimestamp = Date.now();
+  }
+}
+
+export function setLiveAddressBookCache(data) {
+  _liveAddressBook = data || null;
+}
+
 async function getCachedDeliveryCustomers() {
+  if (_liveDeliveryCustomers) {
+    return _liveDeliveryCustomers;
+  }
   const now = Date.now();
   if (_deliveryCustomersCache && now - _cacheTimestamp < CACHE_TTL) {
     return _deliveryCustomersCache;
@@ -129,11 +146,13 @@ export async function recalcItemCount(deliveryUid) {
  * @param {string} ownerName - Display name of customer
  * @param {string|null} ownerUid - UID or proxy UID
  * @param {string} videoId - Current video session ID
+ * @param {Object|null} localStockData - Optional already-synced stockData from stockStore
  */
 export async function syncDeliveryCustomerForOwner(
   ownerName,
   ownerUid = null,
   videoId = null,
+  localStockData = null,
 ) {
   if (!ownerName || !videoId || videoId === "demo") return;
 
@@ -141,9 +160,12 @@ export async function syncDeliveryCustomerForOwner(
   if (!normName) return;
 
   try {
-    // 1. Fetch current video stock
-    const stockSnap = await get(dbRef(db, `stock/${videoId}`));
-    const stockData = stockSnap.val() || {};
+    // 1. Use in-memory stockData if available, otherwise fetch from Firebase
+    let stockData = localStockData;
+    if (!stockData || Object.keys(stockData).length === 0) {
+      const stockSnap = await get(dbRef(db, `stock/${videoId}`));
+      stockData = stockSnap.val() || {};
+    }
 
     // 2. Count items and calculate total price for this customer in this video
     let count = 0;
@@ -164,8 +186,14 @@ export async function syncDeliveryCustomerForOwner(
     // 3. Resolve canonical deliveryUid
     const deliveryUid = await resolveDeliveryUid(ownerUid, ownerName);
     const customerRef = dbRef(db, `delivery_customers/${deliveryUid}`);
-    const customerSnap = await get(customerRef);
-    const existing = customerSnap.val();
+    let existing =
+      _liveDeliveryCustomers && _liveDeliveryCustomers[deliveryUid] !== undefined
+        ? _liveDeliveryCustomers[deliveryUid]
+        : null;
+    if (!existing && !_liveDeliveryCustomers) {
+      const customerSnap = await get(customerRef);
+      existing = customerSnap.val();
+    }
 
     // Guard: If customer has 0 items and does not exist in delivery_customers, no write needed
     if (count === 0 && !existing) {
@@ -192,9 +220,13 @@ export async function syncDeliveryCustomerForOwner(
       if (!existing || !existing.paymentType) {
         try {
           const normKey = normName.replace(/[.#$[\]/]/g, "_");
-          const bookSnap = await get(dbRef(db, `address_book/${normKey}`));
-          if (bookSnap.exists() && bookSnap.val()?.paymentType) {
-            prefilledPaymentType = bookSnap.val().paymentType;
+          if (_liveAddressBook) {
+            prefilledPaymentType = _liveAddressBook[normKey]?.paymentType || "";
+          } else {
+            const bookSnap = await get(dbRef(db, `address_book/${normKey}`));
+            if (bookSnap.exists() && bookSnap.val()?.paymentType) {
+              prefilledPaymentType = bookSnap.val().paymentType;
+            }
           }
         } catch (e) {
           logger.warn("deliverySync address_book lookup error:", e);

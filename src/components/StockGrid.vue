@@ -325,6 +325,7 @@ import StockItemCard from "./StockItemCard.vue";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
+import { useCustomerStore } from "../stores/customer";
 import { useAudio } from "../composables/useAudio";
 import { ref as dbRef, onValue, get, remove, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
@@ -339,6 +340,7 @@ const logger = { log: (...args) => DEBUG_MODE && console.log(...args) };
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
 const nicknameStore = useNicknameStore();
+const customerStore = useCustomerStore();
 const { playSfx, queueAudio } = useAudio();
 const openShippingManager = inject("openShippingManager");
 const gridContainer = ref(null);
@@ -429,9 +431,9 @@ let autocompleteTimer = null;
 let pullResetTimer = null;
 
 
-// 📦 Delivery Strip & Customer Meta State
-const deliveryCustomers = ref([]);
-const addressBook = ref({});
+// 📦 Delivery Strip & Customer Meta State (Shared via customerStore)
+const deliveryCustomers = computed(() => customerStore.deliveryCustomersList);
+const addressBook = computed(() => customerStore.addressBook);
 const cleanupFns = [];
 
 const thaiMonths = [
@@ -561,22 +563,8 @@ const deliveryCountsMap = computed(() => {
 let cleanupOwnerModal = null;
 
 onMounted(() => {
-  // 📦 Listen delivery_customers for badge count + strip
-  const unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
-    const data = snapshot.val() || {};
-    deliveryCustomers.value = Object.keys(data).map((key) => ({
-      id: key,
-      uid: key,
-      ...data[key],
-    }));
-  });
-  cleanupFns.push(unsubDelivery);
-
-  // 📍 Listen address_book for customer micro-badges
-  const unsubAddressBook = onValue(dbRef(db, "address_book"), (snapshot) => {
-    addressBook.value = snapshot.val() || {};
-  });
-  cleanupFns.push(unsubAddressBook);
+  const unsubCustomers = customerStore.initCustomerListeners();
+  if (unsubCustomers) cleanupFns.push(unsubCustomers);
 
   window.addEventListener('keydown', handleGlobalKeydown);
 });
@@ -669,9 +657,7 @@ watch(soldCount, (newVal, oldVal) => {
 watch(soldPercentage, (newVal, oldVal) => {
   if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
   const from = oldVal ?? 0;
-  // Trigger pulse effect
-  isPulsingPercent.value = false;
-  void document.body.offsetWidth; // force reflow
+  // Trigger pulse effect without forcing synchronous layout reflow
   isPulsingPercent.value = true;
   if (pulsingPercentTimer) clearTimeout(pulsingPercentTimer);
   pulsingPercentTimer = setTimeout(() => {
@@ -757,38 +743,12 @@ function isUnsavedOwner(name) {
   return typeof name === "string" && name.trim().startsWith("@");
 }
 
-// 🏷️ Customer Metadata (Address, Channel, Payment) Fast Lookup
+// 🏷️ Customer Metadata (Address, Channel, Payment) O(1) Memoized Lookup
 function getCustomerMeta(ownerName) {
   if (!ownerName || typeof ownerName !== "string") return null;
   const rawName = ownerName.trim();
   if (!rawName) return null;
-  const normName = normalizeCustomerName(rawName).replace(/[.#$[\]/]/g, "_");
-
-  // 1. Check address_book
-  const book = normName && addressBook.value?.[normName];
-
-  // 2. Check delivery_customers fallback
-  const deliv = deliveryCustomers.value.find((c) => {
-    if (!c) return false;
-    const cNorm = normalizeCustomerName(c.name || c.displayName || "").replace(/[.#$[\]/]/g, "_");
-    return cNorm === normName || c.uid === normName || c.id === normName;
-  });
-
-  const hasAddress = Boolean(
-    (book?.address && book.address.trim()) ||
-    (deliv?.address && deliv.address.trim()) ||
-    (Array.isArray(book?.addresses) && book.addresses.some((a) => a && a.address && a.address.trim()))
-  );
-  const contactChannel = book?.contactChannel || deliv?.contactChannel || "";
-  const paymentType = book?.paymentType || deliv?.paymentType || "";
-
-  if (!hasAddress && !contactChannel && !paymentType) return null;
-
-  return {
-    hasAddress,
-    contactChannel,
-    paymentType,
-  };
+  return customerStore.getCustomerMetaByName(rawName);
 }
 
 function getChannelLabel(channel) {
@@ -973,15 +933,17 @@ function updateOwnerItemsModal() {
   });
 }
 
-// เฝ้าติดตามการซิงค์ข้อมูลสต็อกหรือการจัดส่งเพื่ออัปเดตป๊อปอัปให้เป็นเรียลไทม์
+// เฝ้าติดตามการซิงค์ข้อมูลสต็อกหรือการจัดส่งเพื่ออัปเดตป๊อปอัปให้เป็นเรียลไทม์ (ทำงานเฉพาะตอนเปิดป๊อปอัปอยู่เท่านั้น)
 watch(
-  [() => stockStore.stockData, () => deliveryCustomers.value],
-  () => {
-    if (activeOwnerName.value) {
+  () =>
+    activeOwnerName.value
+      ? [stockStore.stockData, deliveryCustomers.value]
+      : null,
+  (val) => {
+    if (val && activeOwnerName.value) {
       updateOwnerItemsModal();
     }
   },
-  { deep: true }
 );
 
 // 👗 แสดงรายการสินค้าทั้งหมดของลูกค้าคนนี้ (รวมทุกวันสะสม) + ปุ่มลบ

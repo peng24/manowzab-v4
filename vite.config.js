@@ -92,8 +92,11 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
-            // API Calls to Google (YouTube Data API, etc.)
-            urlPattern: ({ url }) => url.href.includes('googleapis.com'),
+            // API Calls to Google (YouTube Data API metadata, etc. — exclude real-time liveChat polling & TTS)
+            urlPattern: ({ url }) =>
+              url.href.includes("googleapis.com") &&
+              !url.pathname.includes("/liveChat/messages") &&
+              !url.hostname.includes("texttospeech.googleapis.com"),
             handler: "NetworkFirst",
             options: {
               cacheName: "google-api-cache",

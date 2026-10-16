@@ -88,6 +88,7 @@ import ChatPanel from "./components/ChatPanel.vue";
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import { useVoiceLearningStore } from "./stores/voiceLearning";
+import { useCustomerStore } from "./stores/customer";
 import { useChatProcessor } from "./composables/useChatProcessor";
 
 // 🚀 Performance: Lazy load AuthGate & heavy modals on demand via defineAsyncComponent
@@ -103,6 +104,7 @@ const stockStore = useStockStore();
 const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
 const voiceLearningStore = useVoiceLearningStore();
+const customerStore = useCustomerStore();
 
 // ✅ Global Watcher: Silence immediately when Sound is toggled OFF
 watch(
@@ -203,6 +205,9 @@ onMounted(async () => {
 
   const unsubVoiceLearning = voiceLearningStore.initVoicePatterns(); // ✅ Init Voice Patterns Self-Learning
   if (unsubVoiceLearning) cleanupFns.push(unsubVoiceLearning);
+
+  const unsubCustomers = customerStore.initCustomerListeners(); // ✅ Init Shared Customer & Address Book Store
+  if (unsubCustomers) cleanupFns.push(unsubCustomers);
 
 
   // ✅ Reset Connection State (Ensure YouTube starts disconnected)
@@ -461,9 +466,25 @@ watch(
 
     if (changedUids.length === 0) return;
 
-    // 3. Atomically update changed customers via transactions
+    // 3. Atomically update changed customers via transactions (skipping already-synced or non-existent UIDs)
+    const liveCustomers = customerStore.deliveryCustomersRaw || {};
     for (const uid of changedUids) {
+      const existingCust = liveCustomers[uid];
+      // Skip if customer key doesn't exist in delivery_customers (e.g. proxy-xxx UID)
+      if (!existingCust) continue;
+
       const newSession = currentSessionCounts[uid] || { count: 0, totalPrice: 0 };
+      const existingSess = existingCust.sessions?.[videoId];
+      // Skip if syncDeliveryCustomerForOwner already updated this session to the exact same count & totalPrice
+      if (
+        (newSession.count === 0 && !existingSess) ||
+        (existingSess &&
+          existingSess.count === newSession.count &&
+          (existingSess.totalPrice || 0) === newSession.totalPrice)
+      ) {
+        continue;
+      }
+
       const customerRef = dbRef(db, `delivery_customers/${uid}`);
 
       runTransaction(customerRef, (currentVal) => {
@@ -473,7 +494,13 @@ watch(
 
         const prevSession = currentVal.sessions[videoId] || { count: 0, totalPrice: 0, status: "pending" };
         const prevCount = prevSession.count || 0;
+        const prevPrice = prevSession.totalPrice || 0;
         const prevStatus = prevSession.status || "pending";
+
+        // Abort transaction if another device/sync already wrote the exact same count & price
+        if (prevCount === newSession.count && prevPrice === newSession.totalPrice) {
+          return;
+        }
 
         // Revert status to pending if the customer has booked a NEW item in this session (new count is greater than prev)
         const isNewOrder = (prevStatus === "done" && newSession.count > prevCount) ||

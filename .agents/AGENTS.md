@@ -15,19 +15,35 @@
    - Toasts generated from `Swal.mixin({ toast: true, ... })` must not be injected with popup configurations (`allowOutsideClick` / `showCloseButton`).
    - The global `Swal.fire` wrapper in `main.js` and `shipping-main.js` must verify `this.defaultParams?.toast` in addition to `opts.toast` to identify mixin toasts correctly.
 
+## ⚡ Performance & Real-Time Sync Invariants (v5.3.2+)
+1. **Centralized Customer Store (`useCustomerStore` in `src/stores/customer.js`)**:
+   - Do **NOT** create duplicate `onValue(dbRef(db, "delivery_customers"))` or `onValue(dbRef(db, "address_book"))` listeners inside UI components (`App.vue`, `StockGrid.vue`, `ChatPanel.vue`, `ShippingManager.vue`).
+   - Always consume `useCustomerStore()` (`initCustomerSync` / `stopCustomerSync`) and use $O(1)$ lookup indexes (`deliveryByNormKey`, `getCustomerMetaByName`) and live cache hooks (`setLiveDeliveryCustomersCache`, `setLiveAddressBookCache`) in `deliverySync.js`.
+2. **Concurrent Poll Batching (`YouTubeLiveChat.js` + `useChatProcessor.js`)**:
+   - `YouTubeLiveChat.js` must enqueue all new messages in a poll cycle concurrently (`Promise.allSettled`) into `useChatProcessor`'s `incomingBatchQueue` so they sort by `publishedAt` and execute within a single 80ms batch window instead of stalling `80ms × N` sequentially.
+3. **Shared `AudioContext` & Service Worker Bypass**:
+   - Share a single `AudioContext` (`ttsService.getAudioContext()`) across `TextToSpeech.js`, `useAudio.js`, and `celebration.js`, and preload celebration audio via `requestIdleCallback`.
+   - Workbox `runtimeCaching` in `vite.config.js` must exclude `/liveChat/messages` and `texttospeech.googleapis.com`.
+
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:
 1. **Bump Version in `package.json`** using Semantic Versioning (MAJOR.MINOR.PATCH).
-2. **Update Patch Notes in `src/components/Header.vue`** inside `showChangelog()` function with `Swal.fire({ html: ... })` HTML format (✨ ปรับปรุงใหม่, 🐛 แก้ไขบั๊ก, 🧹 ทำความสะอาด) in Thai.
-3. **Update `src/data/changelog.js` & Prune Old Entries (Changelog Pruning Policy)**:
-   - บันทึกการเปลี่ยนแปลงใน `src/data/changelog.js` ตามรูปแบบ Keep a Changelog
+2. **Update Patch Notes in `src/data/changelog.js` & Prune Old Entries (Changelog Pruning Policy)**:
+   - บันทึกการเปลี่ยนแปลงใน `src/data/changelog.js` (ซึ่งแสดงผลผ่าน `ChangelogModal.vue` ที่เรียกจาก `showChangelog()` ใน `src/components/Header.vue`) ตามรูปแบบ Keep a Changelog
    - **กฎการตัด Changelog เก่าออก**: ตรวจสอบและคงเหลือเฉพาะเวอร์ชันล่าสุดประมาณ **15–20 เวอร์ชัน** เท่านั้น ทุกครั้งที่มีเวอร์ชันใหม่ให้ตัดเวอร์ชันเก่าทิ้งเสมอ เพื่อไม่ให้ไฟล์บวมและควบคุมขนาด Bundle ของแอปพลิเคชัน
-4. **Build & Verify** with `npm run build` and `npm test`.
+3. **Build & Verify** with `npm run build` and `npm test`.
+
+## 🧠 Mandatory Proactive Rule & `/verify` Auto-Evolution Rule (บังคับทำและรายงานทุกครั้ง)
+Every time you complete a code change, feature addition, bug fix, or optimization:
+1. **Think & Evaluate Proactively**: Automatically analyze whether any project rules (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) or verification checklist items (`.agents/workflows/verify.md`) should be added or updated to reflect the new logic or invariants.
+2. **Auto-Update Immediately**: If any rule or `/verify` item should be updated, update the files immediately **without waiting for the user to ask**.
+3. **Always Report to User**: In every response after modifying code, explicitly report to the user which rules and `/verify` items were updated (or confirm that they were reviewed and are already up-to-date).
 
 ## 📦 Automated Release Trigger Rule ("อัพเลย")
 When the user specifies **"อัพเลย"** (Deploy now), automatically execute the full pipeline in order:
-1. **Run `/verify` Workflow**: Execute `npm test` & `npm run build` and verify all 14 checklist categories.
-2. **Run `/update` Workflow**: Bump version in `package.json`, update Patch Notes in `Header.vue` & `src/data/changelog.js`.
+1. **Run `/verify` Workflow**: Execute `npm test` & `npm run build`, verify all 15 checklist categories, and auto-update rules/`/verify` if needed.
+2. **Run `/update` Workflow**: Bump version in `package.json` and update Patch Notes in `src/data/changelog.js` (and `Header.vue` if applicable).
 3. **Git Commit & Push**: Commit all changes (`git add .`, `git commit -m "..."`, `git push origin main` or active branch).
 4. **Deploy**: Run `npm run deploy` (or `npm run deploy:gh`) to deploy live to GitHub Pages.
+
 

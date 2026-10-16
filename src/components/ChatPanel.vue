@@ -355,6 +355,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComp
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
+import { useCustomerStore } from "../stores/customer";
 import { useAudio } from "../composables/useAudio";
 
 // 🚀 Performance: Lazy load CustomerQuickEditModal on demand
@@ -377,6 +378,7 @@ import { normalizeName } from "../utils/addressParser";
 const chatStore = useChatStore();
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
+const customerStore = useCustomerStore();
 const { resetVoice, playSfx } = useAudio();
 let chatUnsubscribe = null;
 
@@ -398,12 +400,12 @@ let pullResetTimer = null;
 const selectedChatTab = ref("all");
 const showNewMsgPill = ref(false);
 
-// 👥 Customer Author Filter & Address Sync State
+// 👥 Customer Author Filter & Address Sync State (Shared via customerStore)
 const selectedAuthors = ref([]);
 const showAuthorDropdown = ref(false);
 const authorSearchQuery = ref("");
-const addressBook = ref({});
-const deliveryCustomers = ref({});
+const addressBook = computed(() => customerStore.addressBook);
+const deliveryCustomers = computed(() => customerStore.deliveryByNormKey);
 const cleanupFns = [];
 
 // 🚀 Performance: O(1) Author Name Lookup via Set
@@ -477,24 +479,40 @@ function selectActiveBuyers() {
   });
 }
 
-// 👤 ดึงชื่อลูกค้าเป้าหมายสำหรับข้อความที่ admin จองให้/สั่งส่งให้
+// 👤 ดึงชื่อลูกค้าเป้าหมายสำหรับข้อความที่ admin จองให้/สั่งส่งให้ (Memoized per chat message)
 function getAdminProxyCustomerName(chat) {
   if (!chat) return null;
+  if (chat._cachedProxyName !== undefined && chat._cachedProxyName !== null) {
+    return chat._cachedProxyName;
+  }
+
+  // 1. ตรวจสอบ proxyCustomerName ที่บันทึกไว้ (พร้อมทำความสะอาดหากบันทึกคำสั่งติดไปด้วย เช่น "วาศินา เอาไปฝากคนอื่นด้วย")
+  if (chat.proxyCustomerName) {
+    const cleaned = extractAdminCustomerName(chat.proxyCustomerName) || chat.proxyCustomerName;
+    chat._cachedProxyName = cleaned;
+    return cleaned;
+  }
+
+  if (chat._cachedProxyName === null) {
+    return null;
+  }
+
   const isMsgAdmin =
     chat.isAdmin ||
     /admin|แอดมิน/i.test(chat.displayName || chat.authorName || "");
 
-  // 1. ตรวจสอบ proxyCustomerName ที่บันทึกไว้ (พร้อมทำความสะอาดหากบันทึกคำสั่งติดไปด้วย เช่น "วาศินา เอาไปฝากคนอื่นด้วย")
-  if (chat.proxyCustomerName) {
-    const cleaned = extractAdminCustomerName(chat.proxyCustomerName);
-    if (cleaned) return cleaned;
-    return chat.proxyCustomerName;
+  if (!isMsgAdmin) {
+    chat._cachedProxyName = null;
+    return null;
   }
 
   // 2. หากยังไม่มี proxyCustomerName ให้สกัดจากข้อความแอดมิน
-  if (isMsgAdmin && chat.text) {
+  if (chat.text) {
     const extracted = extractAdminCustomerName(chat.text);
-    if (extracted) return extracted;
+    if (extracted) {
+      chat._cachedProxyName = extracted;
+      return extracted;
+    }
 
     // 3. Fallback: ตรวจสอบคำแรกๆ ของข้อความแอดมินเทียบกับฐานข้อมูลลูกค้า (addressBook หรือ deliveryCustomers)
     const text = chat.text.trim();
@@ -507,6 +525,7 @@ function getAdminProxyCustomerName(chat) {
           (addressBook.value && addressBook.value[norm2]) ||
           (deliveryCustomers.value && deliveryCustomers.value[norm2])
         ) {
+          chat._cachedProxyName = candidate2;
           return candidate2;
         }
       }
@@ -516,6 +535,7 @@ function getAdminProxyCustomerName(chat) {
         (addressBook.value && addressBook.value[norm1]) ||
         (deliveryCustomers.value && deliveryCustomers.value[norm1])
       ) {
+        chat._cachedProxyName = candidate1;
         return candidate1;
       }
     }
@@ -523,39 +543,15 @@ function getAdminProxyCustomerName(chat) {
   return null;
 }
 
-// 🏷️ Customer Metadata (Address, Channel, Payment) Fast O(1) Lookup
+// 🏷️ Customer Metadata (Address, Channel, Payment) Fast O(1) Memoized Lookup
 function getCustomerMeta(chat) {
   if (!chat) return null;
   const proxyName = getAdminProxyCustomerName(chat);
   const rawName = proxyName || chat.displayName || chat.authorName || "";
-  const normName = normalizeName(rawName).replace(/[.#$[\]/]/g, "_");
-  const normReal = !proxyName && chat.realName ? normalizeName(chat.realName).replace(/[.#$[\]/]/g, "_") : "";
-
-  // 1. Check address_book
-  const book = (normName && addressBook.value[normName]) || (normReal && addressBook.value[normReal]);
-
-  // 2. Check delivery_customers fallback
   const targetUid = proxyName ? (chat.proxyUid || null) : chat.uid;
-  const deliv =
-    (targetUid && deliveryCustomers.value[targetUid]) ||
-    (normName && deliveryCustomers.value[normName]) ||
-    (normReal && deliveryCustomers.value[normReal]);
+  const realName = !proxyName ? chat.realName : null;
 
-  const hasAddress = Boolean(
-    (book?.address && book.address.trim()) ||
-    (deliv?.address && deliv.address.trim()) ||
-    (Array.isArray(book?.addresses) && book.addresses.some((a) => a && a.address && a.address.trim()))
-  );
-  const contactChannel = book?.contactChannel || deliv?.contactChannel || "";
-  const paymentType = book?.paymentType || deliv?.paymentType || "";
-
-  if (!hasAddress && !contactChannel && !paymentType) return null;
-
-  return {
-    hasAddress,
-    contactChannel,
-    paymentType,
-  };
+  return customerStore.getCustomerMetaByName(rawName, targetUid, realName);
 }
 
 function getCustomerMetaKey(chat) {
@@ -733,13 +729,14 @@ function getChatRowStyle(chat) {
 
 
 
+const thaiTimeFormatter = new Intl.DateTimeFormat("th-TH", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 function formatTime(timestamp) {
   if (!timestamp) return "";
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString("th-TH", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return thaiTimeFormatter.format(new Date(timestamp));
 }
 
 // ✏️ เปิด Modal แก้ไขข้อมูลลูกค้าของ proxy customer
@@ -947,17 +944,9 @@ onMounted(() => {
     logger.info("✅ Chat sync initialized for:", systemStore.currentVideoId);
   }
 
-  // ✅ Real-time Address Book Sync for Customer Badges
-  const unsubBook = onValue(dbRef(db, "address_book"), (snap) => {
-    addressBook.value = snap.val() || {};
-  });
-  cleanupFns.push(unsubBook);
-
-  // ✅ Real-time Delivery Customers Sync
-  const unsubDeliv = onValue(dbRef(db, "delivery_customers"), (snap) => {
-    deliveryCustomers.value = snap.val() || {};
-  });
-  cleanupFns.push(unsubDeliv);
+  // ✅ Real-time Customer & Address Book Sync via Shared Store
+  const unsubCustomers = customerStore.initCustomerListeners();
+  if (unsubCustomers) cleanupFns.push(unsubCustomers);
 });
 
 onUnmounted(() => {
@@ -1465,7 +1454,6 @@ async function refreshChat() {
   padding-bottom: calc(
     20px + env(safe-area-inset-bottom)
   ); /* ✅ Safe Area for Mobile */
-  scroll-behavior: smooth;
 }
 
 #chat-list {

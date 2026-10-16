@@ -59,9 +59,9 @@ description: Mandatory verification checklist after every code change
 | 4.8 | Emoji and Run Fallback | `src/composables/useChatProcessor.js` | อ่านสติกเกอร์เป็น "ส่งสติกเกอร์" เมื่อ sanitizes เป็นค่าว่าง, fallback ไป `messageRuns` เมื่อ `displayMessage` ว่าง |
 | 4.9 | เว้นวรรคหน่วงเวลาในคิวเสียง (`delayAfter`) | `src/composables/useAudio.js` | คิวเสียง `queueAudio` รองรับ `options.delayAfter` (เช่น 800ms) เพื่อเว้นจังหวะอ่านชื่อลูกค้าแต่ละคนให้ชัดเจน ไม่รัวติดกัน |
 | 4.10 | ออกเสียงชื่อลูกค้าจริงเมื่อแอดมินจองแทน (Admin Proxy TTS) | `src/composables/useChatProcessor.js` | เมื่อแอดมินพิมพ์จองให้ลูกค้า เสียง TTS จะอ่านเป็นชื่อลูกค้าเท่านั้น ไม่นำชื่อแอดมินมาอ่าน |
-| 4.11 | Microsoft Edge TTS Proxy (`th-TH-PremwadeeNeural`) | `src/services/TextToSpeech.js`, `scripts/cloudflare-edge-tts-worker.js` | สังเคราะห์เสียงเปรมวดี (`th-TH-PremwadeeNeural`) ผ่าน Cloudflare Worker proxy พร้อมคำนวณ `Sec-MS-GEC` token และตัด metadata binary header length (uint16 big-endian) ออกเพื่อสตรีม MP3 สมบูรณ์ |
-| 4.12 | TTS 4-State Toggle Switcher | `src/components/Header.vue`, `src/stores/system.js` | ปุ่มสลับเสียงรองรับ 4 โหมดวนลูป (`P` เปรมวดี ➡️ `N` Google Neural2 ➡️ `S` Google Standard ➡️ `🤖` Native TTS) พร้อมจำค่าลง `localStorage` |
-| 4.13 | Multi-Tier TTS Fallback System | `src/services/TextToSpeech.js` | หากโหมด `P` ขัดข้องหรือไม่สามารถเชื่อมต่อได้ ระบบต้อง Fallback อัตโนมัติไปยัง Google Neural2 ➡️ Google Standard ➡️ Native TTS โดยคิวเสียงไม่ค้างและไม่สะดุด |
+| 4.11 | Shared Singleton `AudioContext` & LRU Cache | `src/services/TextToSpeech.js`, `src/composables/useAudio.js` | ใช้ `AudioContext` ร่วมกันตัวเดียว (`ttsService.getAudioContext()`) ทั้งระบบ TTS / SFX / Celebration พร้อม LRU Audio Buffer Cache (สูงสุด 200 รายการ) ลดเวลาถอดรหัสเสียงซ้ำ |
+| 4.12 | TTS 2-State Toggle Switcher (`S` / `🤖`) | `src/components/Header.vue`, `src/stores/system.js` | ปุ่มสลับเสียงรองรับ 2 โหมด (`S` Google Cloud Standard `th-TH-Standard-A` ➡️ `🤖` Native TTS) พร้อมจำค่าลง `localStorage` |
+| 4.13 | Zero-Stall TTS Auto-Fallback System | `src/services/TextToSpeech.js` | หากโหมด `S` (Google Cloud TTS) ขัดข้อง หมดโควตา หรือเกิด Timeout ระบบต้องหมุน API Key และ Fallback อัตโนมัติไปยัง Native TTS (`🤖`) โดยคิวเสียงไม่ค้างและไม่สะดุด |
 
 
 ---
@@ -169,13 +169,17 @@ description: Mandatory verification checklist after every code change
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
 | 13.1 | Batched History Recalculation | `src/components/HistoryModal.vue` | `updateDeliveryAndHistoryTotals` ต้องใช้ Batched Multi-Path Update (`update(dbRef(db), multiPathUpdates)`) ห้ามวนลูปยิง N+1 Queries |
-| 13.2 | Delivery Customer TTL Cache | `src/utils/deliverySync.js` | `resolveDeliveryUid` ต้องใช้ In-Memory Cache (TTL: 3s) เพื่อลดการยิงเครือข่ายดึงข้อมูลทั้งฐานข้อมูลเมื่อมีคำสั่งจองรัวๆ |
-| 13.3 | Fast Instant Chat Scroll | `src/components/ChatPanel.vue` | สกรอลล์แชทสดต้องใช้ `requestAnimationFrame` (`scrollTop = scrollHeight`) ห้ามสั่ง Smooth Scroll ซ้ำซ้อน เพื่อคงความเร็ว 100 FPS |
-| 13.4 | O(1) Stock Queue Map | `src/components/StockGrid.vue` | การเรนเดอร์ Stock Grid ต้องใช้ `queueLengthsMap` (computed) ห้ามเรียกฟังก์ชันสืบค้นคิวซ้ำในทุกลูป Template |
+| 13.2 | Centralized Customer Store & Live Cache (`useCustomerStore`) | `src/stores/customer.js`, `src/utils/deliverySync.js` | รวมศูนย์ listener ของ `delivery_customers` และ `address_book` ไว้ที่ `useCustomerStore` จุดเดียว (Reference-Counted) พร้อมซิงค์เข้า `setLiveDeliveryCustomersCache` / `setLiveAddressBookCache` และค้นหาข้อมูลลูกค้าด้วยดัชนี $O(1)$ (`deliveryByNormKey`, `getCustomerMetaByName`) |
+| 13.3 | Fast Instant Chat Scroll & Zero Forced Reflow | `src/components/ChatPanel.vue`, `src/App.vue` | สกรอลล์แชทสดต้องใช้ `requestAnimationFrame` (`scrollTop = scrollHeight`) ห้ามใส่ `scroll-behavior: smooth` บน `#chat-viewport`, ใช้ `Intl.DateTimeFormat` singleton และ `normalizedProxyNameMap` (computed), และห้ามสั่ง Forced Synchronous Layout (`offsetWidth`) ขณะสลับย่อ/ขยายแชท |
+| 13.4 | O(1) Stock Queue Map & Conditional Modal Watch | `src/components/StockGrid.vue` | การเรนเดอร์ Stock Grid ต้องใช้ `queueLengthsMap` (computed) และเฝ้าดู `stockData` สำหรับอัปเดต Modal เฉพาะเมื่อเปิด `currentViewingOwnerUid` อยู่เท่านั้น |
 | 13.5 | Fast Thai-to-Arabic Conversion | `src/utils/chatParserUtils.js` | `thaiToArabic` ต้องใช้ Static Lookup Map `THAI_TO_ARABIC_MAP` เพื่อความเร็วสูงสุดในการสืบค้นแบบ $O(1)$ |
 | 13.6 | Execution Time Tracking | `src/utils/logger.js` | `logger.time` และ `logger.timeAsync` ต้องสามารถวัดและแสดงเวลาการทำงานเป็นมิลลิวินาที (ms) ได้ถูกต้อง |
 | 13.7 | Benchmark Test Suite | `src/__tests__/benchmark.test.js` | ชุดทดสอบ Benchmark ops/sec ต้องรันและผ่านผ่านคำสั่ง `npm test` |
-| 13.8 | Throttled History DB Writes | `src/stores/stock.js` | การเขียนสถิติประวัติ ต้องใช้ Throttling 5 วินาที ลดภาระการเขียน Firebase Database ในช่วงพีค |
+| 13.8 | Throttled & Deduplicated History DB Writes | `src/stores/stock.js` | การเขียนสถิติประวัติลง `history/${videoId}` ต้องใช้ Throttling 5 วินาที และเช็ค `lastSyncedHistoryTotals` เพื่อข้ามการเขียนซ้ำเมื่อ `totalSales` และ `totalItems` ไม่เปลี่ยนแปลง รวมถึงส่ง `stockData.value` ในหน่วยความจำให้ `syncDeliveryCustomerForOwner` โดยตรง |
+| 13.9 | Zero-Delay Concurrent Poll Batching | `src/services/YouTubeLiveChat.js`, `src/composables/useChatProcessor.js` | `YouTubeLiveChat.js` ต้องส่งข้อความใหม่ทั้งหมดในรอบ Poll เข้าคิวพร้อมกัน (`Promise.allSettled`) เพื่อให้ `incomingBatchQueue` รวบประมวลผลและเรียงตาม `publishedAt` ภายในหน้าต่าง 80ms เดียว ไม่หน่วงสะสม `80ms × N` |
+| 13.10 | Lazy Short-Circuit Regex, Cached Runs & Bounded Voice Sync | `src/composables/useChatProcessor.js` | ประมวลผล 7 Buy Regex แบบ Lazy Short-Circuit (หยุดทันทีเมื่อเจอแพทเทิร์นที่ตรง), แคชผลลัพธ์ `getMessageRuns()`, และจำกัดการดึง `voice_chats/${videoId}` ด้วย `limitToLast(10)` |
+| 13.11 | Shared Singleton `AudioContext` & Idle Celebration Preload | `src/composables/useAudio.js`, `src/services/TextToSpeech.js`, `src/utils/celebration.js` | แชร์ `AudioContext` ตัวเดียวทั่วทั้งแอป และโหลดไฟล์เสียงพลุฉลองล่วงหน้าในช่วงเบราว์เซอร์ว่าง (`requestIdleCallback`) เพื่อไม่ให้แย่งแบนด์วิดท์ขณะเริ่มไลฟ์ |
+| 13.12 | Service Worker Real-Time API Bypass & GPU/Touch Hygiene | `vite.config.js`, `src/components/StockItemCard.vue`, `src/composables/usePullToRefresh.js` | ยกเว้น `/liveChat/messages` และ `texttospeech.googleapis.com` จาก Workbox `runtimeCaching`, เปิด `will-change` เฉพาะการ์ดที่กำลังแสดงแอนิเมชัน, และตัดจบ `touchstart` ทันทีเมื่อ `scrollTop > 5` |
 
 ---
 
@@ -209,16 +213,22 @@ description: Mandatory verification checklist after every code change
 | 15.10 | Multi-Address & Custom Recipient Name | `src/components/CustomerAddressModal.vue` | แยกชื่อผู้รับจริง (`recipientName`) จากชื่อ CF และรองรับการบันทึกหลายที่อยู่ต่อ 1 ลูกค้าลง Address Book |
 
 
-## How to Verify
+## How to Verify & Auto-Update Policy (บังคับทำทุกครั้ง)
 
 1. Review the diff of changed files
 2. For each changed file, check which checklist items (by number) it relates to
 3. **Read the actual source code** of affected functions to verify logic is still intact
 4. If any function may be broken, **fix it immediately** before proceeding
-5. Report verification results in this format:
+5. **🔄 คิดและอัปเดตกฎ + `/verify` อัตโนมัติทุกครั้ง (Proactive Rule & `/verify` Auto-Evolution)**:
+   - ทุกครั้งหลังแก้ไขโค้ด เพิ่มฟีเจอร์ หรือปรับปรุงระบบ ให้วิเคราะห์ทันทีว่ามีข้อกำหนดสถาปัตยกรรมใหม่ หรือมีจุดใดในไฟล์กฎ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) และรายการตรวจสอบใน `.agents/workflows/verify.md` ที่ควรเพิ่มหรืออัปเดตหรือไม่
+   - **หากมี ต้องอัปเดตไฟล์กฎและ `/verify` ให้ทันทีโดยไม่ต้องรอให้ผู้ใช้สั่ง**
+   - **ต้องรายงานให้ผู้ใช้ทราบทุกครั้ง** ว่าได้ตรวจสอบและอัปเดตกฎหรือ `/verify` ในส่วนใดบ้าง (หรือรายงานว่าตรวจสอบแล้วกฎและ `/verify` ปัจจุบันครอบคลุมครบถ้วนแล้ว)
+6. Report verification results in this format:
    ```
    ✅ 1.1 connectVideo — ไม่กระทบ
    ✅ 2.1 processMessage — ตรวจสอบแล้ว ยังทำงานถูกต้อง
    ⚠️ 4.1 queueAudio — ต้องตรวจสอบเพิ่ม (มีการแก้ไขใกล้เคียง)
    ❌ 3.1 processOrder — เสียหาย! แก้ไขแล้ว
+   📋 อัปเดตกฎ & /verify — (ระบุรายการกฎและ /verify ที่อัปเดต หรือระบุว่าตรวจสอบแล้วเป็นปัจจุบัน)
    ```
+

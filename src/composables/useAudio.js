@@ -4,12 +4,13 @@ import { ttsService } from "../services/TextToSpeech";
 import { logger } from "../utils/logger";
 
 
-// ✅ Global Singleton AudioContext (Shared across all components)
+// ✅ Global Singleton AudioContext (Shared with ttsService across all components)
 export const audioCtx =
-  typeof window !== "undefined" &&
+  ttsService?.audioCtx ||
+  (typeof window !== "undefined" &&
   (window.AudioContext || window.webkitAudioContext)
     ? new (window.AudioContext || window.webkitAudioContext)()
-    : null;
+    : null);
 
 // ✅ Auto-unlock AudioContext on first user interaction (click / touch / keydown)
 if (typeof window !== "undefined") {

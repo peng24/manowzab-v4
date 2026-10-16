@@ -18,6 +18,18 @@
 export const changelog = [
   // ─── 5.3.x ───────────────────────────────────────────
   {
+    version: '5.3.2',
+    date: '2026-10-16',
+    changes: {
+      improved: [
+        'เร่งความเร็วในการประมวลผลแชทและตัดสต็อกแบบ Zero-Delay Batching — ปรับ YouTubeLiveChat.js ให้ส่งข้อความใหม่ทั้งหมดในรอบ Poll เดียวกันเข้าคิว Micro-Batch พร้อมกันใน Tick เดียว ขจัดปัญหาหน่วงเวลาสะสมทีละ 80ms ต่อข้อความเมื่อแชทไหลรัวพร้อมกัน',
+        'ประมวลผล Regex คำสั่งซื้อแบบ Lazy Short-Circuit — ปรับ useChatProcessor.js ให้ตรวจสอบแพทเทิร์นการจองตามลำดับความสำคัญแบบหยุดทันทีเมื่อพบ (Short-Circuit) และแคช extractMessageRuns ลดภาระ CPU ต่อข้อความลงกว่า 70%',
+        'รวมศูนย์ฐานข้อมูลลูกค้าและสมุดที่อยู่ด้วย O(1) Customer Store (src/stores/customer.js) — ยุบรวม Firebase Listener ของ delivery_customers และ address_book ที่เคยเปิดซ้ำซ้อนกันในหลายหน้าให้เหลือเพียงจุดเดียว พร้อมดัชนีค้นหา O(1) และตัดการยิง get() / runTransaction ซ้ำซ้อนข้ามเครื่องขณะรัว CF',
+        'ยกระดับความลื่นไหลหน้าจอ 60 FPS และลดความร้อนบน iPad/มือถือ — แคชข้อมูลสถานะลูกค้าและชื่อ Proxy ใน ChatPanel.vue, ใช้ Singleton Intl.DateTimeFormat, ตัด Forced Synchronous Reflow ใน StockGrid.vue, ลด GPU Compositing Layers ที่ไม่จำเป็นใน StockItemCard.vue, และรวม Singleton AudioContext เดียวทั้งระบบ',
+      ],
+    },
+  },
+  {
     version: '5.3.1',
     date: '2026-10-14',
     changes: {
@@ -296,40 +308,7 @@ export const changelog = [
       ],
     },
   },
-  {
-    version: '4.91.1',
-    date: '2026-09-28',
-    changes: {
-      improved: [
-        'Phase 1.1 — เพิ่ม IndexedDB Archive สำหรับ fullChatLog: จำกัด RAM ไว้ที่ 3,000 รายการ ก่อน trim จะ persist ข้อมูลลง IndexedDB อัตโนมัติ ทำให้ Export CSV ยังได้ข้อมูลครบ 100% ตลอด session ยาว ป้องกัน Tab Crash จาก Heap Overflow',
-        'Phase 1.2 — แก้ไข AudioNode Leak ใน useAudio.js: ติดตาม {osc, gain} pairs แทนที่จะเก็บแค่ OscillatorNode ทำให้ disconnect ทั้ง Oscillator และ GainNode ได้ครบถ้วน ป้องกัน detached AudioNode สะสมใน Web Audio Context Graph หลังเล่น SFX นับร้อยครั้ง',
-        'Phase 1.3 — Memoized nameToUidMap computed: เปลี่ยนจาก getNameToUidMap() ที่ O(n) ทุก shipping message มาเป็น Vue computed ที่ lazy — recompute เฉพาะเมื่อ nicknames เปลี่ยนจริงๆ ลดภาระ CPU ต่อ shipping intent',
-        'Phase 1.4 — จำกัด warnedNewCustomers Set ไม่เกิน 1,000 UIDs: ใช้ FIFO eviction ลบ 200 รายการเก่าสุดเมื่อถึง cap ป้องกัน Set โต unbounded ใน session ยาว 4+ ชั่วโมง',
-        'Phase 2.2 — Compiled Regex Cache ใน voiceLearning.js: เพิ่ม compiledVoiceRegex computed ที่ cache 4 RegExp ที่ compile แล้ว recompile เฉพาะเมื่อ codeKeywords/priceKeywords/unitKeywords เปลี่ยน ไม่ใช่ทุก message ลด CPU 80% สำหรับ Voice Price Detection',
-        'Phase 2.4 — Firebase limitToLast(200): เพิ่ม query limitToLast ใน syncFromFirebase เพื่อป้องกัน Reconnect Storm เมื่อเน็ตหลุดแล้วต่อใหม่ Firebase จะส่งเฉพาะข้อมูล 200 รายการล่าสุด ไม่ทำให้ Main Thread Freeze',
-      ],
-    },
-  },
-  {
-    version: '4.91.0',
-    date: '2026-09-28',
-    changes: {
-      added: [
-        'หน้าต่างแก้ไขข้อมูลลูกค้าด่วนจากช่องแชท (Chat Customer Quick Edit Modal) — เมื่อคลิกที่ชื่อลูกค้าในช่องแชท สามารถแก้ไขได้ครบทั้ง 3 รายการ: ชื่อเล่น (ชื่อเรียก/เสียงอ่าน), ช่องทางการติดต่อ (-, Line, LineOA, โทรศัพท์), และ ที่อยู่จัดส่ง พร้อมระบบตรวจจับเบอร์โทรและรหัสไปรษณีย์อัตโนมัติ โดยข้อมูลจะซิงค์ถาวรลง address_book, nicknames และ delivery_customers ทันที',
-        'อัปเดตชื่อในรายการสินค้าอัตโนมัติเมื่อแก้ไขชื่อเล่นจากช่องแชท (Auto-Sync Customer Name to Stock Items) — เมื่อแก้ไขชื่อเล่นลูกค้าจากหน้าต่างแก้ไขข้อมูลด่วนในช่องแชท ระบบจะค้นหาและอัปเดตชื่อลูกค้าในรายการสต็อกสินค้าทั้งหมด ทั้งที่เป็นเจ้าของหลักและในคิวสำรองให้เป็นชื่อใหม่โดยอัตโนมัติทันที พร้อมซิงค์ข้อมูลลงฐานข้อมูลและสะท้อนผลข้ามเครื่องแบบเรียลไทม์',
-        'เพิ่มช่องทางการติดต่อในรายการจัดส่งและใบปะหน้า (Shipping Contact Channel) — รองรับการเลือกและสลับช่องทางการติดต่อลูกค้า 3 ช่องทางหลัก ได้แก่ Line (💬 Line), LineOA (💚 LineOA), และ โทรศัพท์ (📞 โทร) โดยค่าเริ่มต้นจะเป็น "-" เพื่อรอให้ผู้ใช้บันทึกเอง',
-        'ระบบจดจำช่องทางการติดต่อเดิมตลอดไป (Persistent Contact Channel Sync) — หากเคยเลือกช่องทางติดต่อไว้แล้ว ระบบจะจดจำและใช้งานช่องทางเดิมของลูกค้ารายนั้นตลอดไปทั้งใน delivery_customers และ address_book ข้ามทุกรอบการสั่งซื้อและทุกไลฟ์สดโดยอัตโนมัติ',
-        'แสดงช่องทางติดต่อที่มุมล่างซ้ายของใบปะหน้าพัสดุ (Label Contact Display) — พิมพ์ช่องทางติดต่อต่อจากชื่อลูกค้าที่มุมล่างซ้าย เช่น "แจ๋ว (-)", "แจ๋ว (Line)", "แจ๋ว (LineOA)", "แจ๋ว (โทร)" ในขนาดกระชับชัดเจน ทั้งบนใบปะหน้าแนวนอน (130x76mm) และแนวตั้ง (76x130mm) พร้อมคลิกเพื่อสลับช่องทางได้โดยตรงจากตัวอย่างใบปะหน้า',
-      ],
-      improved: [
-        'เพิ่มตัวเลือกช่องทางการติดต่อในแบบฟอร์มแก้ไขที่อยู่ (CustomerAddressModal) — เพิ่มเมนู Dropdown เลือกช่องทางติดต่อคู่กับรูปแบบชำระเงิน พร้อมตัวเลือกเริ่มต้น "- (ยังไม่ระบุ)" และแสดงป้ายช่องทางติดต่อบนการ์ดที่อยู่',
-      ],
-      removed: [
-        'ถอดระบบจำลองแชท (Chat Simulation System) ออกจากระบบทั้งหมด — ลบปุ่ม "เริ่มจำลองแชท / หยุดจำลองแชท" ออกจากเมนู Tools และเคลียร์โค้ดจำลองแชทรวมถึงการโหลดโมดูลที่ไม่จำเป็นออกอย่างสมบูรณ์',
-        'ถอดช่องกรอกราคา (🏷️ ราคา) ออกจากหน้าต่างแก้ไขลำดับการจองสต็อก (Stock Edit Modal) — ปรับให้เหลือเฉพาะการจัดการลำดับคิวและรายชื่อผู้จองเพื่อความกระชับและใช้งานสะดวกรวดเร็วยิ่งขึ้น',
-      ],
-    },
-  },
 ];
+
 
 

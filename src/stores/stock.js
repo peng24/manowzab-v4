@@ -50,6 +50,8 @@ export const useStockStore = defineStore("stock", () => {
 
     let historyWriteTimeout = null;
     const HISTORY_WRITE_DELAY = 5000; // Throttle history writes to every 5 seconds
+    let lastHistorySales = -1;
+    let lastHistoryItems = -1;
 
     let isInitialLoad = true;
     const unsubStock = onValue(stockRef, (snapshot) => {
@@ -97,16 +99,20 @@ export const useStockStore = defineStore("stock", () => {
           if (percentage >= 100) milestones.value.hundred = true;
         }
 
-        // ✅ Throttle history writes to prevent excessive Firebase writes
-        if (historyWriteTimeout) clearTimeout(historyWriteTimeout);
-        historyWriteTimeout = setTimeout(() => {
-          const historyRef = dbRef(db, `history/${videoId}`);
-          update(historyRef, {
-            totalSales: totalSales,
-            totalItems: totalItems,
-            lastUpdated: Date.now(),
-          }).catch((err) => console.error("History Sync Error:", err));
-        }, HISTORY_WRITE_DELAY);
+        // ✅ Throttle history writes & skip if totals haven't changed
+        if (totalSales !== lastHistorySales || totalItems !== lastHistoryItems) {
+          if (historyWriteTimeout) clearTimeout(historyWriteTimeout);
+          historyWriteTimeout = setTimeout(() => {
+            lastHistorySales = totalSales;
+            lastHistoryItems = totalItems;
+            const historyRef = dbRef(db, `history/${videoId}`);
+            update(historyRef, {
+              totalSales: totalSales,
+              totalItems: totalItems,
+              lastUpdated: Date.now(),
+            }).catch((err) => console.error("History Sync Error:", err));
+          }, HISTORY_WRITE_DELAY);
+        }
       }
 
       isInitialLoad = false;
@@ -207,7 +213,7 @@ export const useStockStore = defineStore("stock", () => {
 
       // ✅ Auto-sync customer to delivery_customers
       if (action === "claimed") {
-        syncDeliveryCustomerForOwner(owner, uid, systemStore.currentVideoId).catch((e) =>
+        syncDeliveryCustomerForOwner(owner, uid, systemStore.currentVideoId, stockData.value).catch((e) =>
           console.warn("Auto sync delivery error:", e)
         );
       }
@@ -286,12 +292,12 @@ export const useStockStore = defineStore("stock", () => {
 
       // ✅ Auto-sync delivery_customers for previous owner and promoted next owner
       if (previousOwner) {
-        syncDeliveryCustomerForOwner(previousOwner, uid, systemStore.currentVideoId).catch((e) =>
+        syncDeliveryCustomerForOwner(previousOwner, uid, systemStore.currentVideoId, stockData.value).catch((e) =>
           console.warn("Auto sync delivery error on cancel:", e)
         );
       }
       if (nextOwner) {
-        syncDeliveryCustomerForOwner(nextOwner, null, systemStore.currentVideoId).catch((e) =>
+        syncDeliveryCustomerForOwner(nextOwner, null, systemStore.currentVideoId, stockData.value).catch((e) =>
           console.warn("Auto sync delivery error on promote:", e)
         );
       }
@@ -489,12 +495,12 @@ export const useStockStore = defineStore("stock", () => {
 
     // 2. Auto-sync delivery_customers for previous owner and new owner
     if (oldOwner) {
-      syncDeliveryCustomerForOwner(oldOwner, oldUid, systemStore.currentVideoId).catch((e) =>
+      syncDeliveryCustomerForOwner(oldOwner, oldUid, systemStore.currentVideoId, stockData.value).catch((e) =>
         console.warn("Auto sync delivery error on item edit:", e)
       );
     }
     if (newData && newData.owner && newData.owner !== oldOwner) {
-      syncDeliveryCustomerForOwner(newData.owner, newData.uid, systemStore.currentVideoId).catch((e) =>
+      syncDeliveryCustomerForOwner(newData.owner, newData.uid, systemStore.currentVideoId, stockData.value).catch((e) =>
         console.warn("Auto sync delivery error on item edit:", e)
       );
     }

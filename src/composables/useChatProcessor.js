@@ -13,6 +13,8 @@ import {
   push,
   get,
   onChildAdded,
+  query,
+  limitToLast,
 } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ref, computed } from "vue";
@@ -194,9 +196,13 @@ export function useChatProcessor() {
       }
     }
 
+    let cachedMessageRuns = null;
+    const getMessageRuns = () =>
+      cachedMessageRuns || (cachedMessageRuns = extractMessageRuns(item));
+
     if (!msg) {
       // ถ้าไม่มี displayMessage → ลอง fallback จาก messageRuns (emoji-only etc.)
-      const runs = extractMessageRuns(item);
+      const runs = getMessageRuns();
       const fallbackText = runs
         .map((r) => r.text || "")
         .join("")
@@ -347,7 +353,7 @@ export function useChatProcessor() {
       chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
         id: item.id,
         text: msg,
-        messageRuns: extractMessageRuns(item),
+        messageRuns: getMessageRuns(),
         authorName: realName,
         displayName,
         phoneticName,
@@ -371,7 +377,7 @@ export function useChatProcessor() {
       chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
         id: item.id,
         text: msg,
-        messageRuns: extractMessageRuns(item),
+        messageRuns: getMessageRuns(),
         authorName: realName,
         displayName: customerName ? `${customerName} (โน้ตเมื่อวานโดย ${displayName})` : displayName,
         proxyCustomerName: customerName,
@@ -403,7 +409,7 @@ export function useChatProcessor() {
         chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
           id: item.id,
           text: msg,
-          messageRuns: extractMessageRuns(item),
+          messageRuns: getMessageRuns(),
           authorName: realName,
           displayName: `${customerName} (โน้ตโดย ${displayName})`,
           proxyCustomerName: customerName,
@@ -524,7 +530,7 @@ export function useChatProcessor() {
         chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
           id: item.id,
           text: msg,
-          messageRuns: extractMessageRuns(item),
+          messageRuns: getMessageRuns(),
           authorName: realName,
           displayName: isProxyMulti ? `${ownerName} (โดย ${displayName})` : displayName,
           proxyCustomerName: isProxyMulti ? ownerName : null,
@@ -767,83 +773,84 @@ export function useChatProcessor() {
     } else if (questionRegex.test(normalizedMsg) || tryRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || negationGuardRegex.test(normalizedMsg) || sizeRangeRegex.test(normalizedMsg)) {
       method = questionRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || sizeRangeRegex.test(normalizedMsg) ? "question-skip" : negationGuardRegex.test(normalizedMsg) ? "negation-skip" : "try-skip";
     } else {
-      // 🟢 Regex Matching
-      const matchPure = normalizedMsg.match(pureNumberRegex);
-      const matchFuzzy = !matchPure ? normalizedMsg.match(fuzzyNumberRegex) : null;
-      const matchExplicit = normalizedMsg.match(explicitBuyRegex);
-      const matchPolite = normalizedMsg.match(numberWithPoliteRegex);
-      const matchDash = normalizedMsg.match(dashBuyRegex);
-      const matchCustomerName = normalizedMsg.match(customerNameNumRegex);
-      const matchNumDesc = normalizedMsg.match(numAndDescRegex);
-
-      // ✅ Check Admin Proxy (Both Name-First and Number-First)
-      let matchAdminNumFirst = isAdmin
-        ? normalizedMsg.match(adminProxyNumFirstRegex)
-        : null;
-      let matchAdminNameFirst = isAdmin
-        ? normalizedMsg.match(adminProxyNameFirstRegex)
-        : null;
-
+      // 🟢 Lazy Short-Circuit Regex Matching (evaluates regexes only when prior branches don't match)
+      let m;
       if (
-        matchAdminNameFirst &&
-        parseInt(matchAdminNameFirst[2]) <= MAX_ITEM_ID
+        isAdmin &&
+        (m = normalizedMsg.match(adminProxyNameFirstRegex)) &&
+        parseInt(m[2]) <= MAX_ITEM_ID
       ) {
         intent = "buy";
-        targetId = parseInt(matchAdminNameFirst[2]);
-        forcedOwnerName = sanitizeAdminCustomerName(matchAdminNameFirst[1]) || matchAdminNameFirst[1].trim();
+        targetId = parseInt(m[2]);
+        forcedOwnerName = sanitizeAdminCustomerName(m[1]) || m[1].trim();
         method = "admin-proxy-name-first";
       } else if (
-        matchAdminNumFirst &&
-        parseInt(matchAdminNumFirst[1]) <= MAX_ITEM_ID
+        isAdmin &&
+        (m = normalizedMsg.match(adminProxyNumFirstRegex)) &&
+        parseInt(m[1]) <= MAX_ITEM_ID
       ) {
         intent = "buy";
-        targetId = parseInt(matchAdminNumFirst[1]);
-        forcedOwnerName = sanitizeAdminCustomerName(matchAdminNumFirst[2]) || matchAdminNumFirst[2].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
+        targetId = parseInt(m[1]);
+        forcedOwnerName = sanitizeAdminCustomerName(m[2]) || m[2].replace(/^[^\u0E00-\u0E7Fa-zA-Z]+/, "").trim();
         method = "admin-proxy-num-first";
-      } else if (matchPure && parseInt(matchPure[1]) <= MAX_ITEM_ID) {
+      } else if (
+        (m = normalizedMsg.match(pureNumberRegex)) &&
+        parseInt(m[1]) <= MAX_ITEM_ID
+      ) {
         intent = "buy";
-        targetId = parseInt(matchPure[1]);
+        targetId = parseInt(m[1]);
         method = "regex-pure";
-      } else if (matchFuzzy && parseInt(matchFuzzy[1]) <= MAX_ITEM_ID) {
+      } else if (
+        (m = normalizedMsg.match(fuzzyNumberRegex)) &&
+        parseInt(m[1]) <= MAX_ITEM_ID
+      ) {
         intent = "buy";
-        targetId = parseInt(matchFuzzy[1]);
+        targetId = parseInt(m[1]);
         method = "regex-fuzzy";
       } else if (
-        matchExplicit &&
-        parseInt(matchExplicit[1] || matchExplicit[2]) <= MAX_ITEM_ID
+        (m = normalizedMsg.match(explicitBuyRegex)) &&
+        parseInt(m[1] || m[2]) <= MAX_ITEM_ID
       ) {
         intent = "buy";
-        targetId = parseInt(matchExplicit[1] || matchExplicit[2]);
+        targetId = parseInt(m[1] || m[2]);
         method = "regex-explicit";
-      } else if (matchPolite && parseInt(matchPolite[1]) <= MAX_ITEM_ID) {
+      } else if (
+        (m = normalizedMsg.match(numberWithPoliteRegex)) &&
+        parseInt(m[1]) <= MAX_ITEM_ID
+      ) {
         intent = "buy";
-        targetId = parseInt(matchPolite[1]);
+        targetId = parseInt(m[1]);
         method = "regex-polite";
-      } else if (matchDash && !/^\d+$/.test(matchDash[1].trim()) && !sizeRangeRegex.test(normalizedMsg) && parseInt(matchDash[2]) <= MAX_ITEM_ID) {
+      } else if (
+        (m = normalizedMsg.match(dashBuyRegex)) &&
+        !/^\d+$/.test(m[1].trim()) &&
+        !sizeRangeRegex.test(normalizedMsg) &&
+        parseInt(m[2]) <= MAX_ITEM_ID
+      ) {
         intent = "buy";
-        targetId = parseInt(matchDash[2]);
+        targetId = parseInt(m[2]);
         method = "regex-dash";
       } else if (
-        matchCustomerName &&
-        parseInt(matchCustomerName[2]) <= MAX_ITEM_ID
+        (m = normalizedMsg.match(customerNameNumRegex)) &&
+        parseInt(m[2]) <= MAX_ITEM_ID
       ) {
         // Guard: ต้องไม่ใช่คำถาม/shipping keyword
-        const nameOnly = matchCustomerName[1].trim();
+        const nameOnly = m[1].trim();
         if (!questionRegex.test(nameOnly) && !shippingRegex.test(nameOnly)) {
           intent = "buy";
-          targetId = parseInt(matchCustomerName[2]);
+          targetId = parseInt(m[2]);
           forcedOwnerName = nameOnly;
           method = "regex-customer-name";
         }
       } else if (
-        matchNumDesc &&
-        parseInt(matchNumDesc[1]) <= MAX_ITEM_ID
+        (m = normalizedMsg.match(numAndDescRegex)) &&
+        parseInt(m[1]) <= MAX_ITEM_ID
       ) {
-        const desc = matchNumDesc[2].trim();
+        const desc = m[2].trim();
         // Guard: ต้องไม่ใช่คำถาม/shipping keyword ในรายละเอียด
         if (!questionRegex.test(desc) && !shippingRegex.test(desc)) {
           intent = "buy";
-          targetId = parseInt(matchNumDesc[1]);
+          targetId = parseInt(m[1]);
           if (isAdmin) {
             forcedOwnerName = desc;
             method = "admin-proxy-num-desc";
@@ -953,7 +960,7 @@ export function useChatProcessor() {
         return chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
           id: item.id,
           text: msg,
-          messageRuns: extractMessageRuns(item),
+          messageRuns: getMessageRuns(),
           authorName: realName,
           displayName: isProxyBooking ? `${ownerName} (โดย ${displayName})` : displayName,
           proxyCustomerName: isProxyBooking ? ownerName : null,
@@ -1083,7 +1090,7 @@ export function useChatProcessor() {
       await chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
         id: item.id,
         text: msg,
-        messageRuns: extractMessageRuns(item),
+        messageRuns: getMessageRuns(),
         authorName: realName,
         displayName,
         phoneticName,
@@ -1128,7 +1135,7 @@ export function useChatProcessor() {
       await chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
         id: item.id,
         text: msg,
-        messageRuns: extractMessageRuns(item),
+        messageRuns: getMessageRuns(),
         authorName: realName,
         displayName,
         proxyCustomerName,
@@ -1154,7 +1161,10 @@ export function useChatProcessor() {
     logger.debug(
       `🎙️ Initializing ManowPriceVoiceListener for video: ${videoId}`,
     );
-    const voiceChatRef = dbRef(db, `voice_chats/${videoId}`);
+    const voiceChatRef = query(
+      dbRef(db, `voice_chats/${videoId}`),
+      limitToLast(10),
+    );
 
     return onChildAdded(
       voiceChatRef,

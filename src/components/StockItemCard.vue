@@ -108,9 +108,7 @@ function isUnsavedOwner(name) {
   padding: 8px 6px;
   min-height: 85px;
   z-index: 0;
-  transform: translateZ(0);
   backface-visibility: hidden;
-  will-change: transform;
   transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.03);
 }
@@ -119,6 +117,7 @@ function isUnsavedOwner(name) {
   .stock-item:hover {
     border-color: rgba(16, 185, 129, 0.45);
     background: rgba(16, 185, 129, 0.06);
+    will-change: transform;
     transform: translateY(-2px) translateZ(0);
     z-index: 10;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(16, 185, 129, 0.2);
@@ -132,6 +131,7 @@ function isUnsavedOwner(name) {
 }
 
 .stock-item:active {
+  will-change: transform;
   transform: scale(0.97) translateZ(0);
 }
 

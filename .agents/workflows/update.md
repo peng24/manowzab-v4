@@ -27,3 +27,8 @@ description: How to update Patch Notes and version after making code changes
 4. **Verify** that `src/stores/system.js` reads version from `package.json` correctly
 
 5. **Run `/verify` workflow** to ensure no checklist items were broken
+
+6. **Auto-Update Rules & `/verify` + Report to User (บังคับทำทุกครั้ง)**
+   - ตรวจสอบว่ามีการเปลี่ยนแปลงสถาปัตยกรรม ลอจิก หรือข้อกำหนดใหม่ที่ควรอัปเดตลงใน `AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md` และ `.agents/workflows/verify.md` หรือไม่
+   - หากมี ให้อัปเดตไฟล์เหล่านั้นทันทีโดยไม่ต้องรอให้สั่ง และ**รายงานให้ผู้ใช้ทราบทุกครั้ง**
+

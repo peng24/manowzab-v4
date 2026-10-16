@@ -468,6 +468,7 @@ import { ref as dbRef, onValue, update, remove, get, runTransaction } from "fire
 import { db } from "../composables/useFirebase";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
+import { useCustomerStore } from "../stores/customer";
 import Swal from "sweetalert2";
 import ThaiDatePicker from "./ThaiDatePicker.vue";
 
@@ -489,9 +490,10 @@ const emit = defineEmits(["close"]);
 
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
+const customerStore = useCustomerStore();
 
 // State
-const allCustomers = ref([]);
+const allCustomers = computed(() => customerStore.deliveryCustomersList);
 const newName = ref("");
 const newDate = ref("");
 const showDone = ref(false);
@@ -500,7 +502,7 @@ const showShippingLabels = ref(false);
 const selectedCustomerForPrint = ref(null);
 const showAddressImport = ref(false);
 const selectedCustomerForAddress = ref(null);
-const addressBook = ref({});
+const addressBook = computed(() => customerStore.addressBook);
 const cleanupFns = [];
 
 const currentCustomerForModal = computed(() => {
@@ -607,23 +609,8 @@ function handleTableDateChange(id, val) {
 }
 
 onMounted(() => {
-  const customersRef = dbRef(db, "delivery_customers");
-  const unsubListener = onValue(customersRef, (snapshot) => {
-    const data = snapshot.val() || {};
-    allCustomers.value = Object.keys(data).map((key) => ({
-      id: key,
-      ...data[key],
-      itemCount: data[key].itemCount || 0,
-      sessions: data[key].sessions || null,
-    }));
-  });
-  cleanupFns.push(unsubListener);
-
-  const addressBookRef = dbRef(db, "address_book");
-  const unsubAddressBook = onValue(addressBookRef, (snapshot) => {
-    addressBook.value = snapshot.val() || {};
-  });
-  cleanupFns.push(unsubAddressBook);
+  const unsubCustomers = customerStore.initCustomerListeners();
+  if (unsubCustomers) cleanupFns.push(unsubCustomers);
 
   const unsubCycle = systemStore.initShippingCycleListener();
   if (unsubCycle) cleanupFns.push(unsubCycle);

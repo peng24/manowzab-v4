@@ -78,8 +78,21 @@ export function usePullToRefresh() {
   let activeScrollContainer = null;
 
   function handleTouchStart(e) {
+    // ✅ Skip global pull-to-refresh if touch starts inside #stock-viewport or #chat-viewport
+    // (those viewports manage their own component-level pull-to-refresh without forcing getComputedStyle loops)
+    const targetEl = e.target;
+    if (
+      targetEl &&
+      typeof targetEl.closest === "function" &&
+      targetEl.closest("#stock-viewport, #chat-viewport")
+    ) {
+      isPulling = false;
+      activeScrollContainer = null;
+      return;
+    }
+
     // ✅ Find the nearest scrollable container from touch target
-    activeScrollContainer = getScrollableParent(e.target);
+    activeScrollContainer = getScrollableParent(targetEl);
 
     // Check if at top: either window or the scrollable container
     const isAtTop = activeScrollContainer

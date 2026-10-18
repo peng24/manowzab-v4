@@ -988,3 +988,85 @@ export function formatShippingCycleLabel(cycleSetting, referenceDate = new Date(
   return `${dayName} (${dayNum} ${monthName})`;
 }
 
+/**
+ * คำนวณสถานะการเลื่อนช่องแชท (Auto-Scroll vs User Scrolling Up)
+ * ป้องกันปัญหาเมื่อเปิดหน้าเว็บใหม่แล้วเนื้อหาแชทขยายตัว (เช่น โหลดป้ายสถานะลูกค้า/ป้ายชื่อแอดมิน/อิโมจิเสร็จทีหลัง)
+ * แล้วทำให้ระบบเข้าใจผิดว่าผู้ใช้เลื่อนขึ้นไปดูประวัติ
+ * @param {Object} params
+ * @param {number} params.scrollTop
+ * @param {number} params.scrollHeight
+ * @param {number} params.clientHeight
+ * @param {number} params.lastScrollTop
+ * @param {number} params.lastScrollHeight
+ * @param {boolean} params.isUserScrolling
+ * @param {boolean} params.isProgrammaticScroll
+ * @param {number} [params.bottomThreshold=30]
+ */
+export function evaluateChatScrollState({
+  scrollTop,
+  scrollHeight,
+  clientHeight,
+  lastScrollTop = 0,
+  lastScrollHeight = 0,
+  isUserScrolling = false,
+  isProgrammaticScroll = false,
+  bottomThreshold = 30,
+}) {
+  const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+  const heightShrank = scrollHeight < lastScrollHeight - 1;
+  const scrolledUp = !heightShrank && scrollTop < lastScrollTop - 0.5;
+
+  // 1. อยู่ที่ด้านล่างสุดแล้ว (ภายในระยะ threshold) -> เปิด auto-scroll เสมอ
+  if (distanceToBottom <= bottomThreshold) {
+    return {
+      isUserScrolling: false,
+      showScrollButton: false,
+      shouldAutoScroll: false,
+      lastScrollTop: scrollTop,
+      lastScrollHeight: scrollHeight,
+    };
+  }
+
+  // 2. หากเป็นการเลื่อนอัตโนมัติของระบบ แต่ความสูงแชทขยายเพิ่มระหว่างเฟรม ให้เลื่อนตามลงไปจนสุด
+  if (isProgrammaticScroll) {
+    return {
+      isUserScrolling,
+      showScrollButton: isUserScrolling,
+      shouldAutoScroll: !isUserScrolling,
+      lastScrollTop: scrollTop,
+      lastScrollHeight: scrollHeight,
+    };
+  }
+
+  // 3. ผู้ใช้เลื่อนขึ้นด้านบนจริง (scrollTop ลดลงโดยที่ความสูงไม่ได้หดตัว) และห่างจากขอบล่างเกิน threshold
+  if (scrolledUp) {
+    return {
+      isUserScrolling: true,
+      showScrollButton: true,
+      shouldAutoScroll: false,
+      lastScrollTop: scrollTop,
+      lastScrollHeight: scrollHeight,
+    };
+  }
+
+  // 4. ผู้ใช้ไม่ได้เลื่อนขึ้น และไม่ได้อยู่ในโหมดดูประวัติ แต่ความสูงเนื้อหาขยายตัวลงด้านล่าง -> ดึงลงล่างสุดตามทันที
+  if (!isUserScrolling) {
+    return {
+      isUserScrolling: false,
+      showScrollButton: false,
+      shouldAutoScroll: true,
+      lastScrollTop: scrollTop,
+      lastScrollHeight: scrollHeight,
+    };
+  }
+
+  // 5. ผู้ใช้กำลังดูประวัติอยู่ (isUserScrolling === true) และเลื่อนลงมาเล็กน้อยแต่ยังไม่ถึงขอบล่าง
+  return {
+    isUserScrolling: true,
+    showScrollButton: true,
+    shouldAutoScroll: false,
+    lastScrollTop: scrollTop,
+    lastScrollHeight: scrollHeight,
+  };
+}
+

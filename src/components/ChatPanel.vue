@@ -370,6 +370,7 @@ import {
   backdatedNoteRegex,
   adminSizeSelectionNoteRegex,
   shippingRegex,
+  evaluateChatScrollState,
 } from "../utils/chatParserUtils";
 import { parseYouTubeEmotesToRuns, hasYouTubeEmotes } from "../data/youtubeEmotes";
 import { logger } from "../utils/logger";
@@ -387,6 +388,12 @@ const quickEditModalRef = ref(null);
 const showScrollButton = ref(false);
 const displayLimit = ref(200); // ✅ Pagination: Start with last 200 messages
 let isUserScrolling = false;
+let isProgrammaticScroll = false;
+let lastScrollTop = 0;
+let lastScrollHeight = 0;
+let chatResizeObserver = null;
+let programmaticScrollTimer = null;
+let scrollConfirmFrame = null;
 
 // ✅ Pull-to-Refresh State
 const isPulling = ref(false);
@@ -859,15 +866,30 @@ function getChatRuns(chat) {
   return null;
 }
 
-// ตรวจจับการ Scroll
+// ตรวจจับการ Scroll (แยกแยะการเลื่อนขึ้นของผู้ใช้จริง ออกจากกรณีความสูงแชทขยายตัวตอนโหลดข้อมูล/ป้ายชื่อลูกค้า)
 function handleScroll() {
   const el = chatViewport.value;
   if (!el) return;
 
-  // ถ้า Scroll ขึ้นไปเกิน 30px จากด้านล่าง ถือว่า user กำลังดูประวัติ (หยุด auto-scroll ทันที)
-  const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-  isUserScrolling = distanceToBottom > 30;
-  showScrollButton.value = isUserScrolling;
+  const state = evaluateChatScrollState({
+    scrollTop: el.scrollTop,
+    scrollHeight: el.scrollHeight,
+    clientHeight: el.clientHeight,
+    lastScrollTop,
+    lastScrollHeight,
+    isUserScrolling,
+    isProgrammaticScroll,
+    bottomThreshold: 30,
+  });
+
+  lastScrollTop = state.lastScrollTop;
+  lastScrollHeight = state.lastScrollHeight;
+  isUserScrolling = state.isUserScrolling;
+  showScrollButton.value = state.showScrollButton;
+
+  if (state.shouldAutoScroll) {
+    scrollToBottom(false);
+  }
 }
 
 // ✅ Phase 3.2: Scroll throttle ด้วย requestAnimationFrame
@@ -880,6 +902,10 @@ let lastSmoothScrollTime = 0;
 function scrollToBottom(isSmooth = false) {
   const el = chatViewport.value;
   if (!el) return;
+
+  showScrollButton.value = false;
+  showNewMsgPill.value = false;
+  isUserScrolling = false;
 
   const now = performance.now();
   // ป้องกันกรณีส่ง PointerEvent เข้ามา หรือสั่ง smooth scroll ซ้อนกันถี่เกินไป (ต้องห่างกันอย่างน้อย 300ms)
@@ -894,11 +920,22 @@ function scrollToBottom(isSmooth = false) {
       cancelAnimationFrame(scrollAnimFrame);
       scrollAnimFrame = null;
     }
+    if (scrollConfirmFrame) {
+      cancelAnimationFrame(scrollConfirmFrame);
+      scrollConfirmFrame = null;
+    }
     scrollPending = false;
+    isProgrammaticScroll = true;
     el.scrollTo({ top: el.scrollHeight + 1000, behavior: "smooth" });
-    showScrollButton.value = false;
-    showNewMsgPill.value = false;
-    isUserScrolling = false;
+    if (programmaticScrollTimer) clearTimeout(programmaticScrollTimer);
+    programmaticScrollTimer = setTimeout(() => {
+      isProgrammaticScroll = false;
+      programmaticScrollTimer = null;
+      if (chatViewport.value && !isUserScrolling) {
+        lastScrollTop = chatViewport.value.scrollTop;
+        lastScrollHeight = chatViewport.value.scrollHeight;
+      }
+    }, 350);
   } else {
     // Instant scroll: ถ้ามี RAF pending อยู่แล้ว ไม่ต้อง queue อีก (coalesce)
     if (scrollPending) return;
@@ -908,10 +945,26 @@ function scrollToBottom(isSmooth = false) {
       scrollAnimFrame = null;
       const container = chatViewport.value;
       if (!container) return;
+      isProgrammaticScroll = true;
       container.scrollTop = container.scrollHeight;
+      lastScrollTop = container.scrollTop;
+      lastScrollHeight = container.scrollHeight;
       showScrollButton.value = false;
       showNewMsgPill.value = false;
       isUserScrolling = false;
+
+      // Double-RAF: ยืนยันตำแหน่งล่างสุดในเฟรมถัดไปหลัง Browser คำนวณ Layout/Transition เสร็จสิ้น
+      if (scrollConfirmFrame) cancelAnimationFrame(scrollConfirmFrame);
+      scrollConfirmFrame = requestAnimationFrame(() => {
+        scrollConfirmFrame = null;
+        const c2 = chatViewport.value;
+        if (c2 && !isUserScrolling) {
+          c2.scrollTop = c2.scrollHeight;
+          lastScrollTop = c2.scrollTop;
+          lastScrollHeight = c2.scrollHeight;
+        }
+        isProgrammaticScroll = false;
+      });
     });
   }
 }
@@ -924,6 +977,7 @@ function loadMoreMessages() {
 
   // Save current scroll height to preserve position
   const oldScrollHeight = el.scrollHeight;
+  isUserScrolling = true;
 
   // Increase display limit by 200 messages
   displayLimit.value += 200;
@@ -933,12 +987,17 @@ function loadMoreMessages() {
     const newScrollHeight = el.scrollHeight;
     const scrollDiff = newScrollHeight - oldScrollHeight;
     el.scrollTop += scrollDiff;
+    lastScrollTop = el.scrollTop;
+    lastScrollHeight = newScrollHeight;
   });
 }
 
-// เมื่อมีข้อความใหม่
+// เมื่อมีข้อความใหม่ (รองรับทั้งกรณีความยาวเพิ่มขึ้น และกรณีแตะเพดาน MAX_MESSAGES = 500)
 watch(
-  () => chatStore.messages.length,
+  () => [
+    chatStore.messages.length,
+    chatStore.messages[chatStore.messages.length - 1]?.id,
+  ],
   async () => {
     await nextTick();
     // ถ้า User ไม่ได้เลื่อนดูประวัติอยู่ ให้เลื่อนลงอัตโนมัติแบบ instant fast scroll
@@ -949,10 +1008,36 @@ watch(
       showScrollButton.value = true;
     }
   },
+  { flush: "post" },
+);
+
+// เมื่อสลับแท็บกรองประเภทแชท หรือเปลี่ยนตัวกรองรายชื่อลูกค้า ให้เลื่อนไปยังข้อความล่าสุดเสมอ
+watch(
+  [selectedChatTab, () => selectedAuthors.value.length],
+  async () => {
+    isUserScrolling = false;
+    await nextTick();
+    scrollToBottom(false);
+  },
+  { flush: "post" },
 );
 
 onMounted(() => {
-  scrollToBottom();
+  scrollToBottom(false);
+
+  // ✅ Observe #chat-list & #chat-viewport height changes (เช่น เมื่อโหลดป้ายสถานะลูกค้า/ป้ายชื่อแอดมิน/ฟอนต์/อิโมจิเสร็จ)
+  if (typeof ResizeObserver !== "undefined" && chatViewport.value) {
+    chatResizeObserver = new ResizeObserver(() => {
+      if (!isUserScrolling) {
+        scrollToBottom(false);
+      }
+    });
+    chatResizeObserver.observe(chatViewport.value);
+    const chatListEl = chatViewport.value.querySelector("#chat-list");
+    if (chatListEl) {
+      chatResizeObserver.observe(chatListEl);
+    }
+  }
 
   // ✅ Initialize Firebase Chat Sync
   if (systemStore.currentVideoId) {
@@ -973,12 +1058,27 @@ onUnmounted(() => {
   });
   cleanupFns.length = 0;
 
+  // ✅ Clean up ResizeObserver
+  if (chatResizeObserver) {
+    chatResizeObserver.disconnect();
+    chatResizeObserver = null;
+  }
+
   // ✅ Phase 3.2: Cancel pending RAF scroll ป้องกัน callback ทำงานหลัง unmount
   if (scrollAnimFrame) {
     cancelAnimationFrame(scrollAnimFrame);
     scrollAnimFrame = null;
   }
+  if (scrollConfirmFrame) {
+    cancelAnimationFrame(scrollConfirmFrame);
+    scrollConfirmFrame = null;
+  }
+  if (programmaticScrollTimer) {
+    clearTimeout(programmaticScrollTimer);
+    programmaticScrollTimer = null;
+  }
   scrollPending = false;
+  isProgrammaticScroll = false;
   if (chatUnsubscribe) {
     chatUnsubscribe();
     chatUnsubscribe = null;
@@ -1000,8 +1100,11 @@ watch(
       logger.info(
         `🔄 Video ID changed from ${oldVideoId} to ${newVideoId}, re-syncing chat...`,
       );
+      isUserScrolling = false;
+      showScrollButton.value = false;
       if (chatUnsubscribe) chatUnsubscribe();
       chatUnsubscribe = chatStore.syncFromFirebase(newVideoId);
+      nextTick(() => scrollToBottom(false));
     }
   },
 );
@@ -1013,9 +1116,7 @@ watch(
     if (!isCollapsed) {
       chatStore.resetUnreadCollapsed();
       nextTick(() => {
-        if (chatViewport.value) {
-          chatViewport.value.scrollTop = chatViewport.value.scrollHeight;
-        }
+        scrollToBottom(false);
       });
     }
   },
@@ -1480,8 +1581,6 @@ async function refreshChat() {
 }
 
 .chat-row {
-  content-visibility: auto;
-  contain-intrinsic-size: 55px;
   display: flex;
   align-items: flex-start;
   gap: 10px;

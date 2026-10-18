@@ -34,6 +34,8 @@
    - In `clearAllStock()`, always `await remove()`, deduplicate owners, and pass `{}` to `syncDeliveryCustomerForOwner()` (which must accept `{}` without re-querying Firebase).
    - In `ShippingManager.vue`, record `lastDoneCount` and `lastDoneSessions` on `markDone()` so `undoDone()` reverts `totalBookings` and only restores sessions from that delivery cycle.
    - In `StockGrid.vue` and `HistoryModal.vue` (`showOwnerItems`), use `runTransaction` when cancelling past-session items, escape HTML with `escapeHtml()`, and re-open `showOwnerItems()` after confirm/cancel.
+6. **Chat Initial Bottom Pinning & Direction-Aware Auto-Scroll Invariant**:
+   - `ChatPanel.vue` must use `evaluateChatScrollState()`, Double-`requestAnimationFrame` in `scrollToBottom()`, and `ResizeObserver` on `#chat-list`/`#chat-viewport` (and never use `contain-intrinsic-size: 55px` on `.chat-row`) so opening the page or async customer badge/pill rendering always lands at the latest message without falsely triggering `isUserScrolling`.
 
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:

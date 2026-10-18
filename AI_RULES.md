@@ -41,6 +41,7 @@
 2.  **Concurrent Poll Micro-Batching:** `YouTubeLiveChat.js` must dispatch all new chat items per poll concurrently (`Promise.allSettled`) into `useChatProcessor`'s 80ms micro-batch window (`incomingBatchQueue`) so messages sort by `publishedAt` and execute in one 80ms batch instead of stalling `80ms × N` sequentially.
 3.  **Centralized Customer Store (`useCustomerStore`):** Never attach duplicate `onValue(dbRef(db, "delivery_customers"))` or `onValue(dbRef(db, "address_book"))` listeners in components. Always use `src/stores/customer.js` and its $O(1)$ lookup indexes (`deliveryByNormKey`, `getCustomerMetaByName`).
 4.  **Quota Safety:** Viewer polling interval must be >= 60s. Workbox Service Worker in `vite.config.js` must exclude `/liveChat/messages` and `texttospeech.googleapis.com`.
+5.  **Chat Initial Bottom Pinning & Direction-Aware Auto-Scroll:** `ChatPanel.vue` must use `evaluateChatScrollState()`, Double-`requestAnimationFrame` in `scrollToBottom()`, and `ResizeObserver` on `#chat-list`/`#chat-viewport` (without `contain-intrinsic-size: 55px` on `.chat-row`) so initial page load and async customer badge/pill rendering always stay pinned to the latest message without falsely showing `"ข้อความใหม่ ⬇"`.
 
 ### 🎯 Regex Engine, Cancel Safety & Chat Intent Accuracy (v5.4.0+)
 

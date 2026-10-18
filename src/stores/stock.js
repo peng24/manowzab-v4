@@ -160,13 +160,14 @@ export const useStockStore = defineStore("stock", () => {
 
     try {
       let action = "unknown";
+      let committedItem = undefined;
 
       await runTransaction(itemRef, (currentData) => {
         const markBackdated = (isBackdated || systemStore.isLiveFinished) ? true : null;
         if (currentData === null) {
           // Create new item if not exists
           action = "claimed";
-          return {
+          committedItem = {
             owner,
             uid,
             time: Date.now(),
@@ -175,6 +176,7 @@ export const useStockStore = defineStore("stock", () => {
             price: price || null,
             backdated: markBackdated,
           };
+          return committedItem;
         } else if (!currentData.owner) {
           // Claim empty item
           action = "claimed";
@@ -187,6 +189,7 @@ export const useStockStore = defineStore("stock", () => {
           if (markBackdated) {
             currentData.backdated = true;
           }
+          committedItem = { ...currentData };
           return currentData;
         } else {
           // Add to queue if occupied
@@ -207,13 +210,19 @@ export const useStockStore = defineStore("stock", () => {
             backdated: markBackdated,
           });
           currentData.queue = queue;
+          committedItem = { ...currentData };
           return currentData;
         }
       });
 
-      // ✅ Auto-sync customer to delivery_customers
+      // ✅ Auto-sync customer to delivery_customers with post-transaction snapshot
       if (action === "claimed") {
-        syncDeliveryCustomerForOwner(owner, uid, systemStore.currentVideoId, stockData.value).catch((e) =>
+        const nextStockSnapshot = { ...stockData.value };
+        if (committedItem) {
+          nextStockSnapshot[num] = committedItem;
+        }
+        stockData.value = nextStockSnapshot;
+        syncDeliveryCustomerForOwner(owner, uid, systemStore.currentVideoId, nextStockSnapshot).catch((e) =>
           console.warn("Auto sync delivery error:", e)
         );
       }
@@ -225,32 +234,55 @@ export const useStockStore = defineStore("stock", () => {
     }
   }
 
+  const STRIP_HONORIFIC_REGEX = /^(?:คุณ|พี่|น้อง|ป้า|น้า|อา|แม่|ยาย)\s*/i;
+
+  function isMatchingCancelOwner(actualName, targetName) {
+    if (!actualName || !targetName) return false;
+    const a = String(actualName).trim().toLowerCase();
+    const b = String(targetName).trim().toLowerCase();
+    if (a === b) return true;
+    const normA = a.replace(STRIP_HONORIFIC_REGEX, "").replace(/\s+/g, " ").trim();
+    const normB = b.replace(STRIP_HONORIFIC_REGEX, "").replace(/\s+/g, " ").trim();
+    return Boolean(normA && normB && normA === normB);
+  }
+
   /**
    * Cancels an order and promotes the next person in queue, or removes a user from the queue.
    *
    * @param {number} num - The item number to cancel.
    * @param {string|null} uid - Unique ID of the buyer to cancel.
    * @param {string|null} ownerName - Display name of the buyer to cancel.
-   * @returns {Promise<{previousOwner: string|null, nextOwner: string|null, cancelledFromQueue: boolean}|null>} Info about the cancellation for TTS.
+   * @returns {Promise<{previousOwner: string|null, previousUid: string|null, nextOwner: string|null, nextUid: string|null, cancelledFromQueue: boolean}|null>} Info about the cancellation for TTS.
    */
   async function processCancel(num, uid = null, ownerName = null) {
     const itemRef = dbRef(db, `stock/${systemStore.currentVideoId}/${num}`);
     let previousOwner = null;
+    let previousUid = null;
     let nextOwner = null;
+    let nextUid = null;
     let cancelledFromQueue = false;
+    let committedItem = undefined;
 
     try {
       await runTransaction(itemRef, (currentData) => {
-        if (!currentData) return null; // Nothing to cancel
+        previousOwner = null;
+        previousUid = null;
+        nextOwner = null;
+        nextUid = null;
+        cancelledFromQueue = false;
+        committedItem = undefined;
+
+        if (!currentData || !currentData.owner) return currentData; // Nothing to cancel (preserve existing price if any)
 
         // Check if the cancellation is for the owner
         const isOwner =
           (!uid && !ownerName) ||
           (uid && currentData.uid === uid) ||
-          (ownerName && currentData.owner === ownerName);
+          (ownerName && isMatchingCancelOwner(currentData.owner, ownerName));
 
         if (isOwner) {
           previousOwner = currentData.owner;
+          previousUid = currentData.uid || uid || null;
 
           if (currentData.queue && currentData.queue.length > 0) {
             // Promote next in queue
@@ -258,8 +290,9 @@ export const useStockStore = defineStore("stock", () => {
             const nextQ = currentData.queue.slice(1);
 
             nextOwner = next.owner;
+            nextUid = next.uid || null;
 
-            return {
+            committedItem = {
               ...currentData,
               owner: next.owner,
               uid: next.uid,
@@ -268,8 +301,17 @@ export const useStockStore = defineStore("stock", () => {
               source: "queue",
               backdated: next.backdated || null,
             };
+            return committedItem;
           } else {
-            // No one in queue, delete the item
+            // No one in queue: preserve price if set, otherwise delete the item
+            const preservedPrice = Number(currentData.price);
+            if (!isNaN(preservedPrice) && preservedPrice > 0) {
+              committedItem = {
+                price: preservedPrice,
+              };
+              return committedItem;
+            }
+            committedItem = null;
             return null;
           }
         } else {
@@ -278,26 +320,47 @@ export const useStockStore = defineStore("stock", () => {
             const initialLen = currentData.queue.length;
             currentData.queue = currentData.queue.filter((q) => {
               const matchesUid = uid && q.uid === uid;
-              const matchesName = ownerName && q.owner === ownerName;
+              const matchesName = ownerName && isMatchingCancelOwner(q.owner, ownerName);
               return !(matchesUid || matchesName);
             });
 
             if (currentData.queue.length < initialLen) {
               cancelledFromQueue = true;
+              committedItem = { ...currentData };
             }
           }
           return currentData;
         }
       });
 
-      // ✅ Auto-sync delivery_customers for previous owner and promoted next owner
+      // ✅ Update post-transaction stock snapshot and auto-sync delivery_customers
+      const nextStockSnapshot = { ...stockData.value };
+      if (committedItem === null) {
+        delete nextStockSnapshot[num];
+      } else if (committedItem !== undefined) {
+        nextStockSnapshot[num] = committedItem;
+      }
+      if (committedItem !== undefined) {
+        stockData.value = nextStockSnapshot;
+      }
+
       if (previousOwner) {
-        syncDeliveryCustomerForOwner(previousOwner, uid, systemStore.currentVideoId, stockData.value).catch((e) =>
+        syncDeliveryCustomerForOwner(
+          previousOwner,
+          previousUid || uid,
+          systemStore.currentVideoId,
+          nextStockSnapshot,
+        ).catch((e) =>
           console.warn("Auto sync delivery error on cancel:", e)
         );
       }
       if (nextOwner) {
-        syncDeliveryCustomerForOwner(nextOwner, null, systemStore.currentVideoId, stockData.value).catch((e) =>
+        syncDeliveryCustomerForOwner(
+          nextOwner,
+          nextUid,
+          systemStore.currentVideoId,
+          nextStockSnapshot,
+        ).catch((e) =>
           console.warn("Auto sync delivery error on promote:", e)
         );
       }
@@ -305,7 +368,9 @@ export const useStockStore = defineStore("stock", () => {
       return {
         success: true,
         previousOwner,
+        previousUid,
         nextOwner,
+        nextUid,
         cancelledFromQueue,
         error: null,
       };
@@ -314,7 +379,9 @@ export const useStockStore = defineStore("stock", () => {
       return {
         success: false,
         previousOwner,
+        previousUid: null,
         nextOwner: null,
+        nextUid: null,
         cancelledFromQueue: false,
         error: e.message,
       };
@@ -405,22 +472,30 @@ export const useStockStore = defineStore("stock", () => {
   /**
    * Clears all stock for the current video.
    */
-  function clearAllStock() {
+  async function clearAllStock() {
     const videoId = systemStore.currentVideoId;
-    const affectedOwners = [];
+    const uniqueOwnersMap = new Map();
     Object.values(stockData.value).forEach((item) => {
-      if (item?.owner) affectedOwners.push({ owner: item.owner, uid: item.uid });
+      if (item?.owner) {
+        const key = String(item.owner).trim().toLowerCase();
+        if (key && (!uniqueOwnersMap.has(key) || (!uniqueOwnersMap.get(key).uid && item.uid))) {
+          uniqueOwnersMap.set(key, { owner: item.owner, uid: item.uid || null });
+        }
+      }
     });
 
-    remove(dbRef(db, `stock/${videoId}`));
+    stockData.value = {};
     milestones.value = { fifty: false, eighty: false, hundred: false }; // ✅ Reset milestones for the next round
 
+    await remove(dbRef(db, `stock/${videoId}`));
+
     if (videoId) {
-      affectedOwners.forEach(({ owner, uid }) => {
-        syncDeliveryCustomerForOwner(owner, uid, videoId).catch((e) =>
+      const emptySnapshot = {};
+      for (const { owner, uid } of uniqueOwnersMap.values()) {
+        syncDeliveryCustomerForOwner(owner, uid, videoId, emptySnapshot).catch((e) =>
           console.warn("Auto sync delivery error on clear all stock:", e)
         );
-      });
+      }
     }
   }
 
@@ -493,14 +568,18 @@ export const useStockStore = defineStore("stock", () => {
       newData,
     );
 
+    const mergedItem = { ...(stockData.value[num] || {}), ...(newData || {}) };
+    const nextStockSnapshot = { ...stockData.value, [num]: mergedItem };
+    stockData.value = nextStockSnapshot;
+
     // 2. Auto-sync delivery_customers for previous owner and new owner
     if (oldOwner) {
-      syncDeliveryCustomerForOwner(oldOwner, oldUid, systemStore.currentVideoId, stockData.value).catch((e) =>
+      syncDeliveryCustomerForOwner(oldOwner, oldUid, systemStore.currentVideoId, nextStockSnapshot).catch((e) =>
         console.warn("Auto sync delivery error on item edit:", e)
       );
     }
     if (newData && newData.owner && newData.owner !== oldOwner) {
-      syncDeliveryCustomerForOwner(newData.owner, newData.uid, systemStore.currentVideoId, stockData.value).catch((e) =>
+      syncDeliveryCustomerForOwner(newData.owner, newData.uid, systemStore.currentVideoId, nextStockSnapshot).catch((e) =>
         console.warn("Auto sync delivery error on item edit:", e)
       );
     }

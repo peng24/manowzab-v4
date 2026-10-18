@@ -48,7 +48,8 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 - **Shared Singleton `AudioContext`**: Reuse `ttsService.getAudioContext()` across TTS, SFX, and celebration audio.
 
 ### 2. Concurrency & Transaction Safety
-- **Inventory writes must use `runTransaction`**: Never perform raw `set()` or `update()` when booking (`processOrder`), canceling (`processCancel`), or completing orders (`markDone`).
+- **Inventory writes must use `runTransaction`**: Never perform raw `set()`, `update()`, or `remove()` when booking (`processOrder`), canceling (`processCancel` or past-session cancel in `showOwnerItems`), or updating `totalBookings` (`markDone` / `undoDone`).
+- **UID & Snapshot Preservation**: `processCancel` must preserve `previousUid` and `nextUid` and pass post-transaction snapshots to `syncDeliveryCustomerForOwner`. `clearAllStock` must `await remove()`, deduplicate owners, and pass `{}` to `syncDeliveryCustomerForOwner`. `markDone` must store `lastDoneCount` and `lastDoneSessions` so `undoDone` accurately reverts `totalBookings` and restores only current-cycle sessions.
 - **Device Role Election**: Host role and Price Detector election (`system/activePriceDetectorId`) must be acquired and released atomically.
 
 ### 3. Memory Leak & Event Listener Hygiene
@@ -59,8 +60,8 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 ### 4. Thai Numeral & Intent Normalization
 - **Strict $O(1)$ Thai transcription**: Always route through `thaiToArabic()` using the static table lookup `THAI_TO_ARABIC_MAP`.
 - **Admin Proxy**: Support both `"26 พี่อ้อย"` and `"พี่อ้อย 26"` syntax; pronounce only the recipient customer's name during TTS.
-- **Admin Proxy Cancel**: Support `"12 มะระ ยกเลิก"`, `"19 กนกวรรณ ยกเลิก"`, `"มะระ ยกเลิก 12"`, and `"ยกเลิก 12 มะระ"` while guarding against conditional notes (`conditionalCancelGuardRegex`).
-- **Disambiguation Guards**: Guard buys against size complaints (`negationGuardRegex`), price classifiers (`pricePatternRegex`), and quantity units (`quantityUnitRegex`).
+- **Admin Proxy & Multi-Cancel Safety**: Support single and multi-item cancel (`"ยกเลิก 12 15"`, `"12 มะระ ยกเลิก"`, `"12 15 มะระ ยกเลิก"`, `"มะระ ยกเลิก 12"`, `"ยกเลิก 12 มะระ"`) while guarding against conditional notes (`conditionalCancelGuardRegex`), never falling back to `null` wildcard when Admin specifies a customer name, and preserving item `price` when the sole owner cancels in `processCancel`.
+- **Disambiguation & Parity Guards**: Guard `multiBuyRegex` with `!isMultiBuyBlocked()`, guard buys against size complaints (`negationGuardRegex`), price classifiers (`pricePatternRegex`), and quantity units (`quantityUnitRegex`), share `isAdminSizeSelectionNote()` across parser and processor, and always push `isDateMismatch` messages to Firebase before returning.
 - **Zero-Allocation Regex & ReDoS Hygiene**: Hoist regular expressions to module scope, avoid nested quantifiers (`*?\s*`), and use memoized regex pools for dynamic search strings.
 
 ### 5. UI & Alert Standards

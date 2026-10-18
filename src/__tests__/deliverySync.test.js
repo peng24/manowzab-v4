@@ -255,5 +255,89 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
       expect(vasina.uid).toBe("UC123456789"); // Preserved real YouTube channel UID
       expect(vasina.items).toEqual(["1", "3", "4", "6", "15", "17", "22"]);
     });
+
+    it("respects explicitly passed empty stockData ({}) in syncDeliveryCustomerForOwner without re-fetching stock from Firebase", async () => {
+      const { get, update } = await import("firebase/database");
+      const { syncDeliveryCustomerForOwner, setLiveDeliveryCustomersCache } = await import("../utils/deliverySync");
+
+      setLiveDeliveryCustomersCache({
+        UC_TEST_1: {
+          uid: "UC_TEST_1",
+          name: "สมศรี",
+          status: "pending",
+          itemCount: 2,
+          totalPrice: 200,
+          sessions: {
+            vid_live_1: { count: 2, totalPrice: 200, status: "pending" },
+          },
+        },
+      });
+
+      await syncDeliveryCustomerForOwner("สมศรี", "UC_TEST_1", "vid_live_1", {});
+
+      // Should NOT have called get(dbRef(db, 'stock/vid_live_1')) because {} was explicitly provided
+      expect(get).not.toHaveBeenCalledWith("stock/vid_live_1");
+      expect(update).toHaveBeenCalledWith(
+        "delivery_customers/UC_TEST_1",
+        expect.objectContaining({
+          itemCount: 0,
+          totalPrice: 0,
+        }),
+      );
+
+      setLiveDeliveryCustomersCache(null);
+    });
+
+    it("restores only lastDoneSessions and subtracts lastDoneCount on undoDone without re-opening historical done sessions", () => {
+      const customerBeforeDone = {
+        id: "UC_CUST_1",
+        name: "กนกวรรณ",
+        status: "pending",
+        itemCount: 2,
+        totalPrice: 250,
+        totalBookings: 5,
+        sessions: {
+          old_vid_1: { count: 3, totalPrice: 300, status: "done" },
+          current_vid_2: { count: 2, totalPrice: 250, status: "pending" },
+        },
+      };
+
+      // Simulate markDone
+      const doneSessionIds = Object.keys(customerBeforeDone.sessions).filter(
+        (vid) => customerBeforeDone.sessions[vid]?.status !== "done"
+      );
+      expect(doneSessionIds).toEqual(["current_vid_2"]);
+
+      const customerAfterDone = {
+        ...customerBeforeDone,
+        status: "done",
+        itemCount: 0,
+        lastDoneCount: customerBeforeDone.itemCount,
+        lastDoneSessions: doneSessionIds,
+        totalBookings: customerBeforeDone.totalBookings + customerBeforeDone.itemCount,
+        sessions: {
+          old_vid_1: { count: 3, totalPrice: 300, status: "done" },
+          current_vid_2: { count: 2, totalPrice: 250, status: "done" },
+        },
+      };
+      expect(customerAfterDone.totalBookings).toBe(7);
+
+      // Simulate undoDone
+      const targetVids = new Set(customerAfterDone.lastDoneSessions);
+      let restoredCount = 0;
+      let restoredPrice = 0;
+      Object.keys(customerAfterDone.sessions).forEach((vid) => {
+        if (targetVids.has(vid)) {
+          restoredCount += customerAfterDone.sessions[vid].count;
+          restoredPrice += customerAfterDone.sessions[vid].totalPrice;
+        }
+      });
+      const countToSubtract = customerAfterDone.lastDoneCount;
+      const revertedTotalBookings = Math.max(0, customerAfterDone.totalBookings - countToSubtract);
+
+      expect(restoredCount).toBe(2); // Does NOT include old_vid_1's 3 items
+      expect(restoredPrice).toBe(250);
+      expect(revertedTotalBookings).toBe(5); // Reverted from 7 back to 5
+    });
   });
 });

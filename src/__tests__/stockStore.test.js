@@ -108,4 +108,122 @@ describe("Stock Store", () => {
       expect(result).toBe(20);
     });
   });
+
+  describe("processCancel() — Price Preservation & Owner Name Safety", () => {
+    it("preserves item price when the sole owner cancels an item that has a price set", async () => {
+      const { runTransaction } = await import("firebase/database");
+      let transactionResult;
+      runTransaction.mockImplementationOnce(async (_ref, updateFn) => {
+        transactionResult = updateFn({
+          owner: "มะระ",
+          uid: "user-1",
+          price: 150,
+          queue: [],
+        });
+        return { committed: true };
+      });
+
+      const stockStore = useStockStore();
+      const res = await stockStore.processCancel(15, "user-1", "มะระ");
+      expect(res.success).toBe(true);
+      expect(res.previousOwner).toBe("มะระ");
+      expect(transactionResult).toEqual({ price: 150 });
+    });
+
+    it("deletes item node (returns null) when sole owner cancels an item without price", async () => {
+      const { runTransaction } = await import("firebase/database");
+      let transactionResult;
+      runTransaction.mockImplementationOnce(async (_ref, updateFn) => {
+        transactionResult = updateFn({
+          owner: "มะระ",
+          uid: "user-1",
+          price: null,
+          queue: [],
+        });
+        return { committed: true };
+      });
+
+      const stockStore = useStockStore();
+      const res = await stockStore.processCancel(15, "user-1", "มะระ");
+      expect(res.success).toBe(true);
+      expect(res.previousOwner).toBe("มะระ");
+      expect(transactionResult).toBeNull();
+    });
+
+    it("matches owner with honorific prefix ('พี่มะระ' vs 'มะระ') and refuses to cancel wrong owner ('กนกวรรณ' vs 'มะระ')", async () => {
+      const { runTransaction } = await import("firebase/database");
+      let txResultMismatch;
+      runTransaction.mockImplementationOnce(async (_ref, updateFn) => {
+        txResultMismatch = updateFn({
+          owner: "กนกวรรณ",
+          uid: "user-kanok",
+          price: 200,
+          queue: [],
+        });
+        return { committed: true };
+      });
+
+      const stockStore = useStockStore();
+      const mismatchRes = await stockStore.processCancel(12, null, "มะระ");
+      expect(mismatchRes.previousOwner).toBeNull();
+      expect(mismatchRes.cancelledFromQueue).toBe(false);
+      expect(txResultMismatch.owner).toBe("กนกวรรณ");
+
+      let txResultHonorific;
+      runTransaction.mockImplementationOnce(async (_ref, updateFn) => {
+        txResultHonorific = updateFn({
+          owner: "พี่มะระ",
+          uid: "proxy-123",
+          price: 200,
+          queue: [],
+        });
+        return { committed: true };
+      });
+
+      const honorificRes = await stockStore.processCancel(12, null, "มะระ");
+      expect(honorificRes.previousOwner).toBe("พี่มะระ");
+      expect(honorificRes.previousUid).toBe("proxy-123");
+      expect(txResultHonorific).toEqual({ price: 200 });
+    });
+
+    it("preserves previousUid and nextUid when promoting next person in queue", async () => {
+      const { runTransaction } = await import("firebase/database");
+      let txResult;
+      runTransaction.mockImplementationOnce(async (_ref, updateFn) => {
+        txResult = updateFn({
+          owner: "สมชาย",
+          uid: "UC_SOMCHAI",
+          price: 180,
+          queue: [{ owner: "สมศรี", uid: "UC_SOMSRI", time: 12345 }],
+        });
+        return { committed: true };
+      });
+
+      const stockStore = useStockStore();
+      const res = await stockStore.processCancel(9, null, "สมชาย");
+      expect(res.success).toBe(true);
+      expect(res.previousOwner).toBe("สมชาย");
+      expect(res.previousUid).toBe("UC_SOMCHAI");
+      expect(res.nextOwner).toBe("สมศรี");
+      expect(res.nextUid).toBe("UC_SOMSRI");
+      expect(txResult.owner).toBe("สมศรี");
+      expect(txResult.uid).toBe("UC_SOMSRI");
+      expect(txResult.price).toBe(180);
+    });
+
+    it("clears stockData and awaits remove in clearAllStock()", async () => {
+      const { remove } = await import("firebase/database");
+      const stockStore = useStockStore();
+      stockStore.stockData = {
+        1: { owner: "วาศินา", uid: null, price: 100 },
+        2: { owner: "วาศินา", uid: "UC_VASINA", price: 150 },
+        3: { owner: "สมหญิง", uid: "UC_SOMYING", price: 200 },
+      };
+
+      await stockStore.clearAllStock();
+      expect(remove).toHaveBeenCalled();
+      expect(stockStore.stockData).toEqual({});
+    });
+  });
 });
+

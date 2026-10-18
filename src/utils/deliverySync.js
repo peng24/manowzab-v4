@@ -1,7 +1,15 @@
 import { ref as dbRef, get, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "./logger";
-import { isAdminUser } from "./chatParserUtils";
+import {
+  isAdminUser,
+  formatShippingCycleLabel,
+  resolveShippingCycleDate,
+  formatDateToYYYYMMDD,
+} from "./chatParserUtils";
+import { useSystemStore } from "../stores/system";
+import { useAudio } from "../composables/useAudio";
+import { useNicknameStore } from "../stores/nickname";
 
 /**
  * Checks if a UID is a temporary/proxy UID.
@@ -160,9 +168,9 @@ export async function syncDeliveryCustomerForOwner(
   if (!normName) return;
 
   try {
-    // 1. Use in-memory stockData if available, otherwise fetch from Firebase
+    // 1. Use in-memory stockData if provided (including {} when board is cleared), otherwise fetch from Firebase
     let stockData = localStockData;
-    if (!stockData || Object.keys(stockData).length === 0) {
+    if (!stockData || typeof stockData !== "object") {
       const stockSnap = await get(dbRef(db, `stock/${videoId}`));
       stockData = stockSnap.val() || {};
     }
@@ -300,8 +308,6 @@ function getCountdownDays(deliveryDate) {
  */
 export async function getShippingRequestedCustomers(targetCycle = null) {
   try {
-    const { resolveShippingCycleDate, formatDateToYYYYMMDD } = await import("./chatParserUtils");
-    const { useSystemStore } = await import("../stores/system");
     const systemStore = useSystemStore();
 
     let targetDateStr = null;
@@ -366,7 +372,6 @@ export async function announceShippingCustomers(videoId = null, options = {}) {
   const { force = false, cycle = null } = options;
   const now = Date.now();
 
-  const { useSystemStore } = await import("../stores/system");
   const systemStore = useSystemStore();
 
   const activeVid = videoId || systemStore.currentVideoId;
@@ -386,10 +391,6 @@ export async function announceShippingCustomers(videoId = null, options = {}) {
   _lastAnnounceTimestamp = now;
 
   if (!systemStore.isSoundOn) return;
-
-  const { useAudio } = await import("../composables/useAudio");
-  const { useNicknameStore } = await import("../stores/nickname");
-  const { formatShippingCycleLabel } = await import("./chatParserUtils");
 
   const { queueAudio } = useAudio();
   const nicknameStore = useNicknameStore();

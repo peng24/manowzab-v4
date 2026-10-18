@@ -24,11 +24,16 @@
 3. **Shared `AudioContext` & Service Worker Bypass**:
    - Share a single `AudioContext` (`ttsService.getAudioContext()`) across `TextToSpeech.js`, `useAudio.js`, and `celebration.js`, and preload celebration audio via `requestIdleCallback`.
    - Workbox `runtimeCaching` in `vite.config.js` must exclude `/liveChat/messages` and `texttospeech.googleapis.com`.
-4. **Chat Intent Accuracy & Regex Optimization Invariant (v5.4.0)**:
-   - Handle Admin Proxy Cancel (`cancelNumFirstRegex`, `cancelNameKeywordNumRegex`, `cancelWithNumRegex`) and protect against false-positive cancels (`conditionalCancelGuardRegex`).
-   - Disambiguate buying from questions, try requests, size complaints (`negationGuardRegex`), classifiers/pricing (`pricePatternRegex`), and quantity units (`quantityUnitRegex`).
+4. **Chat Intent Accuracy, Cancel Safety & Regex Optimization Invariant (v5.4.0+)**:
+   - Handle single & multi-item Admin Proxy Cancel (`cancelNumFirstRegex`, `cancelNameKeywordNumRegex`, `cancelWithNumRegex`, `parseCancelIds`), protect against false-positive cancels (`conditionalCancelGuardRegex`), guard `multiBuyRegex` with `!isMultiBuyBlocked()`, preserve item `price` on chat cancel (`processCancel`), and never fall back to `null` (wildcard cancel) when Admin specifies a target customer name.
+   - Disambiguate buying from questions, try requests, size complaints (`negationGuardRegex`), classifiers/pricing (`pricePatternRegex`), and quantity units (`quantityUnitRegex`), share `isAdminSizeSelectionNote()` across parser & processor, and always sync `isDateMismatch` messages to Firebase before returning.
    - Extract clean customer names on shipping (`extractAdminCustomerName`) and strictly filter conversational non-names in self-name learning (`extractCustomerSelfName`).
    - Eliminate nested quantifiers (`*?\s*`) to prevent catastrophic backtracking (ReDoS) and pre-compile regexes at module scope.
+5. **Stock, Queue Promotion & Delivery Sync Consistency Invariant**:
+   - Preserve `previousUid` and `nextUid` in `processCancel()` and pass post-transaction stock snapshots to `syncDeliveryCustomerForOwner()`.
+   - In `clearAllStock()`, always `await remove()`, deduplicate owners, and pass `{}` to `syncDeliveryCustomerForOwner()` (which must accept `{}` without re-querying Firebase).
+   - In `ShippingManager.vue`, record `lastDoneCount` and `lastDoneSessions` on `markDone()` so `undoDone()` reverts `totalBookings` and only restores sessions from that delivery cycle.
+   - In `StockGrid.vue` and `HistoryModal.vue` (`showOwnerItems`), use `runTransaction` when cancelling past-session items, escape HTML with `escapeHtml()`, and re-open `showOwnerItems()` after confirm/cancel.
 
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:

@@ -69,10 +69,12 @@ import {
   sanitizeAdminCustomerName,
   extractCustomerSelfName,
   isHandleOrNonThaiName,
+  isAdminSizeSelectionNote,
+  isMultiBuyBlocked,
+  parseCancelIds,
 } from "../utils/chatParserUtils";
 
 // 🚀 Pre-compiled Module-Scoped Regexes (Zero allocation per chat message)
-const ADMIN_SHORT_NOTE_REGEX = /^(?:[ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา)$/i;
 const SPLIT_NUMS_REGEX = /[\s,_]+/;
 const BACKDATED_ORDER_REGEX = /เมื่อวาน|เมือวาน|ย้อนหลัง|รอบเมื่อวาน/i;
 const STRIP_LEADING_NON_LETTER_REGEX = /^[^\u0E00-\u0E7Fa-zA-Z]+/;
@@ -403,12 +405,8 @@ export function useChatProcessor() {
       return;
     }
 
-    // 📝 Admin Size Selection / Request Note (e.g. "พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล", "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า", "อำไพ เอาตัวอก56", "อำไพ ถ้าใส่ไม่ได้ก็ไม่เอา")
-    if (
-      isAdmin &&
-      (adminSizeSelectionNoteRegex.test(normalizedMsg) ||
-       ADMIN_SHORT_NOTE_REGEX.test(normalizedMsg))
-    ) {
+    // 📝 Admin Size Selection / Request Note (e.g. "พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล", "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า", "อำไพ เอาตัวอก56", "3xl อำไพ", "เสื้อเชิ้ต อก56 สมฤทธิ์")
+    if (isAdmin && isAdminSizeSelectionNote(normalizedMsg)) {
       const customerName = extractAdminCustomerName(normalizedMsg);
       if (customerName) {
         chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
@@ -436,9 +434,11 @@ export function useChatProcessor() {
       }
     }
 
-    // 🔥 HIGHEST PRIORITY: Multi-Buy Logic (before all other checks)
+    // 🔥 HIGHEST PRIORITY: Multi-Buy Logic (Guarded against cancel, try, question, negation, shipping, and size/price queries)
     // Handles "26 38 74", "26 38 74 ClientName", or "มะระ เอา 19 13 10"
-    const matchMultiBuy = normalizedMsg.match(multiBuyRegex);
+    const matchMultiBuy = !isMultiBuyBlocked(normalizedMsg)
+      ? normalizedMsg.match(multiBuyRegex)
+      : null;
     if (matchMultiBuy) {
       const numbersStr = matchMultiBuy[2] || matchMultiBuy[1]; // "26 38 74"
       const proxyName =
@@ -455,7 +455,7 @@ export function useChatProcessor() {
         .filter((n) => n > 0 && n <= MAX_ITEM_ID);
 
       if (itemIds.length > 0) {
-        // ✅ Check Date Mismatch (If date specified in message does not match live date -> do nothing)
+        // ✅ Check Date Mismatch (If date specified in message does not match live date -> sync message & skip stock booking)
         const msgTimestamp = item.snippet?.publishedAt
           ? new Date(item.snippet.publishedAt).getTime()
           : Date.now();
@@ -465,6 +465,24 @@ export function useChatProcessor() {
             icon: "warning",
             title: `🗓️ ข้ามการจอง: วันที่ในแชทไม่ตรงกับวันไลฟ์สด`,
             toast: true,
+          });
+          await chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+            id: item.id,
+            text: msg,
+            messageRuns: getMessageRuns(),
+            authorName: realName,
+            displayName,
+            phoneticName,
+            realName,
+            uid,
+            avatar,
+            color: stringToColor(uid),
+            isAdmin,
+            type: isAdmin ? "note" : "general",
+            sfxType: "error",
+            ttsText: isVoiceChat ? "" : ttsMessage,
+            detectionMethod: "date-mismatch-skip",
+            timestamp: msgTimestamp,
           });
           return;
         }
@@ -560,39 +578,46 @@ export function useChatProcessor() {
       }
     }
 
-    // 🔴 CANCEL CHECK
+    // 🔴 CANCEL CHECK (Supports single or multi-item cancel e.g. "ยกเลิก 12 15", "12 มะระ ยกเลิก")
     let isCancel = false;
     let cancelTargetName = null;
+    let cancelIds = [];
 
     if (!conditionalCancelGuardRegex.test(normalizedMsg)) {
-      // 1. Check number first patterns (e.g. "12 ยกเลิก", "12 มะระ ยกเลิก", "19 กนกวรรณ ยกเลิก")
+      // 1. Check number first patterns (e.g. "12 ยกเลิก", "12 มะระ ยกเลิก", "12 15 ยกเลิก")
       const matchNumFirst = normalizedMsg.match(cancelNumFirstRegex);
-      if (matchNumFirst && parseInt(matchNumFirst[1]) <= MAX_ITEM_ID) {
+      const parsedNumFirst = matchNumFirst ? parseCancelIds(matchNumFirst[1]) : [];
+      if (parsedNumFirst.length > 0) {
         isCancel = true;
-        targetId = parseInt(matchNumFirst[1]);
+        cancelIds = parsedNumFirst;
+        targetId = parsedNumFirst[0];
         if (matchNumFirst[2]) {
           cancelTargetName = sanitizeAdminCustomerName(matchNumFirst[2]);
         }
         method = "regex-cancel-num-first";
       }
 
-      // 2. Check name + cancel keyword + number (e.g. "มะระ ยกเลิก 12")
+      // 2. Check name + cancel keyword + number (e.g. "มะระ ยกเลิก 12", "มะระ ยกเลิก 12 15")
       if (!isCancel) {
         const matchNameKeywordNum = normalizedMsg.match(cancelNameKeywordNumRegex);
-        if (matchNameKeywordNum && parseInt(matchNameKeywordNum[2]) <= MAX_ITEM_ID) {
+        const parsedNameFirst = matchNameKeywordNum ? parseCancelIds(matchNameKeywordNum[2]) : [];
+        if (parsedNameFirst.length > 0) {
           isCancel = true;
-          targetId = parseInt(matchNameKeywordNum[2]);
+          cancelIds = parsedNameFirst;
+          targetId = parsedNameFirst[0];
           cancelTargetName = sanitizeAdminCustomerName(matchNameKeywordNum[1]);
           method = "regex-cancel-name-first";
         }
       }
 
-      // 3. Check cancel with number patterns (keyword first, e.g. "ยกเลิก 12", "ยกเลิก 12 มะระ")
+      // 3. Check cancel with number patterns (keyword first, e.g. "ยกเลิก 12", "ยกเลิก 12 15", "ยกเลิก 12 มะระ")
       if (!isCancel) {
         const matchWithNum = normalizedMsg.match(cancelWithNumRegex);
-        if (matchWithNum && parseInt(matchWithNum[1]) <= MAX_ITEM_ID) {
+        const parsedWithNum = matchWithNum ? parseCancelIds(matchWithNum[1]) : [];
+        if (parsedWithNum.length > 0) {
           isCancel = true;
-          targetId = parseInt(matchWithNum[1]);
+          cancelIds = parsedWithNum;
+          targetId = parsedWithNum[0];
           if (matchWithNum[2]) {
             cancelTargetName = sanitizeAdminCustomerName(matchWithNum[2]);
           }
@@ -611,6 +636,7 @@ export function useChatProcessor() {
     if (isCancel && standalonePassRegex.test(normalizedMsg)) {
       isCancel = false;
       targetId = null;
+      cancelIds = [];
       method = null;
     }
 
@@ -921,7 +947,7 @@ export function useChatProcessor() {
 
     // 5. Process Order & Audio Logic (Updated with SFX)
     if (intent === "buy" && targetId > 0) {
-      // ✅ Check Date Mismatch (If date specified in message does not match live date -> do nothing)
+      // ✅ Check Date Mismatch (If date specified in message does not match live date -> sync message & skip stock booking)
       const msgTimestamp = item.snippet?.publishedAt
         ? new Date(item.snippet.publishedAt).getTime()
         : Date.now();
@@ -931,6 +957,24 @@ export function useChatProcessor() {
           icon: "warning",
           title: `🗓️ ข้ามการจอง: วันที่ในแชทไม่ตรงกับวันไลฟ์สด`,
           toast: true,
+        });
+        await chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+          id: item.id,
+          text: msg,
+          messageRuns: getMessageRuns(),
+          authorName: realName,
+          displayName,
+          phoneticName,
+          realName,
+          uid,
+          avatar,
+          color: stringToColor(uid),
+          isAdmin,
+          type: isAdmin ? "note" : "general",
+          sfxType: "error",
+          ttsText: isVoiceChat ? "" : ttsMessage,
+          detectionMethod: "date-mismatch-skip",
+          timestamp: msgTimestamp,
         });
         return;
       }
@@ -1060,11 +1104,19 @@ export function useChatProcessor() {
         }
       }
     } else if (intent === "cancel") {
-      // --- Cancel Logic ---
+      // --- Cancel Logic (Single or Multi-Item) ---
       let cancelSuccess = false;
+      const idsToCancel =
+        cancelIds.length > 0
+          ? cancelIds
+          : targetId && targetId > 0
+          ? [targetId]
+          : [];
+      const cancelledIds = [];
+      let lastCancelledName = cancelTargetName || displayName;
 
-      if (targetId && targetId > 0) {
-        const currentItem = stockStore.stockData[targetId];
+      for (const idToCancel of idsToCancel) {
+        const currentItem = stockStore.stockData[idToCancel];
         const isUserInQueue =
           currentItem &&
           currentItem.queue &&
@@ -1080,17 +1132,15 @@ export function useChatProcessor() {
 
         if (isAdmin || isUserOwner || isUserInQueue) {
           const isAdminProxyCancel = isAdmin && !isUserOwner && !isUserInQueue;
-          const targetMatchesItemOrQueue =
-            cancelTargetName &&
-            currentItem &&
-            (currentItem.owner === cancelTargetName ||
-              (currentItem.queue && currentItem.queue.some((q) => q.owner === cancelTargetName)));
           const cancelUid = isAdminProxyCancel ? null : uid;
+          // 🛡️ Safety: When Admin specifies a target customer name (e.g. "12 มะระ ยกเลิก"),
+          // NEVER fall back to null (wildcard cancel). Only use null when Admin gave no name (e.g. "ยกเลิก 12").
           const cancelOwnerName = isAdminProxyCancel
-            ? (targetMatchesItemOrQueue ? cancelTargetName : null)
+            ? cancelTargetName || null
             : displayName;
+
           const result = await stockStore.processCancel(
-            targetId,
+            idToCancel,
             cancelUid,
             cancelOwnerName,
           );
@@ -1100,24 +1150,36 @@ export function useChatProcessor() {
             (result.previousOwner || result.cancelledFromQueue)
           ) {
             cancelSuccess = true;
+            cancelledIds.push(idToCancel);
+            lastCancelledName =
+              result.previousOwner || cancelTargetName || displayName;
 
             // ✅ Audit Log: Track admin cancel actions
             if (isAdminProxyCancel) {
               logger.log(
-                `🛡️ ADMIN CANCEL: ${displayName} (uid: ${uid}) cancelled item #${targetId} of ${result.previousOwner || cancelTargetName || "queue member"} via ${method}`,
+                `🛡️ ADMIN CANCEL: ${displayName} (uid: ${uid}) cancelled item #${idToCancel} of ${result.previousOwner || cancelTargetName || "queue member"} via ${method}`,
               );
             }
-
-            // ✅ Toast: แจ้งยกเลิกสำเร็จ พร้อมระบุรหัส
-            const cancelledName = result.previousOwner || cancelTargetName || displayName;
-            const isAutoResolved = method && method.includes("auto-latest");
+          } else if (isAdminProxyCancel && cancelTargetName) {
+            logger.warn(
+              `⚠️ Admin cancel skipped for item #${idToCancel}: target "${cancelTargetName}" does not match current owner/queue`,
+            );
             Toast.fire({
               icon: "warning",
-              title: `❌ ยกเลิกรหัส ${targetId}${isAutoResolved ? " (ล่าสุด)" : ""} ของ ${cancelledName} แล้ว`,
+              title: `⚠️ ไม่พบชื่อ "${cancelTargetName}" ในรหัส ${idToCancel} (ข้ามการยกเลิก)`,
               toast: true,
             });
           }
         }
+      }
+
+      if (cancelledIds.length > 0) {
+        const isAutoResolved = method && method.includes("auto-latest");
+        Toast.fire({
+          icon: "warning",
+          title: `❌ ยกเลิกรหัส ${cancelledIds.join(", ")}${isAutoResolved ? " (ล่าสุด)" : ""} ของ ${lastCancelledName} แล้ว`,
+          toast: true,
+        });
       }
 
       const sfxType = cancelSuccess ? "cancel" : (isNewCustomerChat ? "bell" : null);

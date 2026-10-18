@@ -327,10 +327,10 @@ import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
 import { useCustomerStore } from "../stores/customer";
 import { useAudio } from "../composables/useAudio";
-import { ref as dbRef, onValue, get, remove, update } from "firebase/database";
+import { ref as dbRef, onValue, get, remove, update, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
-import { normalizeCustomerName } from "../utils/deliverySync";
+import { normalizeCustomerName, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
 import { resolveShippingCycleDate, formatDateToYYYYMMDD } from "../utils/chatParserUtils";
 import Swal from "sweetalert2";
 
@@ -1001,7 +1001,9 @@ async function showOwnerItems(ownerName) {
 
         const result = await Swal.fire({
           title: `ลบ #${num} ของ ${ownerName}?`,
-          text: !isToday ? `สินค้านี้อยู่ในรอบส่งย้อนหลัง` : `ราคาและคิวทั้งหมดในช่องนี้จะถูกลบ`,
+          text: !isToday
+            ? `ยกเลิกรายการจองนี้จากรอบส่งย้อนหลัง (หากมีคิวสำรองจะเลื่อนขึ้นมาแทน)`
+            : `ยกเลิกรายการจองนี้ของลูกค้า (หากมีคิวสำรองจะเลื่อนขึ้นมาแทน)`,
           icon: 'warning',
           showCancelButton: true,
           confirmButtonText: 'ลบเลย',
@@ -1013,63 +1015,60 @@ async function showOwnerItems(ownerName) {
 
         if (result.isConfirmed) {
           if (isToday) {
-            // ลบรายการของวันนี้ตามปกติ
-            await stockStore.processCancel(num);
+            // ลบรายการของวันนี้ตามปกติ (ระบุ uid และ ownerName เพื่อให้เลื่อนคิวสำรองและเก็บราคาไว้)
+            await stockStore.processCancel(num, uid, ownerName);
           } else {
-            // ลบรายการของวันก่อนหน้า (Past Session)
+            // ลบรายการของวันก่อนหน้า (Past Session) อย่างปลอดภัยด้วย Transaction (เลื่อนคิวสำรอง/เก็บราคา)
             const pastItemRef = dbRef(db, `stock/${vid}/${num}`);
-            await remove(pastItemRef);
+            let promotedNext = null;
+            await runTransaction(pastItemRef, (currentData) => {
+              promotedNext = null;
+              if (!currentData || !currentData.owner) return currentData;
 
-            // อัปเดตข้อมูลเซสชั่นใน delivery_customers
-            if (cust) {
-              const sessionRef = dbRef(db, `delivery_customers/${cust.uid || cust.id}/sessions/${vid}`);
-              const sessionSnap = await get(sessionRef);
-              if (sessionSnap.exists()) {
-                const sData = sessionSnap.val();
-                const newCount = Math.max((sData.count || 0) - 1, 0);
+              const isOwnerMatch =
+                (!uid && !ownerName) ||
+                (uid && currentData.uid === uid) ||
+                (ownerName && normalizeCustomerName(currentData.owner) === normalizeCustomerName(ownerName));
 
-                // ดึงรายการสต็อกที่เหลือในเซสชั่นนั้นมาคำนวณราคารวมใหม่
-                const itemSnap = await get(dbRef(db, `stock/${vid}`));
-                const allStock = itemSnap.val() || {};
-                let newTotalPrice = 0;
-                Object.values(allStock).forEach(i => {
-                  if (i.owner === ownerName || (i.uid && cust.uid && i.uid === cust.uid)) {
-                    newTotalPrice += i.price ? parseInt(i.price) : 0;
-                  }
-                });
-
-                if (newCount === 0) {
-                  await remove(sessionRef);
+              if (isOwnerMatch) {
+                if (currentData.queue && currentData.queue.length > 0) {
+                  const next = currentData.queue[0];
+                  const nextQ = currentData.queue.slice(1);
+                  promotedNext = next;
+                  return {
+                    ...currentData,
+                    owner: next.owner,
+                    uid: next.uid,
+                    time: Date.now(),
+                    queue: nextQ,
+                    source: "queue",
+                    backdated: next.backdated || null,
+                  };
                 } else {
-                  await update(sessionRef, {
-                    count: newCount,
-                    totalPrice: newTotalPrice
-                  });
+                  const preservedPrice = Number(currentData.price);
+                  if (!isNaN(preservedPrice) && preservedPrice > 0) {
+                    return { price: preservedPrice };
+                  }
+                  return null;
                 }
-
-                // คำนวณยอดสะสม itemCount และ totalPrice ใหม่ในหน้าจัดส่ง
-                const sessionsSnap = await get(dbRef(db, `delivery_customers/${cust.uid || cust.id}/sessions`));
-                const sessions = sessionsSnap.val() || {};
-                const totalCount = Object.values(sessions)
-                  .filter(s => s.status !== "done")
-                  .reduce((sum, s) => sum + (s.count || 0), 0);
-                const totalPrice = Object.values(sessions)
-                  .filter(s => s.status !== "done")
-                  .reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-
-                await update(dbRef(db, `delivery_customers/${cust.uid || cust.id}`), {
-                  itemCount: totalCount,
-                  totalPrice: totalPrice,
-                  updatedAt: Date.now(),
-                });
               }
+              return currentData;
+            });
+
+            // ดึงรายการสต็อกที่เหลือในเซสชั่นนั้นมาคำนวณยอดจัดส่งและยอดประวัติใหม่ (ประกาศ allStock นอก if เพื่อไม่ให้เกิด ReferenceError)
+            const itemSnap = await get(dbRef(db, `stock/${vid}`));
+            const allStock = itemSnap.val() || {};
+
+            await syncDeliveryCustomerForOwner(ownerName, uid || cust?.uid || null, vid, allStock);
+            if (promotedNext && promotedNext.owner) {
+              await syncDeliveryCustomerForOwner(promotedNext.owner, promotedNext.uid || null, vid, allStock);
             }
 
             // คำนวณยอดขายในประวัติใหม่โดยใช้ allStock ที่ดึงมาแล้ว
             let totalSales = 0;
             let totalItems = 0;
-            Object.values(allStock).forEach(order => {
-              if (order.owner) {
+            Object.values(allStock).forEach((order) => {
+              if (order && order.owner) {
                 totalItems++;
                 const p = parseInt(order.price, 10);
                 totalSales += isNaN(p) ? 0 : p;
@@ -1078,24 +1077,31 @@ async function showOwnerItems(ownerName) {
             await update(dbRef(db, `history/${vid}`), {
               totalSales,
               totalItems,
-              lastUpdated: Date.now()
+              lastUpdated: Date.now(),
             });
 
             // ลบจากรายการ pastItems ท้องถิ่นเพื่ออัปเดต UI ทันที
-            pastItems.value = pastItems.value.filter(i => !(i.num === num && i.videoId === vid));
+            pastItems.value = pastItems.value.filter((i) => !(i.num === num && i.videoId === vid));
           }
 
-          Swal.fire({
-            icon: 'success',
-            title: `ลบ #${num} เรียบร้อย`,
-            toast: true,
-            position: 'top-end',
-            timer: 1500,
-            showConfirmButton: false,
-          });
-
-          // อัปเดต Modal ทันที
-          updateOwnerItemsModal();
+          const remainingTodayCount = Object.values(stockStore.stockData).filter(
+            (item) => item && item.owner === ownerName
+          ).length;
+          if (remainingTodayCount + pastItems.value.length > 0) {
+            await showOwnerItems(ownerName);
+          } else {
+            Swal.fire({
+              icon: 'success',
+              title: `ลบ #${num} เรียบร้อย`,
+              toast: true,
+              position: 'top-end',
+              timer: 1500,
+              showConfirmButton: false,
+            });
+          }
+        } else {
+          // หากกดยกเลิกการลบ ให้เปิดป๊อปอัปรายการของลูกค้าคนนี้กลับขึ้นมาเหมือนเดิม
+          await showOwnerItems(ownerName);
         }
       };
 

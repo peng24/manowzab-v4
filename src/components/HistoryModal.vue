@@ -1311,13 +1311,13 @@ function updateOwnerItemsModal() {
   const itemsHtml = allItems.map((item) => {
     const priceText = item.price ? `${parseInt(item.price).toLocaleString()}` : '';
     const timeText = item.time ? formatTime(item.time) : '';
-    const removeDetail = `${item.num}|${item.videoId}`;
+    const removeDetail = escapeHtml(`${item.num}|${item.videoId}`);
 
     return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin:4px 0; background:linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius:10px; border:1px solid #2a2a4a; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#2a2a4a'">
       <div style="flex:1; min-width:0;">
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span style="background:linear-gradient(135deg, #0ea5e9, #2563eb); color:#fff; font-weight:700; padding:2px 10px; border-radius:20px; font-size:0.85em; white-space:nowrap;">#${item.num}</span>
-          <span style="background:rgba(255, 255, 255, 0.08); color:#cbd5e1; border:1px solid rgba(255, 255, 255, 0.15); font-weight:500; padding:2px 8px; border-radius:20px; font-size:0.8em; white-space:nowrap;">${item.title}</span>
+          <span style="background:rgba(255, 255, 255, 0.08); color:#cbd5e1; border:1px solid rgba(255, 255, 255, 0.15); font-weight:500; padding:2px 8px; border-radius:20px; font-size:0.8em; white-space:nowrap;">${escapeHtml(item.title)}</span>
           ${priceText ? `<span style="color:#fbbf24; font-weight:600; font-size:0.85em;">💰 ${priceText} ฿</span>` : ''}
         </div>
         ${timeText ? `<div style="font-size:0.7em; color:#6b7280; margin-top:4px; padding-left:2px;">📅 ${timeText}</div>` : ''}
@@ -1398,7 +1398,9 @@ async function showOwnerItems(ownerName) {
 
         const result = await Swal.fire({
           title: `ลบ #${num} ของ ${ownerName}?`,
-          text: !isCurrentSession ? `สินค้านี้อยู่ในรอบส่งย้อนหลัง` : `ราคาและคิวทั้งหมดในช่องนี้จะถูกลบ`,
+          text: !isCurrentSession
+            ? `ยกเลิกรายการจองนี้จากรอบส่งย้อนหลัง (หากมีคิวสำรองจะเลื่อนขึ้นมาแทน)`
+            : `ยกเลิกรายการจองนี้ของลูกค้า (หากมีคิวสำรองจะเลื่อนขึ้นมาแทน)`,
           icon: 'warning',
           showCancelButton: true,
           confirmButtonText: 'ลบเลย',
@@ -1413,23 +1415,61 @@ async function showOwnerItems(ownerName) {
             await processHistoryCancel(num, uid, ownerName);
           } else {
             const pastItemRef = dbRef(db, `stock/${vid}/${num}`);
-            await remove(pastItemRef);
-            
+            await runTransaction(pastItemRef, (currentData) => {
+              if (!currentData || !currentData.owner) return currentData;
+
+              const isOwnerMatch =
+                (!uid && !ownerName) ||
+                (uid && currentData.uid === uid) ||
+                (ownerName && normalizeCustomerName(currentData.owner) === normalizeCustomerName(ownerName));
+
+              if (isOwnerMatch) {
+                if (currentData.queue && currentData.queue.length > 0) {
+                  const next = currentData.queue[0];
+                  const nextQ = currentData.queue.slice(1);
+                  return {
+                    ...currentData,
+                    owner: next.owner,
+                    uid: next.uid,
+                    time: Date.now(),
+                    queue: nextQ,
+                    source: "queue",
+                    backdated: next.backdated || null,
+                  };
+                } else {
+                  const preservedPrice = Number(currentData.price);
+                  if (!isNaN(preservedPrice) && preservedPrice > 0) {
+                    return { price: preservedPrice };
+                  }
+                  return null;
+                }
+              }
+              return currentData;
+            });
+
             await updateDeliveryAndHistoryTotals(vid);
 
-            pastItems.value = pastItems.value.filter(i => !(i.num === num && i.videoId === vid));
+            pastItems.value = pastItems.value.filter((i) => !(i.num === num && i.videoId === vid));
           }
 
-          Swal.fire({
-            icon: 'success',
-            title: `ลบ #${num} เรียบร้อย`,
-            toast: true,
-            position: 'top-end',
-            timer: 1500,
-            showConfirmButton: false,
-          });
-
-          updateOwnerItemsModal();
+          const remainingCurrentCount =
+            selectedItem.value && selectedItem.value.orders
+              ? Object.values(selectedItem.value.orders).filter((item) => item && item.owner === ownerName).length
+              : 0;
+          if (remainingCurrentCount + pastItems.value.length > 0) {
+            await showOwnerItems(ownerName);
+          } else {
+            Swal.fire({
+              icon: 'success',
+              title: `ลบ #${num} เรียบร้อย`,
+              toast: true,
+              position: 'top-end',
+              timer: 1500,
+              showConfirmButton: false,
+            });
+          }
+        } else {
+          await showOwnerItems(ownerName);
         }
       };
 

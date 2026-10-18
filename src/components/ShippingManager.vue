@@ -1000,19 +1000,25 @@ function markDone(customer) {
         });
       }
 
-      // ✅ Reset สถานะ (เซ็ต status: "done" ของลูกค้าและทุก sessions เป็น "done", รีเซ็ตสถานะพิมพ์เป็นยังไม่พิมพ์)
+      // ✅ บันทึกรายการ sessions ที่เพิ่งปิดในรอบนี้ เพื่อให้กดปุ่มย้อน (undoDone) แล้วกู้คืนเฉพาะรอบปัจจุบันและหัก totalBookings กลับได้อย่างถูกต้อง
+      const doneSessionIds = [];
       const updates = {
         status: "done",
         itemCount: 0,
+        lastDoneCount: currentCount,
         labelPrinted: false,
         labelPrintedAt: null,
         updatedAt: Date.now(),
       };
       if (customer.sessions) {
         Object.keys(customer.sessions).forEach((vid) => {
+          if (customer.sessions[vid]?.status !== "done") {
+            doneSessionIds.push(vid);
+          }
           updates[`sessions/${vid}/status`] = "done";
         });
       }
+      updates.lastDoneSessions = doneSessionIds.length > 0 ? doneSessionIds : null;
 
       await update(dbRef(db, `delivery_customers/${customer.id}`), updates);
       Swal.fire({ icon: "success", title: "เสร็จเรียบร้อย!", toast: true, position: "top-end", timer: 1500, showConfirmButton: false });
@@ -1275,21 +1281,44 @@ async function toggleContactChannel(customer) {
   }
 }
 
-function undoDone(customer) {
+async function undoDone(customer) {
   const updates = {
     status: "pending",
+    lastDoneCount: null,
+    lastDoneSessions: null,
     updatedAt: Date.now(),
   };
-  if (customer.sessions) {
-    Object.keys(customer.sessions).forEach((vid) => {
+  const targetVids =
+    Array.isArray(customer.lastDoneSessions) && customer.lastDoneSessions.length > 0
+      ? new Set(customer.lastDoneSessions)
+      : null;
+
+  const allSessions = customer.sessions || {};
+  let restoredCount = 0;
+  let restoredPrice = 0;
+
+  Object.keys(allSessions).forEach((vid) => {
+    if (!targetVids || targetVids.has(vid)) {
       updates[`sessions/${vid}/status`] = "pending";
+      restoredCount += allSessions[vid]?.count || 0;
+      restoredPrice += allSessions[vid]?.totalPrice || 0;
+    }
+  });
+
+  updates.itemCount = restoredCount;
+  updates.totalPrice = restoredPrice;
+
+  // ✅ หักยอด totalBookings คืนตามจำนวนที่เพิ่งบวกไปตอนกดเสร็จ เพื่อไม่ให้ยอดสะสมตลอดชีพถูกบวกเบิ้ลเมื่อกดเสร็จซ้ำ
+  const countToSubtract =
+    typeof customer.lastDoneCount === "number" ? customer.lastDoneCount : restoredCount;
+  if (countToSubtract > 0) {
+    const totalRef = dbRef(db, `delivery_customers/${customer.id}/totalBookings`);
+    await runTransaction(totalRef, (currentTotal) => {
+      return Math.max(0, (currentTotal || 0) - countToSubtract);
     });
   }
-  const allSessions = customer.sessions || {};
-  updates.itemCount = Object.values(allSessions).reduce((sum, s) => sum + (s.count || 0), 0);
-  updates.totalPrice = Object.values(allSessions).reduce((sum, s) => sum + (s.totalPrice || 0), 0);
 
-  update(dbRef(db, `delivery_customers/${customer.id}`), updates);
+  await update(dbRef(db, `delivery_customers/${customer.id}`), updates);
 }
 
 function deleteCustomer(id, name) {

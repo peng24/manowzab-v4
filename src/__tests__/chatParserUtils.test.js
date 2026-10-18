@@ -30,6 +30,9 @@ import {
   pricePatternRegex,
   extractCustomerSelfName,
   isHandleOrNonThaiName,
+  isAdminSizeSelectionNote,
+  isMultiBuyBlocked,
+  parseCancelIds,
 } from "../utils/chatParserUtils";
 
 describe("chatParserUtils", () => {
@@ -920,9 +923,69 @@ describe("chatParserUtils", () => {
       expect(extractCustomerSelfName("40 บุญญาภา")).toBe("บุญญาภา");
     });
   });
+
+  describe("🛡️ Multi-Buy Guard, Multi-Item Cancel & Admin Note Parity (/scrutinize v5.4.1)", () => {
+    it("prevents multiBuyRegex from hijacking multi-item cancellations ('ยกเลิก 12 15', '12 15 ยกเลิก', '12 15 มะระ ยกเลิก')", () => {
+      expect(isMultiBuyBlocked("ยกเลิก 12 15")).toBe(true);
+      expect(isMultiBuyBlocked("12 15 ยกเลิก")).toBe(true);
+
+      expect(parseIntentDetails("ยกเลิก 12 15")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 12,
+        itemIds: [12, 15],
+      });
+      expect(parseIntentDetails("12 15 ยกเลิก")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 12,
+        itemIds: [12, 15],
+      });
+      expect(parseIntentDetails("12 15 มะระ ยกเลิก")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 12,
+        itemIds: [12, 15],
+        customerName: "มะระ",
+      });
+      expect(parseIntentDetails("มะระ ยกเลิก 12 15")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 12,
+        itemIds: [12, 15],
+        customerName: "มะระ",
+      });
+      expect(parseIntentDetails("ยกเลิก 12, 15 มะระ")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 12,
+        itemIds: [12, 15],
+        customerName: "มะระ",
+      });
+    });
+
+    it("prevents multiBuyRegex from hijacking multi-number try requests, size questions, and fit complaints", () => {
+      expect(isMultiBuyBlocked("ขอดู 12 15 หน่อยค่ะ")).toBe(true);
+      expect(isMultiBuyBlocked("ลอง 12 15")).toBe(true);
+      expect(isMultiBuyBlocked("อก 42 44 มีไหมคะ")).toBe(true);
+      expect(isMultiBuyBlocked("ไซส์ 50 52")).toBe(true);
+      expect(isMultiBuyBlocked("12 15 ใส่ไม่ได้")).toBe(true);
+
+      expect(parseIntentDetails("ขอดู 12 15 หน่อยค่ะ").type).toBe("TRY_ITEM");
+      expect(parseIntentDetails("ลอง 12 15").type).toBe("TRY_ITEM");
+      expect(parseIntentDetails("อก 42 44 มีไหมคะ").type).toBe("QUESTION");
+      expect(parseIntentDetails("ไซส์ 50 52").type).toBe("QUESTION");
+      expect(parseIntentDetails("12 15 ใส่ไม่ได้").type).toBe("NEGATION");
+    });
+
+    it("shares identical Admin Size Selection Note detection via isAdminSizeSelectionNote()", () => {
+      expect(isAdminSizeSelectionNote("3xl อำไพ")).toBe(true);
+      expect(isAdminSizeSelectionNote("เสื้อเชิ้ต อก56 สมฤทธิ์")).toBe(true);
+      expect(isAdminSizeSelectionNote("พรจันทร์ รับ")).toBe(true);
+      expect(isAdminSizeSelectionNote("อำไพ เอาตัวอก56")).toBe(true);
+      expect(isAdminSizeSelectionNote("พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล")).toBe(true);
+      expect(isAdminSizeSelectionNote("25")).toBe(false);
+    });
+
+    it("parses valid cancel IDs with parseCancelIds()", () => {
+      expect(parseCancelIds("12 15")).toEqual([12, 15]);
+      expect(parseCancelIds("5, 10, 999")).toEqual([5, 10]);
+      expect(parseCancelIds("")).toEqual([]);
+    });
+  });
 });
-
-
-
-
-

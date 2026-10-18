@@ -1,9 +1,11 @@
 import { ref, onUnmounted } from "vue";
 import { useSystemStore } from "../stores/system";
+import { useChatStore } from "../stores/chat";
 import { ref as dbRef, set } from "firebase/database";
 import { db } from "./useFirebase";
 import { YouTubeLiveChat } from "../services/YouTubeLiveChat";
 import { useAudio } from "./useAudio";
+import { useChatProcessor } from "./useChatProcessor";
 import { CONSTANTS } from "../config/constants";
 import { logger } from "../utils/logger";
 import { announceShippingCustomers } from "../utils/deliverySync";
@@ -151,9 +153,7 @@ export function useYouTube() {
       }
 
       // Initialize Chat Store
-      const chatStore = await import("../stores/chat").then((m) =>
-        m.useChatStore(),
-      );
+      const chatStore = useChatStore();
       if (item.liveStreamingDetails?.actualStartTime) {
         chatStore.streamStartTime = new Date(
           item.liveStreamingDetails.actualStartTime,
@@ -167,8 +167,7 @@ export function useYouTube() {
         activeChatId.value = item.liveStreamingDetails.activeLiveChatId;
         logger.youtube("Live Chat ID:", activeChatId.value);
 
-        // Dynamic parameters for Message Processor
-        const { useChatProcessor } = await import("./useChatProcessor");
+        // Message Processor
         const { processMessage } = useChatProcessor();
         processMessageFunc = processMessage;
 

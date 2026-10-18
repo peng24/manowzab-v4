@@ -42,12 +42,17 @@
 3.  **Centralized Customer Store (`useCustomerStore`):** Never attach duplicate `onValue(dbRef(db, "delivery_customers"))` or `onValue(dbRef(db, "address_book"))` listeners in components. Always use `src/stores/customer.js` and its $O(1)$ lookup indexes (`deliveryByNormKey`, `getCustomerMetaByName`).
 4.  **Quota Safety:** Viewer polling interval must be >= 60s. Workbox Service Worker in `vite.config.js` must exclude `/liveChat/messages` and `texttospeech.googleapis.com`.
 
-### 🎯 Regex Engine & Chat Intent Accuracy (v5.4.0)
+### 🎯 Regex Engine, Cancel Safety & Chat Intent Accuracy (v5.4.0+)
 
-1.  **Admin Proxy Cancel & Guard:** Support proxy cancellation patterns (`"12 มะระ ยกเลิก"`, `"19 กนกวรรณ ยกเลิก"`, `"มะระ ยกเลิก 12"`, `"ยกเลิก 12 มะระ"`) while guarding against conditional notes (`conditionalCancelGuardRegex` เช่น `"อำไพ ถ้าใส่ไม่ได้ก็ไม่เอา"`) และคำทั่วไป (`"ผ่านใหญ่ๆ"`, `"เมื่อคืน"`).
-2.  **Buy vs. Question/Try/Price Disambiguation:** Allow valid buys with color/praise attributes (`"สีขาว34ค่ะพี่นัน"`), block fit complaints (`negationGuardRegex` เช่น `"40 ใส่ไม่ได้"`), block classifier/price queries (`"ตัว 100"`), and guard quantity units (`quantityUnitRegex` เช่น `"4ชิ้น"`, `"3สี"`).
+1.  **Admin Proxy Cancel, Multi-Item Cancel & Safety Guard:** Support single and multi-item proxy cancellation (`"ยกเลิก 12 15"`, `"12 มะระ ยกเลิก"`, `"12 15 มะระ ยกเลิก"`, `"มะระ ยกเลิก 12"`, `"ยกเลิก 12 มะระ"`) while guarding against conditional notes (`conditionalCancelGuardRegex`), guarding `multiBuyRegex` with `!isMultiBuyBlocked()`, preserving item `price` on chat cancel when queue is empty (`processCancel`), and never falling back to `null` (wildcard cancel) when Admin specifies a customer name that does not match the item's owner/queue.
+2.  **Buy vs. Question/Try/Price Disambiguation & Admin Note Parity:** Allow valid buys with color/praise attributes (`"สีขาว34ค่ะพี่นัน"`), block fit complaints (`negationGuardRegex`), block classifier/price queries (`"ตัว 100"`), guard quantity units (`quantityUnitRegex`), share `isAdminSizeSelectionNote()` across `chatParserUtils.js` and `useChatProcessor.js`, and always push `isDateMismatch` messages to Firebase before returning.
 3.  **ReDoS Prevention & Module Scoping:** Eliminate nested quantifiers (`*?\s*`) using disjoint token structures (`([a-zA-Z\u0E00-\u0E7F._-]+(?:\s+[a-zA-Z\u0E00-\u0E7F._-]+)*?)`), pre-compile module-scoped regexes in `addressParser.js` and `useChatProcessor.js`, and memoize dynamic RegExp in `ChatPanel.vue` (`proxyHighlightRegexCache`).
 4.  **Strict Self-Name Filtering:** Block conversational phrases, clothing types, and greetings (`"สวัดดีค่ะ"`, `"ใข่ค่ะ"`, `"เก่าค่ะ"`, `"สบายดีค่ะ"`, `"ลายดอก"`, `"ตัวเล็กๆ"`, `"เมื่อคืน"`, `"บ่"`) from entering customer nickname auto-learning.
+5.  **Stock & Delivery Sync Consistency:**
+    *   `processCancel` must preserve both `previousUid` and `nextUid` and pass post-transaction stock snapshots to `syncDeliveryCustomerForOwner`.
+    *   `clearAllStock` must `await remove()`, deduplicate affected owners, and pass `{}` to `syncDeliveryCustomerForOwner` (which must respect `{}` without re-fetching stale data from Firebase).
+    *   `markDone` / `undoDone` in `ShippingManager.vue` must record `lastDoneCount` and `lastDoneSessions` so `undoDone` decrements `totalBookings` back and only restores sessions from the current delivery cycle.
+    *   Deleting items inside `showOwnerItems` (`👗` modal in `StockGrid.vue` and `HistoryModal.vue`) must use `runTransaction` to promote next-in-queue or preserve price, keep `allStock` in outer scope, and re-open the modal when items remain or when confirmation is cancelled.
 
 ## 4. Key File Structures
 

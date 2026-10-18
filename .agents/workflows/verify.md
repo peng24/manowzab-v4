@@ -27,9 +27,9 @@ description: Mandatory verification checklist after every code change
 | 2.2 | Regex Patterns (ทั้ง 9 แบบ) | `src/composables/useChatProcessor.js` | รองรับ: Multi-Buy, Pure Number, Explicit, Polite, Dash, Customer Name, Admin Proxy, Cancel, Implicit |
 | 2.3 | `thaiToArabic(text)` | `src/composables/useChatProcessor.js` | แปลงเลขไทย → อารบิก (เช่น "๕๖" → "56") |
 | 2.4 | Admin Proxy | `src/composables/useChatProcessor.js` | แอดมินจองให้ลูกค้าได้ ทั้ง "26 พี่อ้อย" และ "พี่อ้อย 26" |
-| 2.5 | Admin Proxy Cancel & Guard | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | รองรับยกเลิกแทนลูกค้า ("12 มะระ ยกเลิก", "19 กนกวรรณ ยกเลิก", "มะระ ยกเลิก 12", "ยกเลิก 12 มะระ") พร้อมบล็อกเงื่อนไขหลอก (`conditionalCancelGuardRegex` เช่น "อำไพ ถ้าใส่ไม่ได้ก็ไม่เอา") และคำทั่วไป ("ผ่านใหญ่ๆ", "เมื่อคืน") |
+| 2.5 | Admin Proxy Cancel, Multi-Cancel & Safety Guard | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | รองรับยกเลิกเดี่ยวและหลายรหัสพร้อมกัน ("ยกเลิก 12 15", "12 มะระ ยกเลิก", "12 15 มะระ ยกเลิก", "มะระ ยกเลิก 12", "ยกเลิก 12 มะระ"), ห้าม Fallback เป็น `null` (Wildcard) เมื่อแอดมินระบุชื่อลูกค้าไม่ตรงกับเจ้าของรหัส, บล็อกเงื่อนไขหลอก (`conditionalCancelGuardRegex`) และใช้ `!isMultiBuyBlocked()` ป้องกัน `multiBuyRegex` แย่งจับประโยคยกเลิก/ขอดู/ถามไซส์ที่มีเลขหลายตัว |
 | 2.6 | Buy vs Question/Try/Price Disambiguation | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | อนุญาตจองเมื่อระบุสีหรือคำชม ("สีขาว34ค่ะพี่นัน", "ไม่ต้องลองก็ได้12"), บล็อกคำบ่นไซส์ (`negationGuardRegex` เช่น "40 ใส่ไม่ได้"), บล็อกตัวระบุราคา/ลักษณนาม ("ตัว 100"), และบล็อกคำบอกจำนวน (`quantityUnitRegex` เช่น "4ชิ้น", "3สี") |
-| 2.7 | Admin Notes & Clean Shipping Name | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | สกัดชื่อลูกค้าสะอาดจากคำสั่งแจ้งส่ง ("วิระวัลย์ รวมยอด" ➡️ "วิระวัลย์"), รองรับ Admin Notes สำหรับแจ้งไซส์/ย้อนหลัง ("อำไพ เอาตัวอก56", "3xl อำไพ", "เสื้อเชิ้ต อก56 สมฤทธิ์") โดยไม่ตัดสต็อกผิดพลาด |
+| 2.7 | Admin Notes Parity, Date Mismatch Sync & Clean Shipping Name | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | สกัดชื่อลูกค้าสะอาดจากคำสั่งแจ้งส่ง ("วิระวัลย์ รวมยอด" ➡️ "วิระวัลย์"), ใช้ `isAdminSizeSelectionNote()` ร่วมกันทั้ง 2 ไฟล์สำหรับ Admin Notes ("อำไพ เอาตัวอก56", "3xl อำไพ", "เสื้อเชิ้ต อก56 สมฤทธิ์"), และส่งข้อความขึ้น Firebase เสมอเมื่อพบ `isDateMismatch` เพื่อไม่ให้แชทหายจากหน้าจอ |
 | 2.8 | Strict Self-Name Auto-Learn Hardening (`extractCustomerSelfName`) | `src/utils/chatParserUtils.js` | บล็อกคำสนทนา/คำบ่น/คำทักทาย ("สวัดดีค่ะ", "ใข่ค่ะ", "เก่าค่ะ", "สบายดีค่ะ", "ลายดอก", "ตัวเล็กๆ", "เมื่อคืน", "บ่") ไม่ให้จำเข้าเป็นชื่อลูกค้า แต่ยังคงจำชื่อแนะนำตัวจริง ("บุญญาภาค่ะ", "40 บุญญาภา", "ต่าย") ได้แม่นยำ 100% |
 
 ---
@@ -39,9 +39,9 @@ description: Mandatory verification checklist after every code change
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
 | 3.1 | `processOrder(num, owner, uid, source, price, method)` | `src/stores/stock.js` | ตัดสต็อก + Firebase Transaction ป้องกันชน + จองซ้ำ=เข้าคิว |
-| 3.2 | `processCancel(num)` | `src/stores/stock.js` | ยกเลิก + เลื่อนคนถัดไปในคิวขึ้นมาเป็นเจ้าของ |
+| 3.2 | `processCancel(num, uid, ownerName)` | `src/stores/stock.js`, `src/components/StockGrid.vue` | ยกเลิก + เลื่อนคนถัดไปในคิวขึ้นมาเป็นเจ้าของ + เก็บ `previousUid` และ `nextUid` ส่งเข้า `syncDeliveryCustomerForOwner` + เปรียบเทียบชื่อแบบตัดคำนำหน้า (`isMatchingCancelOwner`) + หากไม่มีคิวต่อท้ายและมี `price > 0` ต้องคงค่า `{ price }` ไว้ไม่ให้ราคาหาย (รวมถึงการลบรายการในป๊อปอัป `👗 showOwnerItems`) |
 | 3.3 | `connectToStock(videoId)` | `src/stores/stock.js` | sync สต็อก real-time + คำนวณยอดขาย + trigger เฉลิมฉลอง 50%/80%/100% |
-| 3.4 | `clearAllStock()` | `src/stores/stock.js` | ล้างสต็อกทั้งหมด + reset milestones |
+| 3.4 | `clearAllStock()` | `src/stores/stock.js`, `src/utils/deliverySync.js` | `await remove()` ล้างสต็อกทั้งหมด + reset milestones + กรองชื่อลูกค้าไม่ให้ซ้ำและส่ง `{}` เข้า `syncDeliveryCustomerForOwner` โดยไม่ยิง `get()` ซ้ำ |
 | 3.5 | `updateStockSize(newSize)` | `src/stores/stock.js` | ขยาย/ย่อ grid + auto-expand เมื่อจองเกินจำนวน |
 | 3.6 | `updateItemData(num, newData)` | `src/stores/stock.js` | อัปเดตราคา/ไซส์ + sync Overlay |
 | 3.7 | `saveQueueChanges()` | `src/components/StockGrid.vue` | เวลายกเลิกจอง (ลบรายชื่อทิ้งทั้งหมด) หากมีการตั้งราคาไว้ ต้องเคลียร์ข้อมูลเจ้าของ/คิวเป็น null แต่ยังคงราคาไว้ (แก้บั๊กชื่อค้าง) |
@@ -131,7 +131,7 @@ description: Mandatory verification checklist after every code change
 | 10.5 | Real-time Stock Watcher | `src/components/ShippingManager.vue` | watch stockData → auto-update จำนวนสินค้าใน delivery_customers |
 | 10.6 | Delivery Strip (Header) | `src/components/Header.vue` | แถบรายชื่อลูกค้า real-time บน header (pills สี overdue/today/soon/later) |
 | 10.7 | Countdown + Thai Date | `src/components/ShippingManager.vue` | นับถอยหลัง (เลย/วันนี้/พรุ่งนี้/อีก X วัน) + วันที่ไทย (24 มี.ค. 69) |
-| 10.8 | Mark Done + Reset | `src/components/ShippingManager.vue` | เสร็จ → status=done, itemCount=0, sessions=null + สะสม totalBookings |
+| 10.8 | Mark Done + Undo Done | `src/components/ShippingManager.vue` | เสร็จ → `status=done`, `itemCount=0`, บันทึก `lastDoneCount`/`lastDoneSessions` + สะสม `totalBookings`; เมื่อกด `undoDone` ต้องหัก `totalBookings` คืนและกู้คืนเฉพาะ `lastDoneSessions` รอบล่าสุดโดยไม่ปลุก Session เก่าในอดีต |
 | 10.9 | กรองเฉพาะคนที่แจ้งส่ง (Requested Delivery Filter) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue` | แสดงเฉพาะคนที่ระบุวันจัดส่งแล้วเป็นค่าเริ่มต้น (`deliveryDate !== null`) |
 | 10.10 | แท็บสลับดู "ฝากสินค้า" (Unassigned Filter) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue` | สลับดูคนที่ฝากสินค้า (ยังไม่ระบุวันส่ง) และดูทั้งหมดได้อย่างถูกต้อง |
 | 10.11 | Delivery Strip Filter | `src/components/StockGrid.vue` | กรองแสดงเฉพาะลูกค้าที่มีวันจัดส่งแล้ว (`!!c.deliveryDate`) |

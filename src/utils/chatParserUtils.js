@@ -49,9 +49,9 @@ export const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 export const customerNameNumRegex = /^([ก-๛a-zA-Z](?:[ก-๛a-zA-Z\s]*[ก-๛a-zA-Z])?)\s+(\d+)$/;
 export const numAndDescRegex = /^(\d+)\s*([ก-๛a-zA-Z\s\(\)\[\]\-]+)$/;
 export const cancelKeywordRegex = /cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่าน|(?<!เมื่อ|กลาง|ทั้ง|ข้าม)คืน|ไม่รับ|ถอน|สละสิทธิ์|สละ/i;
-export const cancelWithNumRegex = /(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่านโลด|ผ่าน)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+)(?:\s+([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*))?/i;
-export const cancelNumFirstRegex = /(\d+)\s*(?:([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s+)?(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i;
-export const cancelNameKeywordNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s+(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ)\s*[-]?\s*(\d+)/i;
+export const cancelWithNumRegex = /(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่านโลด|ผ่าน)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+(?:[\s,_]+\d+)*)(?:\s+([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*))?/i;
+export const cancelNumFirstRegex = /(\d+(?:[\s,_]+\d+)*)\s*(?:([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s+)?(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i;
+export const cancelNameKeywordNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s+(?:cc|cancel|ยกเลิก|ยกเลก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ)\s*[-]?\s*(\d+(?:[\s,_]+\d+)*)/i;
 export const conditionalCancelGuardRegex = /(?:ถ้า|หาก|สมมติ).*?(?:ไม่เอา|ไม่รับ|ยกเลิก|ผ่าน)|(?:ใส่ไม่ได้|คับไป|หลวมไป|เล็กไป|ใหญ่ไป).*?(?:ค่อย|ก็)?(?:ไม่เอา|ไม่รับ|คืน)|^ผ่าน\s*(?:ใหญ่|เล็ก|ไซส์|ไซร์|ไชส์|ตัวใหญ่|ตัวเล็ก)/i;
 export const standalonePassRegex = /^(?:ขอ)?ผ่าน\s*(?:โลด|ก่อน|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|เลย)*$/i;
 export const shipDayOfWeekRegex = /ส่ง(?:วัน)?\s*(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)/i;
@@ -195,8 +195,65 @@ const PURE_POLITE_OR_CHAT_REGEX = /^(?:ค่ะ|ครับ|จ้า|จ้�
 const SENTENCE_FRAGMENT_REGEX = /(?:แชท|นอน|พาลูก|ร้าน|โปรโมชั่น|ขอบคุณ|เข้าแล้ว|เรียบร้อย|ฟรี|รอบบ่าย|ทัก|ติดต่อ)/;
 const OF_PREFIX_REGEX = /^(?:ของ)\s*/;
 const CLEAN_PUNCT_REGEX = /^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g;
-const SIZE_PREFIX_ADMIN_NOTE_REGEX = /^(?:[2-9]\s*xl|xs|s|m|l|xl|xxl|xxxl|ฟรีไซส์|ฟรีไซร์|freesize)\s+([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,25})$/i;
-const GARMENT_CHEST_SUFFIX_NOTE_REGEX = /^(?:เสื้อ[ก-๙a-zA-Z]*\s+)?(?:อก|เอว|สะโพก|ไซส์|ไซร์|ไชส์|ขนาด)\s*\d+\s+([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,25})$/i;
+export const SIZE_PREFIX_ADMIN_NOTE_REGEX = /^(?:[2-9]\s*xl|xs|s|m|l|xl|xxl|xxxl|ฟรีไซส์|ฟรีไซร์|freesize)\s+([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,25})$/i;
+export const GARMENT_CHEST_SUFFIX_NOTE_REGEX = /^(?:เสื้อ[ก-๙a-zA-Z]*\s+)?(?:อก|เอว|สะโพก|ไซส์|ไซร์|ไชส์|ขนาด)\s*\d+\s+([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,25})$/i;
+export const ADMIN_SHORT_NOTE_REGEX = /^(?:[ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา)$/i;
+const SPLIT_NUMS_INTERNAL_REGEX = /[\s,_]+/;
+
+/**
+ * Checks if a normalized message matches any Admin Size Selection / Request Note pattern.
+ * Shared between chatParserUtils.js and useChatProcessor.js for 100% parity.
+ * @param {string} normalizedMsg
+ * @returns {boolean}
+ */
+export function isAdminSizeSelectionNote(normalizedMsg) {
+  if (!normalizedMsg) return false;
+  return (
+    adminSizeSelectionNoteRegex.test(normalizedMsg) ||
+    SIZE_PREFIX_ADMIN_NOTE_REGEX.test(normalizedMsg) ||
+    GARMENT_CHEST_SUFFIX_NOTE_REGEX.test(normalizedMsg) ||
+    ADMIN_SHORT_NOTE_REGEX.test(normalizedMsg)
+  );
+}
+
+/**
+ * Guard to prevent multiBuyRegex from hijacking multi-number cancellations,
+ * try requests, size/price questions, negations, or shipping messages.
+ * @param {string} normalizedMsg
+ * @returns {boolean} True if multiBuyRegex must NOT match this message
+ */
+export function isMultiBuyBlocked(normalizedMsg) {
+  if (!normalizedMsg) return true;
+  if (cancelKeywordRegex.test(normalizedMsg) && !conditionalCancelGuardRegex.test(normalizedMsg)) {
+    return true;
+  }
+  if (
+    tryRegex.test(normalizedMsg) ||
+    questionRegex.test(normalizedMsg) ||
+    numberWithQuestionRegex.test(normalizedMsg) ||
+    negationGuardRegex.test(normalizedMsg) ||
+    sizeRangeRegex.test(normalizedMsg) ||
+    shippingRegex.test(normalizedMsg) ||
+    holdRegex.test(normalizedMsg) ||
+    ((quantityUnitRegex.test(normalizedMsg) || pricePatternRegex.test(normalizedMsg)) && !explicitBuyRegex.test(normalizedMsg))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Parses a space/comma/underscore-separated string of numbers into valid item IDs (1..MAX_ITEM_ID).
+ * @param {string} numsStr
+ * @returns {number[]}
+ */
+export function parseCancelIds(numsStr) {
+  if (!numsStr || typeof numsStr !== "string") return [];
+  return numsStr
+    .split(SPLIT_NUMS_INTERNAL_REGEX)
+    .map((n) => parseInt(n, 10))
+    .filter((n) => !isNaN(n) && n > 0 && n <= MAX_ITEM_ID);
+}
 
 // Module-scoped date parsing regexes
 const DATE_MISMATCH_REGEX = /(?:วันที่|วันที|รอบวันที่|รอบวันที|รอบ)\s*(\d{1,2})\s*(?:[\/\.-]|\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|\d{1,2})?(?:\s*(?:[\/\.-]|\s*)\s*(\d{2,4}))?/i;
@@ -590,12 +647,7 @@ function _parseIntentDetails(text, liveTimestamp = Date.now()) {
   }
 
   // ⚡ Check: Admin note / size selection request (e.g. "พรจันทร์ อยสกได้ไซส์52 สัก3ตัว เล", "พรจันทร์ รับ", "พรจันทร์ เอา", "พรจันทร์ สีฟ้า", "อำไพ เอาตัวอก56", "3xl อำไพ")
-  if (
-    adminSizeSelectionNoteRegex.test(normalizedMsg) ||
-    SIZE_PREFIX_ADMIN_NOTE_REGEX.test(normalizedMsg) ||
-    GARMENT_CHEST_SUFFIX_NOTE_REGEX.test(normalizedMsg) ||
-    /^(?:[ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา)$/i.test(normalizedMsg)
-  ) {
+  if (isAdminSizeSelectionNote(normalizedMsg)) {
     const customerName = extractAdminCustomerName(normalizedMsg);
     if (customerName) {
       return {
@@ -648,8 +700,8 @@ function _parseIntentDetails(text, liveTimestamp = Date.now()) {
     return { type: "DATE_MISMATCH" };
   }
 
-  // 1. Multi-buy
-  const multiMatch = normalizedMsg.match(multiBuyRegex);
+  // 1. Multi-buy (Guarded against cancel, try, question, negation, shipping, and size/price queries)
+  const multiMatch = !isMultiBuyBlocked(normalizedMsg) ? normalizedMsg.match(multiBuyRegex) : null;
   if (multiMatch) {
     const numsStr = multiMatch[2] || multiMatch[1] || "";
     const rawNums = numsStr.split(/[\s,_]+/).filter(Boolean);
@@ -719,26 +771,49 @@ function _parseIntentDetails(text, liveTimestamp = Date.now()) {
     }
     const cNumFirst = normalizedMsg.match(cancelNumFirstRegex);
     if (cNumFirst) {
-      const itemId = parseInt(cNumFirst[1], 10);
-      const customerName = cNumFirst[2] ? sanitizeAdminCustomerName(cNumFirst[2]) : null;
-      return { type: "CANCEL_ITEM", itemId, ...(customerName ? { customerName } : {}) };
+      const cancelIds = parseCancelIds(cNumFirst[1]);
+      if (cancelIds.length > 0) {
+        const customerName = cNumFirst[2] ? sanitizeAdminCustomerName(cNumFirst[2]) : null;
+        return {
+          type: "CANCEL_ITEM",
+          itemId: cancelIds[0],
+          ...(cancelIds.length > 1 ? { itemIds: cancelIds } : {}),
+          ...(customerName ? { customerName } : {}),
+        };
+      }
     }
     const cNameFirst = normalizedMsg.match(cancelNameKeywordNumRegex);
     if (cNameFirst) {
-      const itemId = parseInt(cNameFirst[2], 10);
-      const customerName = sanitizeAdminCustomerName(cNameFirst[1]);
-      return { type: "CANCEL_ITEM", itemId, ...(customerName ? { customerName } : {}) };
+      const cancelIds = parseCancelIds(cNameFirst[2]);
+      if (cancelIds.length > 0) {
+        const customerName = sanitizeAdminCustomerName(cNameFirst[1]);
+        return {
+          type: "CANCEL_ITEM",
+          itemId: cancelIds[0],
+          ...(cancelIds.length > 1 ? { itemIds: cancelIds } : {}),
+          ...(customerName ? { customerName } : {}),
+        };
+      }
     }
     const cWithNum = normalizedMsg.match(cancelWithNumRegex);
     if (cWithNum) {
-      const itemId = parseInt(cWithNum[1], 10);
-      const customerName = cWithNum[2] ? sanitizeAdminCustomerName(cWithNum[2]) : null;
-      return { type: "CANCEL_ITEM", itemId, ...(customerName ? { customerName } : {}) };
+      const cancelIds = parseCancelIds(cWithNum[1]);
+      if (cancelIds.length > 0) {
+        const customerName = cWithNum[2] ? sanitizeAdminCustomerName(cWithNum[2]) : null;
+        return {
+          type: "CANCEL_ITEM",
+          itemId: cancelIds[0],
+          ...(cancelIds.length > 1 ? { itemIds: cancelIds } : {}),
+          ...(customerName ? { customerName } : {}),
+        };
+      }
     }
     const matchNum = normalizedMsg.match(DIGITS_GLOBAL_REGEX);
     if (matchNum) {
       const itemId = parseInt(matchNum[0], 10);
-      return { type: "CANCEL_ITEM", itemId };
+      if (itemId > 0 && itemId <= MAX_ITEM_ID) {
+        return { type: "CANCEL_ITEM", itemId };
+      }
     }
     return { type: "CANCEL_LATEST", method: "auto-cancel-latest" };
   }

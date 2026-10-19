@@ -319,20 +319,24 @@ function isUnsavedOwner(name) {
 
 .queue-badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  background: linear-gradient(135deg, #ffab00 0%, #ff6d00 100%);
-  color: #000;
-  border-radius: 12px;
-  padding: 1px 7px;
-  display: flex;
+  top: 5px;
+  right: 5px;
+  background: linear-gradient(135deg, #ff6d00 0%, #dd2c00 100%);
+  color: #ffffff;
+  border-radius: 7px;
+  padding: 2px 7px;
+  min-width: 24px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.78em;
+  font-size: 0.85em;
   font-weight: 800;
-  box-shadow: 0 2px 8px rgba(255, 171, 0, 0.5);
+  line-height: 1.1;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 2px 8px rgba(221, 44, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.3);
   z-index: 20;
-  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  border: 1.5px solid #fde047;
 }
 
 .owner-count-badge {

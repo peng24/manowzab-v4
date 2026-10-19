@@ -2305,24 +2305,26 @@ async function openCleanupModal() {
     flex: 1;
 }
 
-/* Queue Badge (Red Circle) */
+/* Queue Badge (High-Contrast Inside Top-Right Corner) */
 .queue-badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  background: #d32f2f;
-  color: white;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
+  top: 5px;
+  right: 5px;
+  background: linear-gradient(135deg, #ff6d00 0%, #dd2c00 100%);
+  color: #ffffff;
+  border-radius: 7px;
+  padding: 2px 7px;
+  min-width: 24px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 0.85em;
-  font-weight: bold;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  font-weight: 800;
+  line-height: 1.1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 2px 8px rgba(221, 44, 0, 0.55);
   z-index: 20;
-  border: 2px solid #1e293b;
+  border: 1.5px solid #fde047;
 }
 
 /* Owner Booking Count Badge (👗 N ตัว) */

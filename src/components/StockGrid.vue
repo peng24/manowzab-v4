@@ -49,7 +49,8 @@
               @click="openShippingManager"
               style="cursor: pointer;"
             >
-              {{ c.name }}
+              <span class="ds-icon" v-if="c.icon">{{ c.icon }}</span>
+              <span class="ds-name">{{ c.name }}</span>
               <span class="ds-info" v-if="c.info">{{ c.info }}</span>
             </span>
           </div>
@@ -468,27 +469,27 @@ const deliveryStrip = computed(() => {
     .filter((c) => c.status !== 'done' && !!c.deliveryDate)
     .map((c) => {
       const days = getDeliveryDays(c.deliveryDate);
-      let urgency, info, tooltip;
+      let urgency, icon, info, tooltip;
       if (!c.deliveryDate) {
-        urgency = 'none'; info = '';
+        urgency = 'none'; icon = '📌'; info = '';
         tooltip = `${c.name}: ยังไม่กำหนดวันส่ง (${c.itemCount || 0} ชิ้น)`;
       } else if (days < 0) {
-        urgency = 'overdue'; info = `เลย ${Math.abs(days)} วัน!`;
-        tooltip = `${c.name}: เลยกำหนด ${Math.abs(days)} วัน (${c.itemCount || 0} ชิ้น)`;
+        urgency = 'overdue'; icon = '🚨'; info = '';
+        tooltip = `🚨 ${c.name}: เลยกำหนด ${Math.abs(days)} วัน (${c.itemCount || 0} ชิ้น)`;
       } else if (days === 0) {
-        urgency = 'today'; info = 'วันนี้!';
-        tooltip = `${c.name}: ส่งวันนี้ (${c.itemCount || 0} ชิ้น)`;
+        urgency = 'today'; icon = '🚚'; info = '';
+        tooltip = `🚚 ${c.name}: ส่งวันนี้ (${c.itemCount || 0} ชิ้น)`;
       } else if (days === 1) {
-        urgency = 'pack-tonight'; info = '📦 แพ็คคืนนี้';
-        tooltip = `${c.name}: ส่งพรุ่งนี้ • แพ็คคืนนี้ (${c.itemCount || 0} ชิ้น)`;
+        urgency = 'pack-tonight'; icon = '📦'; info = '';
+        tooltip = `📦 ${c.name}: ส่งพรุ่งนี้ • แพ็คคืนนี้ (${c.itemCount || 0} ชิ้น)`;
       } else if (days <= 3) {
-        urgency = 'soon'; info = `อีก ${days} วัน`;
-        tooltip = `${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;
+        urgency = 'soon'; icon = '⏳'; info = `อีก ${days} วัน`;
+        tooltip = `⏳ ${c.name}: ${formatThaiDateShort(c.deliveryDate)} • อีก ${days} วัน (${c.itemCount || 0} ชิ้น)`;
       } else {
-        urgency = 'later'; info = formatThaiDateShort(c.deliveryDate);
-        tooltip = `${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;
+        urgency = 'later'; icon = '📅'; info = formatThaiDateShort(c.deliveryDate);
+        tooltip = `📅 ${c.name}: ${formatThaiDateShort(c.deliveryDate)} (${c.itemCount || 0} ชิ้น)`;
       }
-      return { id: c.uid || c.name, name: c.name, urgency, info, days, tooltip, count: c.itemCount || 0 };
+      return { id: c.uid || c.name, name: c.name, urgency, icon, info, days, tooltip, count: c.itemCount || 0 };
     })
     .sort((a, b) => a.days - b.days);
 });
@@ -2039,21 +2040,32 @@ watch(
 
 .ds-scroll {
   display: flex;
-  gap: 4px;
+  gap: 5px;
 }
 
 .ds-pill {
-  font-size: 0.8em; /* Reduced text size */
-  padding: 2px 8px;
+  font-size: 0.8em;
+  padding: 2px 9px 2px 7px;
   border-radius: 12px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
+.ds-icon {
+  font-size: 0.95em;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ds-name {
+  font-weight: 700;
+}
+
 .ds-info {
   font-size: 0.85em;
-  opacity: 0.8;
+  opacity: 0.88;
 }
 
 .stats-row {
@@ -2530,8 +2542,10 @@ watch(
   }
 
   .queue-badge {
-    font-size: 0.7em;
-    padding: 1px 3px;
+    font-size: 0.78em;
+    padding: 2px 6px;
+    top: 4px;
+    right: 4px;
   }
 }
 
@@ -2549,23 +2563,27 @@ watch(
     min-height: 60px; /* Shorter height */
   }
 }
-/* ✅ Queue Badge (Glowing Amber Badge) */
+/* ✅ Queue Badge (High-Contrast Inside Top-Right Corner) */
 .queue-badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  background: linear-gradient(135deg, #ffab00 0%, #ff6d00 100%);
-  color: #000;
-  border-radius: 12px;
-  padding: 1px 7px;
-  display: flex;
+  top: 5px;
+  right: 5px;
+  background: linear-gradient(135deg, #ff6d00 0%, #dd2c00 100%);
+  color: #ffffff;
+  border-radius: 7px;
+  padding: 2px 7px;
+  min-width: 24px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.78em;
+  font-size: 0.85em;
   font-weight: 800;
-  box-shadow: 0 2px 8px rgba(255, 171, 0, 0.5);
+  line-height: 1.1;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 2px 8px rgba(221, 44, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.3);
   z-index: 20;
-  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  border: 1.5px solid #fde047;
 }
 
 /* 🛢 Owner Booking Count Badge (👗 N ตัว) */

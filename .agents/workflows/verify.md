@@ -217,6 +217,31 @@ description: Mandatory verification checklist after every code change
 | 15.9 | Clean Borderless Label Layout (130x76mm / 76x130mm) | `src/components/ShippingLabelModal.vue` | ดีไซน์สะอาดตา ไร้กรอบดำ ผู้ส่งอยู่ซ้าย ผู้รับอยู่ขวา (เว้นขอบล่าง 10%) และข้อความขอบคุณอยู่กึ่งกลางล่างสุด |
 | 15.10 | Multi-Address & Custom Recipient Name | `src/components/CustomerAddressModal.vue` | แยกชื่อผู้รับจริง (`recipientName`) จากชื่อ CF และรองรับการบันทึกหลายที่อยู่ต่อ 1 ลูกค้าลง Address Book |
 
+---
+
+## ⚡ 16. ประสบการณ์ผู้ใช้และการสืบค้นข้อมูลหน้างาน (Operational UX/UI & Search Invariants v5.4.4+)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 16.1 | Stock Quick Search & Jump (`stockSearchQuery`, `handleStockSearchEnter`) | `src/components/StockGrid.vue` | ค้นหาแบบเรียลไทม์รองรับทั้งตัวเลขเบอร์สต็อก (กด Enter กระโดดไปเบอร์นั้นทันทีผ่าน `scrollToItem`) และชื่อลูกค้า/ชื่อเล่น/คิวสำรอง โดยข้าม Window Capping limit (แสดงผลแม้เบอร์ > 120) |
+| 16.2 | Missing Address Indicator (`no-addr-indicator`, `hasCustomerAddress`) | `src/components/StockItemCard.vue`, `src/components/StockGrid.vue` | แสดงหมุดเตือนสีแดง "📍 รอที่อยู่" ทันทีเมื่อลูกค้าที่ได้ของยังไม่มีที่อยู่ในระบบ โดยต้องใส่ `hasCustomerAddress(owner)` ใน `v-memo` เพื่อรักษาประสิทธิภาพการเรนเดอร์ |
+| 16.3 | Shipping Real-Time Search & Sub-Filter Pills | `src/components/ShippingManager.vue` | ค้นหาชื่อลูกค้า/โน้ต/ที่อยู่แบบเรียลไทม์ และปุ่มกรองด่วน "⚠️ ยังไม่มีที่อยู่" และ "🖨️ ยังไม่พิมพ์" ต้องกรองตารางได้แม่นยำทั้งแบบ Desktop Table และ Mobile Cards |
+| 16.4 | Compact Connected Stream State | `src/components/Header.vue`, `src/assets/style.css` | เมื่อเชื่อมต่อไลฟ์สำเร็จ ช่อง YouTube Video ID ต้องยุบขนาดเหลือ ~95px และขยายกลับอัตโนมัติเมื่อ Hover หรือ Focus (`Shift+F` autofocus ด้วย `id="yt-video-id-input"`) |
+| 16.5 | Keyboard Shortcuts Cheat Sheet Modal (`ShortcutsModal.vue`) | `src/components/ShortcutsModal.vue`, `src/components/Header.vue`, `src/App.vue` | เปิดดูตารางคีย์ลัดระบบทั้งหมดได้ผ่านปุ่ม `⚡ Tools` หรือกด `?` / `F1` บนคีย์บอร์ด |
+
+---
+
+## 🛡️ 17. ระบบจัดการบัญชีดำ (Customer Blacklist & Ban Protection v5.4.5+)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 17.1 | `isBanned(uid, name)` | `src/stores/blacklist.js` | ซิงค์ฐานข้อมูล real-time ผ่านพาธ `settings/blacklist` และตรวจสอบสถานะแบนตาม channelId หรือชื่อลูกค้าแบบ Space-Agnostic (เช่น "สมชาย ใจดี" และ "สมชายใจดี") |
+| 17.2 | Zero Audio Leakage | `src/stores/chat.js` | ข้อความจากผู้ใช้ที่ถูกแบนต้องไม่ส่งเสียงอ่าน TTS หรือ SFX ข้ามอุปกรณ์ 100% |
+| 17.3 | Anti-Stock Stealing | `src/composables/useChatProcessor.js` | ผู้ใช้ที่ถูกแบนต้องไม่สามารถจองสินค้า (CF), ยกเลิก, หรือแจ้งส่งได้ บันทึกแชตเป็น `type: "banned"` พร้อม `isBanned: true` |
+| 17.4 | Option A Dimmed Display & 🚫 Avatar Overlay | `src/components/ChatPanel.vue` | ข้อความของผู้ใช้ที่ถูกแบนต้องแสดงผลแบบสีจาง 45% ขอบแดง มีสัญลักษณ์ `🚫` ทับบนรูปโปรไฟล์ และขยายชัดเจนเมื่อเมาส์ชี้ |
+| 17.5 | Admin Quick Ban & Unban via Avatar Click | `src/composables/useChatProcessor.js`, `src/components/ChatPanel.vue` | แอดมินสามารถพิมพ์คำสั่ง `!แบน` / `!ปลดแบน` ในแชต หรือคลิกที่รูปโปรไฟล์ของลูกค้า (Avatar) เพื่อเปิดเมนูแบนได้ทันที |
+| 17.6 | Modal Blacklist & Customer Edit | `src/components/BlacklistModal.vue`, `src/components/CustomerQuickEditModal.vue` | ค้นหารายชื่อแบนและจัดการแบน/ปลดแบนได้ทั้งจากเมนู ⚡ Tools และหน้าต่างแก้ไขข้อมูลลูกค้า |
+| 17.7 | No Auto-Release of Prior Stock | `src/composables/useChatProcessor.js`, `src/stores/blacklist.js` | การแบนลูกค้าต้องไม่ล้างหรือปล่อยสต็อกที่เคยจองไว้ก่อนหน้าโดยอัตโนมัติ (แอดมินเป็นผู้ดำเนินการเองตามต้องการ) |
 
 ## How to Verify & Auto-Update Policy (บังคับทำทุกครั้ง)
 

@@ -3,6 +3,7 @@ import { useChatStore } from "../stores/chat";
 import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
 import { useVoiceLearningStore } from "../stores/voiceLearning";
+import { useBlacklistStore } from "../stores/blacklist";
 
 import { useAudio } from "./useAudio";
 import {
@@ -87,6 +88,8 @@ const STRIP_PREFIX_OF_REGEX = /^(?:ของพี่|ของ|พี่)\s*/;
 const STRIP_BUY_VERB_REGEX = /f|cf|รับ|เอา|=/gi;
 const PURE_DIGITS_TEST_REGEX = /^\d+$/;
 const DOT_GLOBAL_REGEX = /\./g;
+const ADMIN_BAN_REGEX = /^!?แบน\s+(?:@)?(.+)$/i;
+const ADMIN_UNBAN_REGEX = /^!?ปลดแบน\s+(?:@)?(.+)$/i;
 
 // ✅ Toast Notification Mixin
 const Toast = Swal.mixin({
@@ -117,6 +120,7 @@ export function useChatProcessor() {
   const chatStore = useChatStore();
   const systemStore = useSystemStore();
   const nicknameStore = useNicknameStore();
+  const blacklistStore = useBlacklistStore();
 
   const { queueAudio, playSfx, resetVoice } = useAudio();
 
@@ -353,7 +357,99 @@ export function useChatProcessor() {
       }
     }
 
+    // 🛡️ Blacklist Guard for Regular Customers: Block all buying, cancelling, and shipping
+    const isUserBanned = !isAdmin && (blacklistStore.isBanned(uid, realName) || blacklistStore.isBanned(uid, displayName));
+    if (isUserBanned) {
+      logger.warn(`🚫 Blocked banned customer chat: ${displayName} (${uid})`);
+      chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+        id: item.id,
+        text: msg,
+        messageRuns: getMessageRuns(),
+        authorName: realName,
+        displayName,
+        phoneticName,
+        realName,
+        uid,
+        avatar,
+        color: stringToColor(uid),
+        isAdmin: false,
+        isBanned: true,
+        type: "banned",
+        sfxType: null,
+        ttsText: "",
+        detectionMethod: "blacklist-blocked",
+        timestamp: new Date(item.snippet.publishedAt).getTime(),
+      });
+      return;
+    }
+
     // --- Execution ---
+
+    // 🚫 Admin Ban Command (e.g. "!แบน สมชาย", "แบน สมพงษ์ ไม่โอนเงิน", "แบน @ป้าแมว")
+    if (isAdmin && ADMIN_BAN_REGEX.test(normalizedMsg)) {
+      const banMatch = normalizedMsg.match(ADMIN_BAN_REGEX);
+      if (banMatch) {
+        const targetRaw = banMatch[1].trim();
+        const parts = targetRaw.split(/\s+(.+)/);
+        const targetName = parts[0].trim().replace(/^@/, "");
+        const reason = parts[1] ? parts[1].trim() : "แอดมินสั่งแบนผ่านแชท";
+
+        await blacklistStore.banUser({
+          displayName: targetName,
+          reason,
+          bannedBy: displayName || realName || "Admin",
+        });
+
+        chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+          id: item.id || `ban-cmd-${Date.now()}`,
+          text: msg,
+          messageRuns: getMessageRuns(),
+          authorName: realName,
+          displayName,
+          phoneticName,
+          realName,
+          uid,
+          avatar,
+          color: stringToColor(uid),
+          isAdmin: true,
+          type: "system",
+          sfxType: "error",
+          ttsText: `แบนคุณ ${targetName} เรียบร้อยแล้วค่ะ`,
+          detectionMethod: "admin-ban-command",
+          timestamp: new Date(item.snippet.publishedAt).getTime(),
+        });
+        return;
+      }
+    }
+
+    // 🔓 Admin Unban Command (e.g. "!ปลดแบน สมชาย", "ปลดแบน @ป้าแมว")
+    if (isAdmin && ADMIN_UNBAN_REGEX.test(normalizedMsg)) {
+      const unbanMatch = normalizedMsg.match(ADMIN_UNBAN_REGEX);
+      if (unbanMatch) {
+        const targetName = unbanMatch[1].trim().replace(/^@/, "");
+        await blacklistStore.unbanUser(targetName);
+
+        chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+          id: item.id || `unban-cmd-${Date.now()}`,
+          text: msg,
+          messageRuns: getMessageRuns(),
+          authorName: realName,
+          displayName,
+          phoneticName,
+          realName,
+          uid,
+          avatar,
+          color: stringToColor(uid),
+          isAdmin: true,
+          type: "system",
+          sfxType: "success",
+          ttsText: `ปลดแบนคุณ ${targetName} เรียบร้อยแล้วค่ะ`,
+          detectionMethod: "admin-unban-command",
+          timestamp: new Date(item.snippet.publishedAt).getTime(),
+        });
+        return;
+      }
+    }
 
     // 🛑 Admin Stopwords Guard: (e.g. "กำลัง รอแแแ", "รอแปป", "เทส")
     if (isAdmin && adminStopwordsRegex.test(normalizedMsg)) {

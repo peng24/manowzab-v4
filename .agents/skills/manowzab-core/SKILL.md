@@ -27,6 +27,7 @@ The application is an event-driven, real-time live commerce dashboard built with
 | **Customer & Address Sync** | `src/stores/customer.js`, `deliverySync.js` | Centralized reference-counted `delivery_customers` & `address_book` listeners, $O(1)$ `deliveryByNormKey` & `getCustomerMetaByName` cache |
 | **Chat Processing** | `useChatProcessor.js`, `chatParserUtils.js` | Lazy short-circuit regex buying strategies, 80ms micro-batch window, Thai numeral normalization ($O(1)$), admin proxies |
 | **Live Chat Sync** | `useYouTube.js`, `YouTubeLiveChat.js`, `src/stores/chat.js` | Concurrent poll batch dispatch (`Promise.allSettled`), API key rotation, Firebase real-time broadcast |
+| **Blacklist & Safety** | `src/stores/blacklist.js`, `BlacklistModal.vue` | Centralized `/blacklist` RTDB sync, space-agnostic Thai matching, zero-leak audio mute, anti-stock stealing |
 | **Audio & TTS** | `useAudio.js`, `TextToSpeech.js`, `system.js` | Unified sequential queue, 2-state voice switcher (`S` / `🤖`), shared singleton `AudioContext`, LRU cache, iOS unlock |
 | **Shipping & CRM** | `ShippingManager.vue`, `addressParser.js` | Delivery dates, countdowns, smart Thai phone/zip parser, thermal labels |
 | **Device Roles** | `system.js` | Host role takeover, Active Price Detector election, presence-based key balancing |
@@ -68,6 +69,15 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 - **Toast vs Popup Separation**: SweetAlert toasts must not receive `heightAuto` or `returnFocus` options.
 - **XSS Prevention**: Always wrap dynamic user strings with `escapeHtml()` before rendering via `v-html` or Swal modal templates.
 - **Chat Auto-Scroll & Initial Bottom Pinning**: Use `evaluateChatScrollState()`, Double-RAF `scrollToBottom()`, and `ResizeObserver` on `#chat-list`/`#chat-viewport` in `ChatPanel.vue` (without `contain-intrinsic-size: 55px` on `.chat-row`) so initial load and async customer badge rendering stay pinned to the latest message.
+
+### 6. Customer Blacklist & Ban Invariant (v5.4.5+)
+- **Centralized Store & Storage Path**: Sync real-time via `settings/blacklist` in Firebase RTDB (`useBlacklistStore`).
+- **Zero Audio Leakage**: Cross-device audio in `chat.js` MUST suppress all TTS and SFX playback for banned users.
+- **Anti-Stock Stealing**: Banned customers CANNOT claim stock, enter queues, or cancel items in `useChatProcessor.js`.
+- **Option A Visual Style**: `ChatPanel.vue` renders banned chat messages with dimmed opacity (~45%), red border-left accent, and `🚫` overlay directly on the profile picture (restoring full opacity on hover).
+- **No Auto-Release of Prior Stock**: Banning a user never touches their previously booked items or queues automatically; releases remain purely manual by admin.
+- **Space-Agnostic Thai Matching**: `isBanned()` and `getBanInfo()` match Thai names with and without spaces (e.g. "สมชาย ใจดี" and "สมชายใจดี").
+- **Admin Controls**: Support `!แบน [ชื่อ]` / `!ปลดแบน [ชื่อ]` chat commands, 1-click ban/unban by clicking customer profile avatar (hidden inside avatar with hover hint), `BlacklistModal.vue` in `⚡ Tools`, and direct ban/unban toggle inside `CustomerQuickEditModal.vue`.
 
 ---
 

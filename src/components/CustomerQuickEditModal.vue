@@ -159,6 +159,33 @@
                 />
               </div>
             </div>
+
+            <!-- 6. สถานะ Blacklist -->
+            <div class="cqe-form-group cqe-blacklist-group">
+              <label class="cqe-label">
+                <i class="fa-solid fa-shield-halved text-danger"></i>
+                <span>สถานะ Blacklist (บัญชีดำ):</span>
+              </label>
+              <div class="cqe-bl-row">
+                <div class="cqe-bl-status">
+                  <span v-if="isCustomerBanned" class="cqe-bl-badge banned">
+                    🚫 ถูกแบน: {{ banInfo?.reason || 'อยู่ในบัญชีดำ' }}
+                  </span>
+                  <span v-else class="cqe-bl-badge normal">
+                    ✅ สถานะปกติ (ไม่ได้ถูกแบน)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="cqe-btn-ban-action"
+                  :class="isCustomerBanned ? 'unban' : 'ban'"
+                  @click="handleToggleBan"
+                >
+                  <i :class="isCustomerBanned ? 'fa-solid fa-user-check' : 'fa-solid fa-ban'"></i>
+                  <span>{{ isCustomerBanned ? 'ปลดแบน' : 'แบนลูกค้านี้' }}</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Footer Buttons -->
@@ -187,12 +214,14 @@ import { sanitizeDbKey } from "../utils/dbUtils";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
+import { useBlacklistStore } from "../stores/blacklist";
 import { normalizeCustomerName, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
 import Swal from "sweetalert2";
 
 const chatStore = useChatStore();
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
+const blacklistStore = useBlacklistStore();
 
 const isOpen = ref(false);
 const isLoading = ref(false);
@@ -224,6 +253,114 @@ const realNameStr = computed(() => {
     ""
   );
 });
+
+// 🛡️ Blacklist Integration
+const isCustomerBanned = computed(() => {
+  if (!currentChat.value) return false;
+  const uid = currentChat.value.uid;
+  const name = currentChat.value.realName || currentChat.value.displayName || currentChat.value.authorName || formData.value.nickname;
+  return blacklistStore.isBanned(uid, name);
+});
+
+const banInfo = computed(() => {
+  if (!currentChat.value) return null;
+  const uid = currentChat.value.uid;
+  const name = currentChat.value.realName || currentChat.value.displayName || currentChat.value.authorName || formData.value.nickname;
+  return blacklistStore.getBanInfo(uid, name);
+});
+
+async function handleToggleBan() {
+  if (!currentChat.value) return;
+  const uid = currentChat.value.uid;
+  const name = currentChat.value.realName || currentChat.value.displayName || currentChat.value.authorName || formData.value.nickname;
+
+  if (isCustomerBanned.value) {
+    const res = await Swal.fire({
+      title: `ปลดแบนคุณ ${name}?`,
+      text: "ลูกค้าจะสามารถส่งเสียงอ่านและจองสินค้าได้ตามปกติ",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#10b981",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "ปลดแบน",
+      cancelButtonText: "ยกเลิก",
+    });
+
+    if (res.isConfirmed) {
+      await blacklistStore.unbanUser(uid || name);
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: `ปลดแบนคุณ ${name} แล้ว`,
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+      });
+    }
+  } else {
+    const { value: formValues } = await Swal.fire({
+      title: `🚫 แบนคุณ ${name}?`,
+      html: `
+        <div style="text-align: left; font-size: 0.9rem; margin-top: 10px;">
+          <p style="color: #94a3b8; margin-bottom: 8px;">ผู้ใช้ที่ถูกแบนจะไม่สามารถจองสินค้าได้ และระบบจะปิดเสียงอ่าน/เอฟเฟกต์อัตโนมัติ</p>
+          <label style="display: block; font-weight: bold; margin-bottom: 4px; color: #cbd5e1;">เหตุผลในการแบน:</label>
+          <select id="swal-modal-ban-reason" class="swal2-select" style="display: block; width: 100%; margin: 0 0 10px 0; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 6px; padding: 8px;">
+            <option value="CF แล้วไม่โอน / หายเงียบ">CF แล้วไม่โอน / หายเงียบ</option>
+            <option value="ก่อกวน / กวนประสาทในไลฟ์">ก่อกวน / กวนประสาทในไลฟ์</option>
+            <option value="ยกเลิกออเดอร์ซ้ำๆ">ยกเลิกออเดอร์ซ้ำๆ</option>
+            <option value="ใช้คำพูดไม่สุภาพ">ใช้คำพูดไม่สุภาพ</option>
+            <option value="custom">เหตุผลอื่นๆ (ระบุข้างล่าง)...</option>
+          </select>
+          <input id="swal-modal-custom-reason" class="swal2-input" placeholder="ระบุเหตุผลเพิ่มเติม" style="display: none; width: 100%; margin: 0; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 6px; padding: 8px; font-size: 0.9rem;" />
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "🚫 ยืนยันการแบน",
+      cancelButtonText: "ยกเลิก",
+      didOpen: () => {
+        const selectEl = document.getElementById("swal-modal-ban-reason");
+        const customInput = document.getElementById("swal-modal-custom-reason");
+        if (selectEl && customInput) {
+          selectEl.addEventListener("change", (e) => {
+            customInput.style.display = e.target.value === "custom" ? "block" : "none";
+          });
+        }
+      },
+      preConfirm: () => {
+        const selectEl = document.getElementById("swal-modal-ban-reason");
+        const customInput = document.getElementById("swal-modal-custom-reason");
+        let reason = selectEl ? selectEl.value : "CF แล้วไม่โอน / ก่อกวน";
+        if (reason === "custom") {
+          reason = customInput?.value?.trim() || "CF แล้วไม่โอน / ก่อกวน";
+        }
+        return { reason };
+      },
+    });
+
+    if (formValues) {
+      await blacklistStore.banUser({
+        channelId: uid,
+        displayName: name,
+        reason: formValues.reason,
+        bannedBy: "แอดมิน (หน้าแก้ไขข้อมูลลูกค้า)",
+      });
+
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: `แบนคุณ ${name} เรียบร้อยแล้ว`,
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+      });
+    }
+  }
+}
 
 // ✅ Quick Address Parser on input
 function handleAddressInput() {
@@ -1008,6 +1145,86 @@ defineExpose({
 .cqe-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Blacklist Management Row */
+.cqe-blacklist-group {
+  margin-top: 6px;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
+
+.cqe-bl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.cqe-bl-status {
+  flex: 1;
+  min-width: 0;
+}
+
+.cqe-bl-badge {
+  font-size: 0.82rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.cqe-bl-badge.banned {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  font-weight: 600;
+}
+
+.cqe-bl-badge.normal {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.cqe-btn-ban-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.cqe-btn-ban-action.ban {
+  background: #ef4444;
+  color: #fff;
+}
+
+.cqe-btn-ban-action.ban:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.cqe-btn-ban-action.unban {
+  background: #10b981;
+  color: #fff;
+}
+
+.cqe-btn-ban-action.unban:hover {
+  background: #059669;
+  transform: translateY(-1px);
 }
 
 /* Animations */

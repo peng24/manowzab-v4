@@ -58,6 +58,27 @@
 
         <!-- 🏷️ Quick Filter Dropdown -->
         <div class="quick-filter-container">
+          <div class="stock-search-wrap">
+            <i class="fa-solid fa-magnifying-glass stock-search-icon"></i>
+            <input
+              type="text"
+              v-model="stockSearchQuery"
+              class="stock-search-input"
+              placeholder="ค้นหาชื่อ/เบอร์..."
+              @keyup.enter="handleStockSearchEnter"
+              @keydown.esc="stockSearchQuery = ''"
+            />
+            <button
+              v-if="stockSearchQuery"
+              type="button"
+              class="stock-search-clear"
+              @click="stockSearchQuery = ''"
+              title="ล้างคำค้นหา"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
           <div class="quick-filter-dropdown-wrap">
             <select v-model="activeFilter" class="quick-filter-select" :class="'qf-' + activeFilter">
               <option value="all">🌐 ทั้งหมด</option>
@@ -111,7 +132,8 @@
           cancelledItems.has(i),
           cancelledItems.get(i),
           isNewOrder(i),
-          activeFilter
+          activeFilter,
+          hasCustomerAddress(getStockItem(i).owner)
         ]"
         :index="i"
         :item="getStockItem(i)"
@@ -123,6 +145,7 @@
         :is-cancelled="cancelledItems.has(i)"
         :cancelled-name="cancelledItems.get(i) || ''"
         :is-new-order="isNewOrder(i)"
+        :has-address="hasCustomerAddress(getStockItem(i).owner)"
         @select="openQueueModal(i)"
         @show-owner="showOwnerItems"
       />
@@ -380,6 +403,34 @@ function handleGridScroll(e) {
   }
 }
 
+const stockSearchQuery = ref("");
+
+function hasCustomerAddress(owner) {
+  if (!owner) return true;
+  const meta = customerStore.getCustomerMetaByName(owner);
+  return meta ? Boolean(meta.hasAddress) : false;
+}
+
+function handleStockSearchEnter() {
+  const q = stockSearchQuery.value.trim();
+  if (!q) return;
+
+  const numMatch = q.match(/^#?(\d+)$/);
+  if (numMatch) {
+    const num = parseInt(numMatch[1], 10);
+    if (num >= 1 && num <= stockStore.stockSize) {
+      scrollToItem(num);
+      return;
+    }
+  }
+
+  // If text query, if matches items, scroll to first matching item
+  if (visibleItemIds.value.length >= 1) {
+    const firstId = visibleItemIds.value[0];
+    scrollToItem(firstId);
+  }
+}
+
 const visibleItemIds = computed(() => {
   const size = stockStore.stockSize;
   if (!size) return [];
@@ -390,9 +441,42 @@ const visibleItemIds = computed(() => {
   const filter = activeFilter.value;
   const stock = stockStore.stockData || {};
   const queueMap = queueLengthsMap.value || {};
+  const query = stockSearchQuery.value.trim().toLowerCase();
+
+  const numMatch = query.match(/^#?(\d+)$/);
+  const targetNum = numMatch ? parseInt(numMatch[1], 10) : null;
 
   const result = [];
   for (let i = 1; i <= size; i++) {
+    const item = stock[i];
+
+    // If search query is active
+    if (query) {
+      let isMatch = false;
+      if (targetNum !== null) {
+        isMatch = (i === targetNum) || String(i).includes(query.replace(/^#/, ''));
+      }
+      if (!isMatch && item?.owner) {
+        const ownerLower = (item.owner || "").toLowerCase();
+        const nickLower = (nicknameStore.getNickname(item.uid, item.owner) || "").toLowerCase();
+        if (ownerLower.includes(query) || nickLower.includes(query)) {
+          isMatch = true;
+        }
+      }
+      if (!isMatch && item?.queue && item.queue.length > 0) {
+        isMatch = item.queue.some((q) => {
+          const qOwner = (typeof q === "object" ? (q.owner || q.name || "") : String(q)).toLowerCase();
+          const qNick = (nicknameStore.getNickname(q?.uid, qOwner) || "").toLowerCase();
+          return qOwner.includes(query) || qNick.includes(query);
+        });
+      }
+
+      if (!isMatch) continue;
+      // Match found: include in results (bypassing window capping so user can find all matches)
+      result.push(i);
+      continue;
+    }
+
     // 1. Window capping: render ถึง limit หรือถ้าไอเทมกำลังถูกไฮไลท์/แก้ไขอยู่
     if (i > limit && hId !== i && eId !== i) {
       continue;
@@ -403,7 +487,6 @@ const visibleItemIds = computed(() => {
       result.push(i);
       continue;
     }
-    const item = stock[i];
     if (filter === "sold" && item?.owner) {
       result.push(i);
       continue;
@@ -2743,5 +2826,74 @@ watch(
   font-size: 0.75em;
   color: #94a3b8;
   pointer-events: none;
+}
+
+/* 🔍 Stock Search Box */
+.stock-search-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.stock-search-icon {
+  position: absolute;
+  left: 11px;
+  font-size: 0.8em;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.stock-search-input {
+  background: rgba(26, 32, 44, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 6px 28px 6px 30px;
+  font-weight: 500;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.86em;
+  color: #f1f5f9;
+  width: 135px;
+  outline: none;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.stock-search-input:focus {
+  width: 175px;
+  border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.stock-search-clear {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 0.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.stock-search-clear:hover {
+  color: #f87171;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 768px) {
+  .stock-search-input {
+    width: 105px;
+  }
+  .stock-search-input:focus {
+    width: 135px;
+  }
 }
 </style>

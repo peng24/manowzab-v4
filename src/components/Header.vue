@@ -59,11 +59,13 @@
       <div :class="['hero-connect-container', { connected: systemStore.isConnected }]">
         <i class="fa-brands fa-youtube" style="color: #ff0000; margin-right: 6px; font-size: 1.1em;"></i>
         <input
+          id="yt-video-id-input"
           type="text"
           v-model="videoId"
           class="input-id"
           placeholder="YouTube Video ID"
           @keyup.enter="toggleConnection"
+          :title="systemStore.isConnected ? 'กำลังเชื่อมต่อไลฟ์นี้ (คลิกเพื่อแก้ไข หรือกด Disconnect)' : 'พิมพ์หรือวางรหัส YouTube Live Video ID'"
           style="border: none; background: transparent; outline: none; padding: 4px;"
         />
         <button
@@ -223,6 +225,14 @@
               <div class="dropdown-group-title">
                 <i class="fa-solid fa-gears"></i> ระบบ & ทั่วไป
               </div>
+              <a @click="openShortcuts" class="menu-shortcuts">
+                <i class="fa-solid fa-keyboard" style="color: #38bdf8;"></i>
+                <span>รวมคีย์ลัดระบบ (?)</span>
+              </a>
+              <a @click="openBlacklistModal" class="menu-blacklist">
+                <i class="fa-solid fa-user-slash" style="color: #f87171;"></i>
+                <span>จัดการ Blacklist</span>
+              </a>
               <a @click="openNoteEditor" class="menu-note">
                 <i class="fa-solid fa-note-sticky"></i>
                 <span>จัดการ Note</span>
@@ -252,6 +262,12 @@
 
       <!-- ✅ Live Summary Modal -->
       <LiveSummaryModal ref="liveSummaryModalRef" />
+
+      <!-- ✅ Keyboard Shortcuts Modal -->
+      <ShortcutsModal ref="shortcutsModalRef" />
+
+      <!-- ✅ Blacklist Modal -->
+      <BlacklistModal ref="blacklistModalRef" />
     </div>
 
     <div class="header-info">
@@ -287,6 +303,8 @@ import NoteEditor from "./NoteEditor.vue"; // ✅ Import Note Editor
 // 🚀 Performance: Lazy load modals on demand via defineAsyncComponent
 const ChangelogModal = defineAsyncComponent(() => import("./ChangelogModal.vue"));
 const LiveSummaryModal = defineAsyncComponent(() => import("./LiveSummaryModal.vue"));
+const ShortcutsModal = defineAsyncComponent(() => import("./ShortcutsModal.vue"));
+const BlacklistModal = defineAsyncComponent(() => import("./BlacklistModal.vue"));
 import { useAuthStore } from "../stores/auth";
 import { announceShippingCustomers } from "../utils/deliverySync";
 import { CONSTANTS } from "../config/constants";
@@ -337,7 +355,19 @@ const dropdownStyle = ref({});
 const noteEditorRef = ref(null); // ✅ Note Editor Ref
 const changelogModalRef = ref(null); // ✅ Changelog Modal Ref
 const liveSummaryModalRef = ref(null); // ✅ Live Summary Modal Ref
+const shortcutsModalRef = ref(null); // ✅ Shortcuts Modal Ref
+const blacklistModalRef = ref(null); // ✅ Blacklist Modal Ref
 const cleanupFns = [];
+
+function openShortcuts() {
+  if (shortcutsModalRef.value) shortcutsModalRef.value.open();
+  showDropdown.value = false;
+}
+
+function openBlacklistModal() {
+  if (blacklistModalRef.value) blacklistModalRef.value.open();
+  showDropdown.value = false;
+}
 
 // ✅ Base URL for linking to sub-pages
 const baseUrl = computed(() => import.meta.env.BASE_URL || '/');
@@ -722,6 +752,7 @@ defineExpose({
 
 onMounted(() => {
   logger.log("🎯 Header mounted");
+  window.addEventListener("open-shortcuts-modal", openShortcuts);
   const unsubShipping = onValue(
     dbRef(db, "system/shipping"),
     (snapshot) => {
@@ -741,6 +772,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   logger.log("👋 Header unmounting");
+  window.removeEventListener("open-shortcuts-modal", openShortcuts);
   if (announceTimer) {
     clearTimeout(announceTimer);
     announceTimer = null;

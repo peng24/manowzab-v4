@@ -126,6 +126,58 @@
         </button>
       </div>
 
+      <!-- 🔍 Search & Sub-Filter Quick Pills -->
+      <div class="sm-filter-subbar">
+        <div class="sm-search-wrap">
+          <i class="fa-solid fa-magnifying-glass sm-search-icon"></i>
+          <input
+            type="text"
+            v-model="shippingSearchQuery"
+            class="sm-search-input"
+            placeholder="ค้นหาชื่อลูกค้า, โน้ต, ที่อยู่..."
+            @keydown.esc="shippingSearchQuery = ''"
+          />
+          <button
+            v-if="shippingSearchQuery"
+            type="button"
+            class="sm-search-clear"
+            @click="shippingSearchQuery = ''"
+            title="ล้างคำค้นหา"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="sm-sub-pills">
+          <button
+            type="button"
+            class="sm-sub-pill"
+            :class="{ active: shippingSubFilter === 'all' }"
+            @click="shippingSubFilter = 'all'"
+          >
+            ทั้งหมด
+          </button>
+          <button
+            type="button"
+            class="sm-sub-pill pill-warn"
+            :class="{ active: shippingSubFilter === 'no-address' }"
+            @click="shippingSubFilter = shippingSubFilter === 'no-address' ? 'all' : 'no-address'"
+            :title="'แสดงเฉพาะลูกค้าที่ยังไม่มีที่อยู่จัดส่ง'"
+          >
+            <i class="fa-solid fa-location-dot"></i> ยังไม่มีที่อยู่ ({{ noAddressCount }})
+          </button>
+          <button
+            type="button"
+            class="sm-sub-pill pill-print"
+            :class="{ active: shippingSubFilter === 'unprinted' }"
+            @click="shippingSubFilter = shippingSubFilter === 'unprinted' ? 'all' : 'unprinted'"
+            :title="'แสดงเฉพาะลูกค้าที่ยังไม่ได้พิมพ์ใบปะหน้า'"
+          >
+            <i class="fa-solid fa-print"></i> ยังไม่พิมพ์ ({{ unprintedCount }})
+          </button>
+        </div>
+      </div>
+
       <!-- Customer List -->
       <div class="sm-table-wrap">
         <table class="sm-table">
@@ -143,7 +195,10 @@
           <tbody>
             <tr v-if="sortedCustomers.length === 0">
               <td colspan="7" style="text-align: center; color: #888; padding: 30px;">
-                <span v-if="viewMode === 'requested'">
+                <span v-if="shippingSearchQuery || shippingSubFilter !== 'all'">
+                  🔍 ไม่พบรายการลูกค้าที่ตรงกับเงื่อนไขการค้นหา
+                </span>
+                <span v-else-if="viewMode === 'requested'">
                   📭 ยังไม่มีรายการลูกค้าที่แจ้งวันจัดส่ง — เพิ่มวันส่งจากรายการฝากสินค้า หรือเพิ่มลูกค้าด้วยมือ
                 </span>
                 <span v-else-if="viewMode === 'unassigned'">
@@ -320,7 +375,8 @@
         <!-- 📱 Mobile Card View (for portrait smartphones) -->
         <div class="sm-mobile-cards">
           <div v-if="sortedCustomers.length === 0" style="text-align: center; color: #888; padding: 20px;">
-            <span v-if="viewMode === 'requested'">📭 ยังไม่มีรายการลูกค้าที่แจ้งวันจัดส่ง</span>
+            <span v-if="shippingSearchQuery || shippingSubFilter !== 'all'">🔍 ไม่พบรายการลูกค้าที่ตรงกับเงื่อนไขการค้นหา</span>
+            <span v-else-if="viewMode === 'requested'">📭 ยังไม่มีรายการลูกค้าที่แจ้งวันจัดส่ง</span>
             <span v-else-if="viewMode === 'unassigned'">🎉 ไม่มีรายการลูกค้าที่ฝากสินค้า</span>
             <span v-else>ยังไม่มีรายการจัดส่ง</span>
           </div>
@@ -722,6 +778,17 @@ const unassignedCustomers = computed(() =>
   )
 );
 
+const shippingSearchQuery = ref("");
+const shippingSubFilter = ref("all"); // 'all' | 'no-address' | 'unprinted'
+
+const noAddressCount = computed(() => {
+  return customers.value.filter((c) => !hasAddress(c) && c.status !== "done").length;
+});
+
+const unprintedCount = computed(() => {
+  return customers.value.filter((c) => !c.labelPrinted && c.status !== "done").length;
+});
+
 const customers = computed(() => {
   let base = [];
   if (viewMode.value === "requested") {
@@ -741,8 +808,27 @@ const customers = computed(() => {
 
 // 🚀 Optimization: Pre-calculate countdown days once before sorting (O(N) instead of O(N log N) Date object instantiations)
 const sortedCustomers = computed(() => {
-  const list = customers.value;
+  let list = customers.value;
   if (!list || list.length === 0) return [];
+
+  const q = shippingSearchQuery.value.trim().toLowerCase();
+  const sub = shippingSubFilter.value;
+
+  if (q) {
+    list = list.filter((c) => {
+      const nameMatch = (c.name || "").toLowerCase().includes(q);
+      const noteMatch = (c.note || "").toLowerCase().includes(q);
+      const addrSummary = (getCustomerAddressSummary(c) || "").toLowerCase();
+      const addrMatch = addrSummary.includes(q);
+      return nameMatch || noteMatch || addrMatch;
+    });
+  }
+
+  if (sub === "no-address") {
+    list = list.filter((c) => !hasAddress(c));
+  } else if (sub === "unprinted") {
+    list = list.filter((c) => !c.labelPrinted);
+  }
 
   const decorated = list.map((c) => ({
     customer: c,
@@ -1522,6 +1608,117 @@ function deleteCustomer(id, name) {
   border-color: #3b82f6;
   color: #60a5fa;
   box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+}
+
+/* 🔍 Filter Subbar: Search & Sub-Filter Pills */
+.sm-filter-subbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0 10px;
+  flex-wrap: wrap;
+}
+
+.sm-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+}
+
+.sm-search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 0.85em;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.sm-search-input {
+  width: 100%;
+  padding: 7px 32px 7px 34px;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  color: #fff;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.88em;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.sm-search-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+  background: #09090b;
+}
+
+.sm-search-clear {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 3px 6px;
+  font-size: 0.82em;
+  border-radius: 50%;
+}
+
+.sm-search-clear:hover {
+  color: #f87171;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sm-sub-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sm-sub-pill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: #94a3b8;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.82em;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.sm-sub-pill:hover {
+  background: #27272a;
+  color: #fff;
+}
+
+.sm-sub-pill.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+}
+
+.sm-sub-pill.pill-warn.active {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #f87171;
+  color: #fca5a5;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+}
+
+.sm-sub-pill.pill-print.active {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: #fbbf24;
+  color: #fde047;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
 }
 
 /* Add Form */

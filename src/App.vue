@@ -89,6 +89,7 @@ import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Upda
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import { useVoiceLearningStore } from "./stores/voiceLearning";
 import { useCustomerStore } from "./stores/customer";
+import { useBlacklistStore } from "./stores/blacklist";
 import { useChatProcessor } from "./composables/useChatProcessor";
 
 // 🚀 Performance: Lazy load AuthGate & heavy modals on demand via defineAsyncComponent
@@ -105,6 +106,7 @@ const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
 const voiceLearningStore = useVoiceLearningStore();
 const customerStore = useCustomerStore();
+const blacklistStore = useBlacklistStore();
 
 // ✅ Global Watcher: Silence immediately when Sound is toggled OFF
 watch(
@@ -208,6 +210,9 @@ onMounted(async () => {
 
   const unsubCustomers = customerStore.initCustomerListeners(); // ✅ Init Shared Customer & Address Book Store
   if (unsubCustomers) cleanupFns.push(unsubCustomers);
+
+  const unsubBlacklist = blacklistStore.initBlacklistListener(); // ✅ Init Shared Blacklist Store
+  if (unsubBlacklist) cleanupFns.push(unsubBlacklist);
 
 
   // ✅ Reset Connection State (Ensure YouTube starts disconnected)
@@ -349,6 +354,13 @@ function handleGlobalHotkeys(e) {
       ytInput.focus();
       ytInput.select();
     }
+    e.preventDefault();
+    return;
+  }
+
+  // 4. ? or F1: Open Keyboard Shortcuts Cheat Sheet
+  if (e.key === "?" || (e.shiftKey && e.key === "/") || e.key === "F1") {
+    window.dispatchEvent(new CustomEvent("open-shortcuts-modal"));
     e.preventDefault();
     return;
   }

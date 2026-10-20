@@ -6,6 +6,7 @@ import { useAudio } from "../composables/useAudio";
 import { logger } from "../utils/logger";
 import { useNicknameStore } from "./nickname";
 import { useSystemStore } from "./system";
+import { useBlacklistStore } from "./blacklist";
 import { archiveChatEntries, getAllChatEntries, clearChatEntries } from "../utils/chatIdb";
 import { extractAdminCustomerName } from "../utils/chatParserUtils";
 
@@ -255,8 +256,19 @@ export const useChatStore = defineStore("chat", () => {
         // This handles deduplication and logging
         addMessage(messageData);
 
-        // ✅ Play audio for NEW messages in real-time across all connected devices
-        if (isNew && messageData.timestamp >= syncStartTime - 5000) {
+        // ✅ 🛡️ Blacklist Guard: Never play audio (TTS/SFX) for banned users
+        let isUserBanned = messageData.isBanned || messageData.type === "banned";
+        if (!isUserBanned) {
+          try {
+            const blacklistStore = useBlacklistStore();
+            if (blacklistStore.isBanned(messageData.uid, messageData.realName || messageData.displayName || messageData.authorName)) {
+              isUserBanned = true;
+            }
+          } catch (e) {}
+        }
+
+        // ✅ Play audio for NEW messages in real-time across all connected devices (Bypassed if banned)
+        if (isNew && !isUserBanned && messageData.timestamp >= syncStartTime - 5000) {
           const { queueAudio } = useAudio();
           const isVoiceChat = messageData.uid === "voice-chat-uid" || (messageData.uid && messageData.uid.includes("voice-chat"));
 

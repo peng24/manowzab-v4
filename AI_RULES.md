@@ -54,6 +54,22 @@
     *   `clearAllStock` must `await remove()`, deduplicate affected owners, and pass `{}` to `syncDeliveryCustomerForOwner` (which must respect `{}` without re-fetching stale data from Firebase).
     *   `markDone` / `undoDone` in `ShippingManager.vue` must record `lastDoneCount` and `lastDoneSessions` so `undoDone` decrements `totalBookings` back and only restores sessions from the current delivery cycle.
     *   Deleting items inside `showOwnerItems` (`👗` modal in `StockGrid.vue` and `HistoryModal.vue`) must use `runTransaction` to promote next-in-queue or preserve price, keep `allStock` in outer scope, and re-open the modal when items remain or when confirmation is cancelled.
+6.  **Operational UX/UI & Search Filtering (v5.4.4+):**
+    *   `StockGrid.vue`: Real-time search (`stockSearchQuery`) filters cards by number, owner, nickname, or queue and renders all matching items beyond the window-capping limit. Pressing Enter with a number triggers smooth scroll and highlight (`scrollToItem`).
+    *   `StockItemCard.vue`: Show `.no-addr-indicator` (`📍 รอที่อยู่`) reactively via `hasCustomerAddress(owner)` using `customerStore.getCustomerMetaByName(owner)?.hasAddress`, and include `hasCustomerAddress` in `v-memo` of both `StockGrid.vue` and `StockItemCard.vue`.
+    *   `ShippingManager.vue`: Real-time search filters table and mobile cards by customer name, note, or address summary, paired with quick sub-filter pills (`⚠️ ยังไม่มีที่อยู่` and `🖨️ ยังไม่พิมพ์`).
+    *   `Header.vue`: `.hero-connect-container.connected` collapses the Video ID input to ~95px and expands on focus/hover (~170px) to conserve horizontal space without breaking `Shift+F` autofocus (`id="yt-video-id-input"`).
+    *   `ShortcutsModal.vue`: Hotkey cheat sheet modal accessible via `⚡ Tools` menu or pressing `?` / `F1`.
+
+### 🛡️ Customer Blacklist & Ban Protection (v5.4.5+)
+
+1.  **Centralized Store & RTDB Sync:** `useBlacklistStore` in `src/stores/blacklist.js` manages blacklist state under `/blacklist`. All connected devices sync status in real time.
+2.  **Zero Audio Leakage:** Banned customer messages MUST NOT trigger any TTS or SFX (`queueAudio` bypassed in `src/stores/chat.js`).
+3.  **Anti-Stock Stealing:** Banned customers CANNOT claim stock or enter queues. Messages are recorded with `isBanned: true`, `type: "banned"`, `sfxType: null`, `ttsText: ""`.
+4.  **Option A Dimmed Display & Avatar Overlay:** `ChatPanel.vue` renders banned messages with 45% opacity, red border, and `🚫` overlay directly over the profile picture (restoring full opacity on hover for admin inspection).
+5.  **No Auto-Release of Previous Stock:** Banning never automatically releases prior bookings; admin releases manually if desired.
+6.  **Space-Agnostic Matching:** `isBanned()` and `getBanInfo()` match Thai names with and without spaces (e.g. matching "สมชาย ใจดี" and "สมชายใจดี").
+7.  **Admin Tools:** Support `!แบน [ชื่อ]` / `!ปลดแบน [ชื่อ]` chat commands, 1-click ban/unban by clicking customer profile avatar (hidden inside avatar with hover hint), `BlacklistModal.vue` in `⚡ Tools`, and direct ban/unban toggle inside `CustomerQuickEditModal.vue`.
 
 ## 4. Key File Structures
 
@@ -62,6 +78,7 @@
 - `src/composables/useChatProcessor.js`: Chat intent detection (Lazy short-circuit Regex, 80ms micro-batch queue, multi-buy, cancel, admin proxy).
 - `src/stores/stock.js`: Stock management (Firebase transaction sync, auto-expand, queue system, throttled & deduplicated history sync).
 - `src/stores/customer.js`: Centralized reference-counted `delivery_customers` & `address_book` listeners, $O(1)$ lookup maps, and live cache hooks for `deliverySync.js`.
+- `src/stores/blacklist.js`: Centralized blacklist store (`settings/blacklist` Firebase listener, space-agnostic Thai name matching, banUser/unbanUser).
 - `src/services/YouTubeLiveChat.js`: YouTube chat polling (concurrent poll batch dispatch, exponential backoff, key rotation).
 - `src/composables/useYouTube.js`: YouTube connection (smartFetch, viewer count, disconnect).
 
@@ -87,6 +104,7 @@
 | 6   | **รองรับเลขไทย**                                         | เมื่อมีการจองด้วยเลขไทย (เช่น "๕๖") ต้องแปลงเป็นเลขอารบิกและจองได้ตามปกติ                                                                      |
 | 7   | **จองหลายรายการพร้อมกัน**                                | เมื่อผู้ใช้จองหลายรายการในข้อความเดียว (เช่น "จอง 1 3 5") ต้องจำการจองทุกรายการ ห้ามตกหล่น                                                     |
 | 8   | **รวมศูนย์ Listener ลูกค้า & ประสิทธิภาพสูงสุด**         | ใช้ `useCustomerStore` จุดเดียวสำหรับ `delivery_customers` / `address_book` และรักษาความเร็ว 60fps ตลอดการไลฟ์สด                               |
+| 9   | **ระบบ Blacklist ป้องกันเสียงและสต็อก 100%**             | ลูกค้าที่ถูกแบนต้องไม่สามารถจองสินค้าหรือส่งเสียงอ่าน TTS/SFX ข้ามอุปกรณ์ได้ และข้อความแสดงแบบสีจาง 45% พร้อมป้าย 🚫 BAN                         |
 
 ### วิธีตรวจสอบและรายงานผล
 

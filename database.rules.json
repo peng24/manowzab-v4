@@ -30,6 +30,10 @@
       ".read": "auth != null",
       ".write": "auth != null"
     },
+    "blacklist": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
     "voice_chats": {
       ".read": "auth != null",
       ".write": "auth != null"

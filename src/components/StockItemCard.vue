@@ -11,7 +11,8 @@
       isHighlighted,
       isCancelled,
       isNewOrder,
-      cancelledName
+      cancelledName,
+      hasAddress
     ]"
     :class="[
       'stock-item',
@@ -32,12 +33,23 @@
       {{ nickname || item.owner || "ว่าง" }}
     </div>
 
-    <div
-      v-if="item.owner && ownerCount >= 1"
-      class="owner-count-badge"
-      :title="`${item.owner} จองทั้งหมด ${ownerCount} ชิ้น — คลิกเพื่อจัดการ`"
-      @click.stop="$emit('show-owner', item.owner)"
-    >👗 {{ ownerCount }} ตัว</div>
+    <div class="card-meta-row" v-if="item.owner">
+      <div
+        v-if="ownerCount >= 1"
+        class="owner-count-badge"
+        :title="`${item.owner} จองทั้งหมด ${ownerCount} ชิ้น — คลิกเพื่อจัดการ`"
+        @click.stop="$emit('show-owner', item.owner)"
+      >👗 {{ ownerCount }} ตัว</div>
+
+      <div
+        v-if="!hasAddress"
+        class="no-addr-indicator"
+        :title="`${item.owner} ยังไม่มีที่อยู่จัดส่งในระบบ`"
+        @click.stop="$emit('show-owner', item.owner)"
+      >
+        <i class="fa-solid fa-location-dot"></i> รอที่อยู่
+      </div>
+    </div>
 
     <div
       v-if="item.owner && item.backdated"
@@ -74,6 +86,7 @@ const props = defineProps({
   isCancelled: { type: Boolean, default: false },
   cancelledName: { type: String, default: '' },
   isNewOrder: { type: Boolean, default: false },
+  hasAddress: { type: Boolean, default: true },
 });
 
 defineEmits(['select', 'show-owner']);
@@ -339,6 +352,16 @@ function isUnsavedOwner(name) {
   border: 1.5px solid #fde047;
 }
 
+.card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+  z-index: 2;
+}
+
 .owner-count-badge {
   display: inline-flex;
   align-items: center;
@@ -347,10 +370,9 @@ function isUnsavedOwner(name) {
   color: #34d399;
   background: rgba(16, 185, 129, 0.15);
   border: 1px solid rgba(16, 185, 129, 0.3);
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 12px;
   font-weight: 600;
-  margin-top: 4px;
   letter-spacing: 0.3px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -359,6 +381,29 @@ function isUnsavedOwner(name) {
 .owner-count-badge:hover {
   background: rgba(16, 185, 129, 0.3);
   color: #6ee7b7;
+  transform: translateY(-1px);
+}
+
+.no-addr-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72em;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.2px;
+  transition: all 0.2s ease;
+}
+
+.no-addr-indicator:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: #f87171;
+  color: #ffffff;
   transform: translateY(-1px);
 }
 

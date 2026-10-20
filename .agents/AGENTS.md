@@ -36,6 +36,20 @@
    - In `StockGrid.vue` and `HistoryModal.vue` (`showOwnerItems`), use `runTransaction` when cancelling past-session items, escape HTML with `escapeHtml()`, and re-open `showOwnerItems()` after confirm/cancel.
 6. **Chat Initial Bottom Pinning & Direction-Aware Auto-Scroll Invariant**:
    - `ChatPanel.vue` must use `evaluateChatScrollState()`, Double-`requestAnimationFrame` in `scrollToBottom()`, and `ResizeObserver` on `#chat-list`/`#chat-viewport` (and never use `contain-intrinsic-size: 55px` on `.chat-row`) so opening the page or async customer badge/pill rendering always lands at the latest message without falsely triggering `isUserScrolling`.
+7. **Operational UX/UI & Search Filtering Invariant (v5.4.4+)**:
+   - In `StockGrid.vue`, real-time search (`stockSearchQuery`) filters cards by number, owner, nickname, or queue while bypassing display limit (rendering matches > 120), and pressing Enter with a number triggers smooth scroll and highlight (`scrollToItem`).
+   - In `StockItemCard.vue`, show `.no-addr-indicator` (`📍 รอที่อยู่`) reactively via `hasCustomerAddress(owner)` (`customerStore.getCustomerMetaByName(owner)?.hasAddress`), and ensure `hasCustomerAddress` is included in `v-memo` of both `StockGrid.vue` and `StockItemCard.vue`.
+   - In `ShippingManager.vue`, real-time search filters table and mobile cards by customer name, note, or address summary, paired with quick sub-filter pills (`⚠️ ยังไม่มีที่อยู่` and `🖨️ ยังไม่พิมพ์`).
+   - In `Header.vue`, `.hero-connect-container.connected` collapses the Video ID input to a compact state (~95px) and expands on focus/hover (~170px) to conserve horizontal space without breaking `Shift+F` autofocus (`id="yt-video-id-input"`).
+   - In `ShortcutsModal.vue`, provide a hotkey cheat sheet modal accessible via `⚡ Tools` menu or pressing `?` / `F1`.
+8. **Customer Blacklist & Ban Invariant (v5.4.5+)**:
+   - Centralize blacklist state in `useBlacklistStore` (`src/stores/blacklist.js`) syncing real-time via `settings/blacklist` in Firebase RTDB (inheriting write/read permissions cleanly).
+   - Zero Audio Leakage: `src/stores/chat.js` MUST suppress all TTS and SFX audio playback across all connected devices when `isBannedUser` or `blacklistStore.isBanned` evaluates to true.
+   - Anti-Stock Stealing: `useChatProcessor.js` MUST block all buy, cancel, and shipping processing for banned users, recording the chat with `isBanned: true`, `type: "banned"`, `sfxType: null`, `ttsText: ""`.
+   - Option A Visual Display: `ChatPanel.vue` renders banned chat messages with dimmed opacity (~45%), red border-left accent, and `🚫` overlay directly over the profile picture (with `🚫 แบน` badge under avatar), restoring full opacity on hover for admin inspection.
+   - No Auto-Release of Prior Stock: Banning a user never touches their previously booked items or queues automatically; releases remain purely manual by admin.
+   - Space-Agnostic Matching: Customer lookup in `isBanned()` and `getBanInfo()` must support space-stripped Thai names (e.g. matching "สมชาย ใจดี" and "สมชายใจดี").
+   - Admin Controls: Support `!แบน [ชื่อ]` / `!ปลดแบน [ชื่อ]` chat commands, 1-click ban/unban by clicking customer profile avatar (with subtle hover ban hint), `BlacklistModal.vue` accessible via `⚡ Tools`, and direct ban/unban toggle inside `CustomerQuickEditModal.vue`.
 
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:

@@ -200,14 +200,19 @@
         <div
           v-for="chat in filteredVisibleMessages"
           :key="chat.id"
-          v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color, isAuthorFiltered(chat), getCustomerMetaKey(chat), chat.proxyCustomerName, chat.noteCategory, chat.isAdminNote]"
-          :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type]"
+          v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color, isAuthorFiltered(chat), getCustomerMetaKey(chat), chat.proxyCustomerName, chat.noteCategory, chat.isAdminNote, isBannedUser(chat)]"
+          :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type, isBannedUser(chat) ? 'banned' : '']"
           :style="getChatRowStyle(chat)"
         >
 
           <!-- Avatar Left Column (Avatar + Action Badge under it) -->
           <div class="avatar-col">
-            <div class="avatar-container">
+            <div
+              class="avatar-container"
+              :class="{ 'clickable': !chat.isAdmin, 'is-banned': isBannedUser(chat) }"
+              @click.stop="!chat.isAdmin && confirmToggleBan(chat)"
+              :title="chat.isAdmin ? 'แอดมิน' : (isBannedUser(chat) ? 'คลิกที่รูปโปรไฟล์เพื่อปลดแบน' : 'คลิกที่รูปโปรไฟล์เพื่อเปิดเมนูแบน')"
+            >
               <img
                 :src="chat.avatar"
                 class="avatar"
@@ -221,11 +226,36 @@
               >
                 {{ chat.displayName?.[0] || "?" }}
               </div>
+
+              <!-- 🚫 Overlay ทับรูปโปรไฟล์เมื่อถูกแบน -->
+              <div
+                v-if="isBannedUser(chat)"
+                class="avatar-banned-overlay"
+                title="ผู้ใช้นี้ถูกแบน (คลิกเพื่อปลดแบน)"
+              >
+                <i class="fa-solid fa-ban"></i>
+              </div>
+
+              <!-- 👁️ Hover Hint เพื่อบอกว่าคลิกรูปนี้เพื่อแบนได้ -->
+              <div
+                v-else-if="!chat.isAdmin"
+                class="avatar-hover-ban-hint"
+                title="คลิกเพื่อเปิดเมนูแบน"
+              >
+                <i class="fa-solid fa-ban"></i>
+              </div>
             </div>
 
-            <!-- 🏷️ Intent Action Badge Under Profile Avatar (จอง / ส่ง / ยกเลิก) -->
+            <!-- 🏷️ Intent Action Badge Under Profile Avatar (จอง / ส่ง / ยกเลิก / แบน) -->
             <span
-              v-if="getIntentBadge(chat.type)"
+              v-if="isBannedUser(chat)"
+              class="status-badge-under badge-banned"
+              title="ผู้ใช้นี้ถูกแบน (ปิดเสียงอ่านและบล็อกการจองสินค้า)"
+            >
+              🚫 แบน
+            </span>
+            <span
+              v-else-if="getIntentBadge(chat.type)"
               class="status-badge-under"
               :class="getIntentBadge(chat.type).class"
             >
@@ -356,6 +386,7 @@ import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useCustomerStore } from "../stores/customer";
+import { useBlacklistStore } from "../stores/blacklist";
 import { useAudio } from "../composables/useAudio";
 
 // 🚀 Performance: Lazy load CustomerQuickEditModal on demand
@@ -380,6 +411,7 @@ const chatStore = useChatStore();
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
 const customerStore = useCustomerStore();
+const blacklistStore = useBlacklistStore();
 const { resetVoice, playSfx } = useAudio();
 let chatUnsubscribe = null;
 
@@ -680,12 +712,134 @@ function getIntentBadge(type) {
       return { icon: "🚚", label: "ส่ง", class: "badge-shipping" };
     case "cancel":
       return { icon: "❌", label: "ยกเลิก", class: "badge-cancel" };
+    case "banned":
+      return { icon: "🚫", label: "แบน", class: "badge-banned" };
     case "question":
       return { icon: "💬", label: "ถาม", class: "badge-question" };
     case "note":
       return { icon: "📝", label: "โน้ต", class: "badge-note" };
     default:
       return null;
+  }
+}
+
+// 🛡️ Helper: Check if user is banned
+function isBannedUser(chat) {
+  if (!chat) return false;
+  if (chat.isBanned || chat.type === "banned") return true;
+  return blacklistStore.isBanned(chat.uid, chat.realName || chat.displayName || chat.authorName);
+}
+
+// 🚫 Helper: Quick Ban / Unban from Chat Row
+async function confirmToggleBan(chat) {
+  if (!chat) return;
+  const userName = chat.displayName || chat.realName || chat.authorName || "ลูกค้า";
+  const userUid = chat.uid;
+  const isBanned = isBannedUser(chat);
+
+  if (isBanned) {
+    const res = await Swal.fire({
+      title: `ปลดแบนคุณ ${userName}?`,
+      text: "ลูกค้าจะสามารถส่งเสียงอ่านและจองสินค้าได้ตามปกติ",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#10b981",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "ปลดแบน",
+      cancelButtonText: "ยกเลิก",
+    });
+
+    if (res.isConfirmed) {
+      try {
+        await blacklistStore.unbanUser(userUid || userName);
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "success",
+          title: `ปลดแบนคุณ ${userName} แล้ว`,
+          showConfirmButton: false,
+          timer: 2000,
+          timerProgressBar: true,
+        });
+      } catch (err) {
+        logger.error("Unban error:", err);
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาดในการปลดแบน",
+          text: err.message || "ไม่สามารถปลดแบนได้",
+        });
+      }
+    }
+  } else {
+    const { value: formValues } = await Swal.fire({
+      title: `🚫 แบนคุณ ${userName}?`,
+      html: `
+        <div style="text-align: left; font-size: 0.9rem; margin-top: 10px;">
+          <p style="color: #94a3b8; margin-bottom: 8px;">ผู้ใช้ที่ถูกแบนจะไม่สามารถจองสินค้าได้ และระบบจะปิดเสียงอ่าน/เอฟเฟกต์อัตโนมัติ</p>
+          <label style="display: block; font-weight: bold; margin-bottom: 4px; color: #cbd5e1;">เหตุผลในการแบน:</label>
+          <select id="swal-ban-reason" class="swal2-select" style="display: block; width: 100%; margin: 0 0 10px 0; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 6px; padding: 8px;">
+            <option value="CF แล้วไม่โอน / หายเงียบ">CF แล้วไม่โอน / หายเงียบ</option>
+            <option value="ก่อกวน / กวนประสาทในไลฟ์">ก่อกวน / กวนประสาทในไลฟ์</option>
+            <option value="ยกเลิกออเดอร์ซ้ำๆ">ยกเลิกออเดอร์ซ้ำๆ</option>
+            <option value="ใช้คำพูดไม่สุภาพ">ใช้คำพูดไม่สุภาพ</option>
+            <option value="custom">เหตุผลอื่นๆ (ระบุข้างล่าง)...</option>
+          </select>
+          <input id="swal-custom-reason" class="swal2-input" placeholder="ระบุเหตุผลเพิ่มเติม" style="display: none; width: 100%; margin: 0; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 6px; padding: 8px; font-size: 0.9rem;" />
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "🚫 ยืนยันการแบน",
+      cancelButtonText: "ยกเลิก",
+      didOpen: () => {
+        const selectEl = document.getElementById("swal-ban-reason");
+        const customInput = document.getElementById("swal-custom-reason");
+        if (selectEl && customInput) {
+          selectEl.addEventListener("change", (e) => {
+            customInput.style.display = e.target.value === "custom" ? "block" : "none";
+          });
+        }
+      },
+      preConfirm: () => {
+        const selectEl = document.getElementById("swal-ban-reason");
+        const customInput = document.getElementById("swal-custom-reason");
+        let reason = selectEl ? selectEl.value : "CF แล้วไม่โอน / ก่อกวน";
+        if (reason === "custom") {
+          reason = customInput?.value?.trim() || "CF แล้วไม่โอน / ก่อกวน";
+        }
+        return { reason };
+      },
+    });
+
+    if (formValues) {
+      try {
+        await blacklistStore.banUser({
+          channelId: userUid,
+          displayName: userName,
+          reason: formValues.reason,
+          bannedBy: "แอดมิน (คลิกจากรูปโปรไฟล์)",
+        });
+
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "success",
+          title: `แบนคุณ ${userName} เรียบร้อยแล้ว`,
+          showConfirmButton: false,
+          timer: 2000,
+          timerProgressBar: true,
+        });
+      } catch (err) {
+        logger.error("Ban error:", err);
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาดในการแบน",
+          text: err.message || "ไม่สามารถบันทึกสถานะแบนได้",
+        });
+      }
+    }
   }
 }
 
@@ -2360,6 +2514,102 @@ async function refreshChat() {
   background: #f59e0b;
   border-color: #f59e0b;
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+/* 👤 Clickable Avatar Profile Ban Trigger */
+.avatar-container.clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.avatar-container.clickable:hover {
+  transform: scale(1.08);
+}
+
+/* 🚫 Overlay ทับรูปโปรไฟล์เมื่อถูกแบน (Red Ban Overlay) */
+.avatar-banned-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(1.5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+  font-size: 1.35rem;
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+  pointer-events: none;
+  z-index: 2;
+  animation: pulseBanOverlay 2s infinite ease-in-out;
+}
+
+@keyframes pulseBanOverlay {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.95);
+    transform: scale(1.04);
+  }
+}
+
+/* 👁️ Hover Hint ก่อนแบน (ซ่อนในรูปโปรไฟล์ แสดงเมื่อเมาส์ชี้) */
+.avatar-hover-ban-hint {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.82);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.avatar-container.clickable:hover .avatar-hover-ban-hint {
+  opacity: 1;
+}
+
+/* 🚫 Banned Customer Dimmed Style (Option A: 45% opacity, muted red accent, full opacity on hover) */
+.chat-row.banned {
+  opacity: 0.45;
+  background: rgba(239, 68, 68, 0.08) !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  border-left: 4px solid #ef4444 !important;
+  filter: grayscale(35%);
+  transition: opacity 0.2s, filter 0.2s;
+}
+
+.chat-row.banned:hover {
+  opacity: 0.95;
+  filter: grayscale(0%);
+}
+
+.chat-row.banned .chat-bubble {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+
+.chat-row.banned .avatar {
+  border-color: #ef4444;
+  opacity: 0.7;
+}
+
+.badge-banned {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+  color: #ffffff !important;
+  font-weight: 800;
+  border: 1px solid rgba(254, 202, 202, 0.4);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
 }
 
 /* 🎯 Active Author Filter Bar */

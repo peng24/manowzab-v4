@@ -3076,6 +3076,27 @@ body {
   background: rgba(0, 230, 118, 0.05);
 }
 
+.hero-connect-container.connected .input-id {
+  width: 95px;
+  font-size: 0.85em;
+  opacity: 0.85;
+  text-overflow: ellipsis;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.hero-connect-container.connected:focus-within .input-id,
+.hero-connect-container.connected:hover .input-id {
+  width: 170px;
+  opacity: 1;
+}
+
+.hero-connect-container.connected .btn {
+  padding: 4px 8px;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
 /* 5. LED Status Dot */
 .status-led {
   width: 9px;

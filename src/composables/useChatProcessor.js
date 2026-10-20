@@ -474,28 +474,35 @@ export function useChatProcessor() {
       return;
     }
 
-    // 🗓️ Admin Yesterday / Backdated Debt Note (e.g. "หนิง เมื่อวาน", "หนิง เมื่อวาน 41 43", "ตุ๊ก บำรุงรัตน์ เมือวาน 32")
-    if (isAdmin && backdatedNoteRegex.test(normalizedMsg) && !tryRegex.test(normalizedMsg)) {
-      const customerName = extractAdminCustomerName(normalizedMsg);
+    // 🗓️ Yesterday / Backdated Debt Note (e.g. "หนิง เมื่อวาน", "หนิง เมื่อวาน 41 43", "ตุ๊ก บำรุงรัตน์ เมือวาน 32", "มะระ 39 เมื่อวาน")
+    if (!shippingRegex.test(normalizedMsg) && !holdRegex.test(normalizedMsg) && backdatedNoteRegex.test(normalizedMsg) && !tryRegex.test(normalizedMsg)) {
+      const customerName = isAdmin ? extractAdminCustomerName(normalizedMsg) : displayName;
+      const targetDisplayName = isAdmin
+        ? (customerName ? `${customerName} (โน้ตเมื่อวานโดย ${displayName})` : displayName)
+        : displayName;
+      const effectivePhonetic = customerName
+        ? nicknameStore.getPhoneticName(null, customerName)
+        : phoneticName;
+
       chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
         id: item.id,
         text: msg,
         messageRuns: getMessageRuns(),
         authorName: realName,
-        displayName: customerName ? `${customerName} (โน้ตเมื่อวานโดย ${displayName})` : displayName,
-        proxyCustomerName: customerName,
-        phoneticName: customerName ? nicknameStore.getPhoneticName(null, customerName) : phoneticName,
+        displayName: targetDisplayName,
+        proxyCustomerName: isAdmin ? customerName : null,
+        phoneticName: effectivePhonetic,
         realName,
         uid,
         avatar,
         color: stringToColor(uid),
-        isAdmin: true,
+        isAdmin,
         isAdminNote: true,
         noteCategory: "yesterday",
         type: "note",
-        sfxType: null,
-        ttsText: "",
-        detectionMethod: "admin-yesterday-note",
+        sfxType: isNewCustomerChat ? "bell" : "success",
+        ttsText: isVoiceChat ? "" : ttsMessage,
+        detectionMethod: isAdmin ? "admin-yesterday-note" : "customer-yesterday-note",
         timestamp: new Date(item.snippet.publishedAt).getTime(),
       });
       return;
@@ -575,7 +582,7 @@ export function useChatProcessor() {
             color: stringToColor(uid),
             isAdmin,
             type: isAdmin ? "note" : "general",
-            sfxType: "error",
+            sfxType: isNewCustomerChat ? "bell" : "success",
             ttsText: isVoiceChat ? "" : ttsMessage,
             detectionMethod: "date-mismatch-skip",
             timestamp: msgTimestamp,
@@ -1067,7 +1074,7 @@ export function useChatProcessor() {
           color: stringToColor(uid),
           isAdmin,
           type: isAdmin ? "note" : "general",
-          sfxType: "error",
+          sfxType: isNewCustomerChat ? "bell" : "success",
           ttsText: isVoiceChat ? "" : ttsMessage,
           detectionMethod: "date-mismatch-skip",
           timestamp: msgTimestamp,

@@ -568,6 +568,9 @@ describe("chatParserUtils", () => {
       expect(extractAdminCustomerName("พรจันทร์ เอา")).toBe("พรจันทร์");
       expect(extractAdminCustomerName("พรจันทร์ สีฟ้า")).toBe("พรจันทร์");
       expect(extractAdminCustomerName("หนิง เมื่อวาน")).toBe("หนิง");
+      expect(extractAdminCustomerName("มะระ 39 เมื่อวาน")).toBe("มะระ");
+      expect(extractAdminCustomerName("39 เมื่อวาน มะระ")).toBe("มะระ");
+      expect(extractAdminCustomerName("ของมะระ 39 เมื่อวาน")).toBe("มะระ");
     });
 
     it("returns null for admin stopwords and general admin chat", () => {
@@ -632,6 +635,27 @@ describe("chatParserUtils", () => {
         type: "ADMIN_NOTE",
         noteCategory: "yesterday",
         customerName: "ตุ๊ก บำรุงรัตน์",
+        method: "admin-yesterday-note",
+      });
+
+      expect(parseIntentDetails("มะระ 39 เมื่อวาน")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "yesterday",
+        customerName: "มะระ",
+        method: "admin-yesterday-note",
+      });
+
+      expect(parseIntentDetails("39 เมื่อวาน มะระ")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "yesterday",
+        customerName: "มะระ",
+        method: "admin-yesterday-note",
+      });
+
+      expect(parseIntentDetails("ของมะระ 39 เมื่อวาน")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "yesterday",
+        customerName: "มะระ",
         method: "admin-yesterday-note",
       });
 

@@ -607,7 +607,24 @@ export class TextToSpeech {
     if (!sanitized) return Promise.resolve();
 
     // Combine author and message
-    const textToSpeak = author ? `${author} ... ${sanitized}` : sanitized;
+    let messageBody = sanitized;
+    if (author && messageBody) {
+      const trimmedAuthor = author.trim();
+      if (trimmedAuthor) {
+        // If message starts with author name (e.g. "มะระ 39 เมื่อวาน" or "ของมะระ 39 เมื่อวาน" with author "มะระ"),
+        // strip author prefix so TTS doesn't repeat "มะระ ... มะระ 39 เมื่อวาน"
+        const escaped = trimmedAuthor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const prefixRegex = new RegExp(`^(?:ของ(?:พี่|น้อง|แม่|ป้า)?\\s*)?${escaped}\\s*`, "i");
+        if (prefixRegex.test(messageBody)) {
+          const stripped = messageBody.replace(prefixRegex, "").trim();
+          if (stripped) {
+            messageBody = stripped;
+          }
+        }
+      }
+    }
+
+    const textToSpeak = author ? `${author} ... ${messageBody}` : messageBody;
 
     return new Promise((resolve) => {
       // Add to queue with a completion callback

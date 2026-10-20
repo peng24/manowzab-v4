@@ -92,4 +92,28 @@ describe("System Store - TTS Modes", () => {
     systemStore.useOnlineTts = true;
     expect(systemStore.ttsVoiceMode).toBe("standard");
   });
+
+  it("deduplicates author prefix when message starts with author name", async () => {
+    const { ttsService } = await import("../services/TextToSpeech");
+    const pushSpy = vi.spyOn(ttsService.queue, "push");
+    vi.spyOn(ttsService, "processQueue").mockImplementation(() => {
+      ttsService.queue.forEach((i) => i.onComplete?.());
+      ttsService.queue.length = 0;
+    });
+
+    await ttsService.speak("มะระ", "มะระ 39 เมื่อวาน");
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "มะระ ... 39 เมื่อวาน" })
+    );
+
+    await ttsService.speak("มะระ", "ของมะระ 39 เมื่อวาน");
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "มะระ ... 39 เมื่อวาน" })
+    );
+
+    await ttsService.speak("นิรชา", "พี่เอาใบที่120");
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "นิรชา ... พี่เอาใบที่120" })
+    );
+  });
 });

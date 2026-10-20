@@ -308,7 +308,18 @@ export function extractAdminCustomerName(text) {
 
   // 🗓️ 1. Backdated / Yesterday Debt Note: e.g. "หนิง เมื่อวาน 41 43", "ตุ๊ก บำรุงรัตน์ เมือวาน 32", "หนิง เมื่อวาน", "ของมะระ ตัวที่13เมื่อวาน ได้สีอะไร"
   if (backdatedNoteRegex.test(normalized)) {
-    const match = normalized.match(/^(?:ของ(?:พี่|น้อง|แม่|ป้า)?\s*)?([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s*(?:ตัวที่\s*\d+\s*)?(?:เมื่อวาน|เมือวาน|เมี่อวาน|ของเก่า|รอบก่อน|ไลฟ์ก่อน)/i);
+    const nameFirstMatch = normalized.match(
+      /^(?:ของ(?:พี่|น้อง|แม่|ป้า)?\s*)?([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s*(?:(?:ตัวที่|เบอร์|ชุดที่|รหัส)?\s*\d+(?:[\s,_]+\d+)*\s*)?(?:เมื่อวาน|เมือวาน|เมี่อวาน|ของเก่า|รอบก่อน|ไลฟ์ก่อน)/i
+    );
+    if (nameFirstMatch) {
+      const clean = sanitizeAdminCustomerName(nameFirstMatch[1]);
+      if (clean) return clean;
+    }
+
+    const numFirstMatch = normalized.match(
+      /^(?:(?:ตัวที่|เบอร์|ชุดที่|รหัส)?\s*\d+(?:[\s,_]+\d+)*\s*)?(?:เมื่อวาน|เมือวาน|เมี่อวาน|ของเก่า|รอบก่อน|ไลฟ์ก่อน)\s*(?:(?:ตัวที่|เบอร์|ชุดที่|รหัส)?\s*\d+(?:[\s,_]+\d+)*\s*)?(?:ของ(?:พี่|น้อง|แม่|ป้า)?\s*)?([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*)/i
+    );
+    const match = numFirstMatch;
     if (match) {
       const clean = sanitizeAdminCustomerName(match[1]);
       if (clean) return clean;

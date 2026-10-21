@@ -8,21 +8,11 @@
     },
     "stock": {
       ".read": "auth != null",
-      ".write": "auth != null",
-      "$videoId": {
-        "$itemId": {
-          ".validate": "newData.hasChildren(['num']) && newData.child('num').isNumber()"
-        }
-      }
+      ".write": "auth != null"
     },
     "chats": {
       ".read": "auth != null",
-      ".write": "auth != null",
-      "$videoId": {
-        "$msgId": {
-          ".validate": "newData.hasChildren(['text', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length <= 2000"
-        }
-      }
+      ".write": "auth != null"
     },
     "delivery_customers": {
       ".read": "auth != null",
@@ -46,12 +36,7 @@
     },
     "voice_chats": {
       ".read": "auth != null",
-      ".write": "auth != null",
-      "$videoId": {
-        "$chatId": {
-          ".validate": "newData.hasChildren(['text', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length <= 2000"
-        }
-      }
+      ".write": "auth != null"
     },
     "history": {
       ".read": "auth != null",

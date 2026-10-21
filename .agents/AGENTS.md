@@ -51,12 +51,6 @@
    - No Auto-Release of Prior Stock: Banning a user never touches their previously booked items or queues automatically; releases remain purely manual by admin.
    - Space-Agnostic Matching: Customer lookup in `isBanned()` and `getBanInfo()` must support space-stripped Thai names (e.g. matching "สมชาย ใจดี" and "สมชายใจดี").
    - Admin Controls: Support `!แบน [ชื่อ]` / `!ปลดแบน [ชื่อ]` chat commands, 1-click ban/unban by clicking customer profile avatar (with subtle hover ban hint), `BlacklistModal.vue` accessible via `⚡ Tools`, and direct ban/unban toggle inside `CustomerQuickEditModal.vue`.
-9. **Security, Admin Role Verification & XSS/CSV Hardening Invariant (v5.4.7+)**:
-   - Verified Admin Role: Sender authorization in `useChatProcessor.js` MUST use `isVerifiedAdminSender` to verify official YouTube Live Chat badges (`isChatOwner`, `isChatModerator`) or Channel ID allowlist. Never grant admin rights based solely on user-chosen display names (`/admin|แอดมิน/i`).
-   - SweetAlert2 Title Sanitization: Global `Swal.fire` wrapper in `main.js`, `shipping-main.js`, `address-main.js`, and `history-main.js` must sanitize `opts.title` with `escapeHtml` by default, protecting against Stored XSS via customer/viewer names.
-   - CSV Formula Injection Prevention: All CSV export functions (`downloadChatCSV` in `chat.js`, `exportAddressesCsv` in `AddressPage.vue`) must sanitize cells with `sanitizeCsvCell(val)`, neutralizing spreadsheet formula triggers (`=`, `+`, `-`, `@`, `\t`, `\r`).
-   - Local Dev Server Process Security: Vite dev middleware endpoints `/api/transcriber/*` must restrict requests strictly to loopback (`127.0.0.1`, `::1`) and disable shell execution (`shell: false`).
-   - Content Security Policy (CSP): All HTML entrypoints (`index.html`, `shipping/index.html`, `history/index.html`, `address/index.html`) must declare complete CSP whitelisting Google/Firebase (including `wss://*.firebaseio.com` and `wss://*.firebasedatabase.app` in `connect-src` for regional RTDB WebSockets, and `frame-src`/`child-src` for long-polling), YouTube (`yt3.ggpht.com`, `*.ggpht.com`), and Mixkit celebration audio (`assets.mixkit.co` in `connect-src` & `media-src`), explicitly defining `script-src-elem` and `worker-src 'self' blob:`, paired with `modulePreload: { polyfill: false }` in `vite.config.js` to eliminate redundant fetch polyfills and browser extension conflicts.
 
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:

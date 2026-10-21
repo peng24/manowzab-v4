@@ -183,42 +183,6 @@ export function isAdminUser(displayName = "", realName = "") {
   return ADMIN_REGEX.test(displayName) || ADMIN_REGEX.test(realName);
 }
 
-/**
- * Verifies whether a chat message sender is an authenticated/verified admin.
- * Prioritizes YouTube official badges (isChatOwner, isChatModerator) and channelId allowlist.
- * If badge properties are absent (e.g. synthetic test messages or local voice chat),
- * falls back to checking displayName/realName via isAdminUser for backward compatibility.
- * 
- * @param {Object|null} authorDetails - YouTube Live Chat authorDetails object
- * @param {boolean} isVoiceChat - Whether message originates from voice chat detector
- * @param {string} [displayName=""] - Author display name
- * @param {string} [realName=""] - Author channel/real name
- * @param {string[]} [allowlistChannelIds=[]] - Extra admin channel ID allowlist
- * @returns {boolean}
- */
-export function isVerifiedAdminSender(authorDetails = null, isVoiceChat = false, displayName = "", realName = "", allowlistChannelIds = []) {
-  if (isVoiceChat) return true;
-  if (!authorDetails) {
-    return isAdminUser(displayName, realName);
-  }
-  // Check YouTube official verified roles
-  if (authorDetails.isChatOwner === true || authorDetails.isChatModerator === true) {
-    return true;
-  }
-  // Check channel ID allowlist
-  if (authorDetails.channelId && Array.isArray(allowlistChannelIds) && allowlistChannelIds.includes(authorDetails.channelId)) {
-    return true;
-  }
-  // If authorDetails explicitly includes YouTube role metadata, trust YouTube:
-  // a viewer without isChatOwner or isChatModerator is NOT an admin even if their name has "admin".
-  const hasYouTubeRoleFields = "isChatOwner" in authorDetails || "isChatModerator" in authorDetails;
-  if (hasYouTubeRoleFields) {
-    return false;
-  }
-  // Fallback for tests/mock objects without YouTube role fields
-  return isAdminUser(displayName, realName);
-}
-
 // 🚚 Shipping, Hold & Payment action keywords to strip when extracting customer name from admin proxy messages
 export const adminShippingActionRegex = /(?:เอาไปฝาก(?:รวม)?(?:กับ)?(?:คนอื่น)?(?:ด้วย)?|ฝากส่ง(?:รวม)?(?:กับ)?(?:คนอื่น)?(?:ด้วย)?|ฝากรวม(?:กับ)?(?:คนอื่น)?(?:ด้วย)?|ฝากคนอื่น(?:ด้วย)?|ฝากไว้ก่อน(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝากไว้(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝากก่อน(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝากของ(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ยังไม่(?:ต้อง)?ส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝากด้วย(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ฝาก(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ|โลด|เลย)?|ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้|ส่งเลย(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ส่งวันนี้(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ส่งของ(?:วันนี้|พรุ่งนี้|เลย)?|ส่ง(?:วัน)?\s*(?:อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)|ส่ง(?:วันที่\s*)?\d{1,2}(?:\s*(?:ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม))?|ส่งด้วย(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|ส่งให้(?:ด้วย)?|ส่งมา(?:เลย)?|พร้อมส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|ขอส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|แจ้งส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|รวมส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ)?|ส่ง(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ|โลด)?|โอนแล้ว(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|แจ้งโอน(?:นะคะ|นะครับ|นะ|คะ|ค่ะ|ครับ|จ้า|จ้ะ)?|ส่งสลิป(?:แล้ว)?|มีสลิป|สลิป|เก็บปลายทาง|ปลายทาง|รวมยอด|สรุปยอด|แจ้งยอด|ดูยอด|เช็คยอด|คิดยอด|ยอดโอน|ยอด|เช็คเลข|ขอเลข|เลขพัสดุ|พัสดุ|flash|kerry|j&t|jt|ขนส่ง|เคอรี่|แฟลช|ไปรษณีย์|ค่าส่ง)/gi;
 

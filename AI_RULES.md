@@ -72,14 +72,6 @@
 6.  **Space-Agnostic Matching:** `isBanned()` and `getBanInfo()` match Thai names with and without spaces (e.g. matching "สมชาย ใจดี" and "สมชายใจดี").
 7.  **Admin Tools:** Support `!แบน [ชื่อ]` / `!ปลดแบน [ชื่อ]` chat commands, 1-click ban/unban by clicking customer profile avatar (hidden inside avatar with hover hint), `BlacklistModal.vue` in `⚡ Tools`, and direct ban/unban toggle inside `CustomerQuickEditModal.vue`.
 
-### 🔒 Security, Role Verification & Injection Hardening (v5.4.7+)
-
-1.  **Verified Admin Roles:** Sender authorization in `useChatProcessor.js` MUST use `isVerifiedAdminSender` to verify official YouTube Live Chat badges (`isChatOwner`, `isChatModerator`) or Channel ID allowlist. Never grant admin privileges based solely on display name regex (`/admin|แอดมิน/i`).
-2.  **SweetAlert2 Title XSS Sanitization:** The global `Swal.fire` wrapper in all entry points (`main.js`, `shipping-main.js`, `address-main.js`, `history-main.js`) must sanitize `opts.title` with `escapeHtml` by default, eliminating Stored XSS via viewer/customer names.
-3.  **CSV / Formula Injection Prevention:** All CSV exports (`chat.js:downloadChatCSV`, `AddressPage.vue:exportAddressesCsv`) must sanitize cells with `sanitizeCsvCell(val)`, prefixing spreadsheet formula triggers (`=`, `+`, `-`, `@`, `\t`, `\r`) with a single quote `'`.
-4.  **Local Process Isolation:** `vite.config.js` endpoints `/api/transcriber/*` must strictly restrict requests to loopback (`127.0.0.1`, `::1`) and disable shell execution (`shell: false`).
-5.  **Content Security Policy:** All HTML entrypoints (`index.html`, `shipping/index.html`, `history/index.html`, `address/index.html`) must declare complete CSP whitelisting Google, Firebase, FontAwesome, YouTube (`yt3.ggpht.com`, `*.ggpht.com`), and Mixkit celebration audio (`assets.mixkit.co` in `connect-src` & `media-src`), explicitly defining `script-src-elem` and `worker-src 'self' blob:`, paired with `modulePreload: { polyfill: false }` in `vite.config.js`.
-
 ## 4. Key File Structures
 
 - `src/services/TextToSpeech.js`: Core TTS logic (Google Standard + Native, key rotation, LRU buffer cache, shared `AudioContext`).

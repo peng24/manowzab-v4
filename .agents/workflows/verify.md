@@ -199,11 +199,6 @@ description: Mandatory verification checklist after every code change
 | 14.4 | Financial NaN Safeguard | `src/utils/deliverySync.js`, `src/stores/stock.js` | การคำนวณราคาต้องมี `isNaN()` Check เพื่อป้องกันค่า `NaN` รั่วไหลเข้าฐานข้อมูล |
 | 14.5 | Firebase Atomic Transactions | `src/stores/voiceLearning.js`, `src/stores/system.js` | การอัปเดตคะแนนคำเรียนรู้เสียง และการแย่งชิงสิทธิ์ Price Detector ต้องใช้ `runTransaction` ป้องกัน Data Race Condition |
 | 14.6 | Offline Queue Lock | `src/composables/useOfflineQueue.js` | `flushQueue` ต้องมี `isFlushing` guard lock + `try/finally` ป้องกันการประมวลผลซ้ำคิวออฟไลน์พร้อมกัน |
-| 14.7 | Verified Admin Sender Role | `src/utils/chatParserUtils.js`, `src/composables/useChatProcessor.js` | ตรวจสอบสิทธิ์แอดมินของผู้ส่งแชตด้วย `isVerifiedAdminSender()` โดยยืนยันจาก YouTube Badge จริง (`isChatOwner`, `isChatModerator`) หรือ Channel ID Allowlist ห้ามตัดสินจากชื่อแสดงผล (Display Name) เพียงอย่างเดียวเพื่อป้องกัน Privilege Escalation |
-| 14.8 | SweetAlert2 Title XSS Sanitization | `src/main.js`, `src/shipping-main.js`, `src/address-main.js`, `src/history-main.js` | Global `Swal.fire` Wrapper ต้องทำการ Sanitize `opts.title` ด้วย `escapeHtml` โดยอัตโนมัติ (SweetAlert2 เรนเดอร์ Title เป็น innerHTML เสมอ) เพื่อป้องกัน XSS เมื่อแสดงชื่อลูกค้าหรือข้อความจากภายนอก |
-| 14.9 | CSV Formula Injection Prevention | `src/utils/dbUtils.js`, `src/stores/chat.js`, `src/pages/AddressPage.vue` | การ Export CSV ทั้งหมดต้องใช้ `sanitizeCsvCell()` เพื่อ Escape เครื่องหมายคำพูด และเติม Single Quote `'` นำหน้าเซลล์ที่ขึ้นต้นด้วย `=`, `+`, `-`, `@`, `\t`, `\r` เพื่อป้องกัน Remote Formula Execution ใน Excel |
-| 14.10 | Local Loopback Process Security | `vite.config.js` | Endpoint `/api/transcriber/*` ใน Vite Dev Server ต้องจำกัดเฉพาะ Localhost/Loopback (`127.0.0.1`, `::1`) เท่านั้น และห้ามเปิด `shell: true` ใน `spawn` |
-| 14.11 | Content Security Policy (CSP) | `index.html` | ประกาศ CSP Meta Tag ควบคุม Domain Allowlist สำหรับ Scripts, Styles, Fonts, Images, และ Connect Endpoints อย่างรัดกุม |
 
 
 ---
@@ -248,18 +243,6 @@ description: Mandatory verification checklist after every code change
 | 17.5 | Admin Quick Ban & Unban via Avatar Click | `src/composables/useChatProcessor.js`, `src/components/ChatPanel.vue` | แอดมินสามารถพิมพ์คำสั่ง `!แบน` / `!ปลดแบน` ในแชต หรือคลิกที่รูปโปรไฟล์ของลูกค้า (Avatar) เพื่อเปิดเมนูแบนได้ทันที |
 | 17.6 | Modal Blacklist & Customer Edit | `src/components/BlacklistModal.vue`, `src/components/CustomerQuickEditModal.vue` | ค้นหารายชื่อแบนและจัดการแบน/ปลดแบนได้ทั้งจากเมนู ⚡ Tools และหน้าต่างแก้ไขข้อมูลลูกค้า |
 | 17.7 | No Auto-Release of Prior Stock | `src/composables/useChatProcessor.js`, `src/stores/blacklist.js` | การแบนลูกค้าต้องไม่ล้างหรือปล่อยสต็อกที่เคยจองไว้ก่อนหน้าโดยอัตโนมัติ (แอดมินเป็นผู้ดำเนินการเองตามต้องการ) |
-
----
-
-## 🔒 18. ความปลอดภัยและการป้องกันการแทรกโค้ด (Security Hardening & Input Sanitization Invariants v5.4.7+)
-
-| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
-|---|---|---|---|
-| 18.1 | Verified Admin Role (`isVerifiedAdminSender`) | `src/utils/chatParserUtils.js`, `src/composables/useChatProcessor.js` | ตรวจสอบสิทธิ์แอดมินแท้จริงจาก YouTube Live Chat Badges (`isChatOwner`, `isChatModerator`) หรือ Channel ID allowlist โดยไม่อิงจากชื่อ display name |
-| 18.2 | SweetAlert2 Title XSS Sanitization (`Swal.fire` wrapper) | `src/main.js`, `src/shipping-main.js`, `src/address-main.js`, `src/history-main.js` | ทำความสะอาดข้อความหัวเรื่อง (`opts.title`) ด้วย `escapeHtml()` ป้องกัน Stored XSS จากชื่อลูกค้าหรือคอมเมนต์แชท |
-| 18.3 | CSV Formula Injection Sanitization (`sanitizeCsvCell`) | `src/utils/dbUtils.js`, `src/stores/chat.js`, `src/pages/AddressPage.vue` | เติมเครื่องหมาย `'` นำหน้าเซลล์ที่ขึ้นต้นด้วย `=`, `+`, `-`, `@`, `\t`, `\r` ในการส่งออกไฟล์ CSV |
-| 18.4 | Multi-Page Content Security Policy (CSP) & Module Preload | `index.html`, `shipping/index.html`, `history/index.html`, `address/index.html`, `vite.config.js` | กำหนด CSP Meta Tag ครบถ้วนทุกหน้า whitelisting Google/Firebase (รวม `wss://*.firebaseio.com` และ `wss://*.firebasedatabase.app` สำหรับ Regional RTDB WebSockets), FontAwesome, YouTube (`yt3.ggpht.com`), และ Mixkit celebration audio (`assets.mixkit.co` ใน `connect-src` & `media-src`) พร้อม `script-src-elem`, `frame-src`/`child-src` และ `modulePreload: { polyfill: false }` |
-| 18.5 | Local Dev Server Loopback Isolation | `vite.config.js` | จำกัดการเรียก `/api/transcriber/*` เฉพาะ Local Loopback (`127.0.0.1`, `::1`) และปิด `shell: false` |
 
 ## How to Verify & Auto-Update Policy (บังคับทำทุกครั้ง)
 

@@ -1,4 +1,3 @@
-import { escapeHtml } from "./utils/dbUtils";
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import AddressPage from "./pages/AddressPage.vue";
@@ -16,10 +15,6 @@ Swal.fire = function (...args) {
   }
   const isToast = Boolean(opts && (opts.toast || (this && this.defaultParams && this.defaultParams.toast)));
   if (opts && typeof opts === "object") {
-    // 🛡️ XSS Prevention: Sanitize Swal title by default (SweetAlert2 renders title as innerHTML)
-    if (typeof opts.title === "string" && !opts.allowHtmlTitle) {
-      opts.title = escapeHtml(opts.title);
-    }
     if (!isToast) {
       if (opts.heightAuto === undefined) opts.heightAuto = false;
       if (opts.returnFocus === undefined) opts.returnFocus = false;

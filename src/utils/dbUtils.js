@@ -28,18 +28,3 @@ export function sanitizeDbKey(key) {
   const sanitized = String(key).replace(/[.#$\[\]\/]/g, "_").trim();
   return sanitized || "invalid_key";
 }
-
-/**
- * Sanitizes a cell value for CSV export to prevent CSV / Formula Injection (CWE-1236).
- * Escapes quotes and prepends a single quote if the cell begins with =, +, -, @, \t, or \r.
- * @param {any} val 
- * @returns {string} Safe CSV cell string with enclosing quotes
- */
-export function sanitizeCsvCell(val) {
-  if (val === null || val === undefined) return '""';
-  let str = String(val).replace(/"/g, '""');
-  if (/^[=+\-@\t\r]/.test(str)) {
-    str = "'" + str;
-  }
-  return `"${str}"`;
-}

@@ -18,54 +18,6 @@
 export const changelog = [
   // ─── 5.4.x ───────────────────────────────────────────
   {
-    version: '5.4.10',
-    date: '2026-10-21',
-    changes: {
-      fixed: [
-        'แก้ไขการเชื่อมต่อ Firebase Realtime Database WebSocket (CSP Firebase WebSocket Whitelist) — เพิ่ม wss://*.firebasedatabase.app ลงใน connect-src ของ Content Security Policy (CSP) ในทุกหน้า (index.html, shipping/index.html, history/index.html, address/index.html) เพื่อรองรับการยกระดับการเชื่อมต่อ WebSocket ไปยังเซิร์ฟเวอร์ Firebase ประจำภูมิภาค (เช่น asia-southeast1) ทำให้การรับส่งข้อมูลแชทและสต็อกแบบเรียลไทม์ทำงานได้อย่างสมบูรณ์แบบโดยไม่ถูกเบราว์เซอร์บล็อก',
-      ],
-    },
-  },
-  {
-    version: '5.4.9',
-    date: '2026-10-21',
-    changes: {
-      fixed: [
-        'แก้ไขการเชื่อมต่อ Firebase Realtime Database และ Auth (CSP Firebase Script & Frame Whitelist) — อนุญาตโดเมน *.firebaseio.com, *.firebasedatabase.app, apis.google.com, *.googleapis.com, www.gstatic.com ใน script-src, script-src-elem, frame-src และ child-src เพื่อให้การเชื่อมต่อ Long-Polling ของ Firebase RTDB และโมดูลยืนยันตัวตนทำงานได้สมบูรณ์ ไม่ถูกเบราว์เซอร์บล็อก',
-      ],
-    },
-  },
-  {
-    version: '5.4.8',
-    date: '2026-10-21',
-    changes: {
-      fixed: [
-        'แก้ไขการบล็อกไฟล์เสียงฉลองยอดขายและไอคอน YouTube (CSP Media & Img Source Whitelist) — เพิ่มโดเมน assets.mixkit.co ใน connect-src และ media-src เพื่อให้เสียงฉลองยอดขาย (Celebration Audio) โหลดและเล่นได้ตามปกติ พร้อมเพิ่ม yt3.ggpht.com และ *.ggpht.com ใน img-src เพื่อรองรับอีโมจิและรูปโปรไฟล์ของ YouTube อย่างสมบูรณ์',
-        'แก้ไขคำเตือนสคริปต์บล็อกและปรับจูนประสิทธิภาพ Module Loading (CSP Script Directives & ModulePreload Optimization) — กำหนด script-src-elem และ worker-src/child-src อย่างชัดเจน ป้องกันเบราว์เซอร์แจ้งเตือน fallback notice พร้อมปิดโมดูลโพลีฟิลล์ modulePreload: { polyfill: false } ใน vite.config.js ลดภาระการ fetch ซ้ำซ้อนและรองรับการทำงานร่วมกับ Extension เบราว์เซอร์ได้อย่างราบรื่น',
-        'ขยายนโยบายความปลอดภัยครอบคลุมทุกหน้า (Multi-Page CSP Deployment) — ติดตั้ง Content Security Policy meta tag ในทุกหน้าของระบบ (index.html, shipping/index.html, history/index.html, address/index.html)',
-      ],
-    },
-  },
-  {
-    version: '5.4.7',
-    date: '2026-10-21',
-    changes: {
-      added: [
-        'ระบบยืนยันสิทธิ์แอดมินแท้จริงจาก YouTube Live Chat (Verified Admin Role Authorization & Privilege Escalation Guard) — แก้ไขช่องโหว่ความปลอดภัยระดับวิกฤต (MNZ-SEC-02) โดยใช้ isVerifiedAdminSender ตรวจสอบตราสัญลักษณ์จริงของ YouTube (isChatOwner, isChatModerator) หรือ Channel ID Allowlist ป้องกันผู้ชมทั่วไปแอบอ้างสิทธิ์แอดมินผ่านการตั้งชื่อแสดงผลว่า "แอดมิน" หรือ "admin"',
-        'ระบบป้องกัน Formula Injection ในการส่งออกไฟล์สเปรดชีต (CSV Formula Injection Sanitization) — แก้ไขช่องโหว่ (MNZ-SEC-08) โดยเพิ่ม sanitizeCsvCell ในการ Export ประวัติแชท (chat.js) และสมุดที่อยู่ลูกค้า (AddressPage.vue) เติมเครื่องหมาย Single Quote ป้องกันการรันสูตรหรือคำสั่งอันตรายเมื่อเปิดด้วย Microsoft Excel / Google Sheets',
-        'ระบบป้องกัน Cross-Site Scripting อัตโนมัติใน SweetAlert2 (Global Swal Title XSS Sanitization) — แก้ไขช่องโหว่ (MNZ-SEC-04) โดยปรับปรุง Global Swal.fire Wrapper ในทุกหน้า (main.js, shipping-main.js, address-main.js, history-main.js) ให้ Sanitize ค่า title ด้วย escapeHtml โดยอัตโนมัติ เพื่อป้องกันการแทรกโค้ดอันตรายผ่านชื่อลูกค้าหรือคอมเมนต์แชท',
-        'นโยบายความปลอดภัยของเนื้อหาเว็บ (Content Security Policy - CSP) — เพิ่ม CSP Meta Tag ใน index.html เพื่อควบคุมและจำกัดการเชื่อมต่อภายนอกเฉพาะโดเมนที่ได้รับอนุญาตของ Google, Firebase, YouTube และ FontAwesome',
-      ],
-      improved: [
-        'ระบบความปลอดภัยของ Process ถอดเสียงบน Vite Dev Server (Local Process Isolation) — ปรับปรุง transcriberPlugin ใน vite.config.js ให้รับคำสั่งเริ่ม/หยุดเฉพาะจากเครื่อง Local Loopback (127.0.0.1) เท่านั้น และปิด shell: false ในการเรียกคำสั่ง Python เพื่อป้องกัน Remote Command Execution',
-        'ปรับปรุงความปลอดภัยของฐานข้อมูล Firebase Realtime Database (Schema Validation Rules) — เพิ่มกฎ .validate ใน database.rules.json ตรวจสอบความถูกต้องของข้อมูลและขนาดข้อความแชทในโหนดสำคัญ',
-      ],
-      fixed: [
-        'อัปเดตความปลอดภัยแพ็กเกจ Dependencies (Vulnerability Patching via npm audit) — อัปเดตและแพตช์ช่องโหว่ความปลอดภัยระดับสูงของ Rollup, Vite, Vue Server Renderer และ Picomatch รวม 9 รายการ',
-      ],
-    },
-  },
-  {
     version: '5.4.6',
     date: '2026-10-20',
     changes: {
@@ -308,6 +260,73 @@ export const changelog = [
       improved: [
         'ระบบกระจายเฉดสีประจำตัวลูกค้าแบบไม่ชนสีหลักของระบบ (Unique Non-Overlapping Customer Hues) — คัดเลือก 12 เฉดสีเอกลักษณ์สำหรับลูกค้าโดยเน้นโทน ฟ้า, ฟ้าคราม, ม่วงบานเย็น และชมพูสดใส โดยแยกขาด 100% จากสีสงวนของระบบ (จอง: เขียวมรกต, ยกเลิก: แดงปะการัง, ส่ง: ม่วงคราม, แอดมิน: ทองอำพัน)',
         'พื้นหลังและกรอบข้อความแชทกลมกลืนโทนเดียวกับชื่อลูกค้า (Harmonized Bubble Background & Border) — ปรับพื้นหลังและขอบของการ์ดข้อความให้เป็นสีโทนเดียวกับสีชื่อของลูกค้าแต่ละคน พร้อมเอฟเฟกต์ Glassmorphism สวยงามหรูหรา ไม่มืดทึบเกินไป',
+      ],
+    },
+  },
+  // ─── 4.97.x ───────────────────────────────────────────
+  {
+    version: '4.97.0',
+    date: '2026-10-07',
+    changes: {
+      added: [
+        'ระบบสีการ์ดแชทเฉพาะตัวของลูกค้า (Customer Signature Color Themed Rows) — ถ่ายทอดสีประจำตัวของลูกค้าแต่ละคนลงบนการ์ดข้อความและเส้นขอบอย่างนุ่มนวล ช่วยให้กวาดสายตาแยกแยะบทสนทนาของลูกค้ารายบุคคลได้ทันทีในพริบตา',
+        'ระบบเน้นสีเฉพาะกิจ 3 หมวดหมู่หลัก (High-Priority Action Pillars) — จอง/CF (เขียวมรกต & ทอง #10b981), ส่ง/แจ้งโอน (ม่วงครามพรีเมียม #a855f7), ยกเลิก (แดงปะการังเตือนภัย #ef4444) พร้อมป้ายสถานะเด่นชัดเพื่อความรวดเร็วและแม่นยำในการคีย์ออเดอร์',
+        'แท็บตัวกรองเฉพาะข้อความจัดส่ง (🚚 ส่ง Filter Tab) — เพิ่มปุ่มตัวกรองคำสั่งแจ้งส่งพัสดุ/แจ้งโอนเงินในแถบตัวกรองแชทโดยเฉพาะ',
+      ],
+      improved: [
+        'ปุ่มลอยข้อความใหม่สไตล์ Obsidian Gold-Emerald Capsule — ปรับปุ่ม "ข้อความใหม่ ⬇" ให้เป็นแคปซูลกระจกลอยหรูหราพร้อมอนิเมชัน Bounce นุ่มนวลตา',
+        'วงแหวน Glow ขอบ Avatar ตามประเภทคำสั่ง — ส่องสว่างสีเขียว/ม่วง/แดง/ทอง รอบรูปโปรไฟล์ตามประเภทข้อความ',
+      ],
+    },
+  },
+  // ─── 4.96.x ───────────────────────────────────────────
+  {
+    version: '4.96.0',
+    date: '2026-10-07',
+    changes: {
+      added: [
+        'ระบบสถาปัตยกรรมดีไซน์ใหม่ Obsidian Glass & Luxury Emerald/Amber Gold (Full-System Premium Redesign) — ยกระดับระบบทั้งระบบสู่โทนสีหรูหราทันสมัย กระจกฝ้าลึกระดับพรีเมียม (Deep Glassmorphism) พร้อมคอนทราสต์สายตาระดับสูง เหมาะแก่การไลฟ์สด',
+        'การ์ดสต็อกสินค้าสไตล์ Emerald Glow & Amber Gold Number (Stock Grid 2.0) — ปรับสถานะสินค้าว่างเป็นกระจก Obsidian Minimalist นวลตา และสินค้าที่จองแล้วเปล่งประกายสีเขียวมรกต ตัวเลขสีทองเรืองแสง ชัดเจนแม้มองจากระยะไกล',
+        'ระบบตัวแปรสไตล์กลางระดับ Global Tokens (Vanilla CSS Design Tokens) — เพิ่มตัวแปร --bg-card, --border-gold, --border-emerald, --accent-gold-glow เพื่อความสม่ำเสมอทั่วทุกองค์ประกอบ โดยคงขนาด Bundle เบาหวิว 0 dependencies เพิ่มเติม',
+      ],
+      improved: [
+        'ปรับปรุงแถบสถานะและปุ่มควบคุมหลัก (HUD Command Bar & Status Cluster) — กล่องสถานะระบบ YouTube, Database, Chat และ API Key ปรับเป็นแคปซูลกระจกโปร่งแสงพร้อมไฟ LED เรืองแสงหรูหรา',
+        'ปรับระดับสีปุ่มบันทึกและปุ่มดำเนินการหลัก (Emerald Luxury Action Buttons) — เปลี่ยนโทนปุ่มแอ็กชันหลักเป็นเขียวมรกตไล่เฉด สวยสะดุดตาและมีมิติ',
+        'ปรับแต่งหน้าต่างป๊อปอัปทั้งหมดสู่สไตล์ Unified Obsidian Glass (Modals 2.0) — รองรับเงาลึก 100px และขอบตัดแสงทองเรืองรองสำหรับ Queue Modal, Shipping Manager และ History',
+      ],
+      fixed: [
+        'แยกแยะสีปุ่มช่องทางติดต่อ (โทร - ฟ้าสดใส) และรูปแบบการชำระเงิน (โอน - ม่วงพรีเมียม) คมชัด 100% ไม่สับสนกันอีกต่อไป',
+      ],
+    },
+  },
+  // ─── 4.95.x ───────────────────────────────────────────
+  {
+    version: '4.95.0',
+    date: '2026-10-06',
+    changes: {
+      added: [
+        'ระบบแยกสีชื่อลูกค้าประจำตัวในช่องแชท (Unique Customer Color Theming) — แปลงชื่อลูกค้าเป็นรหัสสีเฉพาะตัว 12 เฉดสี ช่วยให้แยกแยะลูกค้ารายบุคคลได้ทันทีในแวบเดียว โดยลูกค้าคนเดียวกันจะได้รับสีเดิมสม่ำเสมอทุกข้อความ',
+        'ไฮไลต์ชื่อลูกค้าแบบชิป Glassmorphism พร้อมไอคอนระบุตัวตน — ออกแบบป้ายชื่อลูกค้าที่แอดมินพิมพ์จอง/สั่งส่งให้อ่านง่าย คมชัด ไม่เบลอ พร้อมคลิกเพื่อเปิดหน้าต่างแก้ไขข้อมูลได้ทันที',
+        'ระบบสร้างรายการพร้อมพิมพ์ทันทีเมื่อกดสินค้าว่าง (Instant Booking Row & Focus) — เมื่อกดเลขสินค้าที่ยังไม่มีการจอง ระบบจะสร้างแถวแรกและโฟกัสช่องกรอกชื่อทันที พร้อมบันทึกด้วยปุ่ม Enter ได้ทันใจ',
+        'ระบบแสดงชื่อลูกค้าที่ยังไม่บันทึกเป็นสีเหลืองทอง (Unsaved Customer Indicator) — ชื่อที่ขึ้นต้นด้วย @ ในตารางสินค้า การ์ดสินค้า และหน้าจัดส่ง จะแสดงเป็นสีเหลืองเด่นชัด',
+      ],
+      improved: [
+        'แก้ปัญหาการเลื่อนเลือกรายชื่อในหน้าต่างจองสินค้า (Autocomplete Scroll & Height Fix) — เพิ่มความสูงขั้นต่ำให้กับหน้าต่างโมดอลและกล่องเนื้อหา พร้อมกักขังการเลื่อน Scroll ด้วย overscroll-behavior: contain ไม่ให้ดันแถวพิมพ์หลุดหายไป',
+        'รองรับการกดลูกศรขึ้น-ลงเลื่อนดูรายชื่ออัตโนมัติ (Arrow Key Auto-Scroll) — เลื่อนมุมมองตามแถบที่กำลังไฮไลต์ในรายการแนะนำชื่อได้อย่างราบรื่น',
+        'นโยบายตัดทอน Changelog อัตโนมัติ (Changelog Pruning Policy) — ควบคุมขนาด Bundle โดยเก็บเฉพาะ 15–20 เวอร์ชันล่าสุด ประหยัดพื้นที่โหลดลงกว่า 126 kB',
+      ],
+      fixed: [
+        'แก้ไขการปิดหน้าต่างแก้ไขข้อมูลลูกค้า (CustomerQuickEditModal Close Fix) — บันทึกข้อมูลสำเร็จแล้วปิดหน้าต่างทันที ไม่ค้างบนหน้าจอ',
+      ],
+    },
+  },
+  // ─── 4.94.x ───────────────────────────────────────────
+  {
+    version: '4.94.1',
+    date: '2026-10-06',
+    changes: {
+      fixed: [
+        'แก้ไขไอคอนช่องทางการติดต่อซ้ำซ้อนในรายการจัดส่ง (Clean Contact Channel Badge): ปรับปรุงการแสดงผลให้มีไอคอน FontAwesome เพียงตัวเดียวตามด้วยชื่อช่องทาง (Line, LineOA, โทร) โดยตัดอีโมจิที่ซ้ำซ้อนออก เพื่อความสะอาดตา สวยงาม และสอดคล้องกับป้ายอื่นๆ ในระบบ',
       ],
     },
   },

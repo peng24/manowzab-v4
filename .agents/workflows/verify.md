@@ -244,6 +244,17 @@ description: Mandatory verification checklist after every code change
 | 17.6 | Modal Blacklist & Customer Edit | `src/components/BlacklistModal.vue`, `src/components/CustomerQuickEditModal.vue` | ค้นหารายชื่อแบนและจัดการแบน/ปลดแบนได้ทั้งจากเมนู ⚡ Tools และหน้าต่างแก้ไขข้อมูลลูกค้า |
 | 17.7 | No Auto-Release of Prior Stock | `src/composables/useChatProcessor.js`, `src/stores/blacklist.js` | การแบนลูกค้าต้องไม่ล้างหรือปล่อยสต็อกที่เคยจองไว้ก่อนหน้าโดยอัตโนมัติ (แอดมินเป็นผู้ดำเนินการเองตามต้องการ) |
 
+## 🕒 18. การแสดงเวลาจองย้อนหลัง (Backdated Booking Time Display)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 18.1 | ormatBackdatedCard(ts) | src/utils/timeFormatUtils.js, src/components/StockItemCard.vue | แสดงเฉพาะไอคอนย้อนเวลา (.backdated-inline-icon) ต่อท้ายชื่อลูกค้าโดยตรง ไม่แสดงข้อความเวลา เพื่อความกะทัดรัดและคลีนตา |
+| 18.2 | ormatBackdatedDetail(ts) & ormatNormalBookingTime(ts) | src/utils/timeFormatUtils.js, src/components/StockGrid.vue, src/components/HistoryModal.vue | ในหน้าต่างจัดการคิว (Modal) แสดงป้าย ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm เด่นชัด และรายการปกติแสดงเวลาสะอาด 🕒 HH:mm |
+| 18.3 | getBookingTooltip(ts, isBackdated) | src/utils/timeFormatUtils.js | แสดง Tooltip สุภาพและชัดเจนเมื่อนำเมาส์ชี้ (จองย้อนหลัง: วันนี้ เวลา 13:11 น.) |
+| 18.4 | UI Sunset Amber Gradient Pill Badge | src/components/StockItemCard.vue, src/components/StockGrid.vue, src/components/HistoryModal.vue | ดีไซน์ป้ายรูปทรง Pill โทนสี Amber/Sunset เกรเดียนต์ ขอบเรืองแสง พร้อมไอคอนย้อนเวลา a-clock-rotate-left |
+
+---
+
 ## How to Verify & Auto-Update Policy (บังคับทำทุกครั้ง)
 
 1. Review the diff of changed files

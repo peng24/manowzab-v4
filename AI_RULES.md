@@ -72,6 +72,13 @@
 6.  **Space-Agnostic Matching:** `isBanned()` and `getBanInfo()` match Thai names with and without spaces (e.g. matching "สมชาย ใจดี" and "สมชายใจดี").
 7.  **Admin Tools:** Support `!แบน [ชื่อ]` / `!ปลดแบน [ชื่อ]` chat commands, 1-click ban/unban by clicking customer profile avatar (hidden inside avatar with hover hint), `BlacklistModal.vue` in `⚡ Tools`, and direct ban/unban toggle inside `CustomerQuickEditModal.vue`.
 
+### 🕒 Backdated Booking Smart Time Formatting (v5.4.7+)
+- **Centralized Formatter**: รวมศูนย์ตรรกะจัดรูปแบบเวลาการจองและจองย้อนหลังไว้ที่ src/utils/timeFormatUtils.js (ormatBackdatedCard, ormatBackdatedDetail, ormatNormalBookingTime, getBookingTooltip)
+- **Zero Noisy Seconds**: ตัดวินาทีที่ไม่จำเป็นออก (13:11:50 -> 13:11)
+- **Calendar Day Boundary Awareness**: แยกความสัมพันธ์ของวันอย่างแม่นยำ (วันนี้, เมื่อวาน, วันอื่น)
+- **Card UI**: แสดงเฉพาะไอคอนย้อนเวลา a-clock-rotate-left สีส้มอำพันต่อท้ายชื่อลูกค้าโดยตรง (.backdated-inline-icon) โดยไม่แสดงตัวหนังสือเวลา เพื่อประหยัดพื้นที่แนวตั้งและการ์ดคลีนตา พร้อม Tooltip แสดงวันและเวลาจองเต็มรูปแบบเมื่อนำเมาส์ชี้
+- **Modal UI**: แสดง Badge ชัดเจน [ ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm ]
+
 ## 4. Key File Structures
 
 - `src/services/TextToSpeech.js`: Core TTS logic (Google Standard + Native, key rotation, LRU buffer cache, shared `AudioContext`).

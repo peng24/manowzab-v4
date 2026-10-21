@@ -82,6 +82,11 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 
 ---
 
+### 7. Backdated Booking Smart Time Formatting Invariant (v5.4.7+)
+- Centralize booking time formatting in src/utils/timeFormatUtils.js (ormatBackdatedCard, ormatBackdatedDetail, ormatNormalBookingTime, getBookingTooltip).
+- Eliminate noisy seconds from timestamps (13:11:50 -> 13:11).
+- Distinguish calendar day boundaries (	oday, yesterday, other) so backdated orders clearly display ย้อนหลัง HH:mm / เมื่อวาน HH:mm / D MMM HH:mm with back-in-time icon (a-clock-rotate-left), inline icon right behind customer name (.backdated-inline-icon) with polite Thai tooltip (	itle) without text clutter, while in the queue modal displaying ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm and normal bookings showing clean 🕒 HH:mm.
+
 ## 🔄 3. Standard Workflows
 
 ### 🧪 1. Verification & Auto-Rule Evolution Protocol (`/verify`)

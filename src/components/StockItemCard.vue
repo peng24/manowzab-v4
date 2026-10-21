@@ -30,7 +30,12 @@
       ❌ {{ cancelledName }}
     </div>
     <div v-else :class="['stock-status', { empty: !item.owner, 'unsaved-owner': isUnsavedOwner(item.owner) }]">
-      {{ nickname || item.owner || "ว่าง" }}
+      <span>{{ nickname || item.owner || "ว่าง" }}</span>
+      <i
+        v-if="item.owner && item.backdated"
+        class="fa-solid fa-clock-rotate-left backdated-inline-icon"
+        :title="backdatedTooltip"
+      ></i>
     </div>
 
     <div class="card-meta-row" v-if="item.owner">
@@ -51,14 +56,6 @@
       </div>
     </div>
 
-    <div
-      v-if="item.owner && item.backdated"
-      class="backdated-time"
-      :title="`จองย้อนหลัง: ${formattedTime}`"
-    >
-      🕒 {{ formattedTime }}
-    </div>
-
     <!-- <div v-if="item.price" class="stock-price">
       {{ item.price }} บาท
     </div> -->
@@ -74,6 +71,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { getBookingTooltip } from '../utils/timeFormatUtils.js';
 
 const props = defineProps({
   index: { type: Number, required: true },
@@ -91,10 +89,8 @@ const props = defineProps({
 
 defineEmits(['select', 'show-owner']);
 
-const formattedTime = computed(() => {
-  if (!props.item.time) return '';
-  const date = new Date(props.item.time);
-  return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const backdatedTooltip = computed(() => {
+  return getBookingTooltip(props.item.time, true);
 });
 
 function isUnsavedOwner(name) {
@@ -437,19 +433,19 @@ function isUnsavedOwner(name) {
   50% { opacity: 0.5; }
 }
 
-.backdated-time {
-  font-size: 0.7em;
+.backdated-inline-icon {
+  display: inline-block;
   color: #fb923c;
-  font-weight: 600;
-  margin-top: 2px;
-  background: rgba(251, 146, 60, 0.1);
-  padding: 1px 5px;
-  border-radius: 4px;
-  border: 1px solid rgba(251, 146, 60, 0.25);
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  letter-spacing: 0.2px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  font-size: 0.8em;
+  margin-left: 5px;
+  vertical-align: -0.5px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+  transition: transform 0.2s ease, color 0.2s ease;
+  cursor: help;
+}
+
+.backdated-inline-icon:hover {
+  color: #fbbf24;
+  transform: scale(1.2);
 }
 </style>

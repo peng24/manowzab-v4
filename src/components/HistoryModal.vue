@@ -231,7 +231,12 @@
                         <div class="item-num">{{ item.id }}</div>
                         
                         <div class="item-status" :class="{ empty: item.isEmpty }">
-                          {{ item.isEmpty ? 'ว่าง' : item.owner }}
+                          <span>{{ item.isEmpty ? 'ว่าง' : item.owner }}</span>
+                          <i
+                            v-if="!item.isEmpty && item.backdated"
+                            class="fa-solid fa-clock-rotate-left backdated-inline-icon"
+                            :title="getBookingTooltip(item.time, true)"
+                          ></i>
                         </div>
                         
                         <div
@@ -241,14 +246,6 @@
                            @click.stop="showOwnerItems(item.owner)"
                         >
                           👗 {{ getOwnerCount(item.owner, item.uid) }} ตัว
-                        </div>
-                        
-                        <div
-                          v-if="!item.isEmpty && item.backdated"
-                          class="backdated-time"
-                          :title="`จองย้อนหลัง: ${formatTime(item.time)}`"
-                        >
-                          🕒 {{ formatTime(item.time) }}
                         </div>
                         
                         <div v-if="!item.isEmpty && item.price" class="stock-price">
@@ -370,10 +367,12 @@
                 <div
                   v-if="person.time"
                   class="queue-item-time backdated"
-                  :title="`จองย้อนหลังเมื่อ ${formatTime(person.time)}`"
+                  :title="getBookingTooltip(person.time, true)"
                 >
-                  <span>🕒</span>
-                  <span>{{ formatTime(person.time) }}</span>
+                  <i class="fa-solid fa-clock-rotate-left backdated-icon"></i>
+                  <span class="backdated-label">ย้อนหลัง</span>
+                  <span class="backdated-sep">•</span>
+                  <span class="backdated-val">{{ formatBackdatedDetail(person.time) }}</span>
                 </div>
               </div>
               
@@ -406,6 +405,7 @@ import { ref as dbRef, onValue, get, remove, update, runTransaction, set } from 
 import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
 import { normalizeCustomerName, isProxyUid } from "../utils/deliverySync";
+import { formatBackdatedDetail, formatNormalBookingTime, getBookingTooltip } from "../utils/timeFormatUtils";
 import Swal from "sweetalert2";
 
 const emit = defineEmits(["close"]);
@@ -1287,6 +1287,7 @@ function updateOwnerItemsModal() {
           num: parseInt(num),
           price: item.price || 0,
           time: item.time || 0,
+          backdated: !!item.backdated,
           videoId: videoId,
           isToday: true,
           title: extractDateFromTitle(selectedItem.value.title)
@@ -1310,7 +1311,11 @@ function updateOwnerItemsModal() {
 
   const itemsHtml = allItems.map((item) => {
     const priceText = item.price ? `${parseInt(item.price).toLocaleString()}` : '';
-    const timeText = item.time ? formatTime(item.time) : '';
+    const timeText = item.time
+      ? (item.backdated
+          ? `<span style="color:#fbbf24; font-weight:600;"><i class="fa-solid fa-clock-rotate-left"></i> ย้อนหลัง • ${escapeHtml(formatBackdatedDetail(item.time))}</span>`
+          : `<span style="color:#94a3b8;"><i class="fa-regular fa-clock"></i> ${escapeHtml(formatNormalBookingTime(item.time))}</span>`)
+      : '';
     const removeDetail = escapeHtml(`${item.num}|${item.videoId}`);
 
     return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin:4px 0; background:linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius:10px; border:1px solid #2a2a4a; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#2a2a4a'">
@@ -1320,7 +1325,7 @@ function updateOwnerItemsModal() {
           <span style="background:rgba(255, 255, 255, 0.08); color:#cbd5e1; border:1px solid rgba(255, 255, 255, 0.15); font-weight:500; padding:2px 8px; border-radius:20px; font-size:0.8em; white-space:nowrap;">${escapeHtml(item.title)}</span>
           ${priceText ? `<span style="color:#fbbf24; font-weight:600; font-size:0.85em;">💰 ${priceText} ฿</span>` : ''}
         </div>
-        ${timeText ? `<div style="font-size:0.7em; color:#6b7280; margin-top:4px; padding-left:2px;">📅 ${timeText}</div>` : ''}
+        ${timeText ? `<div style="font-size:0.75em; margin-top:4px; padding-left:2px;">${timeText}</div>` : ''}
       </div>
       <button onclick="document.dispatchEvent(new CustomEvent('remove-owner-item-history', {detail: '${removeDetail}'}))" 
               style="background:linear-gradient(135deg, #dc2626, #b91c1c); color:white; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.8em; font-weight:600; flex-shrink:0; transition:all 0.2s; box-shadow:0 2px 6px rgba(220,38,38,0.3);"
@@ -2346,24 +2351,67 @@ async function openCleanupModal() {
   text-decoration: underline;
 }
 
+.backdated-inline-icon {
+  display: inline-block;
+  color: #fb923c;
+  font-size: 0.8em;
+  margin-left: 5px;
+  vertical-align: -0.5px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+  transition: transform 0.2s ease, color 0.2s ease;
+  cursor: help;
+}
+
+.backdated-inline-icon:hover {
+  color: #fbbf24;
+  transform: scale(1.2);
+}
+
 .queue-item-time {
   font-size: 0.72em;
-  color: #888;
+  color: #94a3b8;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
   background: rgba(255, 255, 255, 0.05);
-  padding: 2px 6px;
-  border-radius: 6px;
+  padding: 3px 8px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   margin-left: 4px;
+  font-weight: 500;
 }
 
 .queue-item-time.backdated {
-  color: #fb923c;
-  background: rgba(251, 146, 60, 0.12);
-  border-color: rgba(251, 146, 60, 0.3);
+  color: #fbbf24;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(234, 88, 12, 0.22) 100%);
+  border-color: rgba(245, 158, 11, 0.45);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.queue-item-time.backdated .backdated-icon {
+  color: #fbbf24;
+  font-size: 0.9em;
+}
+
+.queue-item-time.backdated .backdated-label {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fff7ed;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  letter-spacing: 0.2px;
+}
+
+.queue-item-time.backdated .backdated-sep {
+  opacity: 0.5;
+  color: #f59e0b;
+}
+
+.queue-item-time.backdated .backdated-val {
+  color: #fed7aa;
 }
 
 .flex-center {

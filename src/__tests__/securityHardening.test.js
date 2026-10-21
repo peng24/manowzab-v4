@@ -119,6 +119,9 @@ describe("🛡️ Security Hardening & Vulnerability Remediation Suite", () => {
         expect(content).toContain("script-src-elem");
         expect(content).toContain("yt3.ggpht.com");
         expect(content).toContain("worker-src 'self' blob:");
+        expect(content).toContain("https://*.firebaseio.com");
+        expect(content).toContain("https://*.firebasedatabase.app");
+        expect(content).toContain("frame-src");
       }
     });
   });

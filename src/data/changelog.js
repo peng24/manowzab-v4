@@ -18,6 +18,15 @@
 export const changelog = [
   // ─── 5.4.x ───────────────────────────────────────────
   {
+    version: '5.4.9',
+    date: '2026-10-21',
+    changes: {
+      fixed: [
+        'แก้ไขการเชื่อมต่อ Firebase Realtime Database และ Auth (CSP Firebase Script & Frame Whitelist) — อนุญาตโดเมน *.firebaseio.com, *.firebasedatabase.app, apis.google.com, *.googleapis.com, www.gstatic.com ใน script-src, script-src-elem, frame-src และ child-src เพื่อให้การเชื่อมต่อ Long-Polling ของ Firebase RTDB และโมดูลยืนยันตัวตนทำงานได้สมบูรณ์ ไม่ถูกเบราว์เซอร์บล็อก',
+      ],
+    },
+  },
+  {
     version: '5.4.8',
     date: '2026-10-21',
     changes: {
@@ -306,26 +315,6 @@ export const changelog = [
       improved: [
         'ปุ่มลอยข้อความใหม่สไตล์ Obsidian Gold-Emerald Capsule — ปรับปุ่ม "ข้อความใหม่ ⬇" ให้เป็นแคปซูลกระจกลอยหรูหราพร้อมอนิเมชัน Bounce นุ่มนวลตา',
         'วงแหวน Glow ขอบ Avatar ตามประเภทคำสั่ง — ส่องสว่างสีเขียว/ม่วง/แดง/ทอง รอบรูปโปรไฟล์ตามประเภทข้อความ',
-      ],
-    },
-  },
-  // ─── 4.96.x ───────────────────────────────────────────
-  {
-    version: '4.96.0',
-    date: '2026-10-07',
-    changes: {
-      added: [
-        'ระบบสถาปัตยกรรมดีไซน์ใหม่ Obsidian Glass & Luxury Emerald/Amber Gold (Full-System Premium Redesign) — ยกระดับระบบทั้งระบบสู่โทนสีหรูหราทันสมัย กระจกฝ้าลึกระดับพรีเมียม (Deep Glassmorphism) พร้อมคอนทราสต์สายตาระดับสูง เหมาะแก่การไลฟ์สด',
-        'การ์ดสต็อกสินค้าสไตล์ Emerald Glow & Amber Gold Number (Stock Grid 2.0) — ปรับสถานะสินค้าว่างเป็นกระจก Obsidian Minimalist นวลตา และสินค้าที่จองแล้วเปล่งประกายสีเขียวมรกต ตัวเลขสีทองเรืองแสง ชัดเจนแม้มองจากระยะไกล',
-        'ระบบตัวแปรสไตล์กลางระดับ Global Tokens (Vanilla CSS Design Tokens) — เพิ่มตัวแปร --bg-card, --border-gold, --border-emerald, --accent-gold-glow เพื่อความสม่ำเสมอทั่วทุกองค์ประกอบ โดยคงขนาด Bundle เบาหวิว 0 dependencies เพิ่มเติม',
-      ],
-      improved: [
-        'ปรับปรุงแถบสถานะและปุ่มควบคุมหลัก (HUD Command Bar & Status Cluster) — กล่องสถานะระบบ YouTube, Database, Chat และ API Key ปรับเป็นแคปซูลกระจกโปร่งแสงพร้อมไฟ LED เรืองแสงหรูหรา',
-        'ปรับระดับสีปุ่มบันทึกและปุ่มดำเนินการหลัก (Emerald Luxury Action Buttons) — เปลี่ยนโทนปุ่มแอ็กชันหลักเป็นเขียวมรกตไล่เฉด สวยสะดุดตาและมีมิติ',
-        'ปรับแต่งหน้าต่างป๊อปอัปทั้งหมดสู่สไตล์ Unified Obsidian Glass (Modals 2.0) — รองรับเงาลึก 100px และขอบตัดแสงทองเรืองรองสำหรับ Queue Modal, Shipping Manager และ History',
-      ],
-      fixed: [
-        'แยกแยะสีปุ่มช่องทางติดต่อ (โทร - ฟ้าสดใส) และรูปแบบการชำระเงิน (โอน - ม่วงพรีเมียม) คมชัด 100% ไม่สับสนกันอีกต่อไป',
       ],
     },
   },

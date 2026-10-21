@@ -121,6 +121,8 @@ describe("🛡️ Security Hardening & Vulnerability Remediation Suite", () => {
         expect(content).toContain("worker-src 'self' blob:");
         expect(content).toContain("https://*.firebaseio.com");
         expect(content).toContain("https://*.firebasedatabase.app");
+        expect(content).toContain("wss://*.firebaseio.com");
+        expect(content).toContain("wss://*.firebasedatabase.app");
         expect(content).toContain("frame-src");
       }
     });

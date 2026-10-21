@@ -65,6 +65,7 @@ import {
   thaiToArabic,
   stringToColor,
   isAdminUser,
+  isVerifiedAdminSender,
   isDateMismatch,
   extractAdminCustomerName,
   sanitizeAdminCustomerName,
@@ -318,7 +319,7 @@ export function useChatProcessor() {
     // ✅ Get phonetic name for TTS (separate from display name)
     const phoneticName = nicknameStore.getPhoneticName(uid, displayName);
 
-    const isAdmin = isVoiceChat || isAdminUser(displayName, realName);
+    const isAdmin = isVerifiedAdminSender(item.authorDetails, isVoiceChat, displayName, realName);
 
     // ✅ Prepare TTS Message (เอาข้อความแนะนำยาวๆ ออก ไม่อ่านออกเสียงแล้ว)
     let ttsMessage = msg;

@@ -14,6 +14,18 @@ function transcriberPlugin() {
     name: "transcriber-api",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
+        // 🛡️ Security: Restrict transcriber API to local loopback connections only
+        if (req.url && req.url.startsWith("/api/transcriber/")) {
+          const clientIp = req.socket?.remoteAddress || "";
+          const isLoopback = clientIp === "127.0.0.1" || clientIp === "::1" || clientIp === "::ffff:127.0.0.1";
+          if (!isLoopback) {
+            res.statusCode = 403;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Forbidden: Local access only" }));
+            return;
+          }
+        }
+
         if (req.url === "/api/transcriber/start") {
           res.setHeader("Content-Type", "application/json");
           if (pythonProcess) {
@@ -24,7 +36,7 @@ function transcriberPlugin() {
           // Spawn python script in background
           pythonProcess = spawn("python", ["yt_transcriber.py"], {
             stdio: "inherit",
-            shell: true,
+            shell: false,
           });
 
           pythonProcess.on("close", (code) => {

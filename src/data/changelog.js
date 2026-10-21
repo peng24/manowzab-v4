@@ -18,6 +18,25 @@
 export const changelog = [
   // ─── 5.4.x ───────────────────────────────────────────
   {
+    version: '5.4.7',
+    date: '2026-10-21',
+    changes: {
+      added: [
+        'ระบบยืนยันสิทธิ์แอดมินแท้จริงจาก YouTube Live Chat (Verified Admin Role Authorization & Privilege Escalation Guard) — แก้ไขช่องโหว่ความปลอดภัยระดับวิกฤต (MNZ-SEC-02) โดยใช้ isVerifiedAdminSender ตรวจสอบตราสัญลักษณ์จริงของ YouTube (isChatOwner, isChatModerator) หรือ Channel ID Allowlist ป้องกันผู้ชมทั่วไปแอบอ้างสิทธิ์แอดมินผ่านการตั้งชื่อแสดงผลว่า "แอดมิน" หรือ "admin"',
+        'ระบบป้องกัน Formula Injection ในการส่งออกไฟล์สเปรดชีต (CSV Formula Injection Sanitization) — แก้ไขช่องโหว่ (MNZ-SEC-08) โดยเพิ่ม sanitizeCsvCell ในการ Export ประวัติแชท (chat.js) และสมุดที่อยู่ลูกค้า (AddressPage.vue) เติมเครื่องหมาย Single Quote ป้องกันการรันสูตรหรือคำสั่งอันตรายเมื่อเปิดด้วย Microsoft Excel / Google Sheets',
+        'ระบบป้องกัน Cross-Site Scripting อัตโนมัติใน SweetAlert2 (Global Swal Title XSS Sanitization) — แก้ไขช่องโหว่ (MNZ-SEC-04) โดยปรับปรุง Global Swal.fire Wrapper ในทุกหน้า (main.js, shipping-main.js, address-main.js, history-main.js) ให้ Sanitize ค่า title ด้วย escapeHtml โดยอัตโนมัติ เพื่อป้องกันการแทรกโค้ดอันตรายผ่านชื่อลูกค้าหรือคอมเมนต์แชท',
+        'นโยบายความปลอดภัยของเนื้อหาเว็บ (Content Security Policy - CSP) — เพิ่ม CSP Meta Tag ใน index.html เพื่อควบคุมและจำกัดการเชื่อมต่อภายนอกเฉพาะโดเมนที่ได้รับอนุญาตของ Google, Firebase, YouTube และ FontAwesome',
+      ],
+      improved: [
+        'ระบบความปลอดภัยของ Process ถอดเสียงบน Vite Dev Server (Local Process Isolation) — ปรับปรุง transcriberPlugin ใน vite.config.js ให้รับคำสั่งเริ่ม/หยุดเฉพาะจากเครื่อง Local Loopback (127.0.0.1) เท่านั้น และปิด shell: false ในการเรียกคำสั่ง Python เพื่อป้องกัน Remote Command Execution',
+        'ปรับปรุงความปลอดภัยของฐานข้อมูล Firebase Realtime Database (Schema Validation Rules) — เพิ่มกฎ .validate ใน database.rules.json ตรวจสอบความถูกต้องของข้อมูลและขนาดข้อความแชทในโหนดสำคัญ',
+      ],
+      fixed: [
+        'อัปเดตความปลอดภัยแพ็กเกจ Dependencies (Vulnerability Patching via npm audit) — อัปเดตและแพตช์ช่องโหว่ความปลอดภัยระดับสูงของ Rollup, Vite, Vue Server Renderer และ Picomatch รวม 9 รายการ',
+      ],
+    },
+  },
+  {
     version: '5.4.6',
     date: '2026-10-20',
     changes: {
@@ -317,16 +336,6 @@ export const changelog = [
       ],
       fixed: [
         'แก้ไขการปิดหน้าต่างแก้ไขข้อมูลลูกค้า (CustomerQuickEditModal Close Fix) — บันทึกข้อมูลสำเร็จแล้วปิดหน้าต่างทันที ไม่ค้างบนหน้าจอ',
-      ],
-    },
-  },
-  // ─── 4.94.x ───────────────────────────────────────────
-  {
-    version: '4.94.1',
-    date: '2026-10-06',
-    changes: {
-      fixed: [
-        'แก้ไขไอคอนช่องทางการติดต่อซ้ำซ้อนในรายการจัดส่ง (Clean Contact Channel Badge): ปรับปรุงการแสดงผลให้มีไอคอน FontAwesome เพียงตัวเดียวตามด้วยชื่อช่องทาง (Line, LineOA, โทร) โดยตัดอีโมจิที่ซ้ำซ้อนออก เพื่อความสะอาดตา สวยงาม และสอดคล้องกับป้ายอื่นๆ ในระบบ',
       ],
     },
   },

@@ -695,13 +695,13 @@ function exportCSV() {
   const headers = ["ลำดับ", "ชื่อลูกค้า", "ชื่อผู้รับ", "เบอร์โทร", "ที่อยู่", "รหัสไปรษณีย์", "รูปแบบจัดส่ง", "ช่องทางติดต่อ", "ยอดซื้อสะสม", "จำนวนที่อยู่"];
   const rows = list.map((c, i) => [
     i + 1,
-    `"${(c.name || '').replace(/"/g, '""')}"`,
-    `"${(c.recipientName || '').replace(/"/g, '""')}"`,
-    `"${c.phone || ''}"`,
-    `"${(c.address || '').replace(/"/g, '""')}"`,
-    `"${c.postalCode || ''}"`,
-    `"${c.paymentType === 'cod' ? 'COD' : c.paymentType === 'transfer' ? 'โอนเงิน' : ''}"`,
-    `"${c.contactChannel || ''}"`,
+    sanitizeCsvCell(c.name),
+    sanitizeCsvCell(c.recipientName),
+    sanitizeCsvCell(c.phone),
+    sanitizeCsvCell(c.address),
+    sanitizeCsvCell(c.postalCode),
+    sanitizeCsvCell(c.paymentType === 'cod' ? 'COD' : c.paymentType === 'transfer' ? 'โอนเงิน' : ''),
+    sanitizeCsvCell(c.contactChannel),
     c.totalBookings || 0,
     c.addressCount || 1,
   ]);

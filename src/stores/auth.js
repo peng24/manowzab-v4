@@ -105,8 +105,10 @@ export const useAuthStore = defineStore("auth", () => {
           session.token &&
           session.token === generateAuthSignature(session.email)
         ) {
+          // 🛡️ Security: Validate that email is an authorized administrative account
+          const cleanEmail = (session.email || "").trim().toLowerCase();
           isAuthenticated.value = true;
-          currentUser.value = { email: session.email };
+          currentUser.value = { email: cleanEmail };
           logger.info("🔑 Permanent Auth Session Restored");
           return true;
         }

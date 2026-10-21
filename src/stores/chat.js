@@ -9,6 +9,7 @@ import { useSystemStore } from "./system";
 import { useBlacklistStore } from "./blacklist";
 import { archiveChatEntries, getAllChatEntries, clearChatEntries } from "../utils/chatIdb";
 import { extractAdminCustomerName } from "../utils/chatParserUtils";
+import { sanitizeCsvCell } from "../utils/dbUtils";
 
 export const useChatStore = defineStore("chat", () => {
   const MAX_MESSAGES = 500;
@@ -186,13 +187,13 @@ export const useChatStore = defineStore("chat", () => {
     let csvContent = "\uFEFF\"Id\",\"Author name\",\"Comment\",\"Video time\",\"Message time\"\n";
 
     merged.forEach((row) => {
-      const safeId = row.id ? String(row.id).replace(/"/g, '""') : "";
-      const safeComment = row.comment ? String(row.comment).replace(/"/g, '""') : "";
-      const safeAuthor = row.author ? String(row.author).replace(/"/g, '""') : "";
-      const safeVideoTime = row.videoTime ? String(row.videoTime).replace(/"/g, '""') : "";
-      const safeMessageTime = row.messageTime ? String(row.messageTime).replace(/"/g, '""') : "";
+      const safeId = sanitizeCsvCell(row.id);
+      const safeAuthor = sanitizeCsvCell(row.author);
+      const safeComment = sanitizeCsvCell(row.comment);
+      const safeVideoTime = sanitizeCsvCell(row.videoTime);
+      const safeMessageTime = sanitizeCsvCell(row.messageTime);
 
-      csvContent += `"${safeId}","${safeAuthor}","${safeComment}","${safeVideoTime}","${safeMessageTime}"\n`;
+      csvContent += `${safeId},${safeAuthor},${safeComment},${safeVideoTime},${safeMessageTime}\n`;
     });
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });

@@ -199,6 +199,11 @@ description: Mandatory verification checklist after every code change
 | 14.4 | Financial NaN Safeguard | `src/utils/deliverySync.js`, `src/stores/stock.js` | การคำนวณราคาต้องมี `isNaN()` Check เพื่อป้องกันค่า `NaN` รั่วไหลเข้าฐานข้อมูล |
 | 14.5 | Firebase Atomic Transactions | `src/stores/voiceLearning.js`, `src/stores/system.js` | การอัปเดตคะแนนคำเรียนรู้เสียง และการแย่งชิงสิทธิ์ Price Detector ต้องใช้ `runTransaction` ป้องกัน Data Race Condition |
 | 14.6 | Offline Queue Lock | `src/composables/useOfflineQueue.js` | `flushQueue` ต้องมี `isFlushing` guard lock + `try/finally` ป้องกันการประมวลผลซ้ำคิวออฟไลน์พร้อมกัน |
+| 14.7 | Verified Admin Sender Role | `src/utils/chatParserUtils.js`, `src/composables/useChatProcessor.js` | ตรวจสอบสิทธิ์แอดมินของผู้ส่งแชตด้วย `isVerifiedAdminSender()` โดยยืนยันจาก YouTube Badge จริง (`isChatOwner`, `isChatModerator`) หรือ Channel ID Allowlist ห้ามตัดสินจากชื่อแสดงผล (Display Name) เพียงอย่างเดียวเพื่อป้องกัน Privilege Escalation |
+| 14.8 | SweetAlert2 Title XSS Sanitization | `src/main.js`, `src/shipping-main.js`, `src/address-main.js`, `src/history-main.js` | Global `Swal.fire` Wrapper ต้องทำการ Sanitize `opts.title` ด้วย `escapeHtml` โดยอัตโนมัติ (SweetAlert2 เรนเดอร์ Title เป็น innerHTML เสมอ) เพื่อป้องกัน XSS เมื่อแสดงชื่อลูกค้าหรือข้อความจากภายนอก |
+| 14.9 | CSV Formula Injection Prevention | `src/utils/dbUtils.js`, `src/stores/chat.js`, `src/pages/AddressPage.vue` | การ Export CSV ทั้งหมดต้องใช้ `sanitizeCsvCell()` เพื่อ Escape เครื่องหมายคำพูด และเติม Single Quote `'` นำหน้าเซลล์ที่ขึ้นต้นด้วย `=`, `+`, `-`, `@`, `\t`, `\r` เพื่อป้องกัน Remote Formula Execution ใน Excel |
+| 14.10 | Local Loopback Process Security | `vite.config.js` | Endpoint `/api/transcriber/*` ใน Vite Dev Server ต้องจำกัดเฉพาะ Localhost/Loopback (`127.0.0.1`, `::1`) เท่านั้น และห้ามเปิด `shell: true` ใน `spawn` |
+| 14.11 | Content Security Policy (CSP) | `index.html` | ประกาศ CSP Meta Tag ควบคุม Domain Allowlist สำหรับ Scripts, Styles, Fonts, Images, และ Connect Endpoints อย่างรัดกุม |
 
 
 ---

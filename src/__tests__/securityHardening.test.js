@@ -101,4 +101,25 @@ describe("🛡️ Security Hardening & Vulnerability Remediation Suite", () => {
       expect(escapeHtml(scriptPayload)).toBe('&lt;script&gt;fetch(&quot;http://evil.com&quot;)&lt;/script&gt;');
     });
   });
+
+  describe("MNZ-SEC-09: CSP (Content Security Policy Completeness)", () => {
+    const fs = require("fs");
+    const htmlFiles = [
+      "index.html",
+      "shipping/index.html",
+      "history/index.html",
+      "address/index.html",
+    ];
+
+    it("declares strict CSP meta tag with all required origins across all HTML entrypoints", () => {
+      for (const file of htmlFiles) {
+        const content = fs.readFileSync(file, "utf8");
+        expect(content).toContain('http-equiv="Content-Security-Policy"');
+        expect(content).toContain("https://assets.mixkit.co");
+        expect(content).toContain("script-src-elem");
+        expect(content).toContain("yt3.ggpht.com");
+        expect(content).toContain("worker-src 'self' blob:");
+      }
+    });
+  });
 });

@@ -71,7 +71,7 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 - **XSS Prevention & Swal Title Sanitization**: Always wrap dynamic user strings with `escapeHtml()` before rendering via `v-html` or Swal modal templates. Global `Swal.fire` wrapper in all entry points (`main.js`, `shipping-main.js`, `address-main.js`, `history-main.js`) must sanitize `opts.title` with `escapeHtml` by default.
 - **CSV Formula Injection Prevention**: All CSV export functions must sanitize cells using `sanitizeCsvCell(val)` to prefix formula triggers (`=`, `+`, `-`, `@`, `\t`, `\r`) with `'`.
 - **Verified Admin Role Authorization**: Sender authorization in `useChatProcessor.js` must use `isVerifiedAdminSender` verifying YouTube badges (`isChatOwner`, `isChatModerator`) or Channel ID allowlist.
-- **Local Dev Server & CSP**: Restrict dev server transcriber API strictly to loopback (`127.0.0.1`, `::1`) with `shell: false`, and declare CSP in `index.html`.
+- **Local Dev Server & Multi-Page CSP**: Restrict dev server transcriber API strictly to loopback (`127.0.0.1`, `::1`) with `shell: false`, and declare complete CSP in all HTML entrypoints whitelisting Google/Firebase, FontAwesome, YouTube (`yt3.ggpht.com`, `*.ggpht.com`), and Mixkit celebration audio (`assets.mixkit.co` in `connect-src` & `media-src`), paired with `modulePreload: { polyfill: false }` in `vite.config.js`.
 - **Chat Auto-Scroll & Initial Bottom Pinning**: Use `evaluateChatScrollState()`, Double-RAF `scrollToBottom()`, and `ResizeObserver` on `#chat-list`/`#chat-viewport` in `ChatPanel.vue` (without `contain-intrinsic-size: 55px` on `.chat-row`) so initial load and async customer badge rendering stay pinned to the latest message.
 
 ### 6. Customer Blacklist & Ban Invariant (v5.4.5+)

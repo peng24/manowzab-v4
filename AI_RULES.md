@@ -78,7 +78,7 @@
 2.  **SweetAlert2 Title XSS Sanitization:** The global `Swal.fire` wrapper in all entry points (`main.js`, `shipping-main.js`, `address-main.js`, `history-main.js`) must sanitize `opts.title` with `escapeHtml` by default, eliminating Stored XSS via viewer/customer names.
 3.  **CSV / Formula Injection Prevention:** All CSV exports (`chat.js:downloadChatCSV`, `AddressPage.vue:exportAddressesCsv`) must sanitize cells with `sanitizeCsvCell(val)`, prefixing spreadsheet formula triggers (`=`, `+`, `-`, `@`, `\t`, `\r`) with a single quote `'`.
 4.  **Local Process Isolation:** `vite.config.js` endpoints `/api/transcriber/*` must strictly restrict requests to loopback (`127.0.0.1`, `::1`) and disable shell execution (`shell: false`).
-5.  **Content Security Policy:** `index.html` must declare CSP restricting origins to trusted Google, Firebase, FontAwesome, and YouTube CDNs.
+5.  **Content Security Policy:** All HTML entrypoints (`index.html`, `shipping/index.html`, `history/index.html`, `address/index.html`) must declare complete CSP whitelisting Google, Firebase, FontAwesome, YouTube (`yt3.ggpht.com`, `*.ggpht.com`), and Mixkit celebration audio (`assets.mixkit.co` in `connect-src` & `media-src`), explicitly defining `script-src-elem` and `worker-src 'self' blob:`, paired with `modulePreload: { polyfill: false }` in `vite.config.js`.
 
 ## 4. Key File Structures
 

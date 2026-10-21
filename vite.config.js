@@ -180,6 +180,9 @@ export default defineConfig({
   },
 
   build: {
+    modulePreload: {
+      polyfill: false,
+    },
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),

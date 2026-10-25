@@ -621,6 +621,16 @@ export class TextToSpeech {
             messageBody = stripped;
           }
         }
+
+        // If message ends with author name (e.g. "เสื้อสีแดง ราคาเท่าไหร่ เดย์" with author "เดย์"),
+        // strip author suffix so TTS doesn't repeat "เดย์ ... เสื้อสีแดง ราคาเท่าไหร่ เดย์"
+        const suffixRegex = new RegExp(`\\s+(?:ของ(?:พี่|น้อง|แม่|ป้า)?\\s*)?${escaped}$`, "i");
+        if (suffixRegex.test(messageBody)) {
+          const stripped = messageBody.replace(suffixRegex, "").trim();
+          if (stripped) {
+            messageBody = stripped;
+          }
+        }
       }
     }
 

@@ -10,6 +10,11 @@
    - Emojis/Stickers must be read out loud as `"ส่งสติกเกอร์"` (sent sticker) when the original message has content but sanitizes to an empty string.
    - Fall back to `messageRuns` text in `useChatProcessor.js` when `displayMessage` is empty.
 
+3. **Zero-Mute Admin Notes & TTS Fallback Guarantee (v5.4.11+)**:
+   - All admin notes (`admin-note`) and admin stopwords (`admin-stopword`) must transmit `ttsText: isVoiceChat ? "" : ttsMessage` to Firebase (never hardcoding `ttsText: ""`), ensuring admin size queries and notes (e.g. `"เสื้อสีแดง ราคาเท่าไหร่ เดย์"`, `"3xl อำไพ"`, `"รอแป๊บ"`) are read out loud across all connected devices.
+   - `src/stores/chat.js` must fall back to `messageData.text` if `ttsText` is missing, null, or empty for non-banned messages to guarantee no chat is ever skipped or muted.
+   - `TextToSpeech.js` must deduplicate author names at both prefix and suffix (`suffixRegex`), so messages like `"เสื้อสีแดง ราคาเท่าไหร่ เดย์"` with author `"เดย์"` speak naturally as `"เดย์ ... เสื้อสีแดง ราคาเท่าไหร่"`.
+
 ## 🔔 SweetAlert2 Config Invariant
 1. **Toast Configurations**:
    - Toasts generated from `Swal.mixin({ toast: true, ... })` must not be injected with popup configurations (`allowOutsideClick` / `showCloseButton`).

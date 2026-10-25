@@ -272,7 +272,10 @@ export const useChatStore = defineStore("chat", () => {
           const { queueAudio } = useAudio();
           const isVoiceChat = messageData.uid === "voice-chat-uid" || (messageData.uid && messageData.uid.includes("voice-chat"));
 
-          let textToRead = messageData.ttsText !== undefined ? messageData.ttsText : (isVoiceChat ? "" : (messageData.text || ""));
+          // ✅ Never skip reading: use ttsText if available and non-empty, otherwise fallback to message text (unless voice chat)
+          let textToRead = (messageData.ttsText !== undefined && messageData.ttsText !== null && messageData.ttsText !== "")
+            ? messageData.ttsText
+            : (isVoiceChat ? "" : (messageData.text || ""));
 
           // Ignore voice chats with no intent
           if (!(isVoiceChat && !messageData.type)) {

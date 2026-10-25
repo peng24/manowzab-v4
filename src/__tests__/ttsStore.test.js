@@ -115,5 +115,10 @@ describe("System Store - TTS Modes", () => {
     expect(pushSpy).toHaveBeenCalledWith(
       expect.objectContaining({ text: "นิรชา ... พี่เอาใบที่120" })
     );
+
+    await ttsService.speak("เดย์", "เสื้อสีแดง ราคาเท่าไหร่ เดย์");
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "เดย์ ... เสื้อสีแดง ราคาเท่าไหร่" })
+    );
   });
 });

@@ -471,7 +471,7 @@ export function useChatProcessor() {
         isAdmin: true,
         type: "general",
         sfxType: null,
-        ttsText: "",
+        ttsText: isVoiceChat ? "" : ttsMessage,
         detectionMethod: "admin-stopword",
         timestamp: new Date(item.snippet.publishedAt).getTime(),
       });
@@ -529,7 +529,7 @@ export function useChatProcessor() {
           authorName: realName,
           displayName: `${customerName} (โน้ตโดย ${displayName})`,
           proxyCustomerName: customerName,
-          phoneticName: nicknameStore.getPhoneticName(null, customerName),
+          phoneticName: nicknameStore.getPhoneticName(null, customerName) || customerName,
           realName,
           uid,
           avatar,
@@ -538,8 +538,8 @@ export function useChatProcessor() {
           isAdminNote: true,
           noteCategory: "size-selection",
           type: "note",
-          sfxType: null,
-          ttsText: "",
+          sfxType: isNewCustomerChat ? "bell" : null,
+          ttsText: isVoiceChat ? "" : ttsMessage,
           detectionMethod: "admin-note",
           timestamp: new Date(item.snippet.publishedAt).getTime(),
         });

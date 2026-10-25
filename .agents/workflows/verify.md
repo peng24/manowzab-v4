@@ -66,8 +66,9 @@ description: Mandatory verification checklist after every code change
 | 4.9 | เว้นวรรคหน่วงเวลาในคิวเสียง (`delayAfter`) | `src/composables/useAudio.js` | คิวเสียง `queueAudio` รองรับ `options.delayAfter` (เช่น 800ms) เพื่อเว้นจังหวะอ่านชื่อลูกค้าแต่ละคนให้ชัดเจน ไม่รัวติดกัน |
 | 4.10 | ออกเสียงชื่อลูกค้าจริงเมื่อแอดมินจองแทน (Admin Proxy TTS) | `src/composables/useChatProcessor.js` | เมื่อแอดมินพิมพ์จองให้ลูกค้า เสียง TTS จะอ่านเป็นชื่อลูกค้าเท่านั้น ไม่นำชื่อแอดมินมาอ่าน |
 | 4.11 | Shared Singleton `AudioContext` & LRU Cache | `src/services/TextToSpeech.js`, `src/composables/useAudio.js` | ใช้ `AudioContext` ร่วมกันตัวเดียว (`ttsService.getAudioContext()`) ทั้งระบบ TTS / SFX / Celebration พร้อม LRU Audio Buffer Cache (สูงสุด 200 รายการ) ลดเวลาถอดรหัสเสียงซ้ำ |
-| 4.12 | TTS 2-State Toggle Switcher (`S` / `🤖`) | `src/components/Header.vue`, `src/stores/system.js` | ปุ่มสลับเสียงรองรับ 2 โหมด (`S` Google Cloud Standard `th-TH-Standard-A` ➡️ `🤖` Native TTS) พร้อมจำค่าลง `localStorage` |
-| 4.13 | Zero-Stall TTS Auto-Fallback System | `src/services/TextToSpeech.js` | หากโหมด `S` (Google Cloud TTS) ขัดข้อง หมดโควตา หรือเกิด Timeout ระบบต้องหมุน API Key และ Fallback อัตโนมัติไปยัง Native TTS (`🤖`) โดยคิวเสียงไม่ค้างและไม่สะดุด |
+| 4.12 | Zero-Mute Admin Notes & TTS Fallback Guarantee | `src/composables/useChatProcessor.js`, `src/stores/chat.js`, `src/services/TextToSpeech.js` | แชทโน้ตแอดมิน (`admin-note`) และคำเฉพาะแอดมิน (`admin-stopword`) ต้องส่ง `ttsText: isVoiceChat ? "" : ttsMessage` ขึ้น Firebase เสมอ และ `chat.js` ต้องมี fallback ไปที่ `messageData.text` หาก `ttsText` ว่างเปล่า เพื่อรับประกันว่าจะไม่มีข้อความใดถูกตัดเสียงอ่านทิ้ง รวมถึงตัดชื่อซ้ำที่ท้ายข้อความใน TTS (`suffixRegex`) |
+| 4.13 | TTS 2-State Toggle Switcher (`S` / `🤖`) | `src/components/Header.vue`, `src/stores/system.js` | ปุ่มสลับเสียงรองรับ 2 โหมด (`S` Google Cloud Standard `th-TH-Standard-A` ➡️ `🤖` Native TTS) พร้อมจำค่าลง `localStorage` |
+| 4.14 | Zero-Stall TTS Auto-Fallback System | `src/services/TextToSpeech.js` | หากโหมด `S` (Google Cloud TTS) ขัดข้อง หมดโควตา หรือเกิด Timeout ระบบต้องหมุน API Key และ Fallback อัตโนมัติไปยัง Native TTS (`🤖`) โดยคิวเสียงไม่ค้างและไม่สะดุด |
 
 
 ---

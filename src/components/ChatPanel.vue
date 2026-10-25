@@ -69,6 +69,10 @@
       <button class="chat-tab tab-cf" :class="{ active: selectedChatTab === 'buy' }" @click="selectedChatTab = 'buy'">🛒 จอง (CF)</button>
       <button class="chat-tab tab-shipping" :class="{ active: selectedChatTab === 'shipping' }" @click="selectedChatTab = 'shipping'">🚚 ส่ง</button>
       <button class="chat-tab tab-cancel" :class="{ active: selectedChatTab === 'cancel' }" @click="selectedChatTab = 'cancel'">❌ ยกเลิก</button>
+      <button class="chat-tab tab-question" :class="{ active: selectedChatTab === 'question' }" @click="selectedChatTab = 'question'" title="แสดงเฉพาะคำถามลูกค้าและข้อมูลช่วยตอบแม่ค้า">
+        💡 คำถาม
+        <span v-if="questionTabCount > 0" class="tab-count-pill">{{ questionTabCount }}</span>
+      </button>
       <button class="chat-tab tab-admin" :class="{ active: selectedChatTab === 'admin' }" @click="selectedChatTab = 'admin'">⚡ แอดมิน</button>
       <button
         type="button"
@@ -105,6 +109,61 @@
         <i class="fa-solid fa-rotate-left"></i> ล้าง
       </button>
     </div>
+
+    <!-- 💡 Pinned Smart Answer HUD Banner (Auto-pins for 25s when customer asks about stored data) -->
+    <Transition name="smart-hud-fade">
+      <div
+        v-if="pinnedSmartHud && activePinnedAnswer"
+        :key="pinnedSmartHud.key"
+        class="smart-hud-banner"
+        :class="`tone-${activePinnedAnswer.tone}`"
+      >
+        <div class="smart-hud-top">
+          <div class="smart-hud-title-group">
+            <span class="smart-hud-badge">
+              <i class="fa-solid fa-bolt"></i>
+              {{ activePinnedAnswer.icon }} {{ activePinnedAnswer.categoryLabel }}
+            </span>
+            <span class="smart-hud-question" :title="pinnedSmartHud.chat.text">
+              {{ pinnedSmartHud.chat.displayName }}: "{{ pinnedSmartHud.chat.text }}"
+            </span>
+          </div>
+          <button
+            type="button"
+            class="smart-hud-close"
+            @click="dismissPinnedHud"
+            title="ปิดแถบช่วยตอบ (✕)"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="smart-hud-headline">
+          {{ activePinnedAnswer.headline }}
+        </div>
+        <div v-if="activePinnedAnswer.subline" class="smart-hud-subline">
+          {{ activePinnedAnswer.subline }}
+        </div>
+
+        <div
+          v-if="activePinnedAnswer.pills && activePinnedAnswer.pills.length > 0"
+          class="smart-answer-pills hud-pills"
+        >
+          <button
+            v-for="(pill, pIdx) in activePinnedAnswer.pills"
+            :key="pIdx"
+            type="button"
+            class="smart-pill"
+            :class="[`pill-${pill.tone}`, { clickable: Boolean(pill.action) }]"
+            @click.stop="handleSmartPillClick(pill, pinnedSmartHud.chat)"
+          >
+            {{ pill.text }}
+          </button>
+        </div>
+
+        <div class="smart-hud-timer-bar"></div>
+      </div>
+    </Transition>
 
     <!-- 👥 Author Dropdown Popover -->
     <div v-if="showAuthorDropdown" class="author-dropdown-popover" @click.stop>
@@ -200,8 +259,8 @@
         <div
           v-for="chat in filteredVisibleMessages"
           :key="chat.id"
-          v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color, isAuthorFiltered(chat), getCustomerMetaKey(chat), chat.proxyCustomerName, chat.noteCategory, chat.isAdminNote, isBannedUser(chat)]"
-          :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type, isBannedUser(chat) ? 'banned' : '']"
+          v-memo="[chat.id, chat.displayName, chat.realName, chat.type, chat.text, chat.color, isAuthorFiltered(chat), getCustomerMetaKey(chat), chat.proxyCustomerName, chat.noteCategory, chat.isAdminNote, isBannedUser(chat), getSmartAnswerKey(chat)]"
+          :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type, isBannedUser(chat) ? 'banned' : '', getSmartAnswer(chat) ? 'has-smart-answer' : '']"
           :style="getChatRowStyle(chat)"
         >
 
@@ -260,6 +319,13 @@
               :class="getIntentBadge(chat.type).class"
             >
               {{ getIntentBadge(chat.type).icon }} {{ getIntentBadge(chat.type).label }}
+            </span>
+            <span
+              v-else-if="getSmartAnswer(chat)"
+              class="status-badge-under badge-question"
+              title="ระบบตรวจพบคำถามที่มีข้อมูลในระบบ"
+            >
+              💡 ถาม
             </span>
             <span
               v-else-if="chat.type === 'spam'"
@@ -360,6 +426,49 @@
                 </template>
               </div>
 
+              <!-- 💡 Inline Smart Seller Answer Card (Visual-Only, Live Reactive) -->
+              <div
+                v-if="getSmartAnswer(chat)"
+                class="smart-answer-card"
+                :class="`tone-${getSmartAnswer(chat).tone}`"
+              >
+                <div class="smart-answer-header">
+                  <span class="smart-answer-badge">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    {{ getSmartAnswer(chat).icon }} {{ getSmartAnswer(chat).categoryLabel }}
+                  </span>
+                  <button
+                    type="button"
+                    class="smart-pin-btn"
+                    @click.stop="triggerPinnedSmartHud(chat)"
+                    title="ปักหมุดคำตอบนี้ไว้ด้านบน 25 วินาที"
+                  >
+                    <i class="fa-solid fa-thumbtack"></i>
+                  </button>
+                </div>
+                <div class="smart-answer-headline">
+                  {{ getSmartAnswer(chat).headline }}
+                </div>
+                <div v-if="getSmartAnswer(chat).subline" class="smart-answer-subline">
+                  {{ getSmartAnswer(chat).subline }}
+                </div>
+                <div
+                  v-if="getSmartAnswer(chat).pills && getSmartAnswer(chat).pills.length > 0"
+                  class="smart-answer-pills"
+                >
+                  <button
+                    v-for="(pill, pIdx) in getSmartAnswer(chat).pills"
+                    :key="pIdx"
+                    type="button"
+                    class="smart-pill"
+                    :class="[`pill-${pill.tone}`, { clickable: Boolean(pill.action) }]"
+                    @click.stop="handleSmartPillClick(pill, chat)"
+                  >
+                    {{ pill.text }}
+                  </button>
+                </div>
+              </div>
+
               <!-- 🛒 Quick Action Key Button (on hover) -->
               <div class="force-process-btn">
                 <button @click="forceProcess(chat)" class="btn-quick-key" title="คีย์ออเดอร์ด่วนสำหรับลูกค้ารายนี้">
@@ -406,6 +515,7 @@ import {
 import { parseYouTubeEmotesToRuns, hasYouTubeEmotes } from "../data/youtubeEmotes";
 import { logger } from "../utils/logger";
 import { normalizeName } from "../utils/addressParser";
+import { resolveSmartAnswer, isSmartQuestionText } from "../utils/smartAnswerUtils";
 
 const chatStore = useChatStore();
 const stockStore = useStockStore();
@@ -600,6 +710,92 @@ function getCustomerMetaKey(chat) {
   return `${proxyName}_${meta.hasAddress ? 1 : 0}_${meta.contactChannel}_${meta.paymentType}`;
 }
 
+// 💡 Smart Seller Answer Assistant (Visual-Only, Zero Extra Firebase Queries)
+const SMART_HUD_DURATION_MS = 25000; // Pin at top of ChatPanel for 25 seconds
+const pinnedSmartHud = ref(null);
+let pinnedHudTimer = null;
+let lastEvaluatedHudMsgId = null;
+
+function getSmartAnswer(chat) {
+  if (!chat || !chat.text) return null;
+  if (isBannedUser(chat)) return null;
+  if (chat.type === "buy" || chat.type === "cancel") return null;
+
+  return resolveSmartAnswer(chat, {
+    stockData: stockStore.stockData,
+    deliveryByNormKey: deliveryCustomers.value,
+    addressBook: addressBook.value,
+    currentVideoId: systemStore.currentVideoId,
+  });
+}
+
+function getSmartAnswerKey(chat) {
+  const ans = getSmartAnswer(chat);
+  return ans ? ans.fingerprint : "";
+}
+
+const activePinnedAnswer = computed(() => {
+  if (!pinnedSmartHud.value || !pinnedSmartHud.value.chat) return null;
+  return getSmartAnswer(pinnedSmartHud.value.chat);
+});
+
+const questionTabCount = computed(() => {
+  const msgs = chatStore.messages;
+  let count = 0;
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (isBannedUser(m)) continue;
+    if (m.type === "question" || (m.type !== "buy" && m.type !== "cancel" && isSmartQuestionText(m.text))) {
+      count++;
+    }
+  }
+  return count;
+});
+
+function triggerPinnedSmartHud(chat) {
+  if (!chat) return;
+  const ans = getSmartAnswer(chat);
+  if (!ans) return;
+
+  if (pinnedHudTimer) {
+    clearTimeout(pinnedHudTimer);
+    pinnedHudTimer = null;
+  }
+
+  pinnedSmartHud.value = {
+    chat,
+    key: `${chat.id}_${Date.now()}`,
+  };
+
+  pinnedHudTimer = setTimeout(() => {
+    pinnedSmartHud.value = null;
+    pinnedHudTimer = null;
+  }, SMART_HUD_DURATION_MS);
+}
+
+function dismissPinnedHud() {
+  if (pinnedHudTimer) {
+    clearTimeout(pinnedHudTimer);
+    pinnedHudTimer = null;
+  }
+  pinnedSmartHud.value = null;
+}
+
+function handleSmartPillClick(pill, chat) {
+  if (!pill || !pill.action) return;
+  if (pill.action === "jump-to-item" && pill.itemId) {
+    window.dispatchEvent(
+      new CustomEvent("manowzab:jump-to-item", { detail: { itemId: pill.itemId } })
+    );
+  } else if (pill.action === "show-owner-items" && pill.ownerName) {
+    window.dispatchEvent(
+      new CustomEvent("manowzab:show-owner-items", { detail: { ownerName: pill.ownerName } })
+    );
+  } else if (pill.action === "edit-customer" && chat) {
+    editNickname(chat);
+  }
+}
+
 function getChannelLabel(channel) {
   if (channel === "line") return "Line";
   if (channel === "lineoa") return "OA";
@@ -690,6 +886,7 @@ const filteredVisibleMessages = computed(() => {
       (tab === "buy" && m.type === "buy") ||
       (tab === "shipping" && m.type === "shipping") ||
       (tab === "cancel" && m.type === "cancel") ||
+      (tab === "question" && (m.type === "question" || Boolean(getSmartAnswer(m)))) ||
       (tab === "admin" && (m.isAdmin || m.type === "question"))
     ) {
       result.unshift(m);
@@ -1153,6 +1350,18 @@ watch(
     chatStore.messages[chatStore.messages.length - 1]?.id,
   ],
   async () => {
+    const latestMsg = chatStore.messages[chatStore.messages.length - 1];
+    if (latestMsg && latestMsg.id !== lastEvaluatedHudMsgId) {
+      lastEvaluatedHudMsgId = latestMsg.id;
+      const now = Date.now();
+      // Auto-pin Smart Answer HUD for 25s when a fresh stored-data question arrives
+      if (!latestMsg.timestamp || now - latestMsg.timestamp <= 60000) {
+        if (getSmartAnswer(latestMsg)) {
+          triggerPinnedSmartHud(latestMsg);
+        }
+      }
+    }
+
     await nextTick();
     // ถ้า User ไม่ได้เลื่อนดูประวัติอยู่ ให้เลื่อนลงอัตโนมัติแบบ instant fast scroll
     if (!isUserScrolling) {
@@ -1240,6 +1449,10 @@ onUnmounted(() => {
   if (pullResetTimer) {
     clearTimeout(pullResetTimer);
     pullResetTimer = null;
+  }
+  if (pinnedHudTimer) {
+    clearTimeout(pinnedHudTimer);
+    pinnedHudTimer = null;
   }
   if (typeof Swal !== "undefined" && Swal.isVisible()) {
     Swal.close();
@@ -2892,5 +3105,327 @@ async function refreshChat() {
   background: rgba(245, 158, 11, 0.18);
   border-color: rgba(245, 158, 11, 0.5);
   color: #fbbf24;
+}
+
+/* 💡 Question Tab & Count Pill */
+.chat-tab.tab-question.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.22);
+}
+
+.tab-count-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.25);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #e0f2fe;
+  font-size: 0.72em;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* ========================================================
+   💡 Smart Seller Answer Assistant (HUD Banner & Inline Card)
+   ======================================================== */
+.smart-hud-banner {
+  position: relative;
+  margin: 6px 10px 4px;
+  padding: 9px 12px 11px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.32) 0%, rgba(15, 23, 42, 0.94) 100%);
+  border: 1.5px solid rgba(56, 189, 248, 0.55);
+  border-left: 4.5px solid #38bdf8;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 16px rgba(56, 189, 248, 0.2);
+  overflow: hidden;
+  z-index: 15;
+  flex-shrink: 0;
+}
+
+.smart-hud-banner.tone-emerald {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.28) 0%, rgba(15, 23, 42, 0.94) 100%);
+  border-color: rgba(52, 211, 153, 0.55);
+  border-left-color: #10b981;
+}
+
+.smart-hud-banner.tone-amber {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.28) 0%, rgba(15, 23, 42, 0.94) 100%);
+  border-color: rgba(251, 191, 36, 0.55);
+  border-left-color: #fbbf24;
+}
+
+.smart-hud-banner.tone-violet {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.28) 0%, rgba(15, 23, 42, 0.94) 100%);
+  border-color: rgba(192, 132, 252, 0.55);
+  border-left-color: #a855f7;
+}
+
+.smart-hud-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.smart-hud-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.smart-hud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.22);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #7dd3fc;
+  font-size: 0.72em;
+  font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.smart-hud-question {
+  font-size: 0.78em;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.smart-hud-close {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78em;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.smart-hud-close:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ffffff;
+}
+
+.smart-hud-headline {
+  font-size: 0.96em;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.35;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.smart-hud-subline {
+  font-size: 0.80em;
+  color: #e2e8f0;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.smart-hud-timer-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(90deg, #38bdf8, #10b981, #fbbf24);
+  transform-origin: left center;
+  animation: smartHudCountdown 25s linear forwards;
+}
+
+@keyframes smartHudCountdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.smart-hud-fade-enter-active,
+.smart-hud-fade-leave-active {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.smart-hud-fade-enter-from,
+.smart-hud-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* 💡 Inline Smart Answer Card inside Chat Bubble */
+.smart-answer-card {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.25) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-left: 3.5px solid #38bdf8;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+}
+
+.smart-answer-card.tone-emerald {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border-color: rgba(52, 211, 153, 0.45);
+  border-left-color: #10b981;
+}
+
+.smart-answer-card.tone-amber {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border-color: rgba(251, 191, 36, 0.45);
+  border-left-color: #fbbf24;
+}
+
+.smart-answer-card.tone-violet {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border-color: rgba(192, 132, 252, 0.45);
+  border-left-color: #a855f7;
+}
+
+.smart-answer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.smart-answer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72em;
+  font-weight: 800;
+  color: #7dd3fc;
+  letter-spacing: 0.2px;
+}
+
+.smart-answer-card.tone-emerald .smart-answer-badge {
+  color: #6ee7b7;
+}
+
+.smart-answer-card.tone-amber .smart-answer-badge {
+  color: #fde68a;
+}
+
+.smart-answer-card.tone-violet .smart-answer-badge {
+  color: #e9d5ff;
+}
+
+.smart-pin-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.smart-pin-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #38bdf8;
+}
+
+.smart-answer-headline {
+  font-size: 0.92em;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.35;
+}
+
+.smart-answer-subline {
+  font-size: 0.79em;
+  color: #cbd5e1;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.smart-answer-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.smart-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.74em;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+  cursor: default;
+  transition: all 0.15s ease;
+}
+
+.smart-pill.clickable {
+  cursor: pointer;
+}
+
+.smart-pill.clickable:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.12);
+}
+
+.smart-pill.pill-emerald {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+}
+
+.smart-pill.pill-sky {
+  background: rgba(14, 165, 233, 0.22);
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #bae6fd;
+}
+
+.smart-pill.pill-amber {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fde68a;
+}
+
+.smart-pill.pill-violet {
+  background: rgba(168, 85, 247, 0.22);
+  border-color: rgba(192, 132, 252, 0.5);
+  color: #e9d5ff;
+}
+
+.smart-pill.pill-rose {
+  background: rgba(244, 63, 94, 0.24);
+  border-color: rgba(251, 113, 133, 0.55);
+  color: #fecdd3;
 }
 </style>

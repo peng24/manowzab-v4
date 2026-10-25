@@ -252,7 +252,19 @@ description: Mandatory verification checklist after every code change
 | 18.1 | ormatBackdatedCard(ts) | src/utils/timeFormatUtils.js, src/components/StockItemCard.vue | แสดงเฉพาะไอคอนย้อนเวลา (.backdated-inline-icon) ต่อท้ายชื่อลูกค้าโดยตรง ไม่แสดงข้อความเวลา เพื่อความกะทัดรัดและคลีนตา |
 | 18.2 | ormatBackdatedDetail(ts) & ormatNormalBookingTime(ts) | src/utils/timeFormatUtils.js, src/components/StockGrid.vue, src/components/HistoryModal.vue | ในหน้าต่างจัดการคิว (Modal) แสดงป้าย ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm เด่นชัด และรายการปกติแสดงเวลาสะอาด 🕒 HH:mm |
 | 18.3 | getBookingTooltip(ts, isBackdated) | src/utils/timeFormatUtils.js | แสดง Tooltip สุภาพและชัดเจนเมื่อนำเมาส์ชี้ (จองย้อนหลัง: วันนี้ เวลา 13:11 น.) |
-| 18.4 | UI Sunset Amber Gradient Pill Badge | src/components/StockItemCard.vue, src/components/StockGrid.vue, src/components/HistoryModal.vue | ดีไซน์ป้ายรูปทรง Pill โทนสี Amber/Sunset เกรเดียนต์ ขอบเรืองแสง พร้อมไอคอนย้อนเวลา a-clock-rotate-left |
+| 18.4 | UI Sunset Amber Gradient Pill Badge | src/components/StockItemCard.vue, src/components/StockGrid.vue, src/components/HistoryModal.vue | ดีไซน์ป้ายรูปทรง Pill โทนสี Amber/Sunset เกรเดียนต์ ขอบเรืองแสง พร้อมไอคอนย้อนเวลา `fa-clock-rotate-left` |
+
+---
+
+## 💡 19. ระบบผู้ช่วยแสดงคำตอบอัจฉริยะให้แม่ค้า (Smart Seller Answer Assistant v5.4.9+)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 19.1 | `resolveSmartAnswer(chat, context)` & `isSmartQuestionText(text)` | `src/utils/smartAnswerUtils.js`, `src/composables/useChatProcessor.js` | ตรวจจับคำถามลูกค้า 5 หมวดหมู่ (`item`, `orders`, `yesterday`, `hold`, `profile`) แบบ $O(1)$ / Single-pass จากหน่วยความจำ ไม่ยิง Firebase ซ้ำ ไม่ส่งเสียงอ่าน TTS แทรก และติด `type: "question"` ให้ข้อความคำถาม |
+| 19.2 | Claimed Count Verification (`CLAIMED_COUNT_REGEX`) | `src/utils/smartAnswerUtils.js` | เมื่อลูกค้าพิมพ์ทวนจำนวนชิ้น (เช่น `"ของพี่ได้2ตัวใช่ไหม"`, `"พี่นับได่8"`, `"ใช่14ตัว"`) ต้องเทียบกับยอดในระบบและแสดงป้าย `✅ ยอดตรง` หรือ `⚠️ ลูกค้าแจ้ง X ตัว (ระบบ: วันนี้ Y / รวม Z ตัว)` |
+| 19.3 | Inline Smart Answer Card & `v-memo` Key (`getSmartAnswerKey`) | `src/components/ChatPanel.vue` | แสดงการ์ด `.smart-answer-card` ใต้ข้อความคำถามในแชท พร้อมใส่ `getSmartAnswerKey(chat)` ใน `v-memo` ของ `.chat-row` เสมอเพื่อให้อัปเดตแบบเรียลไทม์เมื่อสต็อกหรือที่อยู่เปลี่ยน |
+| 19.4 | 25s Pinned Smart HUD Banner (`pinnedSmartHud`, `pinnedHudTimer`) | `src/components/ChatPanel.vue` | เมื่อมีคำถามใหม่ที่มีข้อมูลในระบบเข้ามา ต้องปักหมุดแถบ `.smart-hud-banner` ด้านบนสุดของช่องแชทนาน 25 วินาที พร้อมปุ่มปิด `✕` และล้าง `pinnedHudTimer` ใน `onUnmounted` |
+| 19.5 | แท็บกรอง `💡 คำถาม` & Cross-Panel Jump Actions | `src/components/ChatPanel.vue`, `src/components/StockGrid.vue` | แท็บ `💡 คำถาม` กรองเฉพาะคำถามลูกค้าพร้อมแสดงตัวเลขจำนวน และปุ่มคลิกรหัสสินค้า (`manowzab:jump-to-item`) / ดูรายการสะสม (`manowzab:show-owner-items`) เชื่อมต่อไปยัง `StockGrid.vue` ได้ถูกต้องพร้อมล้าง Event Listener เมื่อ Unmount |
 
 ---
 

@@ -79,6 +79,14 @@
 - **Card UI**: แสดงเฉพาะไอคอนย้อนเวลา a-clock-rotate-left สีส้มอำพันต่อท้ายชื่อลูกค้าโดยตรง (.backdated-inline-icon) โดยไม่แสดงตัวหนังสือเวลา เพื่อประหยัดพื้นที่แนวตั้งและการ์ดคลีนตา พร้อม Tooltip แสดงวันและเวลาจองเต็มรูปแบบเมื่อนำเมาส์ชี้
 - **Modal UI**: แสดง Badge ชัดเจน [ ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm ]
 
+### 💡 Smart Seller Answer Assistant (v5.4.9+)
+1. **Zero Extra Firebase Reads & Visual-Only Mode**: `src/utils/smartAnswerUtils.js` (`resolveSmartAnswer`, `isSmartQuestionText`, `extractQueriedItemId`, `resolveInquiryCustomer`) resolves customer questions across 5 stored-data categories (`item`, `orders`, `yesterday`, `hold`, `profile`) directly from in-memory `stockStore.stockData`, `customerStore.deliveryByNormKey`, and `customerStore.addressBook` without triggering extra TTS audio or duplicate Firebase listeners.
+2. **3-Point Seller Display in `ChatPanel.vue`**:
+   - **Inline Smart Answer Card** (`.smart-answer-card`) directly inside `.chat-bubble` below `.chat-text` (with `getSmartAnswerKey(chat)` included in `.chat-row` `v-memo`).
+   - **25-Second Pinned Smart HUD Banner** (`.smart-hud-banner`) at the top of `ChatPanel.vue` with manual dismiss (`✕`), live reactive answer updates, and `pinnedHudTimer` cleanup in `onUnmounted`.
+   - **Dedicated `💡 คำถาม` Filter Tab** (`selectedChatTab === 'question'`) in `.chat-intent-tabs` with a live question count badge (`questionTabCount`).
+3. **Interactive Cross-Panel Actions**: Clicking item pills (`🔍 ไปที่รหัส #N`) or customer order pills (`📋 ดูรายการทั้งหมด`) dispatches `manowzab:jump-to-item` (`scrollToItem`) and `manowzab:show-owner-items` (`showOwnerItems`) handled by `StockGrid.vue` (cleaned up on unmount).
+
 ## 4. Key File Structures
 
 - `src/services/TextToSpeech.js`: Core TTS logic (Google Standard + Native, key rotation, LRU buffer cache, shared `AudioContext`).

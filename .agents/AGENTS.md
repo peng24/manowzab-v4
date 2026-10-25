@@ -53,9 +53,14 @@
    - Admin Controls: Support `!แบน [ชื่อ]` / `!ปลดแบน [ชื่อ]` chat commands, 1-click ban/unban by clicking customer profile avatar (with subtle hover ban hint), `BlacklistModal.vue` accessible via `⚡ Tools`, and direct ban/unban toggle inside `CustomerQuickEditModal.vue`.
 
 9. **Backdated Booking Smart Time Formatting Invariant (v5.4.7+)**:
-   - Centralize booking time formatting in src/utils/timeFormatUtils.js (ormatBackdatedCard, ormatBackdatedDetail, ormatNormalBookingTime, getBookingTooltip).
-   - Eliminate noisy seconds from booking timestamps (13:11:50 -> 13:11).
-   - Distinguish calendar day boundaries (	oday, yesterday, other) so backdated orders clearly display ย้อนหลัง HH:mm / เมื่อวาน HH:mm / D MMM HH:mm with back-in-time icon (a-clock-rotate-left), inline icon right behind customer name (.backdated-inline-icon) with polite Thai tooltip (	itle) without text clutter, while in the queue modal displaying ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm and normal bookings showing clean 🕒 HH:mm.
+   - Centralize booking time formatting in `src/utils/timeFormatUtils.js` (`formatBackdatedCard`, `formatBackdatedDetail`, `formatNormalBookingTime`, `getBookingTooltip`).
+   - Eliminate noisy seconds from booking timestamps (`13:11:50` -> `13:11`).
+   - Distinguish calendar day boundaries (`today`, `yesterday`, `other`) so backdated orders clearly display inline icon right behind customer name (`.backdated-inline-icon`) with polite Thai tooltip (`title`) without text clutter, while in the queue modal displaying `⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm` and normal bookings showing clean `🕒 HH:mm`.
+10. **Smart Seller Answer Assistant Invariant (v5.4.9+)**:
+   - Centralize stored-data question detection & resolution in `src/utils/smartAnswerUtils.js` (`resolveSmartAnswer`, `isSmartQuestionText`, `extractQueriedItemId`, `resolveInquiryCustomer`) covering 5 categories (`item`, `orders`, `yesterday`, `hold`, `profile`), including claimed count verification (`✅ ยอดตรง` vs `⚠️ ยอดไม่ตรง`).
+   - Tag question/smart-inquiry messages with `type: "question"` in `useChatProcessor.js` when `intent` is null.
+   - Render **Visual-Only** (no extra auto-TTS) in `ChatPanel.vue` via: (1) Inline `.smart-answer-card` inside `.chat-bubble` (with `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (cleaning up `pinnedHudTimer` in `onUnmounted`), and (3) `💡 คำถาม` tab (`tab-question`) in `.chat-intent-tabs`.
+   - Support 1-click item jump (`manowzab:jump-to-item` -> `scrollToItem`) and owner items modal (`manowzab:show-owner-items` -> `showOwnerItems`) in `StockGrid.vue` with proper listener cleanup in `onUnmounted`.
 
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:

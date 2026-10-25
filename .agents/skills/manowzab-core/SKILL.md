@@ -83,9 +83,16 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 ---
 
 ### 7. Backdated Booking Smart Time Formatting Invariant (v5.4.7+)
-- Centralize booking time formatting in src/utils/timeFormatUtils.js (ormatBackdatedCard, ormatBackdatedDetail, ormatNormalBookingTime, getBookingTooltip).
-- Eliminate noisy seconds from timestamps (13:11:50 -> 13:11).
-- Distinguish calendar day boundaries (	oday, yesterday, other) so backdated orders clearly display ย้อนหลัง HH:mm / เมื่อวาน HH:mm / D MMM HH:mm with back-in-time icon (a-clock-rotate-left), inline icon right behind customer name (.backdated-inline-icon) with polite Thai tooltip (	itle) without text clutter, while in the queue modal displaying ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm and normal bookings showing clean 🕒 HH:mm.
+- Centralize booking time formatting in `src/utils/timeFormatUtils.js` (`formatBackdatedCard`, `formatBackdatedDetail`, `formatNormalBookingTime`, `getBookingTooltip`).
+- Eliminate noisy seconds from timestamps (`13:11:50` -> `13:11`).
+- Distinguish calendar day boundaries (`today`, `yesterday`, `other`) so backdated orders clearly display inline icon right behind customer name (`.backdated-inline-icon`) with polite Thai tooltip (`title`) without text clutter, while in the queue modal displaying `⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm` and normal bookings showing clean `🕒 HH:mm`.
+
+---
+
+### 8. Smart Seller Answer Assistant Invariant (v5.4.9+)
+- **Zero Extra Firebase Reads & Visual-Only Mode**: Resolve customer questions across 5 stored-data categories (`item`, `orders`, `yesterday`, `hold`, `profile`) in `src/utils/smartAnswerUtils.js` using in-memory `stockStore.stockData`, `customerStore.deliveryByNormKey`, and `customerStore.addressBook` without triggering extra TTS audio.
+- **3-Point Seller Display (`ChatPanel.vue`)**: Render (1) Inline `.smart-answer-card` below `.chat-text` (including `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (`pinnedHudTimer` cleaned up on unmount), and (3) `💡 คำถาม` filter tab (`selectedChatTab === 'question'`).
+- **Interactive Cross-Panel Actions (`StockGrid.vue`)**: Handle `manowzab:jump-to-item` (`scrollToItem`) and `manowzab:show-owner-items` (`showOwnerItems`) custom window events with cleanup in `onUnmounted`.
 
 ## 🔄 3. Standard Workflows
 

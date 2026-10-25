@@ -25,6 +25,7 @@ import { watch } from "vue";
 import { logger } from "../utils/logger";
 import { resolveDeliveryUid } from "../utils/deliverySync";
 import { sanitizeDbKey } from "../utils/dbUtils";
+import { isSmartQuestionText } from "../utils/smartAnswerUtils";
 
 import {
   MAX_ITEM_ID,
@@ -1354,7 +1355,11 @@ export function useChatProcessor() {
         avatar,
         color: stringToColor(uid),
         isAdmin,
-        type: intent,
+        type:
+          intent ||
+          (method === "question-skip" || isSmartQuestionText(normalizedMsg)
+            ? "question"
+            : null),
         sfxType: isNewCustomerChat ? "bell" : null,
         ttsText: isVoiceChat ? "" : ttsMessage,
         detectionMethod: method,

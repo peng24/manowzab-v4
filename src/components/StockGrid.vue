@@ -655,11 +655,27 @@ const deliveryCountsMap = computed(() => {
 // Reference สำหรับ cleanup listener & observer ของ modal
 let cleanupOwnerModal = null;
 
+function handleExternalJumpToItem(e) {
+  const itemId = parseInt(e?.detail?.itemId, 10);
+  if (itemId && itemId >= 1) {
+    scrollToItem(itemId);
+  }
+}
+
+function handleExternalShowOwnerItems(e) {
+  const ownerName = e?.detail?.ownerName;
+  if (ownerName && typeof ownerName === "string") {
+    showOwnerItems(ownerName);
+  }
+}
+
 onMounted(() => {
   const unsubCustomers = customerStore.initCustomerListeners();
   if (unsubCustomers) cleanupFns.push(unsubCustomers);
 
   window.addEventListener('keydown', handleGlobalKeydown);
+  window.addEventListener('manowzab:jump-to-item', handleExternalJumpToItem);
+  window.addEventListener('manowzab:show-owner-items', handleExternalShowOwnerItems);
 });
 
 // ✅ Pull-to-Refresh State
@@ -797,6 +813,8 @@ onUnmounted(() => {
   });
   cleanupFns.length = 0;
   window.removeEventListener('keydown', handleGlobalKeydown);
+  window.removeEventListener('manowzab:jump-to-item', handleExternalJumpToItem);
+  window.removeEventListener('manowzab:show-owner-items', handleExternalShowOwnerItems);
   logger.log("🧹 Memory Cleaned Up!");
 });
 

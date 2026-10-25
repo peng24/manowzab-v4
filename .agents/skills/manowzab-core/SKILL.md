@@ -90,8 +90,8 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 ---
 
 ### 8. Smart Seller Answer Assistant Invariant (v5.4.9+)
-- **Zero Extra Firebase Reads & Visual-Only Mode**: Resolve customer questions across 5 stored-data categories (`item`, `orders`, `yesterday`, `hold`, `profile`) in `src/utils/smartAnswerUtils.js` using in-memory `stockStore.stockData`, `customerStore.deliveryByNormKey`, and `customerStore.addressBook` without triggering extra TTS audio.
-- **3-Point Seller Display (`ChatPanel.vue`)**: Render (1) Inline `.smart-answer-card` below `.chat-text` (including `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (`pinnedHudTimer` cleaned up on unmount), and (3) `💡 คำถาม` filter tab (`selectedChatTab === 'question'`).
+- **Zero Extra Firebase Reads, Visual-Only & Non-Redundant Copy**: Resolve customer questions across 5 stored-data categories (`item`, `orders`, `yesterday`, `hold`, `profile`) in `src/utils/smartAnswerUtils.js` using in-memory `stockStore.stockData`, `customerStore.deliveryByNormKey`, and `customerStore.addressBook` without triggering extra TTS audio. Omit duplicate customer names (unless `isProxyTarget`), omit duplicate item ID lists in headlines, and omit duplicate address/COD pills in `orders`/`item`/`yesterday`/`hold`.
+- **3-Point Seller Display (`ChatPanel.vue`)**: Render (1) Compact inline `.smart-answer-card` below `.chat-text` (`.smart-answer-top` without separate header row, including `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (`pinnedHudTimer` cleaned up on unmount), and (3) `💡 คำถาม` filter tab (`selectedChatTab === 'question'`).
 - **Interactive Cross-Panel Actions (`StockGrid.vue`)**: Handle `manowzab:jump-to-item` (`scrollToItem`) and `manowzab:show-owner-items` (`showOwnerItems`) custom window events with cleanup in `onUnmounted`.
 
 ## 🔄 3. Standard Workflows

@@ -137,10 +137,10 @@ describe("smartAnswerUtils — Smart Seller Answer Assistant", () => {
       );
       expect(ans).not.toBeNull();
       expect(ans.category).toBe("orders");
-      expect(ans.headline).toContain("วันนี้คุณ วิภาวดี ได้ 2 ตัว");
-      expect(ans.headline).toContain("#11(120฿)");
-      expect(ans.headline).toContain("#20(150฿)");
-      expect(ans.subline).toContain("สะสมรวมทุกวัน: 5 ตัว");
+      expect(ans.headline).toContain("วันนี้ 2 ตัว");
+      expect(ans.headline).toContain("สะสมรวม 5 ตัว (เก่า 3)");
+      expect(ans.pills.some((p) => p.text.includes("#11(120฿)"))).toBe(true);
+      expect(ans.pills.some((p) => p.text.includes("#20(150฿)"))).toBe(true);
     });
 
     it("verifies claimed count match ('ของพี่ได้2ตัวใช่ไหม' / 'ใช่5ตัว')", () => {
@@ -155,7 +155,7 @@ describe("smartAnswerUtils — Smart Seller Answer Assistant", () => {
         mockContext
       );
       expect(matchAns.category).toBe("orders");
-      expect(matchAns.pills.some((p) => p.text.includes("ยอดตรงกับที่ลูกค้าแจ้ง (2 ตัว)"))).toBe(true);
+      expect(matchAns.pills.some((p) => p.text.includes("ยอดตรง (2 ตัว)"))).toBe(true);
 
       const mismatchAns = resolveSmartAnswer(
         {
@@ -169,7 +169,7 @@ describe("smartAnswerUtils — Smart Seller Answer Assistant", () => {
       );
       expect(mismatchAns.category).toBe("orders");
       expect(
-        mismatchAns.pills.some((p) => p.text.includes("ลูกค้าแจ้ง 8 ตัว (ระบบ: วันนี้ 2 / รวม 5 ตัว)"))
+        mismatchAns.pills.some((p) => p.text.includes("แจ้ง 8 (ในระบบ 5 ตัว)"))
       ).toBe(true);
     });
   });
@@ -190,7 +190,7 @@ describe("smartAnswerUtils — Smart Seller Answer Assistant", () => {
       expect(ans1.category).toBe("yesterday");
       expect(ans1.customerName).toBe("มะระ");
       expect(ans1.itemId).toBe(13);
-      expect(ans1.headline).toContain("มียอดค้างจากรอบก่อน 4 ตัว");
+      expect(ans1.headline).toContain("มียอดค้างรอบก่อน 4 ตัว");
 
       const ans2 = resolveSmartAnswer(
         {
@@ -223,8 +223,7 @@ describe("smartAnswerUtils — Smart Seller Answer Assistant", () => {
       );
       expect(ans).not.toBeNull();
       expect(ans.category).toBe("hold");
-      expect(ans.headline).toContain("มีของสะสมรอส่งรวม 5 ตัว");
-      expect(ans.subline).toContain("รอบก่อนฝากไว้ 3 ตัว + วันนี้ 2 ตัว");
+      expect(ans.headline).toContain("มีของสะสมรวม 5 ตัว (เก่า 3 + วันนี้ 2)");
       expect(ans.subline).toContain("กำหนดส่ง:");
     });
   });
@@ -244,8 +243,8 @@ describe("smartAnswerUtils — Smart Seller Answer Assistant", () => {
       expect(ans).not.toBeNull();
       expect(ans.category).toBe("profile");
       expect(ans.headline).toContain("มีที่อยู่จัดส่งในระบบแล้ว");
+      expect(ans.headline).toContain("COD ปลายทาง");
       expect(ans.subline).toContain("081-234-5678");
-      expect(ans.pills.some((p) => p.text.includes("COD ปลายทาง"))).toBe(true);
     });
   });
 

@@ -426,17 +426,16 @@
                 </template>
               </div>
 
-              <!-- 💡 Inline Smart Seller Answer Card (Visual-Only, Live Reactive) -->
+              <!-- 💡 Inline Smart Seller Answer Card (Visual-Only, Live Reactive, Compact) -->
               <div
                 v-if="getSmartAnswer(chat)"
                 class="smart-answer-card"
                 :class="`tone-${getSmartAnswer(chat).tone}`"
               >
-                <div class="smart-answer-header">
-                  <span class="smart-answer-badge">
-                    <i class="fa-solid fa-lightbulb"></i>
-                    {{ getSmartAnswer(chat).icon }} {{ getSmartAnswer(chat).categoryLabel }}
-                  </span>
+                <div class="smart-answer-top">
+                  <div class="smart-answer-headline">
+                    {{ getSmartAnswer(chat).headline }}
+                  </div>
                   <button
                     type="button"
                     class="smart-pin-btn"
@@ -445,9 +444,6 @@
                   >
                     <i class="fa-solid fa-thumbtack"></i>
                   </button>
-                </div>
-                <div class="smart-answer-headline">
-                  {{ getSmartAnswer(chat).headline }}
                 </div>
                 <div v-if="getSmartAnswer(chat).subline" class="smart-answer-subline">
                   {{ getSmartAnswer(chat).subline }}
@@ -3273,76 +3269,54 @@ async function refreshChat() {
   transform: translateY(-8px);
 }
 
-/* 💡 Inline Smart Answer Card inside Chat Bubble */
+/* 💡 Inline Smart Answer Card inside Chat Bubble (Compact & Scannable) */
 .smart-answer-card {
-  margin-top: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(14, 116, 144, 0.25) 0%, rgba(15, 23, 42, 0.85) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.45);
+  margin-top: 6px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.24) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.42);
   border-left: 3.5px solid #38bdf8;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .smart-answer-card.tone-emerald {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(15, 23, 42, 0.85) 100%);
-  border-color: rgba(52, 211, 153, 0.45);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border-color: rgba(52, 211, 153, 0.42);
   border-left-color: #10b981;
 }
 
 .smart-answer-card.tone-amber {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(15, 23, 42, 0.85) 100%);
-  border-color: rgba(251, 191, 36, 0.45);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border-color: rgba(251, 191, 36, 0.42);
   border-left-color: #fbbf24;
 }
 
 .smart-answer-card.tone-violet {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(15, 23, 42, 0.85) 100%);
-  border-color: rgba(192, 132, 252, 0.45);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border-color: rgba(192, 132, 252, 0.42);
   border-left-color: #a855f7;
 }
 
-.smart-answer-header {
+.smart-answer-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
-  margin-bottom: 3px;
-}
-
-.smart-answer-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.72em;
-  font-weight: 800;
-  color: #7dd3fc;
-  letter-spacing: 0.2px;
-}
-
-.smart-answer-card.tone-emerald .smart-answer-badge {
-  color: #6ee7b7;
-}
-
-.smart-answer-card.tone-amber .smart-answer-badge {
-  color: #fde68a;
-}
-
-.smart-answer-card.tone-violet .smart-answer-badge {
-  color: #e9d5ff;
 }
 
 .smart-pin-btn {
   background: transparent;
   border: 1px solid transparent;
   color: #94a3b8;
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72em;
+  font-size: 0.68em;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -3354,34 +3328,34 @@ async function refreshChat() {
 }
 
 .smart-answer-headline {
-  font-size: 0.92em;
+  font-size: 0.86em;
   font-weight: 800;
   color: #ffffff;
-  line-height: 1.35;
+  line-height: 1.32;
 }
 
 .smart-answer-subline {
-  font-size: 0.79em;
+  font-size: 0.77em;
   color: #cbd5e1;
   margin-top: 2px;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .smart-answer-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 5px;
 }
 
 .smart-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
+  gap: 3px;
+  padding: 1.5px 7px;
   border-radius: 999px;
   font-family: "Kanit", sans-serif;
-  font-size: 0.74em;
+  font-size: 0.73em;
   font-weight: 700;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);

@@ -80,12 +80,12 @@
 - **Modal UI**: แสดง Badge ชัดเจน [ ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm ]
 
 ### 💡 Smart Seller Answer Assistant (v5.4.9+)
-1. **Zero Extra Firebase Reads & Visual-Only Mode**: `src/utils/smartAnswerUtils.js` (`resolveSmartAnswer`, `isSmartQuestionText`, `extractQueriedItemId`, `resolveInquiryCustomer`) resolves customer questions across 5 stored-data categories (`item`, `orders`, `yesterday`, `hold`, `profile`) directly from in-memory `stockStore.stockData`, `customerStore.deliveryByNormKey`, and `customerStore.addressBook` without triggering extra TTS audio or duplicate Firebase listeners.
+1. **Zero Extra Firebase Reads, Visual-Only & Non-Redundant Copy**: `src/utils/smartAnswerUtils.js` (`resolveSmartAnswer`, `isSmartQuestionText`, `extractQueriedItemId`, `resolveInquiryCustomer`) resolves customer questions across 5 stored-data categories (`item`, `orders`, `yesterday`, `hold`, `profile`) directly from in-memory `stockStore.stockData`, `customerStore.deliveryByNormKey`, and `customerStore.addressBook` without triggering extra TTS audio or duplicate Firebase listeners. Omit duplicate customer names (unless `isProxyTarget`), omit duplicate item ID lists in headlines, and omit duplicate address/COD pills in `orders`/`item`/`yesterday`/`hold`.
 2. **3-Point Seller Display in `ChatPanel.vue`**:
-   - **Inline Smart Answer Card** (`.smart-answer-card`) directly inside `.chat-bubble` below `.chat-text` (with `getSmartAnswerKey(chat)` included in `.chat-row` `v-memo`).
+   - **Compact Inline Smart Answer Card** (`.smart-answer-card`) directly inside `.chat-bubble` below `.chat-text` using `.smart-answer-top` (combining headline + `📌` pin button without a separate header row, with `getSmartAnswerKey(chat)` included in `.chat-row` `v-memo`).
    - **25-Second Pinned Smart HUD Banner** (`.smart-hud-banner`) at the top of `ChatPanel.vue` with manual dismiss (`✕`), live reactive answer updates, and `pinnedHudTimer` cleanup in `onUnmounted`.
    - **Dedicated `💡 คำถาม` Filter Tab** (`selectedChatTab === 'question'`) in `.chat-intent-tabs` with a live question count badge (`questionTabCount`).
-3. **Interactive Cross-Panel Actions**: Clicking item pills (`🔍 ไปที่รหัส #N`) or customer order pills (`📋 ดูรายการทั้งหมด`) dispatches `manowzab:jump-to-item` (`scrollToItem`) and `manowzab:show-owner-items` (`showOwnerItems`) handled by `StockGrid.vue` (cleaned up on unmount).
+3. **Interactive Cross-Panel Actions**: Clicking item pills (`🔍 ไปที่ #N` / `#N`) or customer order pills (`📋 ดูทั้งหมด`) dispatches `manowzab:jump-to-item` (`scrollToItem`) and `manowzab:show-owner-items` (`showOwnerItems`) handled by `StockGrid.vue` (cleaned up on unmount).
 
 ## 4. Key File Structures
 

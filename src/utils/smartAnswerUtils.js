@@ -68,10 +68,10 @@ export function formatSmartDeliveryDate(dateStr) {
   const diffDays = Math.round((targetDay - today) / 86400000);
   const shortDate = `${targetDay.getDate()} ${THAI_SHORT_MONTHS[targetDay.getMonth()]}`;
 
-  if (diffDays === 0) return `วันนี้ (${shortDate})`;
-  if (diffDays === 1) return `พรุ่งนี้ (${shortDate})`;
+  if (diffDays === 0) return `วันนี้`;
+  if (diffDays === 1) return `พรุ่งนี้`;
   if (diffDays === -1) return `เมื่อวาน (${shortDate})`;
-  if (diffDays < -1) return `${shortDate} (เลยกำหนด ${Math.abs(diffDays)} วัน)`;
+  if (diffDays < -1) return `${shortDate} (เลย ${Math.abs(diffDays)} วัน)`;
   return `${shortDate} (อีก ${diffDays} วัน)`;
 }
 
@@ -446,25 +446,14 @@ export function resolveSmartAnswer(chat, context = {}) {
   }
 
   const { stockData = {}, deliveryByNormKey = {}, addressBook = {}, currentVideoId = null } = context;
-  const { customerName, customerUid, realName } = resolveInquiryCustomer(chat);
+  const { customerName, customerUid, realName, isProxyTarget } = resolveInquiryCustomer(chat);
+  const namePrefix = isProxyTarget ? `${customerName}: ` : "";
   const portfolio = getCustomerStoredPortfolio(customerName, customerUid, realName, {
     stockData,
     deliveryByNormKey,
     addressBook,
     currentVideoId,
   });
-
-  const pills = [];
-  if (portfolio.hasAddress) {
-    pills.push({ text: "📍 มีที่อยู่แล้ว", tone: "emerald" });
-  } else {
-    pills.push({ text: "⚠️ ยังไม่มีที่อยู่", tone: "amber" });
-  }
-  if (portfolio.paymentType === "cod") {
-    pills.push({ text: "📦 COD ปลายทาง", tone: "amber" });
-  } else if (portfolio.paymentType === "transfer") {
-    pills.push({ text: "💳 โอนเงิน", tone: "violet" });
-  }
 
   // ── Category 3: Yesterday / Backdated Inquiry (checked before generic item query when "เมื่อวาน" is present) ──
   if (YESTERDAY_INQUIRY_REGEX.test(normalizedText)) {
@@ -474,46 +463,41 @@ export function resolveSmartAnswer(chat, context = {}) {
 
     let headline = "";
     if (portfolio.pastCount > 0) {
-      headline = `⏪ คุณ ${customerName}: มียอดค้างจากรอบก่อน ${portfolio.pastCount} ตัว`;
+      headline = `⏪ ${namePrefix}มียอดค้างรอบก่อน ${portfolio.pastCount} ตัว`;
       if (portfolio.pastPrice > 0) {
-        headline += ` (฿${portfolio.pastPrice.toLocaleString()})`;
+        headline += ` (${portfolio.pastPrice.toLocaleString()}฿)`;
       }
     } else {
-      headline = `⏪ คุณ ${customerName}: ไม่พบยอดค้างจากรอบก่อนในระบบ`;
+      headline = `⏪ ${namePrefix}ไม่พบยอดค้างรอบก่อน`;
     }
 
     const subParts = [];
     if (validItemId) {
-      subParts.push(`ถามถึงรหัส #${validItemId} (เมื่อวาน)`);
+      subParts.push(`ถามรหัส #${validItemId}`);
     }
     if (portfolio.todayOwned.length > 0) {
-      const idsStr = portfolio.todayOwned.map((x) => `#${x.id}`).join(", ");
-      subParts.push(`🛒 วันนี้ได้ ${portfolio.todayOwned.length} ตัว (${idsStr})`);
-    }
-    if (portfolio.totalAccumulatedCount > 0) {
-      subParts.push(`📦 รวมสะสมทั้งหมด ${portfolio.totalAccumulatedCount} ตัว`);
+      subParts.push(`วันนี้ ${portfolio.todayOwned.length} ตัว • รวม ${portfolio.totalAccumulatedCount} ตัว`);
     }
 
     const actionPills = [
       {
-        text: `📋 ดูรายการย้อนหลังของ ${customerName}`,
+        text: `📋 ดูรายการย้อนหลัง (${portfolio.totalAccumulatedCount || portfolio.pastCount})`,
         tone: "sky",
         action: "show-owner-items",
         ownerName: customerName,
       },
-      ...pills,
     ];
 
     return {
       category: "yesterday",
-      categoryLabel: validItemId ? `เช็คยอดย้อนหลัง (#${validItemId})` : "เช็คยอดย้อนหลัง",
+      categoryLabel: validItemId ? `ยอดย้อนหลัง #${validItemId}` : "ยอดย้อนหลัง",
       icon: "⏪",
       tone: "violet",
       customerName,
       customerUid,
       itemId: validItemId,
       headline,
-      subline: subParts.join(" • ") || "กดปุ่มเพื่อเปิดดูรายละเอียดรหัสสินค้าจากไลฟ์ก่อนหน้า",
+      subline: subParts.join(" • "),
       pills: actionPills,
       fingerprint: `yesterday:${customerName}:${portfolio.pastCount}:${portfolio.todayOwned.length}:${portfolio.hasAddress ? 1 : 0}`,
     };
@@ -532,51 +516,47 @@ export function resolveSmartAnswer(chat, context = {}) {
     let tone = "sky";
 
     if (!itemOwner) {
-      headline = `🟢 รหัส #${queriedItemId} ยังว่าง (ยังไม่มีคนจอง)`;
+      headline = `🟢 รหัส #${queriedItemId} ยังว่าง`;
       tone = "emerald";
     } else if (isMatchingCustomer(itemOwner, item?.uid, customerName, customerUid, realName)) {
-      headline = `✅ ได้ของ! รหัส #${queriedItemId} เป็นของคุณ ${itemOwner}`;
+      headline = `✅ ได้ของ! รหัส #${queriedItemId} เป็นของ ${itemOwner}`;
       tone = "emerald";
     } else {
       const qIdx = queue.findIndex((q) =>
         isMatchingCustomer(q?.owner || q?.name, q?.uid, customerName, customerUid, realName)
       );
       if (qIdx !== -1) {
-        headline = `⏳ คุณ ${customerName} อยู่คิวสำรอง #${qIdx + 1} (เจ้าของ #${queriedItemId}: ${itemOwner})`;
+        headline = `⏳ คิวสำรอง #${qIdx + 1} (เจ้าของ #${queriedItemId}: ${itemOwner})`;
         tone = "amber";
       } else {
-        headline = `👤 รหัส #${queriedItemId} เจ้าของคือ: ${itemOwner}`;
+        headline = `👤 รหัส #${queriedItemId} เจ้าของคือ ${itemOwner}`;
         tone = "sky";
       }
     }
 
     const subParts = [];
-    if (price > 0) subParts.push(`💰 ราคา ${price.toLocaleString()}฿`);
-    if (size) subParts.push(`📏 ไซส์ ${size}`);
-    if (queue.length > 0) {
-      const qNames = queue.slice(0, 3).map((q, i) => `สำรอง${i + 1}: ${q.owner || q.name}`).join(", ");
-      subParts.push(`👥 คิวสำรอง (${queue.length}): ${qNames}`);
+    if (price > 0) subParts.push(`${price.toLocaleString()}฿`);
+    if (size) subParts.push(`ไซส์ ${size}`);
+    if (queue.length > 0 && !headline.includes("คิวสำรอง")) {
+      subParts.push(`สำรอง ${queue.length} คิว`);
     }
     if (portfolio.todayOwned.length > 0) {
-      const idsStr = portfolio.todayOwned.slice(0, 8).map((x) => `#${x.id}`).join(", ");
-      subParts.push(`🛒 วันนี้คุณ ${customerName} ได้แล้ว ${portfolio.todayOwned.length} ตัว (${idsStr})`);
-    } else {
-      subParts.push(`🛒 วันนี้คุณ ${customerName} ยังไม่ได้รหัสสินค้า`);
+      const idsStr = portfolio.todayOwned.slice(0, 6).map((x) => `#${x.id}`).join(", ");
+      subParts.push(`วันนี้ได้ ${portfolio.todayOwned.length} ตัว (${idsStr})`);
     }
 
     const itemPills = [
       {
-        text: `🔍 ไปที่รหัส #${queriedItemId}`,
+        text: `🔍 ไปที่ #${queriedItemId}`,
         tone: "sky",
         action: "jump-to-item",
         itemId: queriedItemId,
       },
-      ...pills,
     ];
 
     return {
       category: "item",
-      categoryLabel: `ข้อมูลรหัสสินค้า #${queriedItemId}`,
+      categoryLabel: `รหัส #${queriedItemId}`,
       icon: "🏷️",
       tone,
       customerName,
@@ -602,59 +582,48 @@ export function resolveSmartAnswer(chat, context = {}) {
     let headline = "";
     let tone = "emerald";
 
-    if (todayCount > 0) {
-      const idsList = portfolio.todayOwned
-        .map((x) => (x.price > 0 ? `#${x.id}(${x.price}฿)` : `#${x.id}`))
-        .join(", ");
-      headline = `🛒 วันนี้คุณ ${customerName} ได้ ${todayCount} ตัว: ${idsList}`;
-      if (portfolio.todayPrice > 0) {
-        headline += ` (รวมวันนี้ ฿${portfolio.todayPrice.toLocaleString()})`;
-      }
+    if (todayCount > 0 && portfolio.pastCount > 0) {
+      headline = `🛒 ${namePrefix}วันนี้ ${todayCount} ตัว • 📦 สะสมรวม ${totalCount} ตัว (เก่า ${portfolio.pastCount})`;
+    } else if (todayCount > 0) {
+      const priceSuffix = portfolio.todayPrice > 0 ? ` (${portfolio.todayPrice.toLocaleString()}฿)` : "";
+      headline = `🛒 ${namePrefix}วันนี้ได้ ${todayCount} ตัว${priceSuffix}`;
     } else if (portfolio.pastCount > 0) {
-      headline = `🛒 วันนี้ยังไม่ได้ของ • มียอดสะสมรอบก่อน ${portfolio.pastCount} ตัว`;
+      headline = `📦 ${namePrefix}วันนี้ 0 • มียอดเก่าสะสม ${portfolio.pastCount} ตัว`;
       tone = "sky";
     } else {
-      headline = `⚪ คุณ ${customerName} ยังไม่มีรายการจองในระบบ (0 ตัว)`;
+      headline = `⚪ ${namePrefix}ยังไม่มีรายการจอง (0 ตัว)`;
       tone = "amber";
     }
 
     const subParts = [];
-    if (portfolio.pastCount > 0) {
-      const totalPriceStr = portfolio.totalAccumulatedPrice > 0
-        ? ` (รวม ฿${portfolio.totalAccumulatedPrice.toLocaleString()})`
-        : "";
-      subParts.push(
-        `📦 สะสมรวมทุกวัน: ${totalCount} ตัว${totalPriceStr} [รอบก่อน ${portfolio.pastCount} + วันนี้ ${todayCount}]`
-      );
-    }
     if (portfolio.todayQueued.length > 0) {
       const qStr = portfolio.todayQueued.map((q) => `#${q.id}(สำรอง${q.rank})`).join(", ");
-      subParts.push(`⏳ ติดคิวสำรอง: ${qStr}`);
+      subParts.push(`⏳ ${qStr}`);
     }
     if (portfolio.deliveryDate) {
-      subParts.push(`🚚 กำหนดส่ง: ${formatSmartDeliveryDate(portfolio.deliveryDate)}`);
+      subParts.push(`🚚 ส่ง${formatSmartDeliveryDate(portfolio.deliveryDate)}`);
     }
 
     const orderPills = [];
     if (claimedCount !== null && !isNaN(claimedCount)) {
       if (claimedCount === todayCount || claimedCount === totalCount) {
         orderPills.push({
-          text: `✅ ยอดตรงกับที่ลูกค้าแจ้ง (${claimedCount} ตัว)`,
+          text: `✅ ยอดตรง (${claimedCount} ตัว)`,
           tone: "emerald",
         });
       } else {
         tone = "amber";
         orderPills.push({
-          text: `⚠️ ลูกค้าแจ้ง ${claimedCount} ตัว (ระบบ: วันนี้ ${todayCount} / รวม ${totalCount} ตัว)`,
+          text: `⚠️ แจ้ง ${claimedCount} (ในระบบ ${totalCount} ตัว)`,
           tone: "rose",
         });
       }
     }
 
-    for (let i = 0; i < Math.min(portfolio.todayOwned.length, 6); i++) {
+    for (let i = 0; i < Math.min(portfolio.todayOwned.length, 8); i++) {
       const owned = portfolio.todayOwned[i];
       orderPills.push({
-        text: `#${owned.id}`,
+        text: owned.price > 0 ? `#${owned.id}(${owned.price}฿)` : `#${owned.id}`,
         tone: "emerald",
         action: "jump-to-item",
         itemId: owned.id,
@@ -663,25 +632,23 @@ export function resolveSmartAnswer(chat, context = {}) {
 
     if (totalCount > 0) {
       orderPills.push({
-        text: `📋 ดูรายการทั้งหมด (${totalCount})`,
+        text: `📋 ดูทั้งหมด (${totalCount})`,
         tone: "sky",
         action: "show-owner-items",
         ownerName: customerName,
       });
     }
 
-    orderPills.push(...pills);
-
     return {
       category: "orders",
-      categoryLabel: `สรุปยอดของคุณ ${customerName}`,
+      categoryLabel: `สรุปยอด ${customerName}`,
       icon: "🛒",
       tone,
       customerName,
       customerUid,
       itemId: portfolio.todayOwned[0]?.id || null,
       headline,
-      subline: subParts.join(" • ") || (todayCount > 0 ? "คลิกที่เลขรหัสเพื่อเลื่อนดูบนตารางสต็อก" : "ยังไม่มีรายการค้างส่งในระบบ"),
+      subline: subParts.join(" • "),
       pills: orderPills,
       fingerprint: `orders:${customerName}:${ portfolio.todayOwned.map((x) => `${x.id}-${x.price}`).join(",") }:${portfolio.pastCount}:${portfolio.todayQueued.length}:${portfolio.hasAddress ? 1 : 0}`,
     };
@@ -695,50 +662,41 @@ export function resolveSmartAnswer(chat, context = {}) {
     let tone = "violet";
 
     if (totalCount > 0) {
-      const priceStr = portfolio.totalAccumulatedPrice > 0
-        ? ` (฿${portfolio.totalAccumulatedPrice.toLocaleString()})`
-        : "";
-      headline = `📦 คุณ ${customerName}: มีของสะสมรอส่งรวม ${totalCount} ตัว${priceStr}`;
+      const breakdown = portfolio.pastCount > 0 ? ` (เก่า ${portfolio.pastCount} + วันนี้ ${todayCount})` : "";
+      headline = `📦 ${namePrefix}มีของสะสมรวม ${totalCount} ตัว${breakdown}`;
       tone = "emerald";
     } else {
-      headline = `⚪ คุณ ${customerName}: ไม่มีรายการฝากค้างส่งในระบบ (0 ตัว)`;
+      headline = `⚪ ${namePrefix}ไม่มีรายการฝากค้างส่ง (0 ตัว)`;
       tone = "amber";
     }
 
     const subParts = [];
-    if (portfolio.pastCount > 0 || todayCount > 0) {
-      subParts.push(`รอบก่อนฝากไว้ ${portfolio.pastCount} ตัว + วันนี้ ${todayCount} ตัว`);
-    }
     if (portfolio.deliveryDate) {
       subParts.push(`🚚 กำหนดส่ง: ${formatSmartDeliveryDate(portfolio.deliveryDate)}`);
     } else if (totalCount > 0) {
-      subParts.push(`⏳ สถานะ: ฝากไว้ (ยังไม่ระบุวันส่ง)`);
-    }
-    if (portfolio.totalBookings > 0) {
-      subParts.push(`⭐ ประวัติสั่งซื้อสะสม ${portfolio.totalBookings} ชิ้น`);
+      subParts.push(`⏳ ฝากไว้ (ยังไม่ระบุวันส่ง)`);
     }
 
     const holdPills = [];
     if (totalCount > 0) {
       holdPills.push({
-        text: `📋 เปิดดูรายการสะสม (${totalCount})`,
+        text: `📋 ดูทั้งหมด (${totalCount})`,
         tone: "sky",
         action: "show-owner-items",
         ownerName: customerName,
       });
     }
-    holdPills.push(...pills);
 
     return {
       category: "hold",
-      categoryLabel: `สถานะฝากของ & รอบส่ง (${customerName})`,
+      categoryLabel: `สถานะฝาก & รอบส่ง`,
       icon: "📦",
       tone,
       customerName,
       customerUid,
       itemId: null,
       headline,
-      subline: subParts.join(" • ") || "ยังไม่มีประวัติรายการฝากในรอบปัจจุบัน",
+      subline: subParts.join(" • "),
       pills: holdPills,
       fingerprint: `hold:${customerName}:${totalCount}:${portfolio.deliveryDate || ""}:${portfolio.hasAddress ? 1 : 0}`,
     };
@@ -746,46 +704,43 @@ export function resolveSmartAnswer(chat, context = {}) {
 
   // ── Category 5: Profile / Address / COD Inquiry ──
   if (PROFILE_ADDRESS_QUERY_REGEX.test(normalizedText)) {
+    const paySuffix =
+      portfolio.paymentType === "cod"
+        ? " • 📦 COD ปลายทาง"
+        : portfolio.paymentType === "transfer"
+        ? " • 💳 โอนเงิน"
+        : "";
     let headline = "";
     let tone = portfolio.hasAddress ? "emerald" : "amber";
 
     if (portfolio.hasAddress) {
-      headline = `📍 คุณ ${customerName}: มีที่อยู่จัดส่งในระบบแล้ว`;
+      headline = `📍 ${namePrefix}มีที่อยู่จัดส่งในระบบแล้ว${paySuffix}`;
     } else {
-      headline = `⚠️ คุณ ${customerName}: ยังไม่มีที่อยู่ในระบบ (แจ้งลูกค้าพิมพ์ที่อยู่ได้เลย)`;
+      headline = `⚠️ ${namePrefix}ยังไม่มีที่อยู่ในระบบ`;
     }
 
-    const subParts = [];
     const preview = formatAddressShortPreview(portfolio.addressText, portfolio.phoneText);
-    if (preview) {
-      subParts.push(preview);
-    }
-    if (portfolio.totalAccumulatedCount > 0) {
-      subParts.push(`🛒 มียอดรอส่งรวม ${portfolio.totalAccumulatedCount} ตัว`);
-    }
-    if (portfolio.totalBookings > 0) {
-      subParts.push(`⭐ ลูกค้าเก่า (สะสม ${portfolio.totalBookings} ชิ้น)`);
-    }
-
     const profilePills = [
       {
-        text: "✏️ เปิดดู/แก้ไขที่อยู่",
+        text: "✏️ ดู/แก้ที่อยู่",
         tone: "sky",
         action: "edit-customer",
       },
-      ...pills,
     ];
+    if (portfolio.paymentType === "cod") {
+      profilePills.push({ text: "📦 COD ปลายทาง", tone: "amber" });
+    }
 
     return {
       category: "profile",
-      categoryLabel: `ข้อมูลที่อยู่ & การชำระเงิน (${customerName})`,
+      categoryLabel: `ข้อมูลที่อยู่`,
       icon: "📍",
       tone,
       customerName,
       customerUid,
       itemId: null,
       headline,
-      subline: subParts.join(" • ") || "คลิกที่ชื่อลูกค้าเพื่อบันทึกที่อยู่หรือตั้งค่า COD",
+      subline: preview,
       pills: profilePills,
       fingerprint: `profile:${customerName}:${portfolio.hasAddress ? 1 : 0}:${portfolio.paymentType || ""}:${portfolio.contactChannel || ""}:${portfolio.totalAccumulatedCount}`,
     };

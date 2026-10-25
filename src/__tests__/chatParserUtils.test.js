@@ -8,6 +8,7 @@ import {
   adminProxyNameFirstRegex,
   shippingRegex,
   holdRegex,
+  questionRegex,
   numberWithQuestionRegex,
   negationGuardRegex,
   tryRegex,
@@ -1010,6 +1011,139 @@ describe("chatParserUtils", () => {
       expect(parseCancelIds("12 15")).toEqual([12, 15]);
       expect(parseCancelIds("5, 10, 999")).toEqual([5, 10]);
       expect(parseCancelIds("")).toEqual([]);
+    });
+  });
+
+  // ==========================================
+  // 🎯 October 20–24, 2569 Real CSV Chat Log Accuracy Suite (v5.4.8)
+  // ==========================================
+  describe("🎯 October 20–24, 2569 CSV Chat Log Accuracy Suite (20, 21, 23, 24 ต.ค. 69)", () => {
+    it("parses cancellation typos and 'ไม่รับ/ไม่เอา + number' accurately ('64ยกเริก', 'ม้นบางยอเลิกก่อน', 'ไม่รับ25นะคะ', 'นาวพี่ไม่เอา38')", () => {
+      expect(parseIntentDetails("64ยกเริก")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 64,
+      });
+      expect(parseIntentDetails("ม้นบางยอเลิกก่อน")).toEqual({
+        type: "CANCEL_LATEST",
+        method: "auto-cancel-latest",
+      });
+      expect(parseIntentDetails("ไม่รับ25นะคะ")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 25,
+      });
+      expect(parseIntentDetails("นาวพี่ไม่เอา38")).toEqual({
+        type: "CANCEL_ITEM",
+        itemId: 38,
+      });
+    });
+
+    it("guards hypothetical/stain conditions from false cancellation ('ผ้าเปื้อนก็ยังไม่เอานะนาวตัวร้ายมันหาย', 'ถ้าเราก็ยังไม่เอานะจ๊ะตัว LINE มันหาย')", () => {
+      expect(parseIntentDetails("ผ้าเปื้อนก็ยังไม่เอานะนาวตัวร้ายมันหาย").type).toBe("UNKNOWN");
+      expect(parseIntentDetails("ถ้าเราก็ยังไม่เอานะจ๊ะตัว LINE มันหาย").type).toBe("UNKNOWN");
+    });
+
+    it("parses new buy expressions ('พี่เอาใบที่120', 'ใช่คะ25', '70นาว', 'รับ200') while blocking non-buy 'พี่นับได่8'", () => {
+      expect(parseIntentDetails("พี่เอาใบที่120")).toEqual({
+        type: "SINGLE_BUY",
+        itemId: 120,
+        method: "explicit-keyword",
+      });
+      expect(parseIntentDetails("ใช่คะ25")).toEqual({
+        type: "SINGLE_BUY",
+        itemId: 25,
+        method: "explicit-keyword",
+      });
+      expect(parseIntentDetails("70นาว")).toEqual({
+        type: "SINGLE_BUY",
+        itemId: 70,
+        method: "polite-number",
+      });
+      expect(parseIntentDetails("รับ200")).toEqual({
+        type: "SINGLE_BUY",
+        itemId: 200,
+        method: "explicit-keyword",
+      });
+      expect(parseIntentDetails("พี่นับได่8").type).toBe("UNKNOWN");
+    });
+
+    it("prevents false questionRegex matches on words containing 'อก' ('บอก', 'ดอก', 'คอกลม', 'ออก', 'นอก') while keeping real chest size questions", () => {
+      expect(questionRegex.test("จำรหัสบอกจะหาง่ายกว่า")).toBe(false);
+      expect(questionRegex.test("นาวลายดอกไม้ข้างหลังดอกไม้แดง")).toBe(false);
+      expect(questionRegex.test("ดอกใหญ่แดง")).toBe(false);
+      expect(questionRegex.test("หาคอกลมขาวให้พี่หน่อยใส่ชับ")).toBe(false);
+      expect(questionRegex.test("ไช้สที่นาวใส่ตอนนี้คอกลมขาวแขนสั้น")).toBe(false);
+      expect(questionRegex.test("จะบอกในไลน์นะคะ")).toBe(false);
+
+      expect(questionRegex.test("อก60")).toBe(true);
+      expect(questionRegex.test("อกน้อย")).toBe(true);
+      expect(questionRegex.test("24อกเท่าไหร่")).toBe(true);
+      expect(questionRegex.test("คุณนาว อก 42-44 วันนี้พอมีไม๊คะ")).toBe(true);
+    });
+
+    it("prevents 'ส่งรูป' / 'พรุ่งนี้ส่งรูป' from falsely triggering parcel shipping", () => {
+      expect(shippingRegex.test("อิ๋ว พรุ่งนี้ส่งรูปให้ดูด้วย")).toBe(false);
+      expect(parseIntentDetails("อิ๋ว พรุ่งนี้ส่งรูปให้ดูด้วย")).toEqual({
+        type: "ADMIN_NOTE",
+        noteCategory: "size-selection",
+        customerName: "อิ๋ว",
+        method: "admin-note",
+      });
+    });
+
+    it("parses Admin garment/pattern/question notes with customer name suffix or prefix", () => {
+      const adminNotes = [
+        ["กางเกงยีนส์ กุญสิญา", "กุญสิญา"],
+        ["เกงขา5ส่วน กุญสิญา", "กุญสิญา"],
+        ["เกงยีนส์ ปราณี", "ปราณี"],
+        ["ลายเขียวๆ กุญสิญา", "กุญสิญา"],
+        ["สีน้ำเงิน มีลาย คอ กุญสิญา", "กุญสิญา"],
+        ["ลายเขียว ที่นาวบอกสวย สมฤทธิ์", "สมฤทธิ์"],
+        ["อาทิตยา ลายจุดเล็กๆ", "อาทิตยา"],
+        ["กุญสิญา เอาอยู่ ชอบ", "กุญสิญา"],
+        ["21 อกเท่าไหร่ สมฤทธิ์", "สมฤทธิ์"],
+        ["66 อกเท่าไหร่ วรรณี เบญ", "วรรณี เบญ"],
+        ["ชุดเดรส อกเท่าไหร กุญสิญา", "กุญสิญา"],
+        ["กางเกงเอวเท่าไหร่ ปราณี", "ปราณี"],
+      ];
+
+      for (const [text, expectedName] of adminNotes) {
+        expect(isAdminSizeSelectionNote(text)).toBe(true);
+        expect(extractAdminCustomerName(text)).toBe(expectedName);
+        expect(parseIntentDetails(text)).toEqual({
+          type: "ADMIN_NOTE",
+          noteCategory: "size-selection",
+          customerName: expectedName,
+          method: "admin-note",
+        });
+      }
+
+      // Admin question without customer name remains QUESTION, not ADMIN_NOTE
+      expect(extractAdminCustomerName("66 อกเท่าไหร่")).toBeNull();
+      expect(parseIntentDetails("66 อกเท่าไหร่").type).toBe("QUESTION");
+      // Customer question about yesterday's shirt without customer name remains QUESTION
+      expect(parseIntentDetails("เขียวเมี่อวานยังอยู่ไหม").type).toBe("QUESTION");
+    });
+
+    it("extracts genuine self-introductions ('จรีพร', 'บัวใข') while blocking new conversational false positives", () => {
+      expect(extractCustomerSelfName("จรีพร")).toBe("จรีพร");
+      expect(extractCustomerSelfName("บัวใข")).toBe("บัวใข");
+
+      const newFalsePositives = [
+        "มาแล้วจ้า",
+        "ออ.ไม่ได้คะ",
+        "ถ้ามันเลอะ",
+        "เกงคะ",
+        "ไม่ข้างซ้าย",
+        "แขนลายเสีอ",
+        "ไปอีก",
+        "ข้างกระเเป๋า",
+        "ดอกใหญ่แดง",
+        "ได้ค่ะ",
+        "ใช่ค่ะ",
+      ];
+      for (const msg of newFalsePositives) {
+        expect(extractCustomerSelfName(msg)).toBeNull();
+      }
     });
   });
 });

@@ -80,9 +80,9 @@ const SPLIT_NUMS_REGEX = /[\s,_]+/;
 const BACKDATED_ORDER_REGEX = /เมื่อวาน|เมือวาน|ย้อนหลัง|รอบเมื่อวาน/i;
 const STRIP_LEADING_NON_LETTER_REGEX = /^[^\u0E00-\u0E7Fa-zA-Z]+/;
 const STRIP_EDGE_PUNCT_REGEX = /^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g;
-const SHIP_TMR_REGEX = /ส่งพรุ่งนี้|พรุ่งนี้ส่ง|ส่งวันพรุ่งนี้/;
+const SHIP_TMR_REGEX = /ส่งพรุ่งนี้|พรุ่งนี้ส่ง(?!\s*(?:รูป|ภาพ))|ส่งวันพรุ่งนี้/;
 const SHIP_DATE_REGEX = /ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/;
-const SHIP_NOW_REGEX = /ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])ส่ง(?:$|[^\u0E00-\u0E7F\w])/;
+const SHIP_NOW_REGEX = /ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])ส่ง(?!\s*(?:รูป|ภาพ|สติกเกอร์|ข้อความ|คลิป|เสียง|กำลังใจ|ใจ|จุ๊บ))(?:$|[^\u0E00-\u0E7F\w])/;
 const TRANSFER_SLIP_REGEX = /โอนแล้ว|แจ้งโอน|สลิป/;
 const STRIP_PREFIX_OF_REGEX = /^(?:ของพี่|ของ|พี่)\s*/;
 const STRIP_BUY_VERB_REGEX = /f|cf|รับ|เอา|=/gi;
@@ -318,7 +318,10 @@ export function useChatProcessor() {
     // ✅ Get phonetic name for TTS (separate from display name)
     const phoneticName = nicknameStore.getPhoneticName(uid, displayName);
 
-    const isAdmin = isVoiceChat || isAdminUser(displayName, realName);
+    const isAdmin =
+      isVoiceChat ||
+      Boolean(item.authorDetails?.isChatOwner || item.authorDetails?.isChatModerator) ||
+      isAdminUser(displayName, realName);
 
     // ✅ Prepare TTS Message (เอาข้อความแนะนำยาวๆ ออก ไม่อ่านออกเสียงแล้ว)
     let ttsMessage = msg;
@@ -475,7 +478,13 @@ export function useChatProcessor() {
     }
 
     // 🗓️ Yesterday / Backdated Debt Note (e.g. "หนิง เมื่อวาน", "หนิง เมื่อวาน 41 43", "ตุ๊ก บำรุงรัตน์ เมือวาน 32", "มะระ 39 เมื่อวาน")
-    if (!shippingRegex.test(normalizedMsg) && !holdRegex.test(normalizedMsg) && backdatedNoteRegex.test(normalizedMsg) && !tryRegex.test(normalizedMsg)) {
+    if (
+      !shippingRegex.test(normalizedMsg) &&
+      !holdRegex.test(normalizedMsg) &&
+      backdatedNoteRegex.test(normalizedMsg) &&
+      !tryRegex.test(normalizedMsg) &&
+      (isAdmin || !questionRegex.test(normalizedMsg) || Boolean(extractAdminCustomerName(normalizedMsg)))
+    ) {
       const customerName = isAdmin ? extractAdminCustomerName(normalizedMsg) : displayName;
       const targetDisplayName = isAdmin
         ? (customerName ? `${customerName} (โน้ตเมื่อวานโดย ${displayName})` : displayName)

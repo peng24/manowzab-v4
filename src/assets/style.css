@@ -71,6 +71,8 @@
   box-sizing: border-box;
 }
 
+html.lenis,
+html.lenis body,
 html,
 body {
   height: 100dvh;
@@ -2624,6 +2626,8 @@ body {
     display: none !important;
   }
 
+  html.lenis,
+  html.lenis body,
   html, body {
     margin: 0 !important;
     padding: 0 !important;

@@ -68,6 +68,13 @@
    - Render **Visual-Only** (no extra auto-TTS) in `ChatPanel.vue` via: (1) Compact inline `.smart-answer-card` (`.smart-answer-top` combining headline + `📌` pin button without a separate header row, with `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (cleaning up `pinnedHudTimer` in `onUnmounted`), and (3) `💡 คำถาม` tab (`tab-question`) in `.chat-intent-tabs`.
    - Support 1-click item jump (`manowzab:jump-to-item` -> `scrollToItem`) and owner items modal (`manowzab:show-owner-items` -> `showOwnerItems`) in `StockGrid.vue` with proper listener cleanup in `onUnmounted`.
 
+11. **Lenis Smooth Scrolling & Scroll Isolation Invariant (v5.4.12+)**:
+    - Centralize smooth scroll via `useSmoothScroll` (`src/composables/useSmoothScroll.js`), `lenis/vue` plugin, and `v-smooth-scroll` directive.
+    - Preserve 100dvh Layout: `src/assets/style.css` enforces `html.lenis, html.lenis body { height: 100dvh; overflow: hidden; }` preventing Lenis `height: auto` from expanding or breaking the fixed command center viewport.
+    - Zero Chat Interference: `#chat-viewport` in `ChatPanel.vue` MUST have `data-lenis-prevent` so YouTube live stream auto-scrolling, drag-to-scroll, and `isUserScrolling` detection remain 100% unaffected.
+    - Smooth Stock Navigation: `StockGrid.vue` uses `useSmoothScroll(gridContainer)` with automatic `resize()` on grid expansion and centered smooth glide in `scrollToItem()`.
+    - Shipping Table Isolation: `ShippingManager.vue` sets `data-lenis-prevent` on `.sm-table-wrap` for native speed and table stability.
+
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:
 1. **Bump Version in `package.json`** using Semantic Versioning (MAJOR.MINOR.PATCH).

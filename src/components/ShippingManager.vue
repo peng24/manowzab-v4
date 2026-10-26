@@ -179,7 +179,7 @@
       </div>
 
       <!-- Customer List -->
-      <div class="sm-table-wrap">
+      <div class="sm-table-wrap" data-lenis-prevent>
         <table class="sm-table">
           <thead>
             <tr>

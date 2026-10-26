@@ -240,6 +240,7 @@
     <div
       id="chat-viewport"
       ref="chatViewport"
+      data-lenis-prevent
       @scroll="handleScroll"
       @touchstart="handleTouchStart"
       @touchmove="handleTouchMove"

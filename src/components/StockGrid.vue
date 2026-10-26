@@ -359,6 +359,7 @@ import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
 import { useCustomerStore } from "../stores/customer";
 import { useAudio } from "../composables/useAudio";
+import { useSmoothScroll } from "../composables/useSmoothScroll";
 import { ref as dbRef, onValue, get, remove, update, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
@@ -377,6 +378,7 @@ const customerStore = useCustomerStore();
 const { playSfx, queueAudio } = useAudio();
 const openShippingManager = inject("openShippingManager");
 const gridContainer = ref(null);
+const gridSmoothScroll = useSmoothScroll(gridContainer);
 const highlightedId = ref(null);
 const newOrders = ref(new Set());
 const activeFilter = ref("all");
@@ -401,6 +403,9 @@ const gridDisplayLimit = ref(120);
 function expandDisplayLimit() {
   if (gridDisplayLimit.value < stockStore.stockSize) {
     gridDisplayLimit.value = Math.min(stockStore.stockSize, gridDisplayLimit.value + 60);
+    nextTick(() => {
+      gridSmoothScroll?.resize();
+    });
   }
 }
 
@@ -1439,7 +1444,14 @@ function scrollToItem(num) {
     nextTick(() => {
       const el = document.getElementById(`stock-${num}`);
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (gridSmoothScroll?.lenis?.value && gridContainer.value) {
+          const cHeight = gridContainer.value.clientHeight || 400;
+          const elHeight = el.clientHeight || 85;
+          const offset = -(cHeight / 2 - elHeight / 2);
+          gridSmoothScroll.scrollTo(el, { offset, duration: 0.8 });
+        } else {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
         highlightedId.value = num;
         if (highlightTimeout) clearTimeout(highlightTimeout);
         highlightTimeout = setTimeout(() => {

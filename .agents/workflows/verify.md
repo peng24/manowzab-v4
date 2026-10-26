@@ -269,6 +269,19 @@ description: Mandatory verification checklist after every code change
 
 ---
 
+## 🌊 20. ระบบเลื่อนหน้าจอเนียนนุ่ม Lenis Smooth Scrolling (v5.4.12+)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 20.1 | `useSmoothScroll(containerRef, options)` | `src/composables/useSmoothScroll.js` | เริ่มต้น Lenis กับคอนเทนเนอร์ ปรับแต่ง lerp/duration, ติดตั้ง ResizeObserver & MutationObserver สำหรับ auto-resize และคืนค่า lenis, scrollTo, resize, destroy |
+| 20.2 | `v-smooth-scroll` Directive | `src/composables/useSmoothScroll.js`, `src/main.js` | ไดเรกทิฟ Vue ติดตั้ง Lenis บนคอนเทนเนอร์ใดๆ ผ่าน `<div v-smooth-scroll>` พร้อม cleanup อัตโนมัติเมื่อ unmounted |
+| 20.3 | Layout 100dvh Preservation (`html.lenis, html.lenis body`) | `src/assets/style.css` | ป้องกันไม่ให้ `lenis.css` (ที่มี `height: auto`) ทำลายโครงสร้าง 100dvh และ overflow: hidden ของหน้าจอหลัก |
+| 20.4 | Real-Time Chat Isolation (`data-lenis-prevent`) | `src/components/ChatPanel.vue` | ช่องแชทสด `#chat-viewport` ต้องมี `data-lenis-prevent` รับประกันว่าการเลื่อนแชทอัตโนมัติ การตรึงหมุดล่างสุด และการตรวจจับ `isUserScrolling` จะไม่ถูกดักจับหรือรบกวน 100% |
+| 20.5 | Buttery-Smooth Stock Grid & Jump (`scrollToItem`) | `src/components/StockGrid.vue` | ตารางสินค้า `.stock-grid` เชื่อมต่อ Lenis เลื่อนล้อเมาส์นุ่มนวล และการกระโดดไปยังหมายเลขสินค้า (`scrollToItem`) เลื่อนแบบนุ่มนวลกึ่งกลางจออย่างแม่นยำ |
+| 20.6 | Shipping Table Isolation | `src/components/ShippingManager.vue` | ตารางขนส่ง `.sm-table-wrap` ต้องมี `data-lenis-prevent` เพื่อความเร็วและการเลื่อนตารางแบบ native ที่เสถียร |
+
+---
+
 ## How to Verify & Auto-Update Policy (บังคับทำทุกครั้ง)
 
 1. Review the diff of changed files

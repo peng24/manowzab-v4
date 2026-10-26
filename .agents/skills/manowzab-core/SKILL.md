@@ -94,6 +94,12 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 - **3-Point Seller Display (`ChatPanel.vue`)**: Render (1) Compact inline `.smart-answer-card` below `.chat-text` (`.smart-answer-top` without separate header row, including `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (`pinnedHudTimer` cleaned up on unmount), and (3) `💡 คำถาม` filter tab (`selectedChatTab === 'question'`).
 - **Interactive Cross-Panel Actions (`StockGrid.vue`)**: Handle `manowzab:jump-to-item` (`scrollToItem`) and `manowzab:show-owner-items` (`showOwnerItems`) custom window events with cleanup in `onUnmounted`.
 
+### 9. Lenis Smooth Scrolling & Scroll Isolation Invariant (v5.4.12+)
+- **Integrated Architecture**: Powered by `lenis`, `lenis/vue`, `src/composables/useSmoothScroll.js`, and `v-smooth-scroll` directive.
+- **Fixed Layout Preservation**: `src/assets/style.css` enforces `html.lenis, html.lenis body { height: 100dvh; overflow: hidden; }` preventing Lenis `height: auto` from breaking the fixed 100dvh SPA command center.
+- **Zero Chat Interference**: `#chat-viewport` in `ChatPanel.vue` MUST have `data-lenis-prevent` to protect YouTube live stream real-time scrolling and bottom pinning.
+- **Fluid Grid Navigation**: `StockGrid.vue` uses `useSmoothScroll(gridContainer)` with centered item jump animation (`scrollToItem`), while `ShippingManager.vue` sets `data-lenis-prevent` on `.sm-table-wrap`.
+
 ## 🔄 3. Standard Workflows
 
 ### 🧪 1. Verification & Auto-Rule Evolution Protocol (`/verify`)

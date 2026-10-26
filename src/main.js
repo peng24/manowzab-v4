@@ -2,6 +2,9 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 import "./assets/style.css";
+import "lenis/dist/lenis.css";
+import vueLenisPlugin from "lenis/vue";
+import { vSmoothScroll } from "./composables/useSmoothScroll";
 import { globalErrorHandler } from "./utils/errorHandler";
 import { logger } from "./utils/logger";
 
@@ -41,6 +44,8 @@ Swal.fire = function (...args) {
 
 const app = createApp(App);
 app.use(createPinia());
+app.use(vueLenisPlugin);
+app.directive("smooth-scroll", vSmoothScroll);
 
 // Register Global Error Handler
 app.config.errorHandler = globalErrorHandler;

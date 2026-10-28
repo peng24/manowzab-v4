@@ -26,6 +26,7 @@ import { logger } from "../utils/logger";
 import { resolveDeliveryUid } from "../utils/deliverySync";
 import { sanitizeDbKey } from "../utils/dbUtils";
 import { isSmartQuestionText } from "../utils/smartAnswerUtils";
+import { replaceNumbersWithThaiWords, numberToThaiWords } from "../utils/thaiNumberWords";
 
 import {
   MAX_ITEM_ID,
@@ -299,7 +300,7 @@ export function useChatProcessor() {
             isAdmin: true,
             type: "price_update",
             sfxType: "success",
-            ttsText: `รหัส ${itemId} ตั้งราคา ${priceVal} บาท`,
+            ttsText: `รหัส ${numberToThaiWords(itemId)} ตั้งราคา ${numberToThaiWords(priceVal)} บาท`,
             detectionMethod: "voice-price-extractor",
             timestamp: new Date(item.snippet.publishedAt).getTime(),
           });
@@ -324,8 +325,8 @@ export function useChatProcessor() {
       Boolean(item.authorDetails?.isChatOwner || item.authorDetails?.isChatModerator) ||
       isAdminUser(displayName, realName);
 
-    // ✅ Prepare TTS Message (เอาข้อความแนะนำยาวๆ ออก ไม่อ่านออกเสียงแล้ว)
-    let ttsMessage = msg;
+    // ✅ Prepare TTS Message (แปลงตัวเลขเป็นคำอ่านภาษาไทย เช่น 15 -> สิบห้า ไม่อ่าน หนึ่งห้า)
+    let ttsMessage = replaceNumbersWithThaiWords(msg);
     const isNewCustomerChat = isNewCustomer && !isAdmin;
 
     // Determine intent
@@ -681,7 +682,7 @@ export function useChatProcessor() {
           sfxType: isNewCustomerChat ? "bell" : "success",
           ttsText: isVoiceChat
             ? ""
-            : `${ttsMessage} ... ทั้งหมด ${itemIds.length} รายการ`,
+            : `${ttsMessage} ... ทั้งหมด ${numberToThaiWords(itemIds.length)} รายการ`,
           detectionMethod: "multi-buy",
           timestamp: new Date(item.snippet.publishedAt).getTime(),
         });

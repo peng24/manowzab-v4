@@ -50,7 +50,7 @@ Manowzab Command Center (currently v5.3.2+) coordinates live sales stream manage
 1. **Audio Sequencing**: Always await SFX completion before triggering TTS. Use the unified queue in `useAudio.js`.
 2. **Firebase Transactions**: Always use `runTransaction` for critical writes (stock claiming, queue adjustments, lifetime booking updates) to prevent concurrent writes from colliding.
 3. **Memory Management & Centralized Listeners**: Keep track of all Firebase event listeners (`onValue`, `onChildAdded`) inside composables/components. Store unsubscribed functions in arrays and clean them up (`off(...)` / calling unsub functions) on component unmount to prevent leaks. Never create duplicate `delivery_customers` or `address_book` listeners in components—always use `useCustomerStore`.
-4. **Thai Number Conversion**: Preserve the numeric transcription capability (`thaiToArabic`) inside the chat processor.
+4. **Thai Number Conversion & Pronunciation**: Preserve the numeric transcription capability (`thaiToArabic`) inside the chat processor, and convert numbers to Thai cardinal words (`numberToThaiWords`, `replaceNumbersWithThaiWords` in `thaiNumberWords.js`) so TTS reads numbers as cardinal words (e.g. 15 -> 'สิบห้า') rather than digit-by-digit ('หนึ่งห้า').
 
 ---
 

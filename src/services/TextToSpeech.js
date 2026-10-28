@@ -1,6 +1,7 @@
 import { useSystemStore } from "../stores/system";
 import { logger } from "../utils/logger";
 import { stripYouTubeEmotes } from "../data/youtubeEmotes";
+import { replaceNumbersWithThaiWords } from "../utils/thaiNumberWords";
 
 // Module-scoped compiled regexes to prevent recreation in TTS sanitize loop
 const TTS_EMOJI_REGEX = /[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE00-\uFE0F\u200D\u20E3]/gu;
@@ -190,6 +191,9 @@ export class TextToSpeech {
 
     // ✅ แก้ไขปัญหาการอ่านออกเสียงเพี้ยน (เช่น คำว่า "จอง" อ่านเป็น "จอ ออ งอ" โดยเปลี่ยนเป็น "จอร์ง" เพื่อให้ออกเสียง "จอง" ได้ถูกต้อง)
     cleanText = cleanText.replace(JONG_FIX_REGEX, "จอร์ง");
+
+    // ✅ แก้ไขปัญหาการอ่านตัวเลข (เช่น 15 ให้อ่านเป็น "สิบห้า" ไม่ใช่ "หนึ่งห้า")
+    cleanText = replaceNumbersWithThaiWords(cleanText);
 
     // Clean up double spaces
     cleanText = cleanText.replace(MULTI_SPACE_REGEX, " ").trim();
@@ -423,7 +427,7 @@ export class TextToSpeech {
     try {
       const voice = this.getBestVoice();
 
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(this.sanitize(text));
       utterance.lang = "th-TH";
       utterance.volume = 1.0;
       utterance.rate = 1.0;

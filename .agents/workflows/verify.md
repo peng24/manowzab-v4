@@ -69,6 +69,7 @@ description: Mandatory verification checklist after every code change
 | 4.12 | Zero-Mute Admin Notes & TTS Fallback Guarantee | `src/composables/useChatProcessor.js`, `src/stores/chat.js`, `src/services/TextToSpeech.js` | แชทโน้ตแอดมิน (`admin-note`) และคำเฉพาะแอดมิน (`admin-stopword`) ต้องส่ง `ttsText: isVoiceChat ? "" : ttsMessage` ขึ้น Firebase เสมอ และ `chat.js` ต้องมี fallback ไปที่ `messageData.text` หาก `ttsText` ว่างเปล่า เพื่อรับประกันว่าจะไม่มีข้อความใดถูกตัดเสียงอ่านทิ้ง รวมถึงตัดชื่อซ้ำที่ท้ายข้อความใน TTS (`suffixRegex`) |
 | 4.13 | TTS 2-State Toggle Switcher (`S` / `🤖`) | `src/components/Header.vue`, `src/stores/system.js` | ปุ่มสลับเสียงรองรับ 2 โหมด (`S` Google Cloud Standard `th-TH-Standard-A` ➡️ `🤖` Native TTS) พร้อมจำค่าลง `localStorage` |
 | 4.14 | Zero-Stall TTS Auto-Fallback System | `src/services/TextToSpeech.js` | หากโหมด `S` (Google Cloud TTS) ขัดข้อง หมดโควตา หรือเกิด Timeout ระบบต้องหมุน API Key และ Fallback อัตโนมัติไปยัง Native TTS (`🤖`) โดยคิวเสียงไม่ค้างและไม่สะดุด |
+| 4.15 | Thai Cardinal Number Pronunciation (`numberToThaiWords`) | `src/utils/thaiNumberWords.js`, `src/services/TextToSpeech.js`, `src/composables/useChatProcessor.js` | อ่านตัวเลขจองสินค้าเป็นจำนวนนับภาษาไทย เช่น "15" -> "สิบห้า" ไม่ใช่อ่านแยกทีละตัว "หนึ่งห้า" พร้อมแปลง CF, ตัวเลขทับลำดับ, และปกป้องเบอร์โทรศัพท์ (08x/09x)/เวลา (13:11) |
 
 
 ---

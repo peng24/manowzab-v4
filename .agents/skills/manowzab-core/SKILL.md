@@ -46,6 +46,7 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 - **Time-guard incoming audio**: Only play audio for messages with `timestamp >= syncStartTime - 5000` and `isNew === true`.
 - **Zero-Stall Fallback**: If Google Cloud TTS encounters a network error, quota limit, or timeout, it must seamlessly fall back to `speakNative()` without stalling the audio queue.
 - **Sanitization & Emoji Fallback**: Messages that sanitize to an empty string (stickers/emojis) must be voiced as `"ส่งสติกเกอร์"`.
+- **Thai Cardinal Number & Booking TTS Pronunciation (v5.4.13+)**: Numbers in booking chats must be converted to Thai cardinal words (`numberToThaiWords`, `replaceNumbersWithThaiWords` in `src/utils/thaiNumberWords.js`) so TTS pronounces "สิบห้า" instead of "หนึ่งห้า", with phone numbers, leading zeros, and time expressions safely preserved.
 - **Shared Singleton `AudioContext`**: Reuse `ttsService.getAudioContext()` across TTS, SFX, and celebration audio.
 
 ### 2. Concurrency & Transaction Safety

@@ -75,6 +75,12 @@
     - Smooth Stock Navigation: `StockGrid.vue` uses `useSmoothScroll(gridContainer)` with automatic `resize()` on grid expansion and centered smooth glide in `scrollToItem()`.
     - Shipping Table Isolation: `ShippingManager.vue` sets `data-lenis-prevent` on `.sm-table-wrap` for native speed and table stability.
 
+12. **Thai Cardinal Number & Booking TTS Pronunciation Invariant (v5.4.13+)**:
+    - Centralize number-to-Thai-words conversion in `src/utils/thaiNumberWords.js` (`numberToThaiWords`, `replaceNumbersWithThaiWords`).
+    - Eliminate digit-by-digit reading (e.g. reading 15 as "หนึ่งห้า", 12 as "หนึ่งสอง", 25 as "สองห้า", 120 as "หนึ่งสองศูนย์") by converting booking item numbers, quantities, prices, and CF bookings into proper Thai cardinal words ("สิบห้า", "สิบสอง", "ยี่สิบห้า", "หนึ่งร้อยยี่สิบ", "ซีเอฟ สิบห้า", "สิบห้า ทับ หนึ่ง").
+    - Two-Tier Guarantee: (1) `useChatProcessor.js` converts numbers in `ttsMessage` / `ttsText` before storing to Firebase RTDB (`text` remains the original raw string for UI display). (2) `TextToSpeech.js` sanitizes and converts numbers before speech in both `speakOnline` (Google Cloud Standard `th-TH-Standard-A`) and `speakNative` (SpeechSynthesis).
+    - Safe Guards: Protects phone numbers (`0812345678`, `091-234-5678`), codes with leading zeros (`01`, `02`), and time expressions (`13:11`) from being converted to cardinal words.
+
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:
 1. **Bump Version in `package.json`** using Semantic Versioning (MAJOR.MINOR.PATCH).

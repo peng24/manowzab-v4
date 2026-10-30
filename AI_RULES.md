@@ -135,3 +135,24 @@
 
 _Please acknowledge that you understand these rules. If I ask for a change, ensure it improves the system without breaking current stability._
 
+
+
+## Firebase identity and delivery cycles (2026-10-30)
+
+- Firebase Authentication is the source of identity. Never trust client-generated sessions, hard-coded password hashes, or automatic anonymous sign-in for dashboard access.
+- Business nodes require a non-anonymous Firebase user with `admin_users/<UID> = true`. Only Firebase Console/Admin SDK may modify grants. Start protected listeners after authorization and tear them down on logout/revocation.
+- Never include passwords in `VITE_*` variables. Python transcriber credentials use server-side `FIREBASE_TRANSCRIBER_EMAIL` / `FIREBASE_TRANSCRIBER_PASSWORD` and an approved account.
+- Both shipping screens must call `deliveryActions.js`; complete/undo are transactions on the whole customer record, guarded by delivery cycle identity and the reviewed booking snapshot.
+- All stock-to-delivery writers, including Dashboard and HistoryModal, must use `syncDeliveryCustomerForOwner`. Retain `items`, `fulfilledItems`, and latest undo metadata. Never overwrite totals calculated from a stale cache.
+- A booking is identified by video + item number + booking time. Editing a price/name/UID cannot make a shipped booking pending. New bookings in the same video count only unshipped items.
+- Keep older iPad support: delivery transitions operate on JSON records without requiring `structuredClone`.
+- Regression verification: `npm test`, `npm run test:transcriber`, `npm run build`, and `npm run test:firebase` with local emulators. Report physical audio/iOS/printer/live API checks separately; passing unit tests does not certify them.
+
+- Firebase may deserialize numeric item maps as sparse arrays. Normalize null slots, and compare booking fields in a canonical order; object/array shape and field serialization order must not change delivery identity.
+
+## Selective reconciliation and reactive answer caching (2026-10-30)
+
+- App delivery reconciliation must group stock in one pass and sync only owners whose booking fields changed. Queue-only edits must not initiate delivery transactions. Include the previous owner on cancellation/promotion, repair late-arriving orphaned sessions, and reset/cancel deferred work on video/auth changes and unmount.
+- Grouped owner items may be passed to the canonical delivery transaction helper; keep shipped-item isolation and transaction guards intact. Other callers still use the existing stock-snapshot API.
+- Smart Answer cache entries must track Vue reactive dependencies, including nested stock edits and replaced customer/address snapshots. Use weak chat keys, check live blacklist/type before returning answers, and include the complete answer in row memo invalidation so address/price edits remain visible.
+- Run `npm run benchmark:performance` for the reproducible 300-customer/200-question workload. Report synthetic timing and local browser measurements with their environment; never equate these with production or device-wide results.

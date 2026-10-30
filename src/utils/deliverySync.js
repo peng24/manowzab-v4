@@ -1,4 +1,5 @@
-import { ref as dbRef, get, update } from "firebase/database";
+import { bookingItems, recalculateDelivery, syncDeliverySession } from "./deliveryState";
+import { ref as dbRef, get, update, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "./logger";
 import {
@@ -85,7 +86,7 @@ export async function resolveDeliveryUid(uid, name) {
     const data = await getCachedDeliveryCustomers();
 
     // If valid non-proxy UID, check if direct active key exists first
-    if (!isProxyUid(uid) && data[uid] && data[uid].status !== "done") {
+    if (!isProxyUid(uid) && data[uid]) {
       return uid;
     }
 
@@ -100,6 +101,8 @@ export async function resolveDeliveryUid(uid, name) {
     });
 
     if (activeKey) return activeKey;
+    const completedKey = Object.keys(data).find(key => data[key] && normalizeCustomerName(data[key].name) === normName);
+    if (completedKey) return completedKey;
   } catch (e) {
     logger.warn("resolveDeliveryUid name search error:", e);
   }
@@ -125,23 +128,9 @@ export async function resolveDeliveryUid(uid, name) {
 export async function recalcItemCount(deliveryUid) {
   if (!deliveryUid) return;
   try {
-    const sessionsSnap = await get(
-      dbRef(db, `delivery_customers/${deliveryUid}/sessions`),
-    );
-    const sessions = sessionsSnap.val() || {};
-
-    const totalCount = Object.values(sessions)
-      .filter((s) => s && s.status !== "done")
-      .reduce((sum, s) => sum + (s.count || 0), 0);
-
-    const totalPrice = Object.values(sessions)
-      .filter((s) => s && s.status !== "done")
-      .reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-
-    await update(dbRef(db, `delivery_customers/${deliveryUid}`), {
-      itemCount: totalCount,
-      totalPrice: totalPrice,
-      updatedAt: Date.now(),
+    await runTransaction(dbRef(db, `delivery_customers/${deliveryUid}`), (current) => {
+      if (!current) return current;
+      return { ...recalculateDelivery(current), updatedAt: Date.now() };
     });
   } catch (e) {
     logger.error("recalcItemCount error:", e);
@@ -155,12 +144,14 @@ export async function recalcItemCount(deliveryUid) {
  * @param {string|null} ownerUid - UID or proxy UID
  * @param {string} videoId - Current video session ID
  * @param {Object|null} localStockData - Optional already-synced stockData from stockStore
+ * @param {Object|null} localBookingItems - Optional owner items grouped from the same stock snapshot
  */
 export async function syncDeliveryCustomerForOwner(
   ownerName,
   ownerUid = null,
   videoId = null,
   localStockData = null,
+  localBookingItems = null,
 ) {
   if (!ownerName || !videoId || videoId === "demo") return;
 
@@ -175,113 +166,23 @@ export async function syncDeliveryCustomerForOwner(
       stockData = stockSnap.val() || {};
     }
 
-    // 2. Count items and calculate total price for this customer in this video
-    let count = 0;
-    let totalPrice = 0;
-
-    Object.values(stockData).forEach((item) => {
-      if (
-        item &&
-        item.owner &&
-        normalizeCustomerName(item.owner) === normName
-      ) {
-        count += 1;
-        const parsedPrice = parseInt(item.price, 10);
-        totalPrice += isNaN(parsedPrice) ? 0 : parsedPrice;
-      }
-    });
-
-    // 3. Resolve canonical deliveryUid
+    const items = localBookingItems ?? bookingItems(stockData, ownerName);
     const deliveryUid = await resolveDeliveryUid(ownerUid, ownerName);
-    const customerRef = dbRef(db, `delivery_customers/${deliveryUid}`);
-    let existing =
-      _liveDeliveryCustomers && _liveDeliveryCustomers[deliveryUid] !== undefined
-        ? _liveDeliveryCustomers[deliveryUid]
-        : null;
-    if (!existing && !_liveDeliveryCustomers) {
-      const customerSnap = await get(customerRef);
-      existing = customerSnap.val();
+    let paymentType = "";
+    const normKey = normName.replace(/[.#$[\]/]/g, "_");
+    if (_liveAddressBook) {
+      paymentType = _liveAddressBook[normKey]?.paymentType || "";
+    } else if (Object.keys(items).length) {
+      const snapshot = await get(dbRef(db, `address_book/${normKey}`));
+      paymentType = snapshot.val()?.paymentType || "";
     }
-
-    // Guard: If customer has 0 items and does not exist in delivery_customers, no write needed
-    if (count === 0 && !existing) {
-      return;
-    }
-
-    // 4. Calculate total itemCount and totalPrice across active sessions
-    const currentSessions = { ...(existing?.sessions || {}) };
-    if (count > 0) {
-      currentSessions[videoId] = { count, totalPrice, status: "pending" };
-    } else {
-      delete currentSessions[videoId];
-    }
-
-    const activeSessions = Object.values(currentSessions).filter(
-      (s) => s && s.status !== "done"
-    );
-    const newTotalCount = activeSessions.reduce((sum, s) => sum + (s.count || 0), 0);
-    const newTotalPrice = activeSessions.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
     const now = Date.now();
-
-    if (count > 0) {
-      let prefilledPaymentType = "";
-      if (!existing || !existing.paymentType) {
-        try {
-          const normKey = normName.replace(/[.#$[\]/]/g, "_");
-          if (_liveAddressBook) {
-            prefilledPaymentType = _liveAddressBook[normKey]?.paymentType || "";
-          } else {
-            const bookSnap = await get(dbRef(db, `address_book/${normKey}`));
-            if (bookSnap.exists() && bookSnap.val()?.paymentType) {
-              prefilledPaymentType = bookSnap.val().paymentType;
-            }
-          }
-        } catch (e) {
-          logger.warn("deliverySync address_book lookup error:", e);
-        }
-      }
-
-      // Single atomic multi-path update for customer info + session info + item counts
-      const multiUpdates = {
-        name: ownerName.trim(),
-        itemCount: newTotalCount,
-        totalPrice: newTotalPrice,
-        updatedAt: now,
-        [`sessions/${videoId}`]: {
-          count,
-          totalPrice,
-          status: "pending",
-        },
-      };
-
-      if (!existing) {
-        multiUpdates.deliveryDate = null;
-        multiUpdates.note = "";
-        multiUpdates.paymentType = prefilledPaymentType;
-        multiUpdates.status = "pending";
-        multiUpdates.createdAt = now;
-      } else {
-        if (!existing.paymentType && prefilledPaymentType) {
-          multiUpdates.paymentType = prefilledPaymentType;
-        }
-        if (existing.status === "done") {
-          multiUpdates.status = "pending";
-          multiUpdates.deliveryDate = null; // ✅ Clear old delivery date
-          multiUpdates.labelPrinted = false; // ✅ Reset print status for new round
-          multiUpdates.labelPrintedAt = null;
-        }
-      }
-
-      await update(customerRef, multiUpdates);
-    } else {
-      // Count is 0 for this session: atomic multi-path update to remove session and update totals
-      await update(customerRef, {
-        itemCount: newTotalCount,
-        totalPrice: newTotalPrice,
-        updatedAt: now,
-        [`sessions/${videoId}`]: null,
-      });
-    }
+    await runTransaction(dbRef(db, `delivery_customers/${deliveryUid}`), current => {
+      const next = syncDeliverySession(current, { ownerName, videoId, items, paymentType, now: current?.updatedAt || now });
+      if (current && JSON.stringify(next) === JSON.stringify(current)) return;
+      if (next) next.updatedAt = now;
+      return next;
+    });
   } catch (e) {
     logger.error("syncDeliveryCustomerForOwner error:", e);
   }

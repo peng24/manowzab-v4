@@ -64,7 +64,7 @@
             <input
               type="email"
               v-model="email"
-              placeholder="peng24@gmail.com"
+              placeholder="admin@example.com"
               class="auth-input"
               :disabled="isLoading || isSuccess || authStore.isLockedOut"
               autocomplete="username"
@@ -118,8 +118,8 @@
             <i class="fa-solid fa-circle-check"></i>
           </span>
           <div class="badge-text-group">
-            <span class="badge-title">เข้าสู่ระบบถาวรบนอุปกรณ์นี้</span>
-            <span class="badge-sub">ไม่ต้องเข้าสู่ระบบซ้ำจนกว่าจะกดออกจากระบบ</span>
+            <span class="badge-title">จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</span>
+            <span class="badge-sub">ระบบจะตรวจสอบสิทธิ์ผู้ดูแลทุกครั้งที่เชื่อมต่อ</span>
           </div>
         </div>
 
@@ -177,7 +177,7 @@
       <div class="auth-footer">
         <p>
           <i class="fa-solid fa-shield-check"></i>
-          <span>ปกป้องด้วย SHA-256 One-Way Cryptographic Hash &bull; เฉพาะแอดมินเท่านั้น</span>
+          <span>ยืนยันตัวตนด้วย Firebase Authentication &bull; เฉพาะแอดมินเท่านั้น</span>
         </p>
       </div>
     </div>

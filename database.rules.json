@@ -2,57 +2,63 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "admin_users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous'",
+        ".write": false
+      }
+    },
     "system": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "stock": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "chats": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "delivery_customers": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "address_book": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "nicknames": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "settings": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "blacklist": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "voice_chats": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "history": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "notes": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "shipping": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     },
     "presence": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true",
+      ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && root.child('admin_users').child(auth.uid).val() === true"
     }
   }
 }

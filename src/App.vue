@@ -72,9 +72,8 @@ import { useSystemStore } from "./stores/system";
 import { useStockStore } from "./stores/stock";
 import { useChatStore } from "./stores/chat";
 import { useNicknameStore } from "./stores/nickname";
-import { ref as dbRef, onValue, onDisconnect, set, runTransaction } from "firebase/database";
-import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
-import { db, auth } from "./composables/useFirebase";
+import { ref as dbRef, onValue, onDisconnect, set, remove } from "firebase/database";
+import { db } from "./composables/useFirebase";
 import { logger } from "./utils/logger"; // ✅ Import Logger
 import { useAwayMode } from "./composables/useAwayMode";
 import { useAutoCleanup } from "./composables/useAutoCleanup"; // ✅ Import Auto Cleanup
@@ -89,6 +88,8 @@ import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Upda
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
 import { useVoiceLearningStore } from "./stores/voiceLearning";
 import { useCustomerStore } from "./stores/customer";
+import { syncDeliveryCustomerForOwner } from "./utils/deliverySync";
+import { useDeliveryReconciliation } from "./composables/useDeliveryReconciliation";
 import { useBlacklistStore } from "./stores/blacklist";
 import { useChatProcessor } from "./composables/useChatProcessor";
 
@@ -150,13 +151,13 @@ const { initManowPriceVoiceListener } = useChatProcessor();
 let voiceListenerUnsub = null;
 
 watch(
-  () => [systemStore.currentVideoId, systemStore.isPriceDetector],
-  ([vid, isDetector]) => {
+  () => [systemStore.currentVideoId, systemStore.isPriceDetector, authStore.isAuthenticated],
+  ([vid, isDetector, isAuth]) => {
     if (voiceListenerUnsub) {
       voiceListenerUnsub();
       voiceListenerUnsub = null;
     }
-    if (isDetector && vid && vid !== "demo") {
+    if (isAuth && isDetector && vid && vid !== "demo") {
       logger.info(`🎙️ [Active Price Detector] Starting voice listener for video: ${vid}`);
       voiceListenerUnsub = initManowPriceVoiceListener(vid);
     }
@@ -164,23 +165,16 @@ watch(
   { immediate: true }
 );
 
-onMounted(async () => {
-  logger.info("🚀 App mounted");
+let listenerGeneration = 0;
+function stopAppListeners() {
+  ++listenerGeneration;
+  cleanupFns.splice(0).forEach(fn => fn?.());
+  stockStore.stopStockSync();
+}
 
-  // 🤖 Test Mode: Auto-Login
-  const testEmail = import.meta.env.VITE_TEST_EMAIL;
-  const testPass = import.meta.env.VITE_TEST_PASSWORD;
-
-  if (testEmail && testPass && !auth.currentUser) {
-    logger.info("🤖 Test Mode Detected: Attempting Auto-Login...");
-    try {
-      await signInWithEmailAndPassword(auth, testEmail, testPass);
-      logger.info("✅ Auto-Login Success:", testEmail);
-    } catch (e) {
-      console.error("❌ Auto-Login Failed:", e.message);
-    }
-  }
-
+function startAppListeners() {
+  stopAppListeners();
+  const version = listenerGeneration;
   // ✅ Initialize Listeners (Capture cleanup functions)
   const unsubNick = nicknameStore.initNicknameListener();
   if (unsubNick) cleanupFns.push(unsubNick);
@@ -193,7 +187,8 @@ onMounted(async () => {
 
   // ✅ Auto Cleanup (Async initialization)
   initAutoCleanup().then((cleanup) => {
-    if (cleanup) cleanupFns.push(cleanup);
+    if (version !== listenerGeneration) cleanup?.();
+    else if (cleanup) cleanupFns.push(cleanup);
   });
 
   const unsubHost = systemStore.initHostListener(); // ✅ Init Host Listener
@@ -222,11 +217,10 @@ onMounted(async () => {
 
   // ✅ Track connection and auth state separately
   const isDbConnected = ref(false);
-  const isUserAuthenticated = ref(false);
 
   // ✅ Setup presence only when BOTH conditions are met
   function setupPresence() {
-    if (isDbConnected.value && isUserAuthenticated.value) {
+    if (isDbConnected.value && authStore.isAuthenticated) {
       const myConnectionRef = dbRef(db, `presence/${systemStore.myDeviceId}`);
       set(myConnectionRef, {
         online: true,
@@ -237,7 +231,12 @@ onMounted(async () => {
         systemStore.assignOptimalTtsKey();
       }).catch((err) => console.error("Presence error:", err));
 
-      onDisconnect(myConnectionRef).remove();
+      const disconnect = onDisconnect(myConnectionRef);
+      disconnect.remove().catch(err => logger.warn('Presence disconnect setup failed:', err));
+      cleanupFns.push(() => {
+        disconnect.cancel().catch(() => {});
+        remove(myConnectionRef).catch(() => {});
+      });
       logger.info("✅ Presence setup complete");
     }
   }
@@ -268,16 +267,6 @@ onMounted(async () => {
     }
   });
   cleanupFns.push(unsubConnected);
-
-  // ✅ Auth State Listener
-  const unsubAuth = onAuthStateChanged(auth, (user) => {
-    isUserAuthenticated.value = !!user;
-    logger.info(
-      `✅ Auth state changed: ${user ? "authenticated" : "not authenticated"}`,
-    );
-    setupPresence();
-  });
-  cleanupFns.push(unsubAuth);
 
   // System Listeners
   const unsubActiveVideo = onValue(dbRef(db, "system/activeVideo"), (snap) => {
@@ -314,9 +303,18 @@ onMounted(async () => {
 
   // ✅ stockSize listener is already handled inside connectToStock()
 
-  // ⌨️ Global Keyboard Hotkeys
+}
+
+onMounted(() => {
   window.addEventListener("keydown", handleGlobalHotkeys);
+  const stopAuthWatch = watch(() => authStore.isAuthenticated, allowed => {
+    if (allowed) startAppListeners();
+    else stopAppListeners();
+  }, { immediate: true });
+  // Keep the auth watcher outside the protected-listener cleanup list.
+  stopAuthWatchOnUnmount = stopAuthWatch;
 });
+let stopAuthWatchOnUnmount = null;
 
 function handleGlobalHotkeys(e) {
   const activeEl = document.activeElement;
@@ -342,7 +340,7 @@ function handleGlobalHotkeys(e) {
 
   // 2. Shift + M: Toggle Sound (Mute/Unmute)
   if (e.shiftKey && (e.key === "M" || e.key === "m")) {
-    systemStore.toggleAudio();
+    systemStore.isSoundOn = !systemStore.isSoundOn;
     e.preventDefault();
     return;
   }
@@ -381,7 +379,8 @@ onUnmounted(() => {
     voiceListenerUnsub();
     voiceListenerUnsub = null;
   }
-  cleanupFns.forEach((fn) => fn && fn());
+  stopAuthWatchOnUnmount?.();
+  stopAppListeners();
   if (typeof Swal !== "undefined" && Swal.isVisible()) {
     Swal.close();
   }
@@ -422,133 +421,15 @@ watch(
   }
 );
 
-// ✅ Centralized Delivery Customer Sync Watcher (Debounced for performance)
-let lastSessionCounts = {};
-let _deliverySyncVersion = 0;
-watch(
-  [() => stockStore.stockData, () => systemStore.currentVideoId],
-  async () => {
-    const myVersion = ++_deliverySyncVersion;
+// Reconcile only changed owners, with booking items grouped in one stock pass.
+useDeliveryReconciliation({
+  stock: () => stockStore.stockData,
+  customers: () => customerStore.deliveryCustomersRaw,
+  videoId: () => systemStore.currentVideoId,
+  authorized: () => authStore.isAuthenticated,
+  sync: syncDeliveryCustomerForOwner,
+});
 
-    // ✅ Debounce: wait 1s after last change to batch rapid stock updates
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // ✅ Skip if superseded by a newer invocation
-    if (myVersion !== _deliverySyncVersion) return;
-
-    // ✅ Read latest values after debounce
-    const newStockData = stockStore.stockData;
-    const videoId = systemStore.currentVideoId;
-
-    if (!videoId || videoId === "demo") {
-      lastSessionCounts = {};
-      return;
-    }
-
-    // 1. Calculate today's session counts per uid
-    const currentSessionCounts = {};
-    Object.keys(newStockData || {}).forEach((num) => {
-      const item = newStockData[num];
-      if (item?.uid) {
-        if (!currentSessionCounts[item.uid]) {
-          currentSessionCounts[item.uid] = { count: 0, totalPrice: 0 };
-        }
-        currentSessionCounts[item.uid].count++;
-        currentSessionCounts[item.uid].totalPrice += item.price ? parseInt(item.price) : 0;
-      }
-    });
-
-    // 2. Identify whose counts/prices changed
-    const allUids = new Set([
-      ...Object.keys(currentSessionCounts),
-      ...Object.keys(lastSessionCounts),
-    ]);
-
-    const changedUids = [];
-    allUids.forEach((uid) => {
-      const prev = lastSessionCounts[uid] || { count: 0, totalPrice: 0 };
-      const curr = currentSessionCounts[uid] || { count: 0, totalPrice: 0 };
-      if (prev.count !== curr.count || prev.totalPrice !== curr.totalPrice) {
-        changedUids.push(uid);
-      }
-    });
-
-    // Cache current counts immediately to avoid concurrent runs re-processing
-    lastSessionCounts = currentSessionCounts;
-
-    if (changedUids.length === 0) return;
-
-    // 3. Atomically update changed customers via transactions (skipping already-synced or non-existent UIDs)
-    const liveCustomers = customerStore.deliveryCustomersRaw || {};
-    for (const uid of changedUids) {
-      const existingCust = liveCustomers[uid];
-      // Skip if customer key doesn't exist in delivery_customers (e.g. proxy-xxx UID)
-      if (!existingCust) continue;
-
-      const newSession = currentSessionCounts[uid] || { count: 0, totalPrice: 0 };
-      const existingSess = existingCust.sessions?.[videoId];
-      // Skip if syncDeliveryCustomerForOwner already updated this session to the exact same count & totalPrice
-      if (
-        (newSession.count === 0 && !existingSess) ||
-        (existingSess &&
-          existingSess.count === newSession.count &&
-          (existingSess.totalPrice || 0) === newSession.totalPrice)
-      ) {
-        continue;
-      }
-
-      const customerRef = dbRef(db, `delivery_customers/${uid}`);
-
-      runTransaction(customerRef, (currentVal) => {
-        if (!currentVal) return currentVal; // Only sync customers already in delivery_customers
-
-        if (!currentVal.sessions) currentVal.sessions = {};
-
-        const prevSession = currentVal.sessions[videoId] || { count: 0, totalPrice: 0, status: "pending" };
-        const prevCount = prevSession.count || 0;
-        const prevPrice = prevSession.totalPrice || 0;
-        const prevStatus = prevSession.status || "pending";
-
-        // Abort transaction if another device/sync already wrote the exact same count & price
-        if (prevCount === newSession.count && prevPrice === newSession.totalPrice) {
-          return;
-        }
-
-        // Revert status to pending if the customer has booked a NEW item in this session (new count is greater than prev)
-        const isNewOrder = (prevStatus === "done" && newSession.count > prevCount) ||
-                           (prevStatus !== "done" && newSession.count > prevCount);
-
-        if (newSession.count === 0) {
-          delete currentVal.sessions[videoId];
-        } else {
-          currentVal.sessions[videoId] = {
-            count: newSession.count,
-            totalPrice: newSession.totalPrice,
-            status: isNewOrder ? "pending" : prevStatus
-          };
-        }
-
-        // Revert status to pending if they placed a new order (Disabled to prevent booking customers from showing up in shipping list)
-        // if (isNewOrder) {
-        //   currentVal.status = "pending";
-        // }
-
-        // Recalculate totals (excluding sessions that are already marked done)
-        const allSessions = currentVal.sessions || {};
-        currentVal.itemCount = Object.values(allSessions)
-          .filter(s => s.status !== "done")
-          .reduce((sum, s) => sum + (s.count || 0), 0);
-        currentVal.totalPrice = Object.values(allSessions)
-          .filter(s => s.status !== "done")
-          .reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-        currentVal.updatedAt = Date.now();
-
-        return currentVal;
-      }).catch((err) => console.error(`Error updating delivery customer ${uid} via transaction:`, err));
-    }
-  },
-  { deep: true }
-);
 </script>
 
 <style>

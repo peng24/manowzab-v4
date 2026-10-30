@@ -732,7 +732,7 @@ async function handleLogout() {
   });
 
   if (res.isConfirmed) {
-    authStore.logout();
+    await authStore.logout();
     Swal.fire({
       toast: true,
       position: "top-end",

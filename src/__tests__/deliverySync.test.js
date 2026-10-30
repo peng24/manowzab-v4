@@ -7,6 +7,7 @@ vi.mock("firebase/database", () => ({
   get: vi.fn(),
   update: vi.fn().mockResolvedValue(true),
   remove: vi.fn().mockResolvedValue(true),
+  runTransaction: vi.fn(),
 }));
 
 // Mock Firebase config
@@ -39,45 +40,30 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
 
   describe("recalcItemCount done status handling", () => {
     it("excludes done sessions when recalculating active itemCount", async () => {
-      const { get, update } = await import("firebase/database");
+      const { runTransaction } = await import("firebase/database");
       
-      get.mockResolvedValueOnce({
-        val: () => ({
+      let result;
+      runTransaction.mockImplementationOnce(async (_ref, transition) => {
+        result = transition({ sessions: {
           session_1: { count: 3, totalPrice: 300, status: "done" },
           session_2: { count: 2, totalPrice: 200, status: "pending" },
-        })
+        } });
       });
-
       await recalcItemCount("customer-123");
-
-      expect(update).toHaveBeenCalledWith(
-        "delivery_customers/customer-123",
-        expect.objectContaining({
-          itemCount: 2,
-          totalPrice: 200,
-        })
-      );
+      expect(result).toMatchObject({ itemCount: 2, totalPrice: 200 });
     });
 
     it("resets itemCount to 0 when all sessions are done", async () => {
-      const { get, update } = await import("firebase/database");
-      
-      get.mockResolvedValueOnce({
-        val: () => ({
+      const { runTransaction } = await import("firebase/database");
+      let result;
+      runTransaction.mockImplementationOnce(async (_ref, transition) => {
+        result = transition({ sessions: {
           session_1: { count: 3, totalPrice: 300, status: "done" },
           session_2: { count: 5, totalPrice: 500, status: "done" },
-        })
+        } });
       });
-
       await recalcItemCount("customer-456");
-
-      expect(update).toHaveBeenCalledWith(
-        "delivery_customers/customer-456",
-        expect.objectContaining({
-          itemCount: 0,
-          totalPrice: 0,
-        })
-      );
+      expect(result).toMatchObject({ itemCount: 0, totalPrice: 0 });
     });
 
     it("handles undefined note field safely without throwing Firebase update error", () => {
@@ -256,35 +242,18 @@ describe("Delivery Sync & Customer Item Count Logic", () => {
       expect(vasina.items).toEqual(["1", "3", "4", "6", "15", "17", "22"]);
     });
 
-    it("respects explicitly passed empty stockData ({}) in syncDeliveryCustomerForOwner without re-fetching stock from Firebase", async () => {
-      const { get, update } = await import("firebase/database");
+    it("respects explicitly passed empty stockData ({}) without re-fetching stock", async () => {
+      const { get, runTransaction } = await import("firebase/database");
       const { syncDeliveryCustomerForOwner, setLiveDeliveryCustomersCache } = await import("../utils/deliverySync");
-
-      setLiveDeliveryCustomersCache({
-        UC_TEST_1: {
-          uid: "UC_TEST_1",
-          name: "สมศรี",
-          status: "pending",
-          itemCount: 2,
-          totalPrice: 200,
-          sessions: {
-            vid_live_1: { count: 2, totalPrice: 200, status: "pending" },
-          },
-        },
-      });
-
+      const customer = { name: "สมศรี", status: "pending", itemCount: 2, sessions: {
+        vid_live_1: { count: 2, totalPrice: 200, status: "pending" },
+      } };
+      setLiveDeliveryCustomersCache({ UC_TEST_1: customer });
+      let result;
+      runTransaction.mockImplementationOnce(async (_ref, transition) => { result = transition(customer); });
       await syncDeliveryCustomerForOwner("สมศรี", "UC_TEST_1", "vid_live_1", {});
-
-      // Should NOT have called get(dbRef(db, 'stock/vid_live_1')) because {} was explicitly provided
       expect(get).not.toHaveBeenCalledWith("stock/vid_live_1");
-      expect(update).toHaveBeenCalledWith(
-        "delivery_customers/UC_TEST_1",
-        expect.objectContaining({
-          itemCount: 0,
-          totalPrice: 0,
-        }),
-      );
-
+      expect(result).toMatchObject({ itemCount: 0, totalPrice: 0 });
       setLiveDeliveryCustomersCache(null);
     });
 

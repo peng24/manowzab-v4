@@ -225,6 +225,7 @@
 </template>
 
 <script setup>
+import { isOutstandingBooking } from "../utils/deliveryState";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
@@ -232,7 +233,7 @@ import { useChatStore } from "../stores/chat";
 import { ref as dbRef, onValue, update, push, get } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
-import { resolveDeliveryUid, recalcItemCount, normalizeCustomerName, isProxyUid } from "../utils/deliverySync";
+import { syncDeliveryCustomerForOwner, normalizeCustomerName, isProxyUid, resolveDeliveryUid } from "../utils/deliverySync";
 import { sanitizeDbKey } from "../utils/dbUtils";
 import { logger } from "../utils/logger";
 
@@ -254,6 +255,9 @@ const userChatHistory = ref([]);
 let historyScrollTimer = null;
 
 // Calculate customer orders (Unify by normalized customer name so mixed proxy/UID bookings merge into 1 customer)
+const deliveryByName = computed(() => Object.fromEntries(Object.values(deliveryCustomers.value)
+  .filter(c => c?.name).map(c => [normalizeCustomerName(c.name), c])));
+
 const customerOrders = computed(() => {
   const orders = {};
 
@@ -261,6 +265,8 @@ const customerOrders = computed(() => {
     const item = stockStore.stockData[num];
     if (item && item.owner) {
       const normName = normalizeCustomerName(item.owner);
+      const delivery = deliveryByName.value[normName];
+      if (!isOutstandingBooking(delivery?.sessions?.[systemStore.currentVideoId], num, item)) return;
       // Group key: Use normalized customer name so ALL items of this person merge into one order!
       const groupKey = normName ? `name:${normName}` : (item.uid || `box-${num}`);
 
@@ -497,47 +503,7 @@ function isProxyGroupKey(uid) {
 
 // ✅ Auto-sync ลูกค้าคนเดียว
 async function syncCustomerToDelivery(uid, name, order, videoId) {
-  // ✅ Resolve proxy group keys ให้เป็น key จริงก่อน sync
-  const deliveryUid = await resolveDeliveryUid(uid, name);
-
-  const sessionData = {
-    count: order.items.length,
-    totalPrice: order.totalPrice,
-    status: "pending", // explicitly set session status to pending when syncing/adding
-  };
-
-  // Create/update customer base info
-  const customerRef = dbRef(db, `delivery_customers/${deliveryUid}`);
-  const snap = await get(customerRef);
-  const existing = snap.val();
-
-  if (!existing) {
-    // New customer
-    await update(customerRef, {
-      name: name ? name.trim() : "",
-      deliveryDate: null,
-      note: "",
-      status: "pending",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
-  } else {
-    // Existing — update name + timestamp, keep status if not done
-    const updates = { name: name ? name.trim() : existing.name, updatedAt: Date.now() };
-    if (existing.status === "done") {
-      updates.status = "pending";
-      updates.deliveryDate = null; // ✅ Clear old delivery date so customer goes to "ฝากสินค้า" tab, not "แจ้งส่ง"
-      updates.labelPrinted = false; // ✅ Reset print status for new round
-      updates.labelPrintedAt = null;
-    }
-    await update(customerRef, updates);
-  }
-
-  // Save session breakdown
-  await update(dbRef(db, `delivery_customers/${deliveryUid}/sessions/${videoId}`), sessionData);
-
-  // Recalculate total itemCount
-  await recalcItemCount(deliveryUid);
+  await syncDeliveryCustomerForOwner(name, uid, videoId, stockStore.stockData);
 }
 
 // ✅ Sync ทั้งรายการ shipping list ไป delivery_customers

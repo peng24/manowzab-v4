@@ -18,6 +18,23 @@
 export const changelog = [
   // ─── 5.4.x ───────────────────────────────────────────
   {
+    version: '5.4.14',
+    date: '2026-10-30',
+    changes: {
+      fixed: [
+        'เปลี่ยนการเข้าสู่ระบบเป็น Firebase Email/Password พร้อมตรวจสิทธิ์ผู้ดูแลจากฐานข้อมูล และหยุดการรับข้อมูลเมื่อออกจากระบบหรือถูกถอนสิทธิ์ ผู้ดูแลต้องใช้บัญชี Firebase ที่ได้รับสิทธิ์แทนรหัสผ่านเดิม',
+        'แก้ไขการยืนยันส่งและย้อนรายการส่งซ้ำจากหลายเครื่อง ด้วย transaction เดียวกันทั้งสองหน้าจัดส่ง พร้อมเก็บยอดสะสมและคืนเฉพาะรอบล่าสุด',
+        'แก้ไขการเปลี่ยนราคาหรือข้อมูลลูกค้าแล้วรายการที่ส่งแล้วกลับมาค้างส่ง และป้องกันยอดรวมผิดเมื่อหลายไลฟ์ซิงก์พร้อมกัน',
+        'แก้ไขการเพิ่มลูกค้าแบบจองแทนในหน้าคิวจัดส่ง และให้คำตอบอัจฉริยะอัปเดตราคากับที่อยู่หลังแก้ไข',
+      ],
+      improved: [
+        'ลดงานซิงก์จัดส่งให้ทำเฉพาะลูกค้าที่รายการจองเปลี่ยน การเพิ่มคิวสำรองไม่กระตุ้นงานซิงก์จัดส่งซ้ำ พร้อมคงการรับข้อมูลเรียลไทม์ทุกเครื่อง',
+        'แคชคำตอบอัจฉริยะตามข้อความและข้อมูลล่าสุด ลดการคำนวณซ้ำระหว่างแสดงการ์ดและแถบปักหมุด โดยยังอัปเดตตามสต็อก ที่อยู่ และ Blacklist',
+        'เพิ่มชุดทดสอบ Firebase emulator และ benchmark สำหรับตรวจสิทธิ์ การจอง คิว การจัดส่งพร้อมกัน และประสิทธิภาพ',
+      ],
+    },
+  },
+  {
     version: '5.4.13',
     date: '2026-10-28',
     changes: {
@@ -295,22 +312,6 @@ export const changelog = [
       ],
       removed: [
         'ขจัดไฟล์ค่าคงที่ซ้ำซ้อน (Constants Deduplication) — ลบไฟล์ src/constants.js และรวมศูนย์การเรียกใช้ที่ src/config/constants.js เป็นมาตรฐานเดียวทั่วทั้งโปรเจกต์',
-      ],
-    },
-  },
-  // ─── 5.0.x ───────────────────────────────────────────
-  {
-    version: '5.0.3',
-    date: '2026-10-09',
-    changes: {
-      improved: [
-        'เพิ่มประสิทธิภาพความเร็ว LCP (Largest Contentful Paint Optimization) — เพิ่ม Resource Hints Preconnect และ DNS-Prefetch สำหรับ Google Fonts และ CDN, นำการโหลดฟอนต์ผ่าน CSS @import ออกเพื่อตัด Request Waterfall, และปรับการโหลด Font Awesome เป็นแบบ Asynchronous',
-        'การแยกส่วนโมดูลอัจฉริยะ (On-Demand Code Splitting via defineAsyncComponent) — ปรับปรุงการโหลด AuthGate, CustomerQuickEditModal, AddressImportModal, ShippingLabelModal, และ HistoryModal เป็น Lazy Loading แบบไดนามิก ส่งผลให้ Main Bundle เบาลงอย่างเห็นได้ชัดและลดเวลา Total Blocking Time (TBT)',
-      ],
-      fixed: [
-        'กำจัดความเสี่ยง Memory Leaks จาก SweetAlert2 และ Unmounted Components — บังคับปิดหน้าต่างป๊อปอัป Swal.close() อัตโนมัติเมื่อคอมโพเนนต์ถูก Unmount ป้องกันการรั่วไหลของ DOM และ Event Listener',
-        'ระบบทำความสะอาดตัวจับเวลาและ Listeners เมื่อออกจากระบบ (Complete Timer & Auth Lifecycle Cleanup) — ตรวจสอบและเคลียร์ setTimeout/setInterval ที่ตกหล่นทั้งหมด (pulsing percent, new orders timers, highlight timeout, autocomplete blur, pull-to-refresh reset, chat scroll) พร้อมตัดการเชื่อมต่อ Firebase Listeners และรีเซ็ตสถานะ Presence ทันทีเมื่อผู้ใช้กด Log out',
-        'ปรับปรุงประสิทธิภาพแคชข้อความแชท (FIFO Key Trimming Queue) — เปลี่ยนการตัด ID แชทที่ซ้ำซ้อนใน chat.js ให้เป็นระบบคิว FIFO ลดภาระการสร้างอาร์เรย์ Object.keys() ซ้ำๆ เพื่อกำจัด GC (Garbage Collection) Thrashing',
       ],
     },
   },

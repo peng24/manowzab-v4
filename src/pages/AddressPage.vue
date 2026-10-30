@@ -774,7 +774,7 @@ async function handleLogout() {
     if (typeof Swal !== "undefined" && Swal.isVisible()) {
       Swal.close();
     }
-    authStore.logout();
+    await authStore.logout();
   }
 }
 

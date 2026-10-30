@@ -344,9 +344,10 @@
 import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from "vue";
 import { useAuthStore } from "../stores/auth";
 const AuthGate = defineAsyncComponent(() => import("../components/AuthGate.vue"));
-import { ref as dbRef, onValue, update, remove, runTransaction } from "firebase/database";
+import { ref as dbRef, onValue, update, remove } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
+import { markDone, undoDone } from "../utils/deliveryActions";
 import ThaiDatePicker from "../components/ThaiDatePicker.vue";
 
 let refreshTimer = null;
@@ -408,7 +409,7 @@ async function handleLogout() {
     if (typeof Swal !== "undefined" && Swal.isVisible()) {
       Swal.close();
     }
-    authStore.logout();
+    await authStore.logout();
     Swal.fire({
       toast: true,
       position: "top-end",
@@ -929,39 +930,6 @@ function updateField(id, field, value) {
   }
 }
 
-function markDone(customer) {
-  Swal.fire({
-    title: `"${customer.name}" ส่งเสร็จ?`,
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "ยืนยัน",
-    cancelButtonText: "ยกเลิก",
-    confirmButtonColor: "#10b981",
-  }).then(async (r) => {
-    if (r.isConfirmed) {
-      const currentCount = customer.itemCount || 0;
-      if (currentCount > 0) {
-        const totalRef = dbRef(db, `delivery_customers/${customer.id}/totalBookings`);
-        await runTransaction(totalRef, (currentTotal) => (currentTotal || 0) + currentCount);
-      }
-      const updates = {
-        status: "done",
-        itemCount: 0,
-        labelPrinted: false,
-        labelPrintedAt: null,
-        updatedAt: Date.now(),
-      };
-      if (customer.sessions) {
-        Object.keys(customer.sessions).forEach((vid) => {
-          updates[`sessions/${vid}/status`] = "done";
-        });
-      }
-      await update(dbRef(db, `delivery_customers/${customer.id}`), updates);
-      Swal.fire({ icon: "success", title: "เสร็จ!", toast: true, position: "top-end", timer: 1200, showConfirmButton: false });
-    }
-  });
-}
-
 function openPrintForCustomer(customer) {
   selectedCustomerForPrint.value = customer.id;
   showShippingLabels.value = true;
@@ -1215,19 +1183,6 @@ async function toggleContactChannel(customer) {
   } catch (err) {
     console.error("Failed to toggle contactChannel:", err);
   }
-}
-
-function undoDone(customer) {
-  const updates = { status: "pending", updatedAt: Date.now() };
-  if (customer.sessions) {
-    Object.keys(customer.sessions).forEach((vid) => {
-      updates[`sessions/${vid}/status`] = "pending";
-    });
-  }
-  const allSessions = customer.sessions || {};
-  updates.itemCount = Object.values(allSessions).reduce((sum, s) => sum + (s.count || 0), 0);
-  updates.totalPrice = Object.values(allSessions).reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-  update(dbRef(db, `delivery_customers/${customer.id}`), updates);
 }
 
 function deleteCustomer(id, name) {

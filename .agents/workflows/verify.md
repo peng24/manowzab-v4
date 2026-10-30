@@ -302,3 +302,27 @@ description: Mandatory verification checklist after every code change
    📋 อัปเดตกฎ & /verify — (ระบุรายการกฎและ /verify ที่อัปเดต หรือระบุว่าตรวจสอบแล้วเป็นปัจจุบัน)
    ```
 
+
+## 🔐 21. Firebase Authentication & Atomic Delivery Cycles (2026-10-30)
+
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
+|---|---|---|---|
+| 21.1 | Firebase identity + administrator grants | `auth.js`, `useFirebase.js`, `database.rules.json` | ไม่ยอมรับ session ที่สร้างใน browser หรือ anonymous user; อ่าน/เขียนข้อมูลธุรกิจได้เฉพาะ UID ที่มี `admin_users/<UID> = true`; client แก้ grant ไม่ได้ |
+| 21.2 | Login lifecycle | `App.vue`, `authStore.test.js` | เริ่ม listeners หลังตรวจสิทธิ์; logout/revoke หยุด listeners และ sign out จริง; countdown lockout ลดและปลดล็อกได้; ห้ามฝังรหัสผ่านใน `VITE_*` |
+| 21.3 | Shared complete/undo transactions | `deliveryActions.js`, `deliveryState.js` | ทั้งหน้าต่างจัดส่งและหน้า shipping ใช้ helper เดียวกัน; สองเครื่องยืนยัน/ย้อนรอบเดียวกันได้เพียงครั้งเดียว; ปรับ status, sessions และ totalBookings ใน transaction เดียว |
+| 21.4 | Shipped-item tracking and legacy records | `deliveryState.test.js`, `deliveryActions.test.js` | แก้ราคา/ชื่อ/UID ไม่ปลุกรายการส่งแล้ว; จองใหม่ในไลฟ์เดิมนับเฉพาะของใหม่; คืนได้เฉพาะรอบล่าสุดโดยคงรายการใหม่ไว้; ข้อมูลเก่าที่มี cycle metadata และประวัติ stock ที่ถูกล้างแล้วยังใช้งานได้ |
+| 21.5 | Canonical delivery sync | `deliverySync.js`, `App.vue`, `Dashboard.vue`, `HistoryModal.vue` | ทุก writer ใช้ transaction helper กลาง; sync คนละ session พร้อมกันแล้วยอดรวมถูกต้อง; เก็บ fulfilledItems และ undo snapshot ไว้; ไม่เขียนซ้ำเมื่อค่าไม่เปลี่ยน |
+| 21.6 | Firebase data representation | `deliveryState.test.js`, `scripts/verify-firebase.mjs` | รองรับ numeric-key maps ที่ Firebase คืนเป็น sparse/JSON arrays และลำดับ field ต่างกัน; ตรวจ state ฝั่ง server แยกจาก client cache ที่ตามหลังอีกเครื่องได้ |
+| 21.7 | Python transcriber auth | `yt_transcriber.py`, `scripts/test_transcriber_auth.py` | ใช้บัญชีที่ได้รับสิทธิ์ผ่านตัวแปรฝั่ง Python ที่ไม่มี VITE_ เท่านั้น; ไม่ reuse token ที่หมดอายุ และไม่ส่ง transcript หากไม่มี token |
+| 21.8 | Verification scope | `docs/verification-2026-10-30.md` | รัน npm test, test:transcriber, build และ test:firebase กับ Emulator; แยกผล automated ออกจาก live YouTube, เสียงจริง/iOS และเครื่องพิมพ์จริง ห้ามรายงานว่าทดสอบฮาร์ดแวร์แล้วจาก unit tests |
+
+## ⚡ 22. Selective Reconciliation & Reactive Answer Cache (2026-10-30)
+
+| # | Function | Files | Required verification |
+|---|---|---|---|
+| 22.1 | Selective delivery sync | `useDeliveryReconciliation.js`, `deliveryReconciliation.test.js` | 300 owners: initial 300 calls, one price edit 1 call, queue-only edit 0 calls; prepared items equal canonical bookingItems; preserve atomic delivery guards |
+| 22.2 | Cancellation/lifecycle | `deliveryReconciliation.test.js` | Sync old and promoted owners, remove last booking, group normalized names, repair late-arriving sessions, cancel timers on logout/unmount and reset on video/login changes |
+| 22.3 | Reactive Smart Answer cache | `useSmartAnswerLookup.js`, `smartAnswerLookup.test.js`, `ChatPanel.vue` | Repeated reads resolve once; nested price edits, chat edits and replaced address/customer snapshots refresh answers; live ban/buy/cancel suppress cards; full answer invalidates row v-memo |
+| 22.4 | Reproducible performance evidence | `scripts/benchmark-performance.mjs`, `docs/performance-2026-10-30.md` | Run npm run benchmark:performance; distinguish synthetic call counts/timings, local login production trace and development dashboard interaction samples from field/device results |
+| 22.5 | Dashboard proxy shipping | `Dashboard.vue` | resolveDeliveryUid is imported and proxy customer can be added to shipping using its canonical key without ReferenceError |
+

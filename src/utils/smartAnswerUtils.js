@@ -15,6 +15,7 @@ import {
   backdatedNoteRegex,
 } from "./chatParserUtils";
 import { normalizeCustomerName, isProxyUid } from "./deliverySync";
+import { isOutstandingBooking } from "./deliveryState";
 
 // ── Pre-compiled Module-Scope Regexes (Zero Catastrophic Backtracking) ──
 
@@ -370,8 +371,11 @@ export function getCustomerStoredPortfolio(
     pastPrice = Math.max(0, (deliveryRecord.totalPrice || 0) - todayPrice);
   }
 
-  const totalAccumulatedCount = todayOwned.length + pastCount;
-  const totalAccumulatedPrice = todayPrice + pastPrice;
+  // Today's sales remain visible, while accumulated goods exclude shipped bookings.
+  const pendingToday = todayOwned.filter(item =>
+    isOutstandingBooking(deliveryRecord?.sessions?.[currentVideoId], String(item.id), stockData[item.id]));
+  const totalAccumulatedCount = pendingToday.length + pastCount;
+  const totalAccumulatedPrice = pendingToday.reduce((sum, item) => sum + item.price, 0) + pastPrice;
   const deliveryDate = isActiveDelivery ? deliveryRecord.deliveryDate || null : null;
   const totalBookings = deliveryRecord?.totalBookings || 0;
 

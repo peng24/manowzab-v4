@@ -399,12 +399,13 @@
 </template>
 
 <script setup>
+import { isOutstandingBooking } from "../utils/deliveryState";
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { useHistory } from "../composables/useHistory";
 import { ref as dbRef, onValue, get, remove, update, runTransaction, set } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
-import { normalizeCustomerName, isProxyUid } from "../utils/deliverySync";
+import { normalizeCustomerName, isProxyUid, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
 import { formatBackdatedDetail, formatNormalBookingTime, getBookingTooltip } from "../utils/timeFormatUtils";
 import Swal from "sweetalert2";
 
@@ -703,13 +704,13 @@ function formatCurrency(val) {
 // Scoped Owner count badge (👗 N ตัว)
 const ownerItemCounts = computed(() => {
   const counts = {};
-  if (!selectedItem.value || !selectedItem.value.orders) return counts;
-  Object.values(selectedItem.value.orders).forEach((item) => {
-    if (item.owner) {
-      const norm = normalizeCustomerName(item.owner);
-      if (norm) counts[norm] = (counts[norm] || 0) + 1;
-      counts[item.owner] = (counts[item.owner] || 0) + 1;
-    }
+  const customersByName = Object.fromEntries(deliveryCustomers.value.map(c => [normalizeCustomerName(c.name), c]));
+  Object.entries(selectedItem.value?.orders || {}).forEach(([id, item]) => {
+    if (!item?.owner) return;
+    const norm = normalizeCustomerName(item.owner);
+    const customer = customersByName[norm];
+    if (!isOutstandingBooking(customer?.sessions?.[selectedId.value], id, item)) return;
+    if (norm) counts[norm] = (counts[norm] || 0) + 1;
   });
   return counts;
 });
@@ -980,58 +981,21 @@ async function updateDeliveryAndHistoryTotals(videoId) {
       }
     });
 
-    const multiPathUpdates = {};
-
-    Object.keys(deliveryData).forEach((custKey) => {
-      const cust = deliveryData[custKey];
-      const hasSession = cust.sessions && cust.sessions[videoId];
-      const normCustName = normalizeCustomerName(cust.name);
-      const matchKey = Object.keys(sessionCounts).find((k) => {
-        const stats = sessionCounts[k];
-        return (
-          (normCustName && k === normCustName) ||
-          (cust.uid && (k === cust.uid || stats.uid === cust.uid)) ||
-          (normCustName && normalizeCustomerName(stats.name) === normCustName)
-        );
-      });
-
-      const updatedSessions = { ...(cust.sessions || {}) };
-
-      if (matchKey) {
-        const stats = sessionCounts[matchKey];
-        const currentSessionStatus = hasSession
-          ? cust.sessions[videoId].status || "pending"
-          : "pending";
-
-        const newSession = {
-          count: stats.count,
-          totalPrice: stats.totalPrice,
-          status: currentSessionStatus,
-        };
-        updatedSessions[videoId] = newSession;
-        multiPathUpdates[`delivery_customers/${custKey}/sessions/${videoId}`] = newSession;
-      } else if (hasSession) {
-        delete updatedSessions[videoId];
-        multiPathUpdates[`delivery_customers/${custKey}/sessions/${videoId}`] = null;
+    // Reuse the same transaction as live bookings; retain shipped-item identities.
+    const owners = new Map(Object.values(sessionCounts).map(stats => [normalizeCustomerName(stats.name), stats]));
+    Object.entries(deliveryData).forEach(([uid, customer]) => {
+      if (customer.sessions?.[videoId] && !owners.has(normalizeCustomerName(customer.name))) {
+        owners.set(normalizeCustomerName(customer.name), { name: customer.name, uid });
       }
-
-      // Compute total itemCount & totalPrice in memory directly
-      const activeSessions = Object.values(updatedSessions).filter(
-        (s) => s && s.status !== "done"
-      );
-      const totalCount = activeSessions.reduce((sum, s) => sum + (s.count || 0), 0);
-      const totalAmount = activeSessions.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
-
-      multiPathUpdates[`delivery_customers/${custKey}/itemCount`] = totalCount;
-      multiPathUpdates[`delivery_customers/${custKey}/totalPrice`] = totalAmount;
-      multiPathUpdates[`delivery_customers/${custKey}/updatedAt`] = Date.now();
     });
-
+    await Promise.all(Array.from(owners.values(), ({ name, uid }) =>
+      syncDeliveryCustomerForOwner(name, uid, videoId, allStock)));
+    const multiPathUpdates = {};
     multiPathUpdates[`history/${videoId}/totalSales`] = totalSales;
     multiPathUpdates[`history/${videoId}/totalItems`] = totalItems;
     multiPathUpdates[`history/${videoId}/lastUpdated`] = Date.now();
 
-    // ⚡ Execute single batched write operation (1 Network Request instead of 200+)
+    // Sales history remains a single multi-path write.
     if (Object.keys(multiPathUpdates).length > 0) {
       await update(dbRef(db), multiPathUpdates);
     }
@@ -1278,11 +1242,12 @@ function updateOwnerItemsModal() {
   const ownerName = activeOwnerName.value;
   const videoId = selectedId.value;
 
+  const customer = deliveryCustomers.value.find(c => normalizeCustomerName(c.name) === normalizeCustomerName(ownerName));
   const currentItems = [];
   if (selectedItem.value && selectedItem.value.orders) {
     Object.keys(selectedItem.value.orders).forEach((num) => {
       const item = selectedItem.value.orders[num];
-      if (item.owner === ownerName) {
+      if (item.owner === ownerName && isOutstandingBooking(customer?.sessions?.[videoId], num, item)) {
         currentItems.push({
           num: parseInt(num),
           price: item.price || 0,
@@ -1519,7 +1484,7 @@ async function showOwnerItems(ownerName) {
 
         Object.keys(stockData).forEach((num) => {
           const item = stockData[num];
-          if (item.owner === ownerName || (item.uid && cust.uid && item.uid === cust.uid)) {
+          if ((item.owner === ownerName || (item.uid && cust.uid && item.uid === cust.uid)) && isOutstandingBooking(cust.sessions?.[vid], num, item)) {
             fetchedPastItems.push({
               num: parseInt(num),
               price: item.price || 0,

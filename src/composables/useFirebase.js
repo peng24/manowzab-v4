@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getDatabase } from "firebase/database";
-import { getAuth, signInAnonymously } from "firebase/auth";
+import { getDatabase, connectDatabaseEmulator } from "firebase/database";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,10 +13,15 @@ const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
 export const auth = getAuth(app);
 
+// Development-only, isolated integration tests. Production builds ignore this flag.
+if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true") {
+  connectDatabaseEmulator(db, '127.0.0.1', 9009);
+  connectAuthEmulator(auth, 'http://127.0.0.1:9098', { disableWarnings: true });
+}
+
 import { ref as dbRef, update } from "firebase/database";
 
-// Auto Sign In
-signInAnonymously(auth).catch(console.error);
+// Authentication is established by the auth store after an explicit login.
 
 /**
  * Perform an atomic multi-path update at root database reference.

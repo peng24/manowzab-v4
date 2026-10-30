@@ -512,7 +512,8 @@ import {
 import { parseYouTubeEmotesToRuns, hasYouTubeEmotes } from "../data/youtubeEmotes";
 import { logger } from "../utils/logger";
 import { normalizeName } from "../utils/addressParser";
-import { resolveSmartAnswer, isSmartQuestionText } from "../utils/smartAnswerUtils";
+import { isSmartQuestionText } from "../utils/smartAnswerUtils";
+import { useSmartAnswerLookup } from "../composables/useSmartAnswerLookup";
 
 const chatStore = useChatStore();
 const stockStore = useStockStore();
@@ -713,22 +714,18 @@ const pinnedSmartHud = ref(null);
 let pinnedHudTimer = null;
 let lastEvaluatedHudMsgId = null;
 
-function getSmartAnswer(chat) {
-  if (!chat || !chat.text) return null;
-  if (isBannedUser(chat)) return null;
-  if (chat.type === "buy" || chat.type === "cancel") return null;
-
-  return resolveSmartAnswer(chat, {
+const getSmartAnswer = useSmartAnswerLookup(() => ({
     stockData: stockStore.stockData,
     deliveryByNormKey: deliveryCustomers.value,
     addressBook: addressBook.value,
     currentVideoId: systemStore.currentVideoId,
-  });
-}
+  }), isBannedUser);
 
 function getSmartAnswerKey(chat) {
   const ans = getSmartAnswer(chat);
-  return ans ? ans.fingerprint : "";
+  // Address previews and item prices can change without changing the category's
+  // concise fingerprint. Include the complete answer so v-memo cannot hide edits.
+  return ans ? JSON.stringify(ans) : "";
 }
 
 const activePinnedAnswer = computed(() => {

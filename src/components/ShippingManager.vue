@@ -520,12 +520,13 @@
 
 <script setup>
 import { ref, computed, inject, onMounted, onUnmounted, watch, defineAsyncComponent } from "vue";
-import { ref as dbRef, onValue, update, remove, get, runTransaction } from "firebase/database";
+import { ref as dbRef, onValue, update, remove, get } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useCustomerStore } from "../stores/customer";
 import Swal from "sweetalert2";
+import { markDone, undoDone } from "../utils/deliveryActions";
 import ThaiDatePicker from "./ThaiDatePicker.vue";
 
 // 🚀 Performance: Lazy load modals on demand
@@ -1066,52 +1067,6 @@ function updateField(id, field, value) {
   }
 }
 
-function markDone(customer) {
-  Swal.fire({
-    title: `ส่งของ "${customer.name}" เสร็จแล้ว?`,
-    text: "สถานะจะเปลี่ยนเป็นเสร็จ + reset sessions",
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "ยืนยัน",
-    cancelButtonText: "ยกเลิก",
-    confirmButtonColor: "#10b981",
-  }).then(async (r) => {
-    if (r.isConfirmed) {
-      // ✅ สะสม totalBookings ก่อน reset (Lifetime booking count)
-      const currentCount = customer.itemCount || 0;
-      if (currentCount > 0) {
-        const totalRef = dbRef(db, `delivery_customers/${customer.id}/totalBookings`);
-        await runTransaction(totalRef, (currentTotal) => {
-          return (currentTotal || 0) + currentCount;
-        });
-      }
-
-      // ✅ บันทึกรายการ sessions ที่เพิ่งปิดในรอบนี้ เพื่อให้กดปุ่มย้อน (undoDone) แล้วกู้คืนเฉพาะรอบปัจจุบันและหัก totalBookings กลับได้อย่างถูกต้อง
-      const doneSessionIds = [];
-      const updates = {
-        status: "done",
-        itemCount: 0,
-        lastDoneCount: currentCount,
-        labelPrinted: false,
-        labelPrintedAt: null,
-        updatedAt: Date.now(),
-      };
-      if (customer.sessions) {
-        Object.keys(customer.sessions).forEach((vid) => {
-          if (customer.sessions[vid]?.status !== "done") {
-            doneSessionIds.push(vid);
-          }
-          updates[`sessions/${vid}/status`] = "done";
-        });
-      }
-      updates.lastDoneSessions = doneSessionIds.length > 0 ? doneSessionIds : null;
-
-      await update(dbRef(db, `delivery_customers/${customer.id}`), updates);
-      Swal.fire({ icon: "success", title: "เสร็จเรียบร้อย!", toast: true, position: "top-end", timer: 1500, showConfirmButton: false });
-    }
-  });
-}
-
 function openPrintForCustomer(customer) {
   selectedCustomerForPrint.value = customer.id;
   showShippingLabels.value = true;
@@ -1365,46 +1320,6 @@ async function toggleContactChannel(customer) {
   } catch (err) {
     console.error("Failed to toggle contactChannel:", err);
   }
-}
-
-async function undoDone(customer) {
-  const updates = {
-    status: "pending",
-    lastDoneCount: null,
-    lastDoneSessions: null,
-    updatedAt: Date.now(),
-  };
-  const targetVids =
-    Array.isArray(customer.lastDoneSessions) && customer.lastDoneSessions.length > 0
-      ? new Set(customer.lastDoneSessions)
-      : null;
-
-  const allSessions = customer.sessions || {};
-  let restoredCount = 0;
-  let restoredPrice = 0;
-
-  Object.keys(allSessions).forEach((vid) => {
-    if (!targetVids || targetVids.has(vid)) {
-      updates[`sessions/${vid}/status`] = "pending";
-      restoredCount += allSessions[vid]?.count || 0;
-      restoredPrice += allSessions[vid]?.totalPrice || 0;
-    }
-  });
-
-  updates.itemCount = restoredCount;
-  updates.totalPrice = restoredPrice;
-
-  // ✅ หักยอด totalBookings คืนตามจำนวนที่เพิ่งบวกไปตอนกดเสร็จ เพื่อไม่ให้ยอดสะสมตลอดชีพถูกบวกเบิ้ลเมื่อกดเสร็จซ้ำ
-  const countToSubtract =
-    typeof customer.lastDoneCount === "number" ? customer.lastDoneCount : restoredCount;
-  if (countToSubtract > 0) {
-    const totalRef = dbRef(db, `delivery_customers/${customer.id}/totalBookings`);
-    await runTransaction(totalRef, (currentTotal) => {
-      return Math.max(0, (currentTotal || 0) - countToSubtract);
-    });
-  }
-
-  await update(dbRef(db, `delivery_customers/${customer.id}`), updates);
 }
 
 function deleteCustomer(id, name) {

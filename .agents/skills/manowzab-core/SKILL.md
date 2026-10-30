@@ -101,6 +101,14 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 - **Zero Chat Interference**: `#chat-viewport` in `ChatPanel.vue` MUST have `data-lenis-prevent` to protect YouTube live stream real-time scrolling and bottom pinning.
 - **Fluid Grid Navigation**: `StockGrid.vue` uses `useSmoothScroll(gridContainer)` with centered item jump animation (`scrollToItem`), while `ShippingManager.vue` sets `data-lenis-prevent` on `.sm-table-wrap`.
 
+### 10. Firebase Authentication & Atomic Delivery Cycles Invariant (2026-10-30)
+- **Identity & Authority**: Firebase Authentication is the sole source of truth for identity. Never trust client-generated sessions, hard-coded password hashes, or automatic anonymous sign-in. Access to all business nodes requires a non-anonymous Firebase user with `admin_users/<UID> = true`.
+- **Protected Lifecycle**: Start protected listeners in `App.vue` only after authorization is verified; tear down listeners and sign out of Firebase on logout or grant revocation. Never include sensitive credentials in `VITE_*` variables.
+- **Canonical Delivery Actions**: Both shipping screens (`ShippingManager.vue` and `ShippingPage.vue`) must use `deliveryActions.js` (`executeMarkDone`, `executeUndoDone`). Complete and undo operations execute as atomic transactions on the entire customer record guarded by delivery cycle identity and the reviewed booking snapshot.
+- **Centralized Stock-to-Delivery Writers**: All stock-to-delivery writers (`App.vue`, `Dashboard.vue`, `HistoryModal.vue`) must route through `syncDeliveryCustomerForOwner` in `deliverySync.js`. Always retain `items`, `fulfilledItems`, and undo metadata.
+- **Shipped Item Isolation**: A booking is identified by `videoId + itemNumber + bookingTime`. Modifying a price, customer name, or UID must never revert a shipped booking to pending. New bookings in the same video session count only unshipped items.
+- **Firebase Sparse Array Normalization**: Handle numeric item maps that Firebase may deserialize as sparse arrays or JSON arrays; compare booking fields in canonical order so serialization differences never alter delivery identity.
+
 ## 🔄 3. Standard Workflows
 
 ### 🧪 1. Verification & Auto-Rule Evolution Protocol (`/verify`)

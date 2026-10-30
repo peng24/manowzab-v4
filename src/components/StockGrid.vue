@@ -352,6 +352,7 @@
 </template>
 
 <script setup>
+import { isOutstandingBooking } from "../utils/deliveryState";
 import { computed, ref, watch, nextTick, inject, onMounted, onUnmounted } from "vue";
 import StockItemCard from "./StockItemCard.vue";
 import { useStockStore } from "../stores/stock";
@@ -595,9 +596,12 @@ const deliveryStrip = computed(() => {
 // คำนวณแยกออกมา ป้องกันไม่ให้ deliveryCountsMap ต้อง iterate stockData ซ้ำ
 const currentNormCountsMap = computed(() => {
   const counts = {};
-  Object.values(stockStore.stockData).forEach((item) => {
+  Object.entries(stockStore.stockData).forEach(([id, item]) => {
     if (item?.owner) {
       const norm = normalizeCustomerName(item.owner);
+      const customerKey = norm.replace(/[.#$[\]/]/g, "_");
+      const customer = customerStore.deliveryByNormKey[customerKey];
+      if (!isOutstandingBooking(customer?.sessions?.[systemStore.currentVideoId], id, item)) return;
       if (norm) counts[norm] = (counts[norm] || 0) + 1;
     }
   });
@@ -974,11 +978,12 @@ function updateOwnerItemsModal() {
   const ownerName = activeOwnerName.value;
   const currentVideoId = systemStore.currentVideoId;
 
+  const customer = deliveryCustomers.value.find(c => normalizeCustomerName(c.name) === normalizeCustomerName(ownerName));
   // 1. ดึงรายการวันนี้
   const todayItems = [];
   Object.keys(stockStore.stockData).forEach((num) => {
     const item = stockStore.stockData[num];
-    if (item.owner === ownerName) {
+    if (item.owner === ownerName && isOutstandingBooking(customer?.sessions?.[currentVideoId], num, item)) {
       todayItems.push({
         num: parseInt(num),
         price: item.price || 0,
@@ -1278,7 +1283,7 @@ async function showOwnerItems(ownerName) {
 
         Object.keys(stockData).forEach((num) => {
           const item = stockData[num];
-          if (item.owner === ownerName || (item.uid && cust.uid && item.uid === cust.uid)) {
+          if ((item.owner === ownerName || (item.uid && cust.uid && item.uid === cust.uid)) && isOutstandingBooking(cust.sessions?.[vid], num, item)) {
             fetchedPastItems.push({
               num: parseInt(num),
               price: item.price || 0,

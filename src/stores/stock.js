@@ -585,7 +585,14 @@ export const useStockStore = defineStore("stock", () => {
     }
   }
 
+  function stopStockSync() {
+    currentUnsubscribe?.();
+    currentUnsubscribe = null;
+    stockData.value = {};
+  }
+
   return {
+    stopStockSync,
     stockData,
     stockSize,
     milestones,

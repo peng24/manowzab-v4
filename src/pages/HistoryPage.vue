@@ -78,7 +78,7 @@ async function handleLogout() {
     if (typeof Swal !== "undefined" && Swal.isVisible()) {
       Swal.close();
     }
-    authStore.logout();
+    await authStore.logout();
     Swal.fire({
       toast: true,
       position: "top-end",

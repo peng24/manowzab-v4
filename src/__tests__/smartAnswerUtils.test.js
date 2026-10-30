@@ -4,6 +4,7 @@ import {
   extractQueriedItemId,
   resolveInquiryCustomer,
   resolveSmartAnswer,
+  getCustomerStoredPortfolio,
 } from "../utils/smartAnswerUtils";
 
 describe("smartAnswerUtils — Smart Seller Answer Assistant", () => {
@@ -280,5 +281,22 @@ describe("smartAnswerUtils — Smart Seller Answer Assistant", () => {
       expect(resolved.customerName).toBe("สมฤทธิ์");
       expect(resolved.isProxyTarget).toBe(true);
     });
+  });
+});
+
+
+describe("shipped bookings in smart answers", () => {
+  it("keeps today's sales visible but excludes shipped items from accumulated goods", () => {
+    const portfolio = getCustomerStoredPortfolio('Buyer', 'u', 'Buyer', {
+      currentVideoId: 'live',
+      stockData: { 1: { owner: 'Buyer', uid: 'u', time: 100, price: 100 }, 2: { owner: 'Buyer', uid: 'u', time: 200, price: 200 } },
+      deliveryByNormKey: { buyer: { name: 'Buyer', status: 'pending', sessions: {
+        live: { count: 1, totalPrice: 200, status: 'pending', fulfilledItems: { 1: { bookingKey: '1:100' } } },
+        old: { count: 3, totalPrice: 300, status: 'done' },
+      } } },
+    });
+    expect(portfolio.todayOwned).toHaveLength(2);
+    expect(portfolio.totalAccumulatedCount).toBe(1);
+    expect(portfolio.totalAccumulatedPrice).toBe(200);
   });
 });

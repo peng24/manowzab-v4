@@ -77,6 +77,13 @@ if not FIREBASE_API_KEY:
     log_error("VITE_FIREBASE_API_KEY is missing in .env")
     sys.exit(1)
 
+# Server-side only: never expose these through VITE_* variables.
+FIREBASE_TRANSCRIBER_EMAIL = os.getenv("FIREBASE_TRANSCRIBER_EMAIL", "")
+FIREBASE_TRANSCRIBER_PASSWORD = os.getenv("FIREBASE_TRANSCRIBER_PASSWORD", "")
+if not FIREBASE_TRANSCRIBER_EMAIL or not FIREBASE_TRANSCRIBER_PASSWORD:
+    log_error("Set FIREBASE_TRANSCRIBER_EMAIL and FIREBASE_TRANSCRIBER_PASSWORD for an approved Firebase account in .env")
+    sys.exit(1)
+
 # Format database URL
 FIREBASE_DB_URL = FIREBASE_DB_URL.rstrip('/')
 
@@ -85,12 +92,18 @@ id_token = None
 token_expiry_time = 0
 
 def refresh_auth_token():
-    """Authenticate with Firebase Auth REST API anonymously to acquire ID Token."""
+    """Authenticate an approved Firebase email/password account to acquire an ID token."""
     global id_token, token_expiry_time
-    log_info("Authenticating with Firebase Auth anonymously...")
-    auth_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={FIREBASE_API_KEY}"
+    id_token = None
+    token_expiry_time = 0
+    log_info("Authenticating transcriber with Firebase...")
+    auth_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
     try:
-        res = requests.post(auth_url, json={"returnSecureToken": True}, timeout=10)
+        res = requests.post(auth_url, json={
+            "email": FIREBASE_TRANSCRIBER_EMAIL,
+            "password": FIREBASE_TRANSCRIBER_PASSWORD,
+            "returnSecureToken": True,
+        }, timeout=10)
         if res.status_code == 200:
             data = res.json()
             id_token = data.get("idToken")
@@ -99,7 +112,7 @@ def refresh_auth_token():
             log_success("Authenticated successfully with Firebase! 🔑")
             return id_token
         else:
-            log_error(f"Authentication failed: HTTP {res.status_code} - {res.text}")
+            log_error(f"Authentication failed: HTTP {res.status_code}")
     except Exception as e:
         log_error(f"Authentication exception: {e}")
     return None
@@ -173,8 +186,9 @@ def push_transcript_to_firebase(video_id, text):
         return
     token = get_auth_token()
     url = f"{FIREBASE_DB_URL}/voice_chats/{video_id}.json"
-    if token:
-        url += f"?auth={token}"
+    if not token:
+        return
+    url += f"?auth={token}"
     payload = {
         "text": text,
         "timestamp": int(time.time() * 1000),
@@ -309,8 +323,10 @@ def sync_active_video():
         try:
             token = get_auth_token()
             url = f"{FIREBASE_DB_URL}/system/activeVideo.json"
-            if token:
-                url += f"?auth={token}"
+            if not token:
+                time.sleep(5)
+                continue
+            url += f"?auth={token}"
             
             res = requests.get(url, timeout=5)
             if res.status_code == 200:

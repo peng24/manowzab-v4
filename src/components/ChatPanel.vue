@@ -427,51 +427,52 @@
                 </template>
               </div>
 
-              <!-- 💡 Inline Smart Seller Answer Card (Visual-Only, Live Reactive, Compact) -->
-              <div
-                v-if="getSmartAnswer(chat)"
-                class="smart-answer-card"
-                :class="`tone-${getSmartAnswer(chat).tone}`"
-              >
-                <div class="smart-answer-top">
-                  <div class="smart-answer-headline">
-                    {{ getSmartAnswer(chat).headline }}
-                  </div>
-                  <button
-                    type="button"
-                    class="smart-pin-btn"
-                    @click.stop="triggerPinnedSmartHud(chat)"
-                    title="ปักหมุดคำตอบนี้ไว้ด้านบน 25 วินาที"
-                  >
-                    <i class="fa-solid fa-thumbtack"></i>
-                  </button>
-                </div>
-                <div v-if="getSmartAnswer(chat).subline" class="smart-answer-subline">
-                  {{ getSmartAnswer(chat).subline }}
-                </div>
-                <div
-                  v-if="getSmartAnswer(chat).pills && getSmartAnswer(chat).pills.length > 0"
-                  class="smart-answer-pills"
-                >
-                  <button
-                    v-for="(pill, pIdx) in getSmartAnswer(chat).pills"
-                    :key="pIdx"
-                    type="button"
-                    class="smart-pill"
-                    :class="[`pill-${pill.tone}`, { clickable: Boolean(pill.action) }]"
-                    @click.stop="handleSmartPillClick(pill, chat)"
-                  >
-                    {{ pill.text }}
-                  </button>
-                </div>
-              </div>
-
               <!-- 🛒 Quick Action Key Button (on hover) -->
               <div class="force-process-btn">
-                <button @click="forceProcess(chat)" class="btn-quick-key" title="คีย์ออเดอร์ด่วนสำหรับลูกค้ารายนี้">
-                  🛒 คีย์ด่วน
+                <button @click="forceProcess(chat)" class="btn-quick-key" title="คีย์ออเดอร์ด่วนสำหรับลูกค้ารายนี้" aria-label="คีย์ออเดอร์ด่วนสำหรับลูกค้ารายนี้">
+                  <span aria-hidden="true">🛒</span><span class="quick-key-label"> คีย์ด่วน</span>
                 </button>
               </div>
+            </div>
+          </div>
+
+          <!-- Full-width answer belongs to the row, outside the customer's bubble. -->
+          <div
+            v-if="getSmartAnswer(chat)"
+            class="smart-answer-card"
+            :class="`tone-${getSmartAnswer(chat).tone}`"
+          >
+            <div class="smart-answer-top">
+              <div class="smart-answer-headline">
+                {{ getSmartAnswer(chat).headline }}
+              </div>
+              <button
+                type="button"
+                class="smart-pin-btn"
+                @click.stop="triggerPinnedSmartHud(chat)"
+                title="ปักหมุดคำตอบนี้ไว้ด้านบน 25 วินาที"
+                aria-label="ปักหมุดคำตอบนี้ไว้ด้านบน 25 วินาที"
+              >
+                <i class="fa-solid fa-thumbtack"></i>
+              </button>
+            </div>
+            <div v-if="getSmartAnswer(chat).subline" class="smart-answer-subline">
+              {{ getSmartAnswer(chat).subline }}
+            </div>
+            <div
+              v-if="getSmartAnswer(chat).pills && getSmartAnswer(chat).pills.length > 0"
+              class="smart-answer-pills"
+            >
+              <button
+                v-for="(pill, pIdx) in getSmartAnswer(chat).pills"
+                :key="pIdx"
+                type="button"
+                class="smart-pill"
+                :class="[`pill-${pill.tone}`, { clickable: Boolean(pill.action) }]"
+                @click.stop="handleSmartPillClick(pill, chat)"
+              >
+                {{ pill.text }}
+              </button>
             </div>
           </div>
         </div>
@@ -3267,32 +3268,111 @@ async function refreshChat() {
   transform: translateY(-8px);
 }
 
-/* 💡 Inline Smart Answer Card inside Chat Bubble (Compact & Scannable) */
+/* Keep the answer below both avatar and message, inside the shared row frame. */
+.chat-row.has-smart-answer {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+}
+
+.chat-row.has-smart-answer:not(.admin):not(.shipping) {
+  background: linear-gradient(135deg, #292235, #1b1b2b) !important;
+  border: 1px solid rgba(192, 132, 252, 0.38) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18) !important;
+}
+
+.has-smart-answer .chat-bubble {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(192, 132, 252, 0.18);
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 10px 12px;
+}
+
+.has-smart-answer .chat-name {
+  color: #fff;
+  max-width: 100%;
+}
+
+.has-smart-answer .chat-meta {
+  flex-wrap: wrap;
+  row-gap: 5px;
+}
+
+.has-smart-answer .cust-meta-cluster {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.has-smart-answer .force-process-btn {
+  position: static;
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  margin: 0;
+  transform: none;
+}
+
+.has-smart-answer .chat-text {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.has-smart-answer .btn-quick-key {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 0.8rem;
+}
+
+.has-smart-answer .quick-key-label {
+  display: none;
+}
+
+.has-smart-answer :is(.chat-name, .chat-time, .chat-text, .smart-answer-headline, .smart-answer-subline, .smart-pill) {
+  text-shadow:
+    -0.65px -0.65px 0 #000,
+    0.65px -0.65px 0 #000,
+    -0.65px 0.65px 0 #000,
+    0.65px 0.65px 0 #000,
+    0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
+/* Visual-only answer panel spans the entire inner width of the row. */
 .smart-answer-card {
-  margin-top: 6px;
-  padding: 6px 9px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, rgba(14, 116, 144, 0.24) 0%, rgba(15, 23, 42, 0.85) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.42);
-  border-left: 3.5px solid #38bdf8;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #193342, #141d2d);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-left: 3px solid #38bdf8;
+  overflow-wrap: anywhere;
 }
 
 .smart-answer-card.tone-emerald {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(15, 23, 42, 0.85) 100%);
-  border-color: rgba(52, 211, 153, 0.42);
+  background: linear-gradient(135deg, #18382f, #141f2d);
+  border-color: rgba(52, 211, 153, 0.25);
   border-left-color: #10b981;
 }
 
 .smart-answer-card.tone-amber {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(15, 23, 42, 0.85) 100%);
-  border-color: rgba(251, 191, 36, 0.42);
+  background: linear-gradient(135deg, #3b3020, #1e202e);
+  border-color: rgba(251, 191, 36, 0.25);
   border-left-color: #fbbf24;
 }
 
 .smart-answer-card.tone-violet {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(15, 23, 42, 0.85) 100%);
-  border-color: rgba(192, 132, 252, 0.42);
+  background: linear-gradient(135deg, #30243f, #1b2031);
+  border-color: rgba(192, 132, 252, 0.25);
   border-left-color: #a855f7;
 }
 
@@ -3300,60 +3380,67 @@ async function refreshChat() {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 6px;
+  gap: 10px;
 }
 
 .smart-pin-btn {
   background: transparent;
   border: 1px solid transparent;
   color: #94a3b8;
-  width: 18px;
-  height: 18px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
-  border-radius: 4px;
+  border-radius: 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.68em;
+  font-size: 0.8em;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.smart-pin-btn:hover {
+.smart-pin-btn:hover,
+.smart-pin-btn:focus-visible {
   background: rgba(56, 189, 248, 0.2);
   border-color: rgba(56, 189, 248, 0.45);
   color: #38bdf8;
 }
 
 .smart-answer-headline {
-  font-size: 0.86em;
-  font-weight: 800;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
   color: #ffffff;
-  line-height: 1.32;
+  line-height: 1.5;
 }
 
 .smart-answer-subline {
-  font-size: 0.77em;
+  font-size: 0.8rem;
   color: #cbd5e1;
   margin-top: 2px;
-  line-height: 1.3;
+  line-height: 1.5;
 }
 
 .smart-answer-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 5px;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .smart-pill {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 1.5px 7px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 9px;
   border-radius: 999px;
   font-family: "Kanit", sans-serif;
-  font-size: 0.73em;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: left;
   font-weight: 700;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);

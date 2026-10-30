@@ -13,12 +13,10 @@ description: How to update Patch Notes and version after making code changes
    - Minor version for new features (e.g., 4.0.x → 4.1.0)
    - Major version only when explicitly requested
 
-2. **Update Patch Notes** in `src/components/Header.vue`
-   - Find the `showChangelog()` function
-   - Add a new entry at the top of the changelog array with:
-     - Version number
-     - Date (current date in YYYY-MM-DD format)
-     - List of changes made
+2. **Check the changelog display in `src/components/Header.vue`**
+   - `showChangelog()` opens `ChangelogModal.vue`, which consumes `src/data/changelog.js`.
+   - Add the version/date/change record to that shared data file in step 3; do not create a duplicate changelog array in Header.
+   - Keep `package-lock.json` and its root package version aligned with `package.json`.
 
 3. **Update & Prune `src/data/changelog.js` (Changelog Pruning Policy)**
    - Add the structured change record (added / improved / fixed / removed)

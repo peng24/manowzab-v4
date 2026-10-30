@@ -65,7 +65,8 @@
    - Centralize stored-data question detection & resolution in `src/utils/smartAnswerUtils.js` (`resolveSmartAnswer`, `isSmartQuestionText`, `extractQueriedItemId`, `resolveInquiryCustomer`) covering 5 categories (`item`, `orders`, `yesterday`, `hold`, `profile`), including concise claimed count verification (`✅ ยอดตรง (X ตัว)` vs `⚠️ แจ้ง X (ในระบบ Y ตัว)`).
    - **Compact & Non-Redundant Copy**: Never repeat the customer's own name in inline cards unless `isProxyTarget === true`, never duplicate item ID lists in the headline text (render item IDs once as clickable pills), and never append duplicate address/COD pills in `orders`/`item`/`yesterday`/`hold` (since `.chat-meta` already displays them).
    - Tag question/smart-inquiry messages with `type: "question"` in `useChatProcessor.js` when `intent` is null.
-   - Render **Visual-Only** (no extra auto-TTS) in `ChatPanel.vue` via: (1) Compact inline `.smart-answer-card` (`.smart-answer-top` combining headline + `📌` pin button without a separate header row, with `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (cleaning up `pinnedHudTimer` in `onUnmounted`), and (3) `💡 คำถาม` tab (`tab-question`) in `.chat-intent-tabs`.
+   - Render **Visual-Only** (no extra auto-TTS) in `ChatPanel.vue` via: (1) Full-width `.smart-answer-card` below the customer bubble inside the row (`.smart-answer-top` combining headline + `📌` pin button without a separate header row, with `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (cleaning up `pinnedHudTimer` in `onUnmounted`), and (3) `💡 คำถาม` tab (`tab-question`) in `.chat-intent-tabs`.
+   - **Full-Width Answer Layout (2026-10-30)**: `.smart-answer-card` must be a direct child of `.chat-row`, outside `.chat-bubble`/`.chat-bubble-container`, spanning both avatar and message columns. Keep equal inner side padding, thin black text outlines, responsive wrapping, and working pin/jump/quick-order controls without changing audio or answer data flow.
    - Support 1-click item jump (`manowzab:jump-to-item` -> `scrollToItem`) and owner items modal (`manowzab:show-owner-items` -> `showOwnerItems`) in `StockGrid.vue` with proper listener cleanup in `onUnmounted`.
 
 11. **Lenis Smooth Scrolling & Scroll Isolation Invariant (v5.4.12+)**:
@@ -105,7 +106,7 @@ Every time you complete a code change, feature addition, bug fix, or optimizatio
 
 ## 📦 Automated Release Trigger Rule ("อัพเลย")
 When the user specifies **"อัพเลย"** (Deploy now), automatically execute the full pipeline in order:
-1. **Run `/verify` Workflow**: Execute `npm test` & `npm run build`, verify all 15 checklist categories, and auto-update rules/`/verify` if needed.
+1. **Run `/verify` Workflow**: Execute `npm test` & `npm run build`, verify all current checklist categories, and auto-update rules/`/verify` if needed.
 2. **Run `/update` Workflow**: Bump version in `package.json` and update Patch Notes in `src/data/changelog.js` (and `Header.vue` if applicable).
 3. **Git Commit & Push**: Commit all changes (`git add .`, `git commit -m "..."`, `git push origin main` or active branch).
 4. **Deploy**: Run `npm run deploy` (or `npm run deploy:gh`) to deploy live to GitHub Pages.

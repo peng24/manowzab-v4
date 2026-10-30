@@ -18,6 +18,16 @@
 export const changelog = [
   // ─── 5.4.x ───────────────────────────────────────────
   {
+    version: '5.4.15',
+    date: '2026-10-30',
+    changes: {
+      improved: [
+        'ปรับคำตอบอัจฉริยะให้แยกอยู่ใต้ข้อความลูกค้าและกว้างเต็มด้านในกรอบหลัก พร้อมพื้นเข้ม เส้นสถานะ และขอบดำบางรอบตัวหนังสือให้อ่านง่าย',
+        'ปรับการตัดบรรทัดชื่อยาวและป้ายข้อมูลสำหรับช่องแชตแคบ เพิ่มขนาดปุ่มปักหมุด เปลี่ยนปุ่มเป็น "ดูสินค้า #N →" และจัดปุ่มคีย์ด่วนให้อยู่ภายในกรอบ โดยคงการอัปเดตคำตอบและแถบปักหมุดแบบเรียลไทม์',
+      ],
+    },
+  },
+  {
     version: '5.4.14',
     date: '2026-10-30',
     changes: {
@@ -294,28 +304,4 @@ export const changelog = [
       ],
     },
   },
-  // ─── 5.1.x ───────────────────────────────────────────
-  {
-    version: '5.1.0',
-    date: '2026-10-14',
-    changes: {
-      improved: [
-        'เพิ่มความเร็วในการประมวลผลคำสั่งซื้อและแชทสด (Chat Processing Fast-Path & 80ms Micro-Batching) — เพิ่ม Fast-Path Guard ข้ามข้อความทั่วไปที่ไม่มีแพทเทิร์นซื้อทันที และจัดคิวประมวลผลข้อความแชทเป็น Micro-Batch ทุก 80ms พร้อมเรียงลำดับแบบ Strict FIFO ป้องกัน Race Condition และการแย่งสิทธิ์สต็อก',
-        'การเรนเดอร์หน้าจอความเร็วสูง (High-Performance StockGrid & Chat Rendering) — ปรับใช้ v-memo ร่วมกับ Queue Fingerprinting ({uid}:{name}) และ Nickname Store บน StockItemCard อัปเดตการ์ดเฉพาะเมื่อข้อมูลเปลี่ยนจริง พร้อมเปิดใช้งาน CSS content-visibility: auto ข้ามการคำนวณ Layout ของการ์ดที่อยู่นอกจอ',
-        'ระบบสกรอลล์แชทแบบ Non-blocking (requestAnimationFrame Auto-Scroll) — ปรับปรุงการเลื่อนแชทอัตโนมัติใน ChatPanel ให้ทำงานประสานกับ Refresh Rate หน้าจอ ป้องกันปัญหา Layout Thrashing และ Frame Drops ขณะแชทไหลเข้าต่อเนื่อง',
-        'บีบอัดไฟล์เสียงและขจัดความจำรั่วไหล (Audio Asset Compression & Audio Node Cleanup) — แปลงไฟล์เสียงโหมดหลับเป็น MP3 128k ลดขนาดไฟล์ลง 96% (จาก 2.09 MB เหลือเพียง 86 KiB) พร้อมตัดการเชื่อมต่อ Web Audio Source/Gain Nodes ทันทีที่เล่นจบ',
-        'ระบบควบคุมแคชหน่วยความจำแบบจำกัดขนาด (Bounded LRU Memory Caches) — จำกัดขนาด sanitizeCache ใน TextToSpeech (สูงสุด 300 รายการ) และ phoneticCache ใน Nickname Store (สูงสุด 500 รายการ) พร้อมกลไกตัดคีย์เก่าสุดแบบ LRU ป้องกันปัญหา Memory Leak เมื่อเปิดใช้งานต่อเนื่องข้ามวัน',
-        'จัดสัดส่วนโมดูล Modal แบบ Lazy Loading (Async Modal Code Splitting) — แปลงการโหลด Modal ทั้งหมดเป็น defineAsyncComponent ช่วยลดขนาด Initial Bundle โหลดหน้าแรกได้รวดเร็วทันใจ',
-      ],
-      fixed: [
-        'ป้องกันการเขียนทับฟิลด์ลูกค้าในระบบจัดส่ง (Atomic Multi-Path Delivery Updates) — ปรับปรุงการซิงค์ข้อมูลลง delivery_customers ให้อัปเดตเฉพาะพาธที่แก้ไข พร้อมป้องกันการสร้างประวัติลูกค้าว่างเปล่าเมื่อกดยกเลิกออเดอร์',
-      ],
-      removed: [
-        'ขจัดไฟล์ค่าคงที่ซ้ำซ้อน (Constants Deduplication) — ลบไฟล์ src/constants.js และรวมศูนย์การเรียกใช้ที่ src/config/constants.js เป็นมาตรฐานเดียวทั่วทั้งโปรเจกต์',
-      ],
-    },
-  },
 ];
-
-
-

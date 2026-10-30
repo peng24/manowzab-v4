@@ -92,7 +92,8 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 
 ### 8. Smart Seller Answer Assistant Invariant (v5.4.9+)
 - **Zero Extra Firebase Reads, Visual-Only & Non-Redundant Copy**: Resolve customer questions across 5 stored-data categories (`item`, `orders`, `yesterday`, `hold`, `profile`) in `src/utils/smartAnswerUtils.js` using in-memory `stockStore.stockData`, `customerStore.deliveryByNormKey`, and `customerStore.addressBook` without triggering extra TTS audio. Omit duplicate customer names (unless `isProxyTarget`), omit duplicate item ID lists in headlines, and omit duplicate address/COD pills in `orders`/`item`/`yesterday`/`hold`.
-- **3-Point Seller Display (`ChatPanel.vue`)**: Render (1) Compact inline `.smart-answer-card` below `.chat-text` (`.smart-answer-top` without separate header row, including `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (`pinnedHudTimer` cleaned up on unmount), and (3) `💡 คำถาม` filter tab (`selectedChatTab === 'question'`).
+- **3-Point Seller Display (`ChatPanel.vue`)**: Render (1) Full-width `.smart-answer-card` below the customer bubble inside `.chat-row` (`.smart-answer-top` without separate header row, including `getSmartAnswerKey(chat)` in `.chat-row` `v-memo`), (2) 25-second Pinned `.smart-hud-banner` at the top of `ChatPanel.vue` (`pinnedHudTimer` cleaned up on unmount), and (3) `💡 คำถาม` filter tab (`selectedChatTab === 'question'`).
+- **Full-Width Answer Layout (2026-10-30)**: `.smart-answer-card` must be a direct child of `.chat-row`, outside `.chat-bubble`/`.chat-bubble-container`, spanning both avatar and message columns. Keep equal inner side padding, thin black text outlines, responsive wrapping, and working pin/jump/quick-order controls without changing audio or answer data flow.
 - **Interactive Cross-Panel Actions (`StockGrid.vue`)**: Handle `manowzab:jump-to-item` (`scrollToItem`) and `manowzab:show-owner-items` (`showOwnerItems`) custom window events with cleanup in `onUnmounted`.
 
 ### 9. Lenis Smooth Scrolling & Scroll Isolation Invariant (v5.4.12+)
@@ -117,7 +118,7 @@ Always execute the automated verification suite before reporting completion:
 npm test
 npm run build
 ```
-1. Verify all 15 categories documented in [.agents/workflows/verify.md](../../workflows/verify.md).
+1. Verify all current categories documented in [.agents/workflows/verify.md](../../workflows/verify.md).
 2. **Proactive Rule & `/verify` Auto-Evolution (บังคับทำและรายงานทุกครั้ง)**: After every code change, proactively check if any project rules (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `SKILL.md`) or `/verify` items should be updated. Apply updates automatically without waiting to be asked, and **always report the rule/`/verify` updates to the user**.
 
 ### 🏷️ 2. Version Bump Protocol (`/update`)

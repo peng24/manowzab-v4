@@ -551,7 +551,7 @@ export function resolveSmartAnswer(chat, context = {}) {
 
     const itemPills = [
       {
-        text: `🔍 ไปที่ #${queriedItemId}`,
+        text: `ดูสินค้า #${queriedItemId} →`,
         tone: "sky",
         action: "jump-to-item",
         itemId: queriedItemId,

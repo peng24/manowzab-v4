@@ -5,6 +5,8 @@ description: Mandatory verification checklist after every code change
 # ✅ Post-Edit Verification Checklist
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
+> รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
+> ผลอ้างอิงล่าสุด: **v5.4.15 — 2026-10-30** ดูผลล่าสุดท้ายไฟล์และ [บันทึก release](../../docs/release-5.4.15.md)
 
 ---
 
@@ -60,7 +62,7 @@ description: Mandatory verification checklist after every code change
 | 4.3 | `resetVoice()` | `src/composables/useAudio.js` | หยุดเสียงทั้งหมดทันที ล้างคิว |
 | 4.4 | `unlockAudio()` | `src/composables/useAudio.js` | ปลดล็อกเสียงบน iOS/iPad |
 | 4.5 | `ttsService.speak(author, message)` | `src/services/TextToSpeech.js` | อ่านข้อความด้วย Google Cloud TTS / fallback Native TTS |
-| 4.6 | TTS ต้องอ่านทุกข้อความ | `src/composables/useChatProcessor.js` | ต้องมี `queueAudio()` ก่อน early return ทุกจุดใน buy logic |
+| 4.6 | TTS ต้องอ่านทุกข้อความที่เข้าเกณฑ์ | `src/composables/useChatProcessor.js`, `src/stores/chat.js` | Processor ต้องบันทึก `sfxType`, `phoneticName`, `ttsText` ก่อนจบเส้นทางซื้อ/ยกเลิก/โน้ต; ให้ Firebase listener ใน `chat.js` เรียก `queueAudio()` เฉพาะข้อความใหม่ตาม time guard ข้อ 4.7 ห้ามเพิ่มเสียงตรงจาก processor; ยกเว้นข้อความต้อนรับที่อนุญาตไว้, ผู้ถูกแบน และ voice-chat ตามเงื่อนไขเดิม |
 | 4.7 | Cross-Device Audio Playback | `src/stores/chat.js`, `src/composables/useChatProcessor.js` | ห้ามเรียก `queueAudio()` ตรงๆ ใน `useChatProcessor.js` (ยกเว้นเสียงต้อนรับ) เสียงทั้งหมดต้องถูกทริกเกอร์ผ่าน Firebase sync listener ใน chat store และเล่นเฉพาะแชทใหม่ (`timestamp >= syncStartTime - 5000` และ `isNew`) |
 | 4.8 | Emoji and Run Fallback | `src/composables/useChatProcessor.js` | อ่านสติกเกอร์เป็น "ส่งสติกเกอร์" เมื่อ sanitizes เป็นค่าว่าง, fallback ไป `messageRuns` เมื่อ `displayMessage` ว่าง |
 | 4.9 | เว้นวรรคหน่วงเวลาในคิวเสียง (`delayAfter`) | `src/composables/useAudio.js` | คิวเสียง `queueAudio` รองรับ `options.delayAfter` (เช่น 800ms) เพื่อเว้นจังหวะอ่านชื่อลูกค้าแต่ละคนให้ชัดเจน ไม่รัวติดกัน |
@@ -78,11 +80,13 @@ description: Mandatory verification checklist after every code change
 
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
-| 5.1 | `syncFromFirebase(videoId)` | `src/stores/chat.js` | sync แชท real-time ข้ามอุปกรณ์ (ใช้ Firebase v9 Direct Unsubscribe Cleanup) |
+| 5.1 | `syncFromFirebase(videoId)` | `src/stores/chat.js` | รับข้อความใหม่ผ่าน `onChildAdded` และ query `limitToLast(200)`; เปลี่ยนไลฟ์/ยกเลิก listener ต้อง cleanup, ไม่สร้าง listener ซ้ำ และไม่เล่นเสียงข้อความเก่าซ้ำหลังเชื่อมต่อใหม่ |
 | 5.2 | `sendMessageToFirebase(videoId, data)` | `src/stores/chat.js` | ส่งข้อความเก็บ Firebase |
 | 5.3 | `addMessage(message)` | `src/stores/chat.js` | เพิ่มข้อความ UI + deduplication + UI Message Trimming (`MAX_MESSAGES=500`, `MAX_SEEN_IDS=2000`) ป้องกัน Memory Leak |
 | 5.4 | `downloadChatCSV(videoId)` | `src/stores/chat.js` | ดาวน์โหลดแชทเป็น CSV (ต้องไม่ถูกกระทบจาก UI trimming) |
 | 5.5 | `clearChat()` | `src/stores/chat.js` | ล้างแชท UI ทั้งหมด |
+| 5.6 | ขอบเขตการซิงก์ข้ามเครื่อง | `src/stores/customer.js`, `src/stores/stock.js`, `src/stores/system.js` | ข้อมูลส่วนกลางรับอัตโนมัติเมื่อออนไลน์และมีสิทธิ์ใน Firebase เดียวกัน; stock/chat ต้องเลือก videoId เดียวกัน ส่วนเปิด–ปิดเสียง โหมด TTS ซ่อนแชต และคำค้นหาเป็นการตั้งค่าเฉพาะเครื่อง |
+| 5.7 | ความหน่วงและทดสอบสองเครื่อง | `src/composables/useDeliveryReconciliation.js`, `src/stores/stock.js`, `scripts/verify-firebase.mjs` | แยก Firebase listener ออกจาก reconciliation debounce 1 วินาที และ history debounce 5 วินาที ไม่รับประกันเวลาตายตัวเมื่อเครือข่ายช้า; ตรวจ A แก้/B รับ, จองชนกัน, เลื่อนคิว, complete/undo พร้อมกัน และ logout/revoke โดยแยกผล SDK emulator ออกจาก UI สองเครื่องจริง |
 
 ---
 
@@ -128,14 +132,14 @@ description: Mandatory verification checklist after every code change
 
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
-| 10.1 | Firebase CRUD (`delivery_customers/{uid}`) | `src/components/ShippingManager.vue` | เพิ่ม/แก้ไข/ลบลูกค้า + real-time listener |
+| 10.1 | Firebase CRUD (`delivery_customers/{uid}`) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue`, `src/stores/customer.js` | เพิ่ม/แก้ไข/ลบลูกค้าได้ตามสิทธิ์; modal ใช้ข้อมูลจาก shared customer store ห้ามเพิ่ม listener ของ delivery_customers/address_book ซ้ำใน component |
 | 10.2 | `addToShipping()` + Auto-Sync | `src/components/Dashboard.vue` | เพิ่มลงคิวส่ง + auto-create delivery_customers + session breakdown |
 | 10.3 | `syncAllToDelivery()` | `src/components/Dashboard.vue` | Sync ลูกค้าทั้ง shipping list ไป delivery_customers ทีเดียว |
-| 10.4 | `recalcItemCount(uid)` | `src/components/Dashboard.vue` | คำนวณ itemCount ใหม่จาก sessions ทั้งหมด |
-| 10.5 | Real-time Stock Watcher | `src/components/ShippingManager.vue` | watch stockData → auto-update จำนวนสินค้าใน delivery_customers |
+| 10.4 | `recalcItemCount(uid)` | `src/utils/deliverySync.js`, `src/utils/deliveryState.js` | คำนวณ itemCount/totalPrice จาก sessions ที่ยังไม่ done ภายใน transaction บน customer ทั้ง record ห้ามนำยอดรวมจาก cache เก่ามาเขียนทับ |
+| 10.5 | Selective stock-to-delivery reconciliation | `src/App.vue`, `src/composables/useDeliveryReconciliation.js`, `src/utils/deliverySync.js` | จัดกลุ่ม booking fields ครั้งเดียวแล้ว sync เฉพาะเจ้าของที่เปลี่ยน; ต้องรวมเจ้าของเดิมเมื่อยกเลิก/เปลี่ยนมือ และส่ง items ที่เตรียมไว้เข้า transaction กลาง; queue-only ไม่กระตุ้น delivery sync ดูข้อ 22 |
 | 10.6 | Delivery Strip (`deliveryStrip`) | `src/components/StockGrid.vue`, `src/assets/style.css` | แถบรายชื่อลูกค้า real-time บนหัวตาราง StockGrid แสดง Icon อยู่หน้าชื่อและแยกสี/Icon ชัดเจนตามประเภท โดยทุกประเภทไม่ต้องใส่ข้อความต่อท้าย (`overdue`: 🚨 สีแดงกะพริบ, `today`: 🚚 สีเขียวมรกต, `pack-tonight`: 📦 สีส้ม) ยกเว้น `soon` (⏳ สีม่วง + อีก X วัน) และ `later` (📅 สีฟ้า + วันที่จัดส่ง) |
 | 10.7 | Countdown + Thai Date | `src/components/ShippingManager.vue` | นับถอยหลัง (เลย/วันนี้/พรุ่งนี้/อีก X วัน) + วันที่ไทย (24 มี.ค. 69) |
-| 10.8 | Mark Done + Undo Done | `src/components/ShippingManager.vue` | เสร็จ → `status=done`, `itemCount=0`, บันทึก `lastDoneCount`/`lastDoneSessions` + สะสม `totalBookings`; เมื่อกด `undoDone` ต้องหัก `totalBookings` คืนและกู้คืนเฉพาะ `lastDoneSessions` รอบล่าสุดโดยไม่ปลุก Session เก่าในอดีต |
+| 10.8 | Mark Done + Undo Done | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue`, `src/utils/deliveryActions.js` | ทั้งสองหน้าใช้ helper กลางและ transaction บน customer ทั้ง record: ปรับ status/sessions/totalBookings พร้อมเก็บ lastDoneId, lastDoneSnapshot, lastDoneCount, lastDoneSessions; ปฏิเสธ snapshot เก่าและ complete/undo ซ้ำจากหลายเครื่อง คืนเฉพาะรอบล่าสุดโดยคงรายการใหม่ไว้ ดูข้อ 21.3–21.4 |
 | 10.9 | กรองเฉพาะคนที่แจ้งส่ง (Requested Delivery Filter) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue` | แสดงเฉพาะคนที่ระบุวันจัดส่งแล้วเป็นค่าเริ่มต้น (`deliveryDate !== null`) |
 | 10.10 | แท็บสลับดู "ฝากสินค้า" (Unassigned Filter) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue` | สลับดูคนที่ฝากสินค้า (ยังไม่ระบุวันส่ง) และดูทั้งหมดได้อย่างถูกต้อง |
 | 10.11 | Delivery Strip Filter | `src/components/StockGrid.vue` | กรองแสดงเฉพาะลูกค้าที่มีวันจัดส่งแล้ว (`!!c.deliveryDate`) |
@@ -152,13 +156,13 @@ description: Mandatory verification checklist after every code change
 | 11.1 | `bookingCount` ใน `shippingList` computed | `src/components/Dashboard.vue` | ดึง `order.items.length` จาก `customerOrders` (real-time จาก stockData) แสดงจำนวนจอง |
 | 11.2 | Badge 🛒 หลังชื่อลูกค้า | `src/components/Dashboard.vue` | แสดง badge สีม่วง `🛒X` หลังชื่อในตาราง Dashboard เมื่อ bookingCount > 0 |
 | 11.3 | Real-time Update | `src/components/Dashboard.vue` | จองเพิ่ม → ตัวเลข badge เพิ่มทันที, ยกเลิก → ลดทันที (ใช้ stockData ที่ sync อยู่แล้ว ไม่ต้องเพิ่ม listener) |
-| 11.4 | `totalBookings` สะสมใน `markDone()` | `src/components/ShippingManager.vue` | เมื่อกด ✅ เสร็จ → `runTransaction` บวก itemCount เข้า totalBookings ก่อน reset เป็น 0 |
+| 11.4 | `totalBookings` สะสมใน `markDone()` | `src/utils/deliveryActions.js`, `src/utils/deliveryState.js` | เพิ่มยอดสะสมพร้อมปิดรอบใน transaction เดียวบน customer ทั้ง record; undo หักเฉพาะรอบล่าสุดได้ครั้งเดียว ห้ามแยก increment ออกจากการเปลี่ยน status/sessions |
 | 11.5 | แสดง "ลูกค้าประจำ" | `src/components/ShippingManager.vue` | แสดงข้อความ "ลูกค้าประจำ • เคยสั่งรวม X ชิ้น" ใต้ชื่อลูกค้าเมื่อ totalBookings > 0 |
 | 11.6 | Owner Count Badge `👗 N ตัว` | `src/components/StockGrid.vue` | แสดง 👗 N ตัว สีฟ้าหลังชื่อ owner ในตาราง StockGrid เมื่อมียอดจองสะสม >= 1 ชิ้น |
-| 11.7 | ยอดจองสะสมรวมทุกวัน (Badge Count Sync) | `src/components/StockGrid.vue` | `getOwnerCount()` ต้องรวมยอดจองวันนี้ (local) + อดีตที่ค้างส่ง (database) เสมอ |
+| 11.7 | ยอดจองสะสมรวมทุกวัน (Badge Count Sync) | `src/components/StockGrid.vue`, `src/utils/deliveryState.js` | getOwnerCount รวมรายการวันนี้ที่ยังค้างส่งกับอดีตที่ยังค้างส่ง โดยไม่นับ session ซ้ำและไม่นับ bookingKey ที่อยู่ใน fulfilledItems; สถิติยอดขายวันนี้ยังแสดงรายการที่ขายแล้วตามเดิม |
 | 11.8 | แสดงรายละเอียดจองสะสมย้อนหลังและลบข้ามเซสชั่น | `src/components/StockGrid.vue` | `showOwnerItems()` ดึงรายการของวันนี้ + อดีตที่ยังไม่จัดส่ง (แสดงแค่วันที่สั้นๆ เช่น "26 พ.ค. 69") และลบออกจากอดีตพร้อมปรับลด itemCount/totalPrice ได้ถูกต้อง |
 | 11.9 | Normalized Name Grouping (`normalizeCustomerName`) | `src/utils/deliverySync.js`, `src/components/StockGrid.vue` | จับคู่และสะสมยอดจองตามชื่อที่ normalize แล้ว ทำให้จองเองและแอดมินจองแทน (`proxy-uid`) รวมยอดจองสะสมตรงกัน 100% |
-| 11.10 | Exclude Shipped Sessions (`status === "done"`) | `src/utils/deliverySync.js`, `src/components/StockGrid.vue`, `src/components/Dashboard.vue` | เมื่อกดส่งสินค้าเสร็จ (`status = "done"`) ยอดจองสะสมจากอดีตต้องถูกยกเว้น และรีเซ็ตยอดของลูกค้ารายนั้นเป็น 0 |
+| 11.10 | Exclude Shipped Bookings | `src/utils/deliveryState.js`, `src/components/StockGrid.vue`, `src/components/Dashboard.vue`, `src/utils/smartAnswerUtils.js` | ยอดค้างส่งไม่รวม session ที่ done และรายการใน fulfilledItems แม้อยู่ในไลฟ์ปัจจุบัน; แก้ราคา/ชื่อ/UID ไม่เปิดของเก่ากลับมา แต่การจองใหม่เวลาใหม่ในไลฟ์เดิมต้องนับได้ |
 | 11.11 | Real-time Modal/Stock Edit Auto-Sync | `src/stores/stock.js` | การแก้ไข/ล้างข้อมูลสต็อกผ่าน Modal (`updateItemData`, `clearAllStock`) ต้อง Auto-sync ไปยัง `delivery_customers` ทันที |
 
 ---
@@ -176,14 +180,14 @@ description: Mandatory verification checklist after every code change
 
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
-| 13.1 | Batched History Recalculation | `src/components/HistoryModal.vue` | `updateDeliveryAndHistoryTotals` ต้องใช้ Batched Multi-Path Update (`update(dbRef(db), multiPathUpdates)`) ห้ามวนลูปยิง N+1 Queries |
+| 13.1 | History Recalculation + Canonical Delivery Transactions | `src/components/HistoryModal.vue`, `src/utils/deliverySync.js` | updateDeliveryAndHistoryTotals อ่าน stock snapshot ของไลฟ์ครั้งเดียวและรวมเจ้าของไม่ซ้ำ ส่ง snapshot เดิมเข้า syncDeliveryCustomerForOwner เพื่อคำนวณยอดจัดส่งด้วย transaction รายลูกค้า; เขียนเฉพาะสถิติ history ด้วย multi-path update ห้ามใช้ยอดรวมจัดส่งจาก cache เก่าทำ batched overwrite |
 | 13.2 | Centralized Customer Store & Live Cache (`useCustomerStore`) | `src/stores/customer.js`, `src/utils/deliverySync.js` | รวมศูนย์ listener ของ `delivery_customers` และ `address_book` ไว้ที่ `useCustomerStore` จุดเดียว (Reference-Counted) พร้อมซิงค์เข้า `setLiveDeliveryCustomersCache` / `setLiveAddressBookCache` และค้นหาข้อมูลลูกค้าด้วยดัชนี $O(1)$ (`deliveryByNormKey`, `getCustomerMetaByName`) |
 | 13.3 | Fast Instant Chat Scroll, Initial Bottom Pinning & Zero Forced Reflow | `src/components/ChatPanel.vue`, `src/utils/chatParserUtils.js`, `src/App.vue` | สกรอลล์แชทสดต้องใช้ Double-`requestAnimationFrame` (`scrollTop = scrollHeight`), ใช้ `evaluateChatScrollState()` แยกแยะการเลื่อนขึ้นจริงของผู้ใช้ออกจากกรณีเนื้อหาขยายตัว, ใช้ `ResizeObserver` บน `#chat-list`/`#chat-viewport` เพื่อดึงลงข้อความล่าสุดเสมอเมื่อเปิดหน้าเว็บหรือเมื่อป้ายสถานะลูกค้าโหลดเสร็จ, ห้ามใส่ `contain-intrinsic-size: 55px` บน `.chat-row` หรือ `scroll-behavior: smooth` บน `#chat-viewport`, และห้ามสั่ง Forced Synchronous Layout (`offsetWidth`) ขณะสลับย่อ/ขยายแชท |
 | 13.4 | O(1) Stock Queue Map & Conditional Modal Watch | `src/components/StockGrid.vue` | การเรนเดอร์ Stock Grid ต้องใช้ `queueLengthsMap` (computed) และเฝ้าดู `stockData` สำหรับอัปเดต Modal เฉพาะเมื่อเปิด `currentViewingOwnerUid` อยู่เท่านั้น |
 | 13.5 | Fast Thai-to-Arabic Conversion | `src/utils/chatParserUtils.js` | `thaiToArabic` ต้องใช้ Static Lookup Map `THAI_TO_ARABIC_MAP` เพื่อความเร็วสูงสุดในการสืบค้นแบบ $O(1)$ |
 | 13.6 | Execution Time Tracking | `src/utils/logger.js` | `logger.time` และ `logger.timeAsync` ต้องสามารถวัดและแสดงเวลาการทำงานเป็นมิลลิวินาที (ms) ได้ถูกต้อง |
 | 13.7 | Benchmark Test Suite | `src/__tests__/benchmark.test.js` | ชุดทดสอบ Benchmark ops/sec ต้องรันและผ่านผ่านคำสั่ง `npm test` |
-| 13.8 | Throttled & Deduplicated History DB Writes | `src/stores/stock.js` | การเขียนสถิติประวัติลง `history/${videoId}` ต้องใช้ Throttling 5 วินาที และเช็ค `lastSyncedHistoryTotals` เพื่อข้ามการเขียนซ้ำเมื่อ `totalSales` และ `totalItems` ไม่เปลี่ยนแปลง รวมถึงส่ง `stockData.value` ในหน่วยความจำให้ `syncDeliveryCustomerForOwner` โดยตรง |
+| 13.8 | Throttled & Deduplicated History DB Writes | `src/stores/stock.js` | บันทึกสถิติ history ด้วย debounce 5 วินาที และใช้ lastHistorySales/lastHistoryItems ข้ามเมื่อยอดไม่เปลี่ยน; ยกเลิก timeout เมื่อหยุด sync; writer จอง/ยกเลิก/แก้ข้อมูลส่ง committed stock snapshot เข้า syncDeliveryCustomerForOwner โดยไม่อ่าน stock ซ้ำ |
 | 13.9 | Zero-Delay Concurrent Poll Batching | `src/services/YouTubeLiveChat.js`, `src/composables/useChatProcessor.js` | `YouTubeLiveChat.js` ต้องส่งข้อความใหม่ทั้งหมดในรอบ Poll เข้าคิวพร้อมกัน (`Promise.allSettled`) เพื่อให้ `incomingBatchQueue` รวบประมวลผลและเรียงตาม `publishedAt` ภายในหน้าต่าง 80ms เดียว ไม่หน่วงสะสม `80ms × N` |
 | 13.10 | Lazy Short-Circuit Regex, Cached Runs & Bounded Voice Sync | `src/composables/useChatProcessor.js` | ประมวลผล 7 Buy Regex แบบ Lazy Short-Circuit (หยุดทันทีเมื่อเจอแพทเทิร์นที่ตรง), แคชผลลัพธ์ `getMessageRuns()`, และจำกัดการดึง `voice_chats/${videoId}` ด้วย `limitToLast(10)` |
 | 13.11 | Shared Singleton `AudioContext` & Idle Celebration Preload | `src/composables/useAudio.js`, `src/services/TextToSpeech.js`, `src/utils/celebration.js` | แชร์ `AudioContext` ตัวเดียวทั่วทั้งแอป และโหลดไฟล์เสียงพลุฉลองล่วงหน้าในช่วงเบราว์เซอร์ว่าง (`requestIdleCallback`) เพื่อไม่ให้แย่งแบนด์วิดท์ขณะเริ่มไลฟ์ |
@@ -264,9 +268,11 @@ description: Mandatory verification checklist after every code change
 |---|---|---|---|
 | 19.1 | `resolveSmartAnswer(chat, context)` & `isSmartQuestionText(text)` | `src/utils/smartAnswerUtils.js`, `src/composables/useChatProcessor.js` | ตรวจจับคำถามลูกค้า 5 หมวดหมู่ (`item`, `orders`, `yesterday`, `hold`, `profile`) แบบ $O(1)$ / Single-pass จากหน่วยความจำ ไม่ยิง Firebase ซ้ำ ไม่ส่งเสียงอ่าน TTS แทรก และติด `type: "question"` ให้ข้อความคำถาม |
 | 19.2 | Claimed Count Verification (`CLAIMED_COUNT_REGEX`) & Non-Redundant Copy | `src/utils/smartAnswerUtils.js` | เมื่อลูกค้าพิมพ์ทวนจำนวนชิ้น (เช่น `"ของพี่ได้2ตัวใช่ไหม"`, `"พี่นับได่8"`, `"ใช่14ตัว"`) ต้องเทียบกับยอดในระบบและแสดงป้ายกระชับ `✅ ยอดตรง (X ตัว)` หรือ `⚠️ แจ้ง X (ในระบบ Y ตัว)` โดยห้ามแสดงชื่อลูกค้าซ้ำ (ยกเว้นถามแทน `isProxyTarget`), ห้ามพิมพ์รหัสสินค้าซ้ำในบรรทัดหัวข้อ, และห้ามใส่ป้ายที่อยู่/COD ซ้ำกับ `.chat-meta` ในหมวด `orders`/`item`/`yesterday`/`hold` |
-| 19.3 | Compact Inline Smart Answer Card & `v-memo` Key (`getSmartAnswerKey`) | `src/components/ChatPanel.vue` | แสดงการ์ด `.smart-answer-card` แบบกะทัดรัด (`.smart-answer-top` รวมบรรทัดหัวข้อกับปุ่มปักหมุด `📌` โดยไม่มี `.smart-answer-header` ซ้ำซ้อน) ใต้ข้อความคำถามในแชท พร้อมใส่ `getSmartAnswerKey(chat)` ใน `v-memo` ของ `.chat-row` เสมอเพื่อให้อัปเดตแบบเรียลไทม์เมื่อสต็อกหรือที่อยู่เปลี่ยน |
+| 19.3 | Full-Width Smart Answer Card & v-memo | `src/components/ChatPanel.vue` | smart-answer-card เป็น direct child ของ chat-row อยู่ใต้และนอก chat-bubble/chat-bubble-container; ใช้ grid-column 1 / -1 กว้างเต็มด้านในกรอบหลักรวมคอลัมน์รูป เว้นขอบซ้าย–ขวาเท่ากัน; หัวข้อกับปักหมุดอยู่แถวเดียว และ getSmartAnswerKey ยังใช้ใน v-memo เพื่ออัปเดตคำตอบจริงทุก field |
 | 19.4 | 25s Pinned Smart HUD Banner (`pinnedSmartHud`, `pinnedHudTimer`) | `src/components/ChatPanel.vue` | เมื่อมีคำถามใหม่ที่มีข้อมูลในระบบเข้ามา ต้องปักหมุดแถบ `.smart-hud-banner` ด้านบนสุดของช่องแชทนาน 25 วินาที พร้อมปุ่มปิด `✕` และล้าง `pinnedHudTimer` ใน `onUnmounted` |
 | 19.5 | แท็บกรอง `💡 คำถาม` & Cross-Panel Jump Actions | `src/components/ChatPanel.vue`, `src/components/StockGrid.vue` | แท็บ `💡 คำถาม` กรองเฉพาะคำถามลูกค้าพร้อมแสดงตัวเลขจำนวน และปุ่มคลิกรหัสสินค้า (`manowzab:jump-to-item`) / ดูรายการสะสม (`manowzab:show-owner-items`) เชื่อมต่อไปยัง `StockGrid.vue` ได้ถูกต้องพร้อมล้าง Event Listener เมื่อ Unmount |
+| 19.6 | Text outline & narrow layout | `src/components/ChatPanel.vue` | ชื่อ เวลา ข้อความ และคำตอบมีขอบดำบางจาก text-shadow; ตรวจ panel กว้าง 200/280/390/440 px พร้อมชื่อยาว metadata หลายป้าย และคำตอบหลายบรรทัด ให้แผงคำตอบเต็มกรอบและไม่มี horizontal overflow; ป้ายชื่อยาวใช้ ellipsis ได้โดยยังแก้ข้อมูลลูกค้าได้ |
+| 19.7 | Answer controls & scroll | `src/components/ChatPanel.vue`, `src/utils/smartAnswerUtils.js` | ปุ่มดูสินค้า #N → ส่ง manowzab:jump-to-item ถูกหมายเลข, pin/HUD ยังอัปเดตเมื่อ stock เปลี่ยน, ปิด HUD ได้ และยังหมดอายุ 25 วินาที; quick-order มี accessible name และอยู่ในกรอบ, คำตอบแยกแล้วไม่รบกวน bottom pinning หรือการเลื่อนขึ้นอ่านของผู้ใช้ |
 
 ---
 
@@ -283,26 +289,6 @@ description: Mandatory verification checklist after every code change
 
 ---
 
-## How to Verify & Auto-Update Policy (บังคับทำทุกครั้ง)
-
-1. Review the diff of changed files
-2. For each changed file, check which checklist items (by number) it relates to
-3. **Read the actual source code** of affected functions to verify logic is still intact
-4. If any function may be broken, **fix it immediately** before proceeding
-5. **🔄 คิดและอัปเดตกฎ + `/verify` อัตโนมัติทุกครั้ง (Proactive Rule & `/verify` Auto-Evolution)**:
-   - ทุกครั้งหลังแก้ไขโค้ด เพิ่มฟีเจอร์ หรือปรับปรุงระบบ ให้วิเคราะห์ทันทีว่ามีข้อกำหนดสถาปัตยกรรมใหม่ หรือมีจุดใดในไฟล์กฎ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) และรายการตรวจสอบใน `.agents/workflows/verify.md` ที่ควรเพิ่มหรืออัปเดตหรือไม่
-   - **หากมี ต้องอัปเดตไฟล์กฎและ `/verify` ให้ทันทีโดยไม่ต้องรอให้ผู้ใช้สั่ง**
-   - **ต้องรายงานให้ผู้ใช้ทราบทุกครั้ง** ว่าได้ตรวจสอบและอัปเดตกฎหรือ `/verify` ในส่วนใดบ้าง (หรือรายงานว่าตรวจสอบแล้วกฎและ `/verify` ปัจจุบันครอบคลุมครบถ้วนแล้ว)
-6. Report verification results in this format:
-   ```
-   ✅ 1.1 connectVideo — ไม่กระทบ
-   ✅ 2.1 processMessage — ตรวจสอบแล้ว ยังทำงานถูกต้อง
-   ⚠️ 4.1 queueAudio — ต้องตรวจสอบเพิ่ม (มีการแก้ไขใกล้เคียง)
-   ❌ 3.1 processOrder — เสียหาย! แก้ไขแล้ว
-   📋 อัปเดตกฎ & /verify — (ระบุรายการกฎและ /verify ที่อัปเดต หรือระบุว่าตรวจสอบแล้วเป็นปัจจุบัน)
-   ```
-
-
 ## 🔐 21. Firebase Authentication & Atomic Delivery Cycles (2026-10-30)
 
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
@@ -318,11 +304,85 @@ description: Mandatory verification checklist after every code change
 
 ## ⚡ 22. Selective Reconciliation & Reactive Answer Cache (2026-10-30)
 
-| # | Function | Files | Required verification |
+| # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
-| 22.1 | Selective delivery sync | `useDeliveryReconciliation.js`, `deliveryReconciliation.test.js` | 300 owners: initial 300 calls, one price edit 1 call, queue-only edit 0 calls; prepared items equal canonical bookingItems; preserve atomic delivery guards |
-| 22.2 | Cancellation/lifecycle | `deliveryReconciliation.test.js` | Sync old and promoted owners, remove last booking, group normalized names, repair late-arriving sessions, cancel timers on logout/unmount and reset on video/login changes |
-| 22.3 | Reactive Smart Answer cache | `useSmartAnswerLookup.js`, `smartAnswerLookup.test.js`, `ChatPanel.vue` | Repeated reads resolve once; nested price edits, chat edits and replaced address/customer snapshots refresh answers; live ban/buy/cancel suppress cards; full answer invalidates row v-memo |
-| 22.4 | Reproducible performance evidence | `scripts/benchmark-performance.mjs`, `docs/performance-2026-10-30.md` | Run npm run benchmark:performance; distinguish synthetic call counts/timings, local login production trace and development dashboard interaction samples from field/device results |
-| 22.5 | Dashboard proxy shipping | `Dashboard.vue` | resolveDeliveryUid is imported and proxy customer can be added to shipping using its canonical key without ReferenceError |
+| 22.1 | Selective delivery sync | `src/composables/useDeliveryReconciliation.js`, `src/__tests__/deliveryReconciliation.test.js` | ชุดจำลอง 300 คน: sync เริ่มต้น 300 ครั้ง, แก้ราคาหนึ่งรายการ 1 ครั้ง, เพิ่มคิวอย่างเดียว 0 ครั้ง; items ที่จัดกลุ่มตรงกับ bookingItems และยังผ่าน transaction guards เดิม ตัวเลขนี้นับ helper calls ไม่ใช่ HTTP requests |
+| 22.2 | Cancellation/lifecycle | `src/__tests__/deliveryReconciliation.test.js` | sync เจ้าของเดิมและคนที่เลื่อนขึ้นคิว รวมการยกเลิกชิ้นสุดท้าย/ล้าง stock, รวมชื่อที่ normalize แล้ว, ซ่อม session ที่มาหลัง stock, ยกเลิก timer เมื่อ logout/unmount และ reset เมื่อเปลี่ยน video/login |
+| 22.3 | Reactive Smart Answer cache | `src/composables/useSmartAnswerLookup.js`, `src/__tests__/smartAnswerLookup.test.js`, `src/components/ChatPanel.vue` | เรียกคำตอบซ้ำใช้ computed เดียว; nested price/chat edits และการแทน customer/address snapshots ต้องอัปเดตคำตอบ; ตรวจ blacklist/type ล่าสุดก่อนคืนค่า และให้ v-memo ใช้คำตอบครบทุก field เพื่อไม่ซ่อนการแก้ราคา/ที่อยู่; WeakMap ไม่เก็บ chat ที่ถูกตัดออกไว้ถาวร |
+| 22.4 | Reproducible performance evidence | `scripts/benchmark-performance.mjs`, `docs/performance-2026-10-30.md` | รัน npm run benchmark:performance: สินค้า 300 รายการ/คำถาม 200 ข้อ/อ่าน 12 ครั้งต่อข้อความ ต้องลด resolver calls จาก 2,400 เหลือ 200; เวลาจริงขึ้นกับเครื่อง ไม่บังคับ timing เดิม และแยก synthetic, local production login, development dashboard กับ production field metrics |
+| 22.5 | Dashboard proxy shipping | `src/components/Dashboard.vue` | import resolveDeliveryUid ครบ; เลือกลูกค้าแบบ proxy แล้วเพิ่มเข้าคิวส่งสำเร็จด้วย canonical key และ name key โดยไม่มี ReferenceError |
 
+---
+
+## 🚀 23. Release & Production Verification
+
+| # | รายการตรวจ | หลักฐานที่ต้องบันทึก |
+|---|---|---|
+| 23.1 | Version/changelog | package.json, package-lock.json และ root package ใน lockfile ต้องเป็น version เดียวกัน; changelog ล่าสุดตรง version/date และเหลือประมาณ 15–20 entries; Header ใช้ ChangelogModal ที่อ่าน src/data/changelog.js ไม่เพิ่มรายการซ้ำใน Header |
+| 23.2 | Firebase readiness | ระบุ project/database เป้าหมาย ตรวจ Email/Password, บัญชีไม่ disabled และ admin_users grant ก่อนเผยแพร่ login ใหม่; การ login CLI ไม่ได้ให้สิทธิ์แอดมินในแอปโดยอัตโนมัติ; การเพิ่ม/เปลี่ยนสิทธิ์ต้องอยู่ในขอบเขตที่ผู้ใช้อนุมัติ และไม่เปลี่ยนรหัสผ่านเดิมโดยพลการ |
+| 23.3 | Production rules | ทดสอบ database.rules.json กับ emulator ก่อน deploy; GitHub Pages deploy ไม่ได้ deploy RTDB rules; หากเก็บ snapshot ให้แยก before/after และไม่เขียนทับต้นฉบับ จากนั้นตรวจ deployed rules เทียบ source; ไม่เก็บ token/รหัสผ่าน/ข้อมูลลูกค้าใน Git หรือรายงาน |
+| 23.4 | Published artifacts | บันทึก source commit และ gh-pages commit; build ด้วย base /manowzab-v4/; ตรวจ main, shipping/, history/, address/ ได้ HTTP 200 และ HTML/entry scripts ตรงกับ build ล่าสุด |
+| 23.5 | Production smoke check | เปิดหน้าเว็บจริงใน browser ตรวจ login inputs, console และ failed resources; ทดสอบ unauthenticated read ของ stock/delivery_customers/address_book ต้องถูกปฏิเสธ; แยกผลโหลดหน้า login ออกจากการเข้าสู่ระบบจริงและการทำงานหลังล็อกอิน |
+| 23.6 | PWA และหลายอุปกรณ์ | อัปเดตแต่ละเครื่องเป็น version เดียวกันและเข้าสู่ระบบใหม่; ลอง reload/ปิดเปิดแอป, sync ข้อมูล, revoke และการแจ้งอัปเดตโดยไม่ขัดจังหวะไลฟ์; ระบุว่าทดสอบกับ browser/emulator หรืออุปกรณ์จริง ยังไม่ถือว่าผ่าน PWA/iPad จริงจาก build อย่างเดียว |
+
+---
+
+## How to Verify & Auto-Update Policy (บังคับทำทุกครั้ง)
+
+1. Review the diff of changed files; เริ่มจาก working tree และระบุ version/commit ที่ตรวจ
+2. For each changed file, check which checklist items (by number) it relates to
+3. **Read the actual source code** of affected functions to verify logic is still intact
+4. If any function may be broken, **fix it immediately** before proceeding
+5. **🔄 คิดและอัปเดตกฎ + `/verify` อัตโนมัติทุกครั้ง (Proactive Rule & `/verify` Auto-Evolution)**:
+   - ทุกครั้งหลังแก้ไขโค้ด เพิ่มฟีเจอร์ หรือปรับปรุงระบบ ให้วิเคราะห์ทันทีว่ามีข้อกำหนดสถาปัตยกรรมใหม่ หรือมีจุดใดในไฟล์กฎ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) และรายการตรวจสอบใน `.agents/workflows/verify.md` ที่ควรเพิ่มหรืออัปเดตหรือไม่
+   - **หากมี ต้องอัปเดตไฟล์กฎและ `/verify` ให้ทันทีโดยไม่ต้องรอให้ผู้ใช้สั่ง**
+   - **ต้องรายงานให้ผู้ใช้ทราบทุกครั้ง** ว่าได้ตรวจสอบและอัปเดตกฎหรือ `/verify` ในส่วนใดบ้าง (หรือรายงานว่าตรวจสอบแล้วกฎและ `/verify` ปัจจุบันครอบคลุมครบถ้วนแล้ว)
+6. เลือกคำสั่งตรวจตามส่วนที่เปลี่ยนและกฎโปรเจกต์:
+   - โค้ดแอป: `npm test` และ `npm run build`; release GitHub Pages ใช้ `npm run build:gh`
+   - Auth/rules/stock/delivery: เพิ่ม `npm run test:firebase` โดยเปิด Auth/RTDB emulators ก่อน ตาม [คู่มือทดสอบในเครื่อง](../../docs/firebase-auth-migration.md#ทดสอบในเครื่องโดยไม่แตะ-production); ห้ามเปลี่ยน harness ให้ชี้ production
+   - Python transcriber: เพิ่ม `npm run test:transcriber`; performance: เพิ่ม `npm run benchmark:performance`
+   - แก้เอกสารอย่างเดียว: ตรวจความตรงกับ source, ลิงก์, โครงสร้างตารางและ `git diff --check`; ไม่อ้างผลชุดทดสอบเก่าว่าเป็นการรันใหม่
+7. รายงานแยก `ผ่าน automated`, `ผ่าน browser/manual`, `ตรวจ source เท่านั้น`, `ยังไม่ได้ทดสอบ` และ `ไม่เกี่ยวข้อง`; แนบคำสั่ง/ผล/สภาพแวดล้อมที่ใช้จริง ไม่ใช้คำว่า “ไม่กระทบ” แทนผลทดสอบ และไม่อ้างว่าทุกฟังก์ชันผ่านจาก unit tests อย่างเดียว
+8. Report verification results in this format:
+   ```
+   ℹ️ 1.1 connectVideo — ตรวจ source เท่านั้น ยังไม่ได้ลอง live YouTube
+   ✅ 21.3 complete/undo — ผ่าน Firebase emulator สอง clients ดู log/รายงานที่แนบ
+   ⚠️ 4.1 queueAudio — ต้องตรวจสอบเพิ่ม (มีการแก้ไขใกล้เคียง)
+   ❌ 3.1 processOrder — ระบุเคสที่ล้มเหลว; หลังแก้ต้องรันเคสเดิมซ้ำและบันทึกผล
+   📋 อัปเดตกฎ & /verify — (ระบุรายการกฎและ /verify ที่อัปเดต หรือระบุว่าตรวจสอบแล้วเป็นปัจจุบัน)
+   ```
+
+---
+
+## 📋 ผลอ้างอิงย้อนหลัง — v5.4.14 (2026-10-30)
+
+ผลชุดนี้มาจากรอบแก้ไขและ release ก่อนหน้า การอัปเดตเอกสารครั้งนี้ไม่ได้รันทดสอบแอปใหม่ จำนวน tests/เวลาเป็นหลักฐาน ณ รอบนั้น ไม่ใช่ค่าที่ทุกรุ่นต้องเท่ากัน
+
+| ขอบเขต | ผลที่ตรวจจริง | หลักฐาน |
+|---|---|---|
+| Unit/regression | npm test ผ่าน 321 tests ใน 24 files; รวม auth, delivery state/actions, selective reconciliation และ Smart Answer cache | [Release](../../docs/release-5.4.14.md), src/__tests__/ |
+| Firebase integration | npm run test:firebase ผ่าน 23 checks กับ local Auth/RTDB และ actual stores; สอง clients ทดสอบจอง/คิว/ยอดรวม/complete/undo/revoke | [Verification](../../docs/verification-2026-10-30.md), scripts/verify-firebase.mjs |
+| Python/build | Transcriber ผ่าน 3 tests; build:gh สร้างครบ 4 หน้าและ PWA 66 precache entries | [Release](../../docs/release-5.4.14.md) |
+| Performance | 300 คน: price change 300 → 1 sync calls, queue-only 300 → 0; คำตอบ 2,400 → 200 resolutions, median งานจำลอง 1,098.23 → 112.61 ms | [Performance](../../docs/performance-2026-10-30.md) |
+| Browser จำลอง | 200 answer cards, ราคาเปลี่ยนแล้วคำตอบ/ยอดจัดส่งเปลี่ยน, ค้นหารายการ 300, proxy shipping; local production login LCP 281 ms/CLS 0.00; dev interactions INP 120 ms/CLS 0.01 | [เงื่อนไขการวัด](../../docs/performance-2026-10-30.md) — ไม่ใช่ field metrics ของเว็บจริง |
+| Production deploy | Source 9468d7f, gh-pages f20882e; ทั้ง 4 หน้าและ entry scripts ตรง build, rules ตรง source, owner grant พร้อม, unauthenticated data reads ถูกปฏิเสธ; หน้า login จริงไม่มี console errors/failed resources | [Release](../../docs/release-5.4.14.md) |
+
+**ยังต้องตรวจด้วยผู้ใช้/อุปกรณ์จริง:** production password login และทุกหน้าหลังล็อกอิน, UI พร้อมกันสองเครื่องและ reconnect, live YouTube/API key rotation, Google/native TTS กับเสียงจริงและ iOS unlock, เครื่องพิมพ์/ขนาดฉลาก, PWA update บนอุปกรณ์ที่ติดตั้งอยู่ รวมถึงการตั้งค่าบัญชี Python transcriber ของเครื่องใช้งานจริง ห้ามเปลี่ยนสถานะรายการเหล่านี้เป็นผ่านจากหลักฐาน emulator/build เพียงอย่างเดียว
+
+## 🎨 ผลตรวจ UI เพิ่มเติม — Smart Answer (2026-10-30)
+
+- เปลี่ยนเฉพาะโครงสร้าง/สไตล์ ChatPanel และข้อความปุ่มดูสินค้า; คง answer resolver, computed cache และ event handlers เดิม
+- ตรวจ component จริงผ่าน local fixture ที่ใช้ข้อมูลจำลองใน memory และ mock customer listeners; ไม่ใช่การทดสอบ Firebase integration หรือ production login
+- Panel 200/280/390/440 px: คำตอบอยู่นอกฟองข้อความ เป็นลูกของกรอบหลัก กว้างเต็มด้านใน และไม่ล้นกรอบ; ชื่อยาว/metadata wrap, ตรวจขอบดำจาก computed styles และตรวจภาพ desktop/mobile emulation
+- ทดสอบปุ่มดูสินค้าได้ itemId 16, pin เปิด HUD, เปลี่ยนข้อมูล stock แล้วคำตอบในการ์ด/HUD อัปเดต และ bottom gap เป็น 0 เมื่ออยู่ท้ายแชต
+- npm test ผ่าน 321 tests; npm run build ผ่านครบ 4 หน้าและ PWA หลังปรับ UI รอบนี้ ไม่ได้ deploy การเปลี่ยนหน้าตานี้
+- ผลบนอุปกรณ์จริง/เสียง/เครื่องพิมพ์และ UI สองเครื่องยังอยู่ในขอบเขตที่ต้องตรวจเพิ่มตามรายการก่อนหน้า
+
+## 🚀 ผลตรวจ release ล่าสุด — v5.4.15 (2026-10-30)
+
+- รันใหม่ในรอบ release: npm test ผ่าน 321 tests/24 files, test:firebase ผ่าน 23 checks, test:transcriber ผ่าน 3 tests, build:gh ผ่านครบ 4 หน้าและ PWA
+- Benchmark counts ผ่าน: initial 300, price change 1, queue-only 0 sync calls; resolver 2,400 → 200 ครั้ง ตัวเลขเวลาแยกบันทึกใน release report และไม่ใช้แทนความเร็ว production
+- Browser fixture: panel 200/280/390/440 px ไม่ล้น; black outlines และ full-width panel ถูกต้อง; jump itemId 16, pin/HUD reactive และหมดอายุ, quick-order dialog เปิด/ยกเลิกได้, question tab กรอง 3 คำถามโดยไม่รวม buy
+- Scroll: อยู่ท้ายแชตแล้วข้อความใหม่ตามลงล่าง และเลื่อนขึ้นอ่านแล้วไม่ถูกดึงลงเมื่อมีข้อความใหม่
+- ตรวจครบทุกหมวดโดยแยก automated/browser/source review/อุปกรณ์จริงตาม [coverage report](../../docs/release-5.4.15.md#checklist-coverage); production rules และ admin grant ตรวจแบบอ่านอย่างเดียว พร้อมใช้งานเดิม
+- ผล deploy และตรวจไฟล์เว็บจริงจะบันทึกใน [release report](../../docs/release-5.4.15.md#deployment) หลังเผยแพร่เสร็จ; เสียง/เครื่องพิมพ์/iPad จริงและ production password login ยังไม่ได้ทดสอบในรอบนี้

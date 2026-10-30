@@ -156,3 +156,9 @@ _Please acknowledge that you understand these rules. If I ask for a change, ensu
 - Grouped owner items may be passed to the canonical delivery transaction helper; keep shipped-item isolation and transaction guards intact. Other callers still use the existing stock-snapshot API.
 - Smart Answer cache entries must track Vue reactive dependencies, including nested stock edits and replaced customer/address snapshots. Use weak chat keys, check live blacklist/type before returning answers, and include the complete answer in row memo invalidation so address/price edits remain visible.
 - Run `npm run benchmark:performance` for the reproducible 300-customer/200-question workload. Report synthetic timing and local browser measurements with their environment; never equate these with production or device-wide results.
+
+## Smart Answer layout (2026-10-30)
+
+- Render the Smart Answer panel as a direct child of the main chat row, outside the customer's bubble, spanning the full inner row width including the avatar column. Keep equal inner margins and a separate, dark status panel.
+- Use thin black text shadows for names, timestamps, customer messages and answer text/buttons. Long names, metadata and pills must wrap or truncate intentionally without overflowing narrow chat panels; preserve Thai glyphs and readable line height.
+- Keep real-time computed answers, row memo invalidation, the 25-second pin, item jump, profile edit and quick-order actions. This is a visual-only change: do not add Firebase reads/writes or audio playback for answers.

@@ -375,7 +375,7 @@ description: Mandatory verification checklist after every code change
 - ตรวจ component จริงผ่าน local fixture ที่ใช้ข้อมูลจำลองใน memory และ mock customer listeners; ไม่ใช่การทดสอบ Firebase integration หรือ production login
 - Panel 200/280/390/440 px: คำตอบอยู่นอกฟองข้อความ เป็นลูกของกรอบหลัก กว้างเต็มด้านใน และไม่ล้นกรอบ; ชื่อยาว/metadata wrap, ตรวจขอบดำจาก computed styles และตรวจภาพ desktop/mobile emulation
 - ทดสอบปุ่มดูสินค้าได้ itemId 16, pin เปิด HUD, เปลี่ยนข้อมูล stock แล้วคำตอบในการ์ด/HUD อัปเดต และ bottom gap เป็น 0 เมื่ออยู่ท้ายแชต
-- npm test ผ่าน 321 tests; npm run build ผ่านครบ 4 หน้าและ PWA หลังปรับ UI รอบนี้ ไม่ได้ deploy การเปลี่ยนหน้าตานี้
+- npm test ผ่าน 321 tests; npm run build ผ่านครบ 4 หน้าและ PWA หลังปรับ UI รอบออกแบบ ยังไม่ได้ deploy ณ ตอนนั้น; เผยแพร่ภายหลังใน release 5.4.15 ตามผลล่าสุดด้านล่าง
 - ผลบนอุปกรณ์จริง/เสียง/เครื่องพิมพ์และ UI สองเครื่องยังอยู่ในขอบเขตที่ต้องตรวจเพิ่มตามรายการก่อนหน้า
 
 ## 🚀 ผลตรวจ release ล่าสุด — v5.4.15 (2026-10-30)
@@ -385,4 +385,5 @@ description: Mandatory verification checklist after every code change
 - Browser fixture: panel 200/280/390/440 px ไม่ล้น; black outlines และ full-width panel ถูกต้อง; jump itemId 16, pin/HUD reactive และหมดอายุ, quick-order dialog เปิด/ยกเลิกได้, question tab กรอง 3 คำถามโดยไม่รวม buy
 - Scroll: อยู่ท้ายแชตแล้วข้อความใหม่ตามลงล่าง และเลื่อนขึ้นอ่านแล้วไม่ถูกดึงลงเมื่อมีข้อความใหม่
 - ตรวจครบทุกหมวดโดยแยก automated/browser/source review/อุปกรณ์จริงตาม [coverage report](../../docs/release-5.4.15.md#checklist-coverage); production rules และ admin grant ตรวจแบบอ่านอย่างเดียว พร้อมใช้งานเดิม
-- ผล deploy และตรวจไฟล์เว็บจริงจะบันทึกใน [release report](../../docs/release-5.4.15.md#deployment) หลังเผยแพร่เสร็จ; เสียง/เครื่องพิมพ์/iPad จริงและ production password login ยังไม่ได้ทดสอบในรอบนี้
+- Deploy 5.4.15 สำเร็จ: source c4cec82, gh-pages 8ecfc81; HTML/entry JS ทั้ง 4 หน้าตรง build, browser โหลด CSS แผงเต็มความกว้างแล้ว ไม่มี failed resources/console errors ที่หน้า login; unauthenticated data reads ถูกปฏิเสธ ดู [release report](../../docs/release-5.4.15.md#deployment)
+- เสียง/เครื่องพิมพ์/iPad จริง, PWA update บนอุปกรณ์ที่ติดตั้งอยู่ และ production password login ยังไม่ได้ทดสอบในรอบนี้

@@ -38,7 +38,12 @@ Project `manowlive-chat` already has Email/Password enabled and an enabled owner
 
 ## Deployment
 
-Pre-deployment checks passed. Source push, GitHub Pages publication and live artifact verification follow in this release record once completed.
+- Source release commit `c4cec82` pushed to `main`; `npm run deploy:gh` completed and published `8ecfc81` to `gh-pages`.
+- Live URL: https://peng24.github.io/manowzab-v4/ .
+- GitHub Pages initially served the previous build during propagation; the subsequent cache-busted check confirmed main, shipping/, history/ and address/ all returned HTTP 200 with HTML and entry JavaScript exactly matching the local 5.4.15 build.
+- Live browser loaded `main-DlsMRA6h.js`, the new full-width answer CSS and email/password login inputs. No failed resources, console warnings or errors were observed on the login page.
+- Unauthenticated production reads of stock, delivery_customers and address_book returned HTTP 401. Existing production rules, administrator grants and passwords were not modified in this release.
+- Local test emulators and Vite preview were stopped after verification. Physical audio/iOS/printer, installed-device PWA update and production password login remain outside the checks performed in this release.
 
 ## Rule updates
 

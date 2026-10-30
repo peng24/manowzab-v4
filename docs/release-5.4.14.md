@@ -19,9 +19,20 @@ Version and lockfile are aligned at 5.4.14. The newest changelog entry is dated 
 
 - Firebase CLI owner signed in interactively.
 - Confirmed Email/Password is enabled in project `manowlive-chat` and an existing, enabled owner account has a password. No password reset is needed.
-- Existing production RTDB rules were backed up locally to ignored `tmp/release-firebase-rules-before.json`.
-- Owner's `admin_users` grant was absent. Automatic approval review rejected the proposed permanent administrator grant pending explicit user approval. No grant or database rules were changed by that rejected action.
-- Deploy new rules and frontend only after the administrator grant is ready, to preserve access to the new login. The deployment instructions and Python credential requirements remain in `firebase-auth-migration.md`.
+- Production RTDB rules were inspected before deployment. The post-deployment audit snapshot is retained locally in ignored `tmp/release-firebase-rules-deployed.json`.
+- Owner's `admin_users` grant was initially absent. Automatic approval review rejected the first proposed grant. The user then explicitly approved permanent administrator access for the signed-in owner and continuation of rules/frontend deployment. The grant was written and read back successfully; the existing password was unchanged.
+- Firebase CLI deployed `database.rules.json` to `manowlive-chat-default-rtdb`; compilation and release succeeded. A later audit confirmed Email/Password, the enabled owner account and its administrator grant remain ready.
+- The deployment instructions and Python credential requirements remain in `firebase-auth-migration.md`.
+
+## Published release verification
+
+- Source release commit: `9468d7f` on `main`, pushed to origin.
+- `npm run deploy:gh`: succeeded; published build commit `f20882e` on `gh-pages`.
+- Live site: https://peng24.github.io/manowzab-v4/ .
+- Fetched main, shipping, history and address pages from GitHub Pages: all HTTP 200. Each published HTML file and its entry JavaScript exactly matched the local release build.
+- Unauthenticated requests to production stock, delivery_customers and address_book returned HTTP 401 as expected.
+- Chrome DevTools opened the live login page and confirmed email/password inputs, no failed resource requests and no console warnings/errors. An actual production password login was not attempted; the owner's password was not requested or changed.
+- Each device should load the updated app and sign in with the authorized Firebase account. Browser-local sessions from the old login do not carry over.
 
 ## Rule review
 

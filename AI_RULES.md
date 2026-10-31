@@ -162,3 +162,13 @@ _Please acknowledge that you understand these rules. If I ask for a change, ensu
 - Render the Smart Answer panel as a direct child of the main chat row, outside the customer's bubble, spanning the full inner row width including the avatar column. Keep equal inner margins and a separate, dark status panel.
 - Use thin black text shadows for names, timestamps, customer messages and answer text/buttons. Long names, metadata and pills must wrap or truncate intentionally without overflowing narrow chat panels; preserve Thai glyphs and readable line height.
 - Keep real-time computed answers, row memo invalidation, the 25-second pin, item jump, profile edit and quick-order actions. This is a visual-only change: do not add Firebase reads/writes or audio playback for answers.
+
+## Chat Log Regression & Request Safety (2026-10-31)
+
+- Normalize intent matching through normalizeChatText (Thai digits + zero-width stripping); preserve the original message for display/audio.
+- shippingRegex detects topics only. Use isShippingRequest/isShippingInquiry before readiness/history/date writes. Hold requests must not set delivery dates, including named weekdays/dates.
+- Share isCancellationRequest and isTryRequest between parser and processor. Cancellation questions, conditional statements, descriptive “ที่หลุดจอง” notes, embedded English cc/cancel, and night references must not cause cancellation. Explicit คืน/ถอน/สละสิทธิ์ + number must cancel that ID, never the latest fallback.
+- Keep numeric captures complete when rejecting quantity/price/measurement suffixes. Never infer item IDs from body measurements or unnumbered contextual chat. Keep conversational fragments out of nickname learning.
+- Preserve every message and settle every Promise in the first poll batch of a new video. Capture videoId when enqueueing and skip stale queued work before processing; never clear the active batch inside processSingleMessage.
+- Regex changes require the reviewed anonymized 307-row corpus, boundary tests, and actual useChatProcessor side-effect tests. Expected labels must be reviewed independently of the changed parser. Keep raw logs/identifiers outside tracked fixtures; archive analyzed files only after hash checks, with no overwrite on filename collisions.
+- See docs/chat-regex-review-2026-10-31.md and /verify 2.11–2.15. Passing this corpus is regression evidence, not a claim of 100% accuracy on new chat.

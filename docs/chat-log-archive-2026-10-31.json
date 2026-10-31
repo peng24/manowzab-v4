@@ -1,0 +1,46 @@
+﻿{
+    "analyzedOn":  "2026-10-31",
+    "sourceDirectory":  "C:\\Users\\PR-Notebook-new\\Documents\\Flash Express COD\\Logs\\Chat",
+    "archiveDirectory":  "C:\\Users\\PR-Notebook-new\\Documents\\Flash Express COD\\Logs\\Chat\\old",
+    "analyzedFiles":  5,
+    "analyzedMessages":  307,
+    "preservedExistingNameCollisions":  3,
+    "report":  "chat-regex-review-2026-10-31.md",
+    "files":  [
+                  {
+                      "source":  "20-10-2569.csv",
+                      "destination":  "20-10-2569__reviewed-2026-10-31-4277ea02.csv",
+                      "rows":  42,
+                      "sha256":  "4277ea02ab2423793893f476fd8bada7c75ace62b22bfb78f6f99c92b8fc58b9",
+                      "verified":  true
+                  },
+                  {
+                      "source":  "21-10-2569.csv",
+                      "destination":  "21-10-2569__reviewed-2026-10-31-11995722.csv",
+                      "rows":  12,
+                      "sha256":  "1199572215c6802ac27cbd95d0de18def8da046533b8edf1a029ba970482745a",
+                      "verified":  true
+                  },
+                  {
+                      "source":  "23-10-69.csv",
+                      "destination":  "23-10-69__reviewed-2026-10-31-c8f86127.csv",
+                      "rows":  122,
+                      "sha256":  "c8f86127b43b59098b36c70317131bce83cce55630b0a597500dac83ae5948a9",
+                      "verified":  true
+                  },
+                  {
+                      "source":  "27-10-69.csv",
+                      "destination":  "27-10-69.csv",
+                      "rows":  94,
+                      "sha256":  "f3b77e5542a01e43e170d82c082817bc02b3319a451ec498f1086c1e9f563061",
+                      "verified":  true
+                  },
+                  {
+                      "source":  "28-10-69.csv",
+                      "destination":  "28-10-69.csv",
+                      "rows":  37,
+                      "sha256":  "644a9347c23240b991efa98f52293763ba64798ab88f3f32da2a4d8f077ba199",
+                      "verified":  true
+                  }
+              ]
+}

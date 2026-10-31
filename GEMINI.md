@@ -96,3 +96,13 @@ We have adapted and installed developer-agent workflows from `9arm-skills` into 
 - **Proactive Rule & `/verify` Auto-Evolution (คิดและอัปเดตกฎ + `/verify` อัตโนมัติทุกครั้ง)**: Every time you make code changes, **proactively evaluate** whether any project rules (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) or `/verify` items (`.agents/workflows/verify.md`) should be updated. If so, **update them immediately without waiting to be asked**, and **always report the rule/`/verify` updates to the user**.
 - **Automated Deploy Command ("อัพเลย")**: When the user says **"อัพเลย"**, automatically run `/verify` (including auto-updating rules/`/verify`) -> `/update` -> Git Commit & Push to GitHub -> `npm run deploy` to GitHub Pages without stopping.
 
+## Chat Log Regression & Request Safety (2026-10-31)
+
+- Normalize intent matching through normalizeChatText (Thai digits + zero-width stripping); preserve the original message for display/audio.
+- shippingRegex detects topics only. Use isShippingRequest/isShippingInquiry before readiness/history/date writes. Hold requests must not set delivery dates, including named weekdays/dates.
+- Share isCancellationRequest and isTryRequest between parser and processor. Cancellation questions, conditional statements, descriptive “ที่หลุดจอง” notes, embedded English cc/cancel, and night references must not cause cancellation. Explicit คืน/ถอน/สละสิทธิ์ + number must cancel that ID, never the latest fallback.
+- Keep numeric captures complete when rejecting quantity/price/measurement suffixes. Never infer item IDs from body measurements or unnumbered contextual chat. Keep conversational fragments out of nickname learning.
+- Preserve every message and settle every Promise in the first poll batch of a new video. Capture videoId when enqueueing and skip stale queued work before processing; never clear the active batch inside processSingleMessage.
+- Regex changes require the reviewed anonymized 307-row corpus, boundary tests, and actual useChatProcessor side-effect tests. Expected labels must be reviewed independently of the changed parser. Keep raw logs/identifiers outside tracked fixtures; archive analyzed files only after hash checks, with no overwrite on filename collisions.
+- See docs/chat-regex-review-2026-10-31.md and /verify 2.11–2.15. Passing this corpus is regression evidence, not a claim of 100% accuracy on new chat.
+

@@ -7,7 +7,7 @@
 export const MAX_ITEM_ID = 300;
 
 // 🚀 Regex patterns enhanced from real live stream CSV logs (v4.67.0 / v5.2.0 / v5.3.3)
-export const multiBuyRegex = /^(?:([ก-๙a-zA-Z][ก-๙a-zA-Z\s]*?)\s+)?(?:F|f|cf|CF|รับ|เอา|เิา|จอง|เมื่อวาน|เมือวาน|ย้อนหลัง)?\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
+export const multiBuyRegex = /^(?:([ก-๙a-zA-Z][ก-๙a-zA-Z\s]*?)\s+)?(?:F|f|cf|CF|รับ|เอา|เิา|จอง|เมื่อวาน|เมือวาน|ย้อนหลัง)?\s*ๆ*\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
 export const adminProxyNumFirstRegex = /^(\d+)\s+([ก-๛a-zA-Z].*)$/;
 export const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z]+(?:\s+[ก-๛a-zA-Z]+)*?)\s*(?:[-_:=]|\s*(?:เอา|รับ|จอง|เอฟ|cf|CF|เิา|เค|ok|ของ|เมื่อวาน|เมือวาน|เมี่อวาน|ย้อนหลัง)\s*)?\s*(\d+)(?:\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ))?$/i; // Supports "พี่อ้อย20", "อิ๋ว เอา 22", "ตุ๊ก บำรุงรัตน์ 18", "ตุ๊ก บำรุงรัตน์ เมือวาน 32"
 export const adminActionNoteRegex = /^([ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา|cf|CF|จอง|เิา|เค|ok|สี|ลาย|ไซส์|ไซร์|ไชส์|ขนาด|อยากได้|อยสกได้|เพิ่ม|ลด|เปลี่ยน|เลือก|ส่งรูป|พรุ่งนี้ส่งรูป|เมื่อวาน|เมือวาน|เมี่อวาน|ย้อนหลัง)/i;
@@ -29,7 +29,7 @@ export const backdatedNoteRegex = /(?:เมื่อวาน|เมือว�
 export const adminSizeSelectionNoteRegex = /(?:อยสกได้|อยากได้|ไซส์|ไซร์|ไชส์|ขนาด|เพิ่มเป็น|เลือกให้|เล่นไลน์|ไม่เรื่องมาก|\d+\s*ตัว|ตัวไหนก็ได้|ถ้าใส่ไม่ได้|เอาตัวอก\s*\d+|เอาตัวที่|เอาอยู่|ส่งรูปให้ดู|พรุ่งนี้ส่งรูป|ลายจุดเล็ก|เสื้อเชิ้ต\s*อก\s*\d+|(?:^|\s)[2-9]\s*xl(?:\s|$)|สีฟ้า|สีแดง|สีขาว|สีดำ|สีชมพู|สีเขียว|สีเหลือง|สีส้ม|สีม่วง|สีกรม)/i;
 
 // 📏 Chest/bust size range guard: e.g. "52-54", "50-52", "อก 42-44"
-export const sizeRangeRegex = /^\s*(?:อก|ไซส์|ไซร์|ไชส์|ขนาด)?\s*(\d{2})\s*[-/]\s*(\d{2})\s*(?:นิ้ว)?\s*$/i;
+export const sizeRangeRegex = /^\s*(?:อก|ไซส์|ไซร์|ไชส์|ไซด์|ขนาด)?\s*(\d{2})\s*[-/]\s*(\d{2})\s*(?:นิ้ว)?\s*$/i;
 
 // 📦 Quantity Unit pattern: e.g. "3ตัว", "2ตัว", "1 ตัว", "4ชิ้น", "3สี" (excluding specific color names like "34 สีขาว")
 export const quantityUnitRegex = /\d+\s*(?:(?:ตัว|ชุด|ใบ|คู่|รายการ)(?![\w\u0E00-\u0E7F])|ชิ้น|ผืน|กล่อง|แพ็ค|แพค|สี(?!ขาว|ดำ|แดง|ฟ้า|ชมพู|เขียว|เหลือง|ส้ม|ม่วง|กรม|น้ำเงิน|ครีม|เทา|น้ำตาล|โอรส|บานเย็น|เลือดหมู|ทอง|เงิน|เนื้อ|กากี|มิ้น|พาสเทล))/;
@@ -37,23 +37,24 @@ export const quantityUnitRegex = /\d+\s*(?:(?:ตัว|ชุด|ใบ|คู�
 // 💰 Price pattern: e.g. "30บาท", "ใบละ200", "ตัวละ 150"
 export const pricePatternRegex = /(?:ใบละ|ตัวละ|ชิ้นละ|ราคา|ชุดละ)\s*\d+|\d+\s*(?:บาท|บ\.|ใบละ|ตัวละ|ชิ้นละ|฿)/;
 
-export const shippingRegex = /โอน|ส่ง(?!\s*(?:รูป|ภาพ|สติกเกอร์|ข้อความ|คลิป|เสียง|กำลังใจ|ใจ|จุ๊บ))|สลิป|รวมยอด|สรุปยอด|แจ้งยอด|ดูยอด|เช็คยอด|คิดยอด|ยอดโอน|ยอด|ที่อยู่|ปลายทาง|พร้อม|รอบส่ง|พัสดุ|เลขพัสดุ|เช็คเลข|แจ้งโอน|ขนส่ง|เคอรี่|แฟลช|ไปรษณีย์|ค่าส่ง|โอนแล้ว|flash|kerry|j&t|jt|ส่งเลย|ส่งวันนี้|ส่งของ|ส่งให้|ส่งมา|ฝากไว้ก่อน|ฝากไว้|ฝาก/i;
-export const holdRegex = /ฝากไว้ก่อน|ฝากไว้|ฝากก่อน|ฝากของ|ยังไม่ส่ง|ฝาก/i;
-export const questionRegex = /(?:รอบอก|วัดอก|ติดอก|เสื้ออก|(?<!ด|บ|อ|น|ศ|หล|ปล|หม|ต|ซ|ล|ก)อก(?!ลม))|เอว|สะโพก|วงแขน|ต้นแขน|ไหล่|ชายเสื้อ|ความยาว|ราคา|เท่าไหร่|เท่าไร|เท่าไหร|ทไหร|กี่บาท|แบบไหน|ผ้าอะไร|เนื้อผ้าอะไร|สีอะไร|มีสี|กี่สี|สีไหน|ตำหนิ|ไหม|มั้ย|มั๊ย|ไม๊|ป่าว|หรือเปล่า|ขอดู|รีวิว|ว่างไหม|ว่างมั้ย|เหลือไหม|เหลือมั้ย|ยังอยู่|อยู่มั๊ย|อยู่ไหม|มีไหม|มีมั้ย|เสื้ออะไร|ตัวอะไร|เป็นแบบ|คือแบบ|ไซส์|ไซร์|ไชส์|ระหัส|รหัสอะไร|ใหม|หรอ|เหรอ|ปะ|ยังไง|อะไร|กี่|นิ้ว|เซน|เซนติเมตร|โล|กิโล|ขนาด|กว้าง|สูง|หนัก|\?/;
+// Topic detection only. Use isShippingRequest before any readiness/date writes.
+export const shippingRegex = /โอน|ส่ง(?!\s*(?:รูป|ภาพ|สติกเกอร์|ข้อความ|คลิป|เสียง|กำลังใจ|ใจ|จุ๊บ))|สลิป|รวมยอด|สรุปยอด|แจ้งยอด|ดูยอด|เช็คยอด|คิดยอด|ยอดโอน|ยอด|ที่อยู่|ปลายทาง|พร้อม|รอบส่ง|พัสดุ|เลขพัสดุ|เช็คเลข|แจ้งโอน|ขนส่ง|เคอรี่|แฟลช|ไปรษณีย์|ค่าส่ง|โอนแล้ว|flash|kerry|j&t|jt|ส่งเลย|ส่งวันนี้|ส่งของ|ส่งให้|ส่งมา|ฝากไว้ก่อน|ฝากไว้|ฝาก|เก็บ(?:ไว้|ใว้)/i;
+export const holdRegex = /ฝาก|เก็บ(?:ไว้|ใว้)|เอา(?:ไว้|ใว้).{0,20}ค่อยส่ง|(?:ยังไม่(?:ต้อง)?|อย่าเพิ่ง|ไม่ต้อง|ค่อย)ส่ง/i;
+export const questionRegex = /(?:รอบอก|วัดอก|ติดอก|เสื้ออก|(?<!ด|บ|อ|น|ศ|หล|ปล|หม|ต|ซ|ล|ก)อก(?!ลม))|เอว|พุง|สะโพก|วงแขน|ต้นแขน|ไหล่|ชายเสื้อ|ความยาว|ราคา|เท่าไหร่|เท่าไร|เท่าไหร|ทไหร|กี่บาท|แบบไหน|ผ้าอะไร|เนื้อผ้าอะไร|สีอะไร|มีสี|กี่สี|สีไหน|ตำหนิ|ไหม|มั้ย|มั๊ย|ไม๊|ป่าว|หรือเปล่า|รึเปล่า|หรือยัง|รึยัง|วันไหน|เมื่อไหร่|เมื่อไร|ขอดู|รีวิว|ว่างไหม|ว่างมั้ย|เหลือไหม|เหลือมั้ย|ยังอยู่|อยู่มั๊ย|อยู่ไหม|มีไหม|มีมั้ย|เสื้ออะไร|ตัวอะไร|เป็นแบบ|คือแบบ|ไซส์|ไซร์|ไชส์|ไซด์|ระหัส|รหัสอะไร|เบอร์ไร|ใหม|หรอ|เหรอ|ปะ|ยังไง|อะไร|กี่|นิ้ว|เซน|เซนติเมตร|โล|กิโล|ขนาด|กว้าง|สูง|หนัก|\?/;
 export const pureNumberRegex = /^\s*(\d+)\s*$/;
 export const fuzzyNumberRegex = /^\s*[,.\/;:\-_=]*\s*(\d+)\s*[,.\/;:\-_=]*\s*$/;
 export const tryRegex = /(?:(?<!ไม่ต้อง)(?:ลองโลด|ลอง|ขอลอง|ขอดู|โชว์|ดู|ทาบ|รีวิว)|(?:ใส่|ไส่).{0,10}?ให้ดู|ลอง.{0,6}?ให้.{0,4}?ดู|ลองใส่|ลองชุด|\d+\s*บอง|บอง\s*\d+)/i;
-export const explicitBuyRegex = /(?:(?:(?:F|f|cf|CF|รับ|เอา|เิา|เค|รหัส|ระหัส|เบอร์|รายการที่|รายการ|ชุดที่|ชุด|ใบที่|ตัวที่|จอง|โอเค|ok|ตกลง|ไม่ต้องลอง(?:ก็ได้)?|ถูกใจ(?:มาก)?)\s*(?:ใบที่|ตัวที่|ชุดที่|รายการที่|รหัส|ระหัส|เบอร์)?\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|นะคะ|นะครับ)?|(?<!ไม่)(?:ใช่|ไช่|ใข่)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|นะคะ|นะครับ))\s*(\d+)(?!\s*(?:ตัว|ชุด|ใบ|คู่|รายการ|ชิ้น|บาท|นิ้ว)))|(?:(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|นะคะ|นะครับ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา|เค|รหัส|ระหัส|เบอร์|รายการที่|รายการ|ชุดที่|ชุด|จอง|โอเค|ok|ตกลง))/i;
+export const explicitBuyRegex = /(?:(?:(?:F|f|cf|CF|รับ|เอา|เิา|เค|รหัส|ระหัส|เบอร์|รายการที่|รายการ|ชุดที่|ชุด|ใบที่|ตัวที่|จอง|โอเค|ok|ตกลง|ไม่ต้องลอง(?:ก็ได้)?|ถูกใจ(?:มาก)?)\s*ๆ*\s*(?:ใบที่|ตัวที่|ชุดที่|รายการที่|รหัส|ระหัส|เบอร์)?\s*(?:นะครับ|นะคะ|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?|(?<!ไม่)(?:ใช่|ไช่|ใข่|ได้)\s*(?:นะครับ|นะคะ|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ))\s*(\d+)(?!\d|\s*(?:ตัว|ชุด|ใบ|คู่|รายการ|ชิ้น|บาท|นิ้ว)))|(?:(\d+)\s*(?:นะครับ|นะคะ|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ)?\s*(?:F|f|cf|CF|รับ|เอา|เิา|เค|รหัส|ระหัส|เบอร์|รายการที่|รายการ|ชุดที่|ชุด|จอง|โอเค|ok|ตกลง))/i;
 export const numberWithPoliteRegex = /^.{0,10}?(\d+)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|คะ|นะคะ|นะครับ|พี่|ป้า|น้า|อา|แม่|น้อง|นาว|ฝาก|\/\/)/;
 export const dashBuyRegex = /^([^-]+)\s*[-]\s*(\d+)$/;
 export const customerNameNumRegex = /^([ก-๛a-zA-Z](?:[ก-๛a-zA-Z\s]*[ก-๛a-zA-Z])?)\s+(\d+)$/;
 export const numAndDescRegex = /^(\d+)\s*([ก-๛a-zA-Z\s\(\)\[\]\-]+)$/;
-export const cancelKeywordRegex = /cc|cancel|ยกเลิก|ยกเลก|ยกเริก|ยอเลิก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่าน|(?<!เมื่อ|กลาง|ทั้ง|ข้าม)คืน|ไม่รับ|ถอน|สละสิทธิ์|สละ/i;
-export const cancelWithNumRegex = /(?:cc|cancel|ยกเลิก|ยกเลก|ยกเริก|ยอเลิก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|ไม่รับ|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่านโลด|ผ่าน)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|นะคะ|นะครับ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*[-]?\s*(\d+(?:[\s,_]+\d+)*)(?:\s+(?!นะคะ|นะครับ|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|มัน|เพราะ|ตัว|สี|ไซส์|ไซร์|ไชส์|เอา|รับ)([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*))?/i;
-export const cancelNumFirstRegex = /(\d+(?:[\s,_]+\d+)*)\s*(?:([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s+)?(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|นะคะ|นะครับ|ก่อน|ก็ได้|ให้เค้า|ไปเลย)*\s*(?:cc|cancel|ยกเลิก|ยกเลก|ยกเริก|ยอเลิก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|ไม่รับ|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i;
-export const cancelNameKeywordNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s+(?:cc|cancel|ยกเลิก|ยกเลก|ยกเริก|ยอเลิก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|ไม่รับ|หลุด|เปลี่ยนใจ)\s*[-]?\s*(\d+(?:[\s,_]+\d+)*)/i;
+export const cancelKeywordRegex = /(?<![a-z])(?:cc|cancel)(?![a-z])|ยกเลิก|ยกเลก|ยกเริก|ยอเลิก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|ไม่เอา|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่าน|(?<!เมื่อ|กลาง|ทั้ง|ข้าม)คืน(?!นี้|วัน)|ไม่รับ|ถอน|สละสิทธิ์|สละ/i;
+export const cancelWithNumRegex = /(?:(?<![a-z])(?:cc|cancel)(?![a-z])|ยกเลิก|ยกเลก|ยกเริก|ยอเลิก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|คืน|ถอน|สละสิทธิ์|สละ|ไม่เอา|ไม่รับ|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า|ผ่านโลด|ผ่าน)\s*(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|นะคะ|นะครับ|ก่อน|ก็ได้|ให้เค้า|ไปเลย){0,8}\s*[-]?\s*(\d+(?:[\s,_]+\d+)*)(?:\s+(?!นะคะ|นะครับ|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|มัน|เพราะ|ตัว|สี|ไซส์|ไซร์|ไชส์|เอา|รับ)([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*))?/i;
+export const cancelNumFirstRegex = /(\d+(?:[\s,_]+\d+)*)\s*(?:([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s+)?(?:ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|นะคะ|นะครับ|ก่อน|ก็ได้|ให้เค้า|ไปเลย){0,8}\s*(?:(?<![a-z])(?:cc|cancel)(?![a-z])|ยกเลิก|ยกเลก|ยกเริก|ยอเลิก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|คืน|ถอน|สละสิทธิ์|สละ|ไม่เอา|ไม่รับ|หลุด|เปลี่ยนใจ|ยกให้|ให้พี่เค้า|ให้เค้า)/i;
+export const cancelNameKeywordNumRegex = /^([ก-๛a-zA-Z][ก-๛a-zA-Z\s]*?)\s+(?:(?<![a-z])(?:cc|cancel)(?![a-z])|ยกเลิก|ยกเลก|ยกเริก|ยอเลิก|ยกเลิกก่อบ|ยกเลิกเลย|ยกเลย|ยกออก|คืน|ถอน|สละสิทธิ์|สละ|ไม่เอา|ไม่รับ|หลุด|เปลี่ยนใจ)\s*[-]?\s*(\d+(?:[\s,_]+\d+)*)/i;
 export const conditionalCancelGuardRegex = /(?:ถ้า|หาก|สมมติ|เปื้อน|เลอะ|มีตำหนิ|ขาด).*?(?:ไม่เอา|ไม่รับ|ยกเลิก|ผ่าน)|ก็ยังไม่(?:เอา|รับ)|(?:ใส่ไม่ได้|คับไป|หลวมไป|เล็กไป|ใหญ่ไป).*?(?:ค่อย|ก็)?(?:ไม่เอา|ไม่รับ|คืน)|^ผ่าน\s*(?:ใหญ่|เล็ก|ไซส์|ไซร์|ไชส์|ตัวใหญ่|ตัวเล็ก)/i;
-export const standalonePassRegex = /^(?:ขอ)?ผ่าน\s*(?:โลด|ก่อน|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|เลย)*$/i;
+export const standalonePassRegex = /^(?:ขอ)?ผ่าน\s*(?:โลด|ก่อน|ค่ะ|ครับ|จ้า|จ้ะ|นะ|คะ|เลย){0,8}$/i;
 export const shipDayOfWeekRegex = /ส่ง(?:วัน)?\s*(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)/i;
 
 /**
@@ -87,10 +88,10 @@ export function calcNextDayOfWeekDate(dayName, referenceDate = new Date()) {
 }
 
 // 🛡️ Guard: Number followed by question keyword → NOT a booking (e.g. "32อกเท่าไร", "48ราคา", "43วงแขนเท่าไรคะ")
-export const numberWithQuestionRegex = /^\s*\d+\s*(?:อก|เอว|สะโพก|ยาว|ความยาว|วงแขน|ต้นแขน|ไหล่|ราคา|เท่าไ(?:หร่|ร)|ทไหร|กี่บาท|อยู่(?:มั๊ย|ไหม|ม[ัั้]ย)|ยังอยู่|ว่าง(?:ไหม|มั้ย)?|เหลือ(?:ไหม|มั้ย)?|เสื้ออะไร|ตัวอะไร|เป็นแบบ|คือแบบ|แบบไหน|ผ้า|สีอะไร|ไซส์|ไซร์|ไชส์|เท่าไ)/i;
+export const numberWithQuestionRegex = /^\s*\d+\s*(?:อก|เอว|พุง|สะโพก|ยาว|ความยาว|วงแขน|ต้นแขน|ไหล่|ราคา|เท่าไ(?:หร่|ร)|ทไหร|กี่บาท|อยู่(?:มั๊ย|ไหม|ม[ัั้]ย)|ยังอยู่|ว่าง(?:ไหม|มั้ย)?|เหลือ(?:ไหม|มั้ย)?|เสื้ออะไร|ตัวอะไร|เป็นแบบ|คือแบบ|แบบไหน|ผ้า|สีอะไร|ไซส์|ไซร์|ไชส์|ไซด์|เท่าไ)/i;
 
 // 🛡️ Guard: Negation or fit complaint + number → NOT a booking (e.g. "ไม่ใช่19", "40 ใส่ไม่ได้")
-export const negationGuardRegex = /(?:ไม่ใช่|ไม่ทัน)\s*\d+|\d+\s*(?:ใส่ไม่ได้|ใส่ไม่พอดี|คับไป|หลวมไป|เล็กไป|ใหญ่ไป|สั้นไป|ยาวไป|ติดพุง|ติดอก|ติดแขน|ไม่ทัน)/i;
+export const negationGuardRegex = /(?:ไม่ใช่|ไม่ทัน)\s*\d+|\d+\s*(?:ใส่ไม่(?:ได้|ใด้)|ใส่ไม่พอดี|คับไป|หลวมไป|เล็กไป|ใหญ่ไป|สั้นไป|ยาวไป|ติดพุง|ติดอก|ติดแขน|ไม่ทัน)/i;
 
 // 🚀 Static Lookup Map for O(1) Thai-to-Arabic Numeral Conversion (3x faster than charCode math)
 const THAI_TO_ARABIC_MAP = {
@@ -106,6 +107,51 @@ const THAI_TO_ARABIC_MAP = {
 export function thaiToArabic(text) {
   if (!text) return "";
   return text.replace(/[๐-๙]/g, (ch) => THAI_TO_ARABIC_MAP[ch]);
+}
+
+export function normalizeChatText(text) {
+  return thaiToArabic(text || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+}
+
+const REQUEST_QUESTION_REGEX = /ไหม|มั้ย|มั๊ย|ไม๊|หรือเปล่า|รึเปล่า|หรือยัง|รึยัง|\?/i;
+const CANCEL_REFERENCE_REGEX = /ที่\s*หลุด(?:จอง|คิว)?|หลุด(?:จอง|คิว).{0,20}(?:สี|ลาย|ตัว)|คืน(?:นี้|วัน)/i;
+const EXPLICIT_CANCEL_REGEX = /(?<![a-z])(?:cc|cancel)(?![a-z])|ยกเลิก|ยกเลก|ยกเริก|ยอเลิก|ไม่เอา|ไม่รับ|ถอน|สละสิทธิ์/i;
+const DIRECT_SHIPPING_QUESTION_REGEX = /(?:ส่ง|โอน|สลิป).{0,24}(?:ได้ไหม|ได้มั้ย|ได้รึเปล่า)|(?:ส่ง|โอน)แล้ว\s*ใช่ไหม|(?:ส่ง|จัดส่ง)(?:แล้ว)?\s*(?:หรือยัง|รึยัง|วันไหน|เมื่อไหร่|เมื่อไร|รอบไหน)/i;
+const SHIPPING_COMMAND_REGEX = /ส่งเลย|ส่งวันนี้|ส่งพรุ่งนี้|ส่งวันพรุ่งนี้|ส่ง(?:วัน)?\s*(?:อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)|ส่ง(?:วันที่)?\s*\d{1,2}|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|โอนแล้ว|แจ้งโอน|ส่งสลิป/i;
+const SHIPPING_INQUIRY_REGEX = /(?:มี|กี่|เท่า|ไหม|มั้ย|หรือยัง|รึยัง|หรือเปล่า|รึเปล่า|เมื่อไหร่|วันไหน|\?).{0,40}(?:ฝาก|ส่ง|โอน|ที่อยู่|ปลายทาง|พัสดุ)|(?:ฝาก|ส่ง|โอน|ที่อยู่|ปลายทาง|พัสดุ|ค่าส่ง).{0,40}(?:ไหม|มั้ย|มั๊ย|ไม๊|หรือยัง|รึยัง|หรือเปล่า|รึเปล่า|เมื่อไหร่|เมื่อไร|วันไหน|รอบไหน|\?)/i;
+const CONVERSATIONAL_NAME_GUARD_REGEX = /ก็ได้|แอด(?:ไลน์)?(?:ได้|ใด้)?แล้ว|ตัดขอบ|เก็บ(?:ไว้|ใว้)|ขอสอบถาม|รึเปล่า|รบกวน/i;
+export const conditionalBuyRegex = /(?:ถ้า|หาก|เผื่อ).{0,40}(?:ใส่|รับ|เอา)|ค่อย(?:เอา|รับ|จอง)/i;
+
+export function isCancellationRequest(text) {
+  const normalized = normalizeChatText(text);
+  if (!normalized || normalized.length > 120 || conditionalCancelGuardRegex.test(normalized) || REQUEST_QUESTION_REGEX.test(normalized)) return false;
+  if (CANCEL_REFERENCE_REGEX.test(normalized) && !EXPLICIT_CANCEL_REGEX.test(normalized)) return false;
+  return cancelKeywordRegex.test(normalized);
+}
+
+export function isShippingInquiry(text) {
+  const normalized = normalizeChatText(text);
+  if (!(shippingRegex.test(normalized) || holdRegex.test(normalized))) return false;
+  if (DIRECT_SHIPPING_QUESTION_REGEX.test(normalized)) return true;
+  if (SHIPPING_COMMAND_REGEX.test(normalized)) return false;
+  return SHIPPING_INQUIRY_REGEX.test(normalized);
+}
+
+export function isShippingRequest(text) {
+  const normalized = normalizeChatText(text);
+  return (shippingRegex.test(normalized) || holdRegex.test(normalized)) &&
+    !isShippingInquiry(normalized) && !isCancellationRequest(normalized);
+}
+
+export function isTryRequest(text) {
+  const normalized = normalizeChatText(text);
+  if (!tryRegex.test(normalized) || isCancellationRequest(normalized)) return false;
+  const commitment = normalized.match(explicitBuyRegex);
+  // An anchored, numbered commitment can precede a casual "ลองดู" comment.
+  const confirmed = commitment?.index === 0 && !questionRegex.test(normalized) &&
+    !conditionalBuyRegex.test(normalized) && !quantityUnitRegex.test(normalized) &&
+    !pricePatternRegex.test(normalized) && !negationGuardRegex.test(normalized);
+  return !confirmed;
 }
 
 // 🚀 Performance: In-Memory Memoization Map for user colors (capped at 500 users)
@@ -196,9 +242,9 @@ const SENTENCE_FRAGMENT_REGEX = /(?:แชท|นอน|พาลูก|ร้�
 const OF_PREFIX_REGEX = /^(?:ของ)\s*/;
 const CLEAN_PUNCT_REGEX = /^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g;
 export const SIZE_PREFIX_ADMIN_NOTE_REGEX = /^(?:[2-9]\s*xl|xs|s|m|l|xl|xxl|xxxl|ฟรีไซส์|ฟรีไซร์|freesize)\s+([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,25})$/i;
-export const GARMENT_CHEST_SUFFIX_NOTE_REGEX = /^(?:เสื้อ[ก-๙a-zA-Z]*\s+)?(?:อก|เอว|สะโพก|ไซส์|ไซร์|ไชส์|ขนาด)\s*\d+\s+([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,25})$/i;
-export const GARMENT_DESC_SUFFIX_NOTE_REGEX = /^(?:เสื้อ|กางเกง|เกง|ชุด|เดรส|กระโปรง|ลาย|สี)[ก-๙a-zA-Z0-9\u0E46]*(?:\s+(?:มีลาย|คอ|ปก|แขน[ก-๙]*|ขา\d*ส่วน|ยีนส์|ที่นาวบอกสวย|สวย)[ก-๙a-zA-Z0-9\u0E46]*)*\s+([ก-๛a-zA-Z]{2,20}(?:\s+[ก-๛a-zA-Z]{2,20})?)$/i;
-export const ADMIN_QUESTION_SUFFIX_NAME_REGEX = /^(?:\d+|(?:เสื้อ|กางเกง|เกง|ชุด|เดรส|กระโปรง|กระเป๋า)[ก-๙a-zA-Z0-9]*)\s*(?:อก|เอว|สะโพก|ยาว|ความยาว|วงแขน|ไหล่|ราคา|ไซส์|ไซร์|ไชส์)\s*(?:เท่าไหร่|เท่าไร|เท่าไหร|ทไหร|กี่บาท|เท่าไ)?\s+([ก-๛a-zA-Z]{2,20}(?:\s+[ก-๛a-zA-Z]{2,20})?)$/i;
+export const GARMENT_CHEST_SUFFIX_NOTE_REGEX = /^(?:เสื้อ[ก-๙a-zA-Z]*\s+)?(?:อก|เอว|พุง|สะโพก|ไซส์|ไซร์|ไชส์|ไซด์|ขนาด)\s*\d+\s+([ก-๛a-zA-Z][ก-๛a-zA-Z\s]{1,25})$/i;
+export const GARMENT_DESC_SUFFIX_NOTE_REGEX = /^(?:เสื้อ|กางเกง|เกง|ชุด|เดรส|กระโปรง|ลาย|สี)[ก-๙a-zA-Z0-9\u0E46]*(?:\s+(?:มีลาย|ที่หลุดจอง|ที่หลุดคิว|คอ|ปก|แขน[ก-๙]*|ขา\d*ส่วน|ยีนส์|ที่นาวบอกสวย|สวย)[ก-๙a-zA-Z0-9\u0E46]*)*\s+([ก-๛a-zA-Z]{2,20}(?:\s+[ก-๛a-zA-Z]{2,20})?)$/i;
+export const ADMIN_QUESTION_SUFFIX_NAME_REGEX = /^(?:\d+|(?:เสื้อ|กางเกง|เกง|ชุด|เดรส|กระโปรง|กระเป๋า)[ก-๙a-zA-Z0-9]*)\s*(?:อก|เอว|พุง|สะโพก|ยาว|ความยาว|วงแขน|ไหล่|ราคา|ไซส์|ไซร์|ไชส์|ไซด์)\s*(?:เท่าไหร่|เท่าไร|เท่าไหร|ทไหร|กี่บาท|เท่าไ)?\s+([ก-๛a-zA-Z]{2,20}(?:\s+[ก-๛a-zA-Z]{2,20})?)$/i;
 export const ADMIN_SHORT_NOTE_REGEX = /^(?:[ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา)$/i;
 const SPLIT_NUMS_INTERNAL_REGEX = /[\s,_]+/;
 
@@ -228,15 +274,16 @@ export function isAdminSizeSelectionNote(normalizedMsg) {
  */
 export function isMultiBuyBlocked(normalizedMsg) {
   if (!normalizedMsg) return true;
-  if (cancelKeywordRegex.test(normalizedMsg) && !conditionalCancelGuardRegex.test(normalizedMsg)) {
+  if (isCancellationRequest(normalizedMsg)) {
     return true;
   }
   if (
-    tryRegex.test(normalizedMsg) ||
+    isTryRequest(normalizedMsg) ||
     questionRegex.test(normalizedMsg) ||
     numberWithQuestionRegex.test(normalizedMsg) ||
     negationGuardRegex.test(normalizedMsg) ||
     sizeRangeRegex.test(normalizedMsg) ||
+    conditionalBuyRegex.test(normalizedMsg) ||
     shippingRegex.test(normalizedMsg) ||
     holdRegex.test(normalizedMsg) ||
     ((quantityUnitRegex.test(normalizedMsg) || pricePatternRegex.test(normalizedMsg)) && !explicitBuyRegex.test(normalizedMsg))
@@ -297,6 +344,7 @@ export function sanitizeAdminCustomerName(name) {
     !tryRegex.test(clean) &&
     !PURE_POLITE_OR_CHAT_REGEX.test(clean) &&
     !SENTENCE_FRAGMENT_REGEX.test(clean) &&
+    !CONVERSATIONAL_NAME_GUARD_REGEX.test(clean) &&
     !adminStopwordsRegex.test(clean)
   ) {
     return clean;
@@ -307,7 +355,7 @@ export function sanitizeAdminCustomerName(name) {
 export function extractAdminCustomerName(text) {
   if (!text || typeof text !== "string") return null;
   const raw = text.trim();
-  const normalized = thaiToArabic(raw);
+  const normalized = normalizeChatText(raw);
 
   // 🛑 0. Admin Stopwords: General chat messages from admin (NOT a customer name)
   if (adminStopwordsRegex.test(normalized)) {
@@ -522,7 +570,7 @@ export function isHandleOrNonThaiName(name) {
 export function extractCustomerSelfName(text) {
   if (!text || typeof text !== "string") return null;
   const raw = text.trim();
-  const normalized = thaiToArabic(raw);
+  const normalized = normalizeChatText(raw);
 
   // 1. If text starts with item number (e.g. "40 บุญญาภา", "40 บุญญาภาค่ะ")
   const numNameMatch = normalized.match(/^(\d+)\s+(.+)$/);
@@ -552,6 +600,7 @@ export function extractCustomerSelfName(text) {
       !adminStopwordsRegex.test(candidate) &&
       !PURE_POLITE_OR_CHAT_REGEX.test(candidate) &&
       !SENTENCE_FRAGMENT_REGEX.test(candidate) &&
+      !CONVERSATIONAL_NAME_GUARD_REGEX.test(rawCandidate) &&
       !isAdminUser(candidate)
     ) {
       return candidate;
@@ -601,6 +650,7 @@ export function extractCustomerSelfName(text) {
     !nonNameNounsRegex.test(candidate) &&
     !PURE_POLITE_OR_CHAT_REGEX.test(candidate) &&
     !SENTENCE_FRAGMENT_REGEX.test(candidate) &&
+    !CONVERSATIONAL_NAME_GUARD_REGEX.test(candidate) &&
     !isAdminUser(candidate)
   ) {
     return candidate;
@@ -641,7 +691,7 @@ export function withSelfName(res, selfName = null) {
  * @returns {Object} Parsed intent details
  */
 function _parseIntentDetails(text, liveTimestamp = Date.now()) {
-  const normalizedMsg = thaiToArabic(text || "").trim();
+  const normalizedMsg = normalizeChatText(text);
   if (!normalizedMsg) return { type: "EMPTY" };
 
   // 🛑 Admin Stopwords Fast-Check
@@ -660,7 +710,10 @@ function _parseIntentDetails(text, liveTimestamp = Date.now()) {
   }
 
   // ⚡ Check: Shipping or Hold (Priority over buy and notes when quantity numbers or hold requests are mentioned e.g. "เอฟใหม่3ตัวฝากไว้ก่อน", "นาวของพี่ส่งเลยของพี่ได้2ตัวใช่ไหม")
-  if (shippingRegex.test(normalizedMsg) || holdRegex.test(normalizedMsg)) {
+  if (isShippingInquiry(normalizedMsg)) {
+    return { type: 'QUESTION', method: 'shipping-inquiry' };
+  }
+  if (isShippingRequest(normalizedMsg)) {
     const customerName = extractAdminCustomerName(normalizedMsg);
     return {
       type: "SHIPPING",
@@ -728,7 +781,7 @@ function _parseIntentDetails(text, liveTimestamp = Date.now()) {
   }
 
   // ⚡ Fast-Path 3: Text with no digits and no relevant intent keywords
-  if (!INTENT_KEYWORD_FAST_CHECK.test(normalizedMsg)) {
+  if (!INTENT_KEYWORD_FAST_CHECK.test(normalizedMsg) && !questionRegex.test(normalizedMsg)) {
     return { type: "UNKNOWN" };
   }
 
@@ -788,7 +841,7 @@ function _parseIntentDetails(text, liveTimestamp = Date.now()) {
   }
 
   // 3. Try / Fit check request (e.g. "ลอง50ให้ดูด้วยค่ะ", "7บอง", "ลองเสี้อกล้าม30บาทให้ดูหน่อยนาว")
-  if (tryRegex.test(normalizedMsg)) {
+  if (isTryRequest(normalizedMsg)) {
     const withoutPrice = normalizedMsg.replace(pricePatternRegex, "");
     const matchNum = withoutPrice.match(/\d+/);
     if (matchNum) {
@@ -801,7 +854,7 @@ function _parseIntentDetails(text, liveTimestamp = Date.now()) {
   }
 
   // 4. Cancel (guarded against conditional notes like "อำไพ ถ้าใส่ไม่ได้ก็ไม่เอา" or "ผ่านใหญ่ๆ")
-  if (cancelKeywordRegex.test(normalizedMsg) && !conditionalCancelGuardRegex.test(normalizedMsg)) {
+  if (isCancellationRequest(normalizedMsg)) {
     if (standalonePassRegex.test(normalizedMsg)) {
       return { type: "CANCEL_LATEST", method: "auto-pass-latest" };
     }
@@ -908,6 +961,8 @@ function _parseIntentDetails(text, liveTimestamp = Date.now()) {
   }
 
   // 5.2. Explicit buy keyword
+  if (questionRegex.test(normalizedMsg)) return { type: 'QUESTION' };
+  if (conditionalBuyRegex.test(normalizedMsg)) return { type: 'UNKNOWN', method: 'conditional-buy-guard' };
   const explicitMatch = normalizedMsg.match(explicitBuyRegex);
   if (explicitMatch) {
     const itemIdStr = explicitMatch[1] || explicitMatch[2];

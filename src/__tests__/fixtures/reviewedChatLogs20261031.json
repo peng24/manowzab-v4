@@ -1,0 +1,2619 @@
+[
+  {
+    "source": "20-10-2569.csv",
+    "line": 2,
+    "text": "มาแล้วจ้า",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 3,
+    "text": "ไปทำสวยมาเหรอ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 4,
+    "text": "น้ำแห้งแล้วส่งได้เลยนะ",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 5,
+    "text": "5",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 5
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 6,
+    "text": "7",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 7
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 7,
+    "text": "ไปแล้วทำไห้คุ้มเลยคะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 8,
+    "text": "10",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 10
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 9,
+    "text": "ยกเลิก7",
+    "expected": {
+      "type": "CANCEL_ITEM",
+      "itemId": 7
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 10,
+    "text": "11",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 11
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 11,
+    "text": "7 กนกวรรณ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 7
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 12,
+    "text": "ตอบคำถามถูกใจ ต ม",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 13,
+    "text": "13",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 13
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 14,
+    "text": "14",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 14
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 15,
+    "text": "18",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 18
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 16,
+    "text": "21",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 21
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 17,
+    "text": "21",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 21
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 18,
+    "text": "20",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 20
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 19,
+    "text": "22 มะระ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 22
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 20,
+    "text": "23",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 23
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 21,
+    "text": "24",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 24
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 22,
+    "text": "นาวพี่ไม่เอา38",
+    "expected": {
+      "type": "CANCEL_ITEM",
+      "itemId": 38
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 23,
+    "text": "30",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 30
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 24,
+    "text": "32",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 32
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 25,
+    "text": "33",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 33
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 26,
+    "text": "มีฝากไหมนาว",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 27,
+    "text": "35",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 35
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 28,
+    "text": "41",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 41
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 29,
+    "text": "43",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 43
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 30,
+    "text": "47",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 47
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 31,
+    "text": "50",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 50
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 32,
+    "text": "50ลองหน่อยค่ะ",
+    "expected": {
+      "type": "TRY_ITEM",
+      "itemId": 50
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 33,
+    "text": "นาวจบไลฟ็โทรบอกยอดพี่ดด้วยส่งเลย",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 34,
+    "text": "นาวลองของพี่ให้ดูทุกตัวหน่อย",
+    "expected": {
+      "type": "TRY_ITEM"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 35,
+    "text": "1อกเท่าไรคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 36,
+    "text": "ตัวเก่า4ตัว",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 37,
+    "text": "15",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 15
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 38,
+    "text": "ได้รับของแล้วค่ะสวยค่ะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 39,
+    "text": "อาบน้ำให้หน่อยครับ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 40,
+    "text": "นาวขอดูในราวข้างหลังสีดำลายเส้นคะ",
+    "expected": {
+      "type": "TRY_ITEM"
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 41,
+    "text": "25คะ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 25
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 42,
+    "text": "ไม่รับ25นะคะ",
+    "expected": {
+      "type": "CANCEL_ITEM",
+      "itemId": 25
+    }
+  },
+  {
+    "source": "20-10-2569.csv",
+    "line": 43,
+    "text": "ออ.ไม่ได้คะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 2,
+    "text": "พี่เอาใบที่120",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 120
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 3,
+    "text": "มะระ 39 เมื่อวาน",
+    "expected": {
+      "type": "ADMIN_NOTE"
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 4,
+    "text": "4 อิ๋ว",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 4
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 5,
+    "text": "40",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 40
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 6,
+    "text": "43 มะระ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 43
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 7,
+    "text": "48",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 48
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 8,
+    "text": "ฝากเพื่อน",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 9,
+    "text": "50",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 50
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 10,
+    "text": "นาวลอง",
+    "expected": {
+      "type": "TRY_ITEM"
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 11,
+    "text": "14จ้า",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 14
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 12,
+    "text": "ส่งเลยจ้า",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "21-10-2569.csv",
+    "line": 13,
+    "text": "49",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 49
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 2,
+    "text": "เปปเปอร์ตามให้แล้ว",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 3,
+    "text": "ok",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 4,
+    "text": "โอเคค่ะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 5,
+    "text": "ok",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 6,
+    "text": "1",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 1
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 7,
+    "text": "ผ้าเปื้อนก็ยังไม่เอานะนาวตัวร้ายมันหาย",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 8,
+    "text": "ถ้าเราก็ยังไม่เอานะจ๊ะตัว LINE มันหาย",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 9,
+    "text": "ถ้ามันเลอะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 10,
+    "text": "ถ้าสนใจ ทักไลน์ได้เลยไช่ไหมคับ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 11,
+    "text": "จรีพร",
+    "expected": {
+      "type": "SELF_INTRO"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 12,
+    "text": "1",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 1
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 13,
+    "text": "4",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 4
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 14,
+    "text": "5",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 5
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 15,
+    "text": "6",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 6
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 16,
+    "text": "7",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 7
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 17,
+    "text": "9 สมฤทธิ์",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 9
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 18,
+    "text": "11คอแบบไหน",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 19,
+    "text": "ลอง",
+    "expected": {
+      "type": "TRY_ITEM"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 20,
+    "text": "รับ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 21,
+    "text": "11",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 11
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 22,
+    "text": "เขียวเมี่อวานยังอยู่ไหม",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 23,
+    "text": "แขน5ส่วน",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 24,
+    "text": "อก60",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 25,
+    "text": "14อกเท่าไรคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 26,
+    "text": "22",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 22
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 27,
+    "text": "14",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 14
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 28,
+    "text": "ราคา",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 29,
+    "text": "รับ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 30,
+    "text": "น้ำตาลเสี้อคลุม",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 31,
+    "text": "15 16 กุญสิญา",
+    "expected": {
+      "type": "MULTI_BUY",
+      "itemIds": [
+        15,
+        16
+      ]
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 32,
+    "text": "คอกลมขาวนาวใส่ขายไหม",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 33,
+    "text": "กุญสิญา เอาอยู่ ชอบ",
+    "expected": {
+      "type": "ADMIN_NOTE"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 34,
+    "text": "คอกลมขาวดูให้พี่หน่อย",
+    "expected": {
+      "type": "TRY_ITEM"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 35,
+    "text": "17",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 17
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 36,
+    "text": "18",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 18
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 37,
+    "text": "15 สมชาย ใจดี",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 15
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 38,
+    "text": "20",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 20
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 39,
+    "text": "20 กุญสิญา",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 20
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 40,
+    "text": "21 อกเท่าไหร่ สมฤทธิ์",
+    "expected": {
+      "type": "ADMIN_NOTE"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 41,
+    "text": "21 สมฤทธิ์",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 21
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 42,
+    "text": "สมฤทธิ์ ส่งเลย",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 43,
+    "text": "26",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 26
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 44,
+    "text": "ส่งเลย",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 45,
+    "text": "28",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 28
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 46,
+    "text": "สวย",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 47,
+    "text": "นาวไส่27ให้ดูหน่อย",
+    "expected": {
+      "type": "TRY_ITEM",
+      "itemId": 27
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 48,
+    "text": "หาคอกลมขาวให้พี่หน่อยใส่ชับ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 49,
+    "text": "27",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 27
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 50,
+    "text": "แบ่งขายให้หน่อยน่ะนาว",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 51,
+    "text": "30",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 30
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 52,
+    "text": "ม้นบางยอเลิกก่อน",
+    "expected": {
+      "type": "CANCEL_LATEST"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 53,
+    "text": "แขนกุดก็ได้",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 54,
+    "text": "31",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 31
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 55,
+    "text": "33",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 33
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 56,
+    "text": "32 กุญสิญา",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 32
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 57,
+    "text": "อยากได้ติดคอเหมีอนที่นาวใส่",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 58,
+    "text": "36",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 36
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 59,
+    "text": "37",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 37
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 60,
+    "text": "38",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 38
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 61,
+    "text": "ยกเลิก36",
+    "expected": {
+      "type": "CANCEL_ITEM",
+      "itemId": 36
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 62,
+    "text": "ชี้อให้พี่เลยแบบสีขาวที่นาวใส่",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 63,
+    "text": "39",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 39
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 64,
+    "text": "ไช้สที่นาวใส่ตอนนี้คอกลมขาวแขนสั้น",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 65,
+    "text": "ใช่",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 66,
+    "text": "ติดคอน่ะนาว",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 67,
+    "text": "41",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 41
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 68,
+    "text": "42",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 42
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 69,
+    "text": "43",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 43
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 70,
+    "text": "ยกเลิกค่ะ",
+    "expected": {
+      "type": "CANCEL_LATEST"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 71,
+    "text": "44",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 44
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 72,
+    "text": "43 อิ๋ว",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 43
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 73,
+    "text": "45",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 45
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 74,
+    "text": "45",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 45
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 75,
+    "text": "46",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 46
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 76,
+    "text": "ได้ค่ะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 77,
+    "text": "ลอง47",
+    "expected": {
+      "type": "TRY_ITEM",
+      "itemId": 47
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 78,
+    "text": "ตัวขาวเมื่อกี้ไซส์เท่าไหร่นะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 79,
+    "text": "รับค่ะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 80,
+    "text": "เอาตัวที่นาวใส่",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 81,
+    "text": "49",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 49
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 82,
+    "text": "70นาว",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 70
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 83,
+    "text": "50",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 50
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 84,
+    "text": "51",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 51
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 85,
+    "text": "ตัว51พี่ได้ไหม",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 86,
+    "text": "52",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 52
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 87,
+    "text": "ยกเลิก",
+    "expected": {
+      "type": "CANCEL_LATEST"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 88,
+    "text": "ตัวที่นาวใส่ขายไหม",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 89,
+    "text": "เอาตัวเมื่อกี้",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 90,
+    "text": "52",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 52
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 91,
+    "text": "53",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 53
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 92,
+    "text": "54",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 54
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 93,
+    "text": "อิ๋ว พรุ่งนี้ส่งรูปให้ดูด้วย",
+    "expected": {
+      "type": "ADMIN_NOTE"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 94,
+    "text": "56",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 56
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 95,
+    "text": "ยกเลิก56",
+    "expected": {
+      "type": "CANCEL_ITEM",
+      "itemId": 56
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 96,
+    "text": "ชุดเดรส อกเท่าไหร กุญสิญา",
+    "expected": {
+      "type": "ADMIN_NOTE"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 97,
+    "text": "ฝากไว้ก่อนนะคะเดียวครบ4ตัวค่อยส่ง",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 98,
+    "text": "น้องนาวใส่สีม่วงให้ดูด้วยจ้า",
+    "expected": {
+      "type": "TRY_ITEM"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 99,
+    "text": "59",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 59
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 100,
+    "text": "รับสีม่วงจ้า",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 101,
+    "text": "57",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 57
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 102,
+    "text": "60",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 60
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 103,
+    "text": "ส่งเลยจ้า",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 104,
+    "text": "ลดราคา",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 105,
+    "text": "รับ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 106,
+    "text": "ชักให้พึ่หน่อย",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 107,
+    "text": "61",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 61
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 108,
+    "text": "67",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 67
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 109,
+    "text": "69",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 69
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 110,
+    "text": "70",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 70
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 111,
+    "text": "ยกเลิก",
+    "expected": {
+      "type": "CANCEL_LATEST"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 112,
+    "text": "ตัวเล็ก",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 113,
+    "text": "ลายกระต่ายคู่ถ้าเบื่อบอกพี่นะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 114,
+    "text": "69 กุญสิญา",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 69
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 115,
+    "text": "ลายเขียว ที่นาวบอกสวย สมฤทธิ์",
+    "expected": {
+      "type": "ADMIN_NOTE"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 116,
+    "text": "19 สมฤทธิ์",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 19
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 117,
+    "text": "24อกเท่าไหร่",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 118,
+    "text": "อกน้อย",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 119,
+    "text": "นาวพี่ได้กี่ตัววันนี้",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 120,
+    "text": "56 สมฤทธิ์",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 56
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 121,
+    "text": "พี่นับได่8",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 122,
+    "text": "ใช่สีเขียวอก60",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "23-10-69.csv",
+    "line": 123,
+    "text": "66",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 66
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 2,
+    "text": "สวัสดีคะ",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 3,
+    "text": "สวัสดีค่ะ",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 4,
+    "text": "3",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 3
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 5,
+    "text": "3 เจี๊ยบ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 3
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 6,
+    "text": "12 มะระ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 12
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 7,
+    "text": "13",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 13
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 8,
+    "text": "15",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 15
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 9,
+    "text": "ยกเลิก15",
+    "expected": {
+      "type": "CANCEL_ITEM",
+      "itemId": 15
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 10,
+    "text": "15",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 15
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 11,
+    "text": "15",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 15
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 12,
+    "text": "15 มะระ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 15
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 13,
+    "text": "สีน้ำเงิน ที่หลุดจอง อำพร",
+    "expected": {
+      "type": "ADMIN_NOTE"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 14,
+    "text": "14 อำพร",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 14
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 15,
+    "text": "18 ขอดูหน่อย มะระ",
+    "expected": {
+      "type": "TRY_ITEM",
+      "itemId": 18
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 16,
+    "text": "14 ราคาเท่าไหร่",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 17,
+    "text": "บอกกิตกาลูกค้าใหม่หน่อย",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 18,
+    "text": "24 สมหญิง",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 24
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 19,
+    "text": "26",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 26
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 20,
+    "text": "26 สมหญิง",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 26
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 21,
+    "text": "อำพร เปลี่ยนชื่อเป็น ศรีอำพร",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 22,
+    "text": "ศรีอำพร ส่งเลย",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 23,
+    "text": "34",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 34
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 24,
+    "text": "ลูกค้าเก่าจ้านาวสบายดีนะคะพี่ทรายเองจ้า",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 25,
+    "text": "ขอบคุณค่ะสบายดีจ้าไม่ใด้ทักไลน์เลยค่ะขอบคุณค่ะ",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 26,
+    "text": "45",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 45
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 27,
+    "text": "ได้ไหมคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 28,
+    "text": "54",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 54
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 29,
+    "text": "เอวคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 30,
+    "text": "นาวบนเล็กคะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 31,
+    "text": "พุง54คะนาว ถ้าถคงใส่ได้คะ รบกวนด้วยคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 32,
+    "text": "ได้คะ43",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 43
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 33,
+    "text": "ขอบคุณคะ",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 34,
+    "text": "38 กุญสิญา",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 38
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 35,
+    "text": "กุญสิยา ส่งเลย",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 36,
+    "text": "ส่งวันเสาร์ค่ะ",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 37,
+    "text": "48คะ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 48
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 38,
+    "text": "อาทิตยก็ได้จ้า",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 39,
+    "text": "49คะ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 49
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 40,
+    "text": "51คะได้ไซด์พี่ไหมคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 41,
+    "text": "ส่งเลยก็ได้จ้า",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 42,
+    "text": "รับคะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 43,
+    "text": "นาวสะดวกส่งเลยคะ",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 44,
+    "text": "1",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 1
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 45,
+    "text": "4",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 4
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 46,
+    "text": "เอาๆ6",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 6
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 47,
+    "text": "😘😘😘😘",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 48,
+    "text": "🥱🥱🥱🥱",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 49,
+    "text": "9คะ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 9
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 50,
+    "text": "10ค่ะ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 10
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 51,
+    "text": ":face-blue-smiling:นาว 555",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 52,
+    "text": "เก็บไว้ก่อนนะคะ",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 53,
+    "text": "นาวลายเหลืองเบอร์ไร",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 54,
+    "text": "เก็บใว้ให้พี่หน่อย",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 55,
+    "text": "เชิตเมื่อกี้นะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 56,
+    "text": "11",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 11
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 57,
+    "text": "แอดพี่ใด้มั้ย contact-0000 พิมพ์เล็กขีดเล็ก",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 58,
+    "text": "พึ่งใด้ตัวเดียวเอาใว้ค่อยส่งให้พี่ดูในไลน์นะนาว",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 59,
+    "text": "แอดแล้ว",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 60,
+    "text": "แอดใด้แล้วค่ะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 61,
+    "text": "22คะ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 22
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 62,
+    "text": "เข้ามาชมติดตามจ้า",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 63,
+    "text": "ใส่ได้ไหมคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 64,
+    "text": "ออ...ไม่คะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 65,
+    "text": "ให้นาวดูให้คะ",
+    "expected": {
+      "type": "TRY_ITEM"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 66,
+    "text": "ขอบคุณคะ",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 67,
+    "text": "ดีมากคะ แม่ค้าน่ารัก พี่ชอบ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 68,
+    "text": "ดีค่ะน่ารักค่ะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 69,
+    "text": "555",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 70,
+    "text": "แม่น",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 71,
+    "text": "25",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 25
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 72,
+    "text": "27",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 27
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 73,
+    "text": "ฝากไว้ก่อนนะคะ",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 74,
+    "text": "นาว28ไหญ่มากมั้ยคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 75,
+    "text": "555คงใส่ไม่ใด้",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 76,
+    "text": "สวย",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 77,
+    "text": "สวัสดีคุฯพ่อจ้า",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 78,
+    "text": "เรียกถูกจ้ากำลังชมจ้า",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 79,
+    "text": "ไลน์วันไหนบ้างและเวลาเท่าไรจ้ะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 80,
+    "text": "รับทราบจ้า",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 81,
+    "text": "กดแล้วแชร์แล้วจ้า",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 82,
+    "text": "40",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 40
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 83,
+    "text": "กี่ตัวแลว",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 84,
+    "text": "18 31 36 39 วาศินา",
+    "expected": {
+      "type": "MULTI_BUY",
+      "itemIds": [
+        18,
+        31,
+        36,
+        39
+      ]
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 85,
+    "text": "สวัสดีคะ",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 86,
+    "text": "42",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 42
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 87,
+    "text": "ตัดขอบ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 88,
+    "text": "18 ยกเลิก",
+    "expected": {
+      "type": "CANCEL_ITEM",
+      "itemId": 18
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 89,
+    "text": "18",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 18
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 90,
+    "text": "44",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 44
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 91,
+    "text": "นาวลายสีฟ้าใหญ่ไหมคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 92,
+    "text": "ข้างหลังคะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 93,
+    "text": "คะไม่ได้",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 94,
+    "text": "ซาร่า",
+    "expected": {
+      "type": "SELF_INTRO"
+    }
+  },
+  {
+    "source": "27-10-69.csv",
+    "line": 95,
+    "text": "สวัสดีจ้า",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 2,
+    "text": "3 อาทิตยา",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 3
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 3,
+    "text": "12",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 12
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 4,
+    "text": "15 อาทิตยา",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 15
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 5,
+    "text": "20อกเท่าไรนะคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 6,
+    "text": "30ขอดูชัดๆ ผ้าอะไรคะ",
+    "expected": {
+      "type": "TRY_ITEM",
+      "itemId": 30
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 7,
+    "text": "ชายบานไหมคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 8,
+    "text": "ขอบคุณค่ะ",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 9,
+    "text": "37 สมหญิง ใจดี",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 37
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 10,
+    "text": "กนกวรรณ ส่งวันอาทิตย์",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 11,
+    "text": "30",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 30
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 12,
+    "text": "ขอสอบถามค่ะ.มีเก็บเงินปลายทางรึเปล่าค่ะ.",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 13,
+    "text": "สี",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 14,
+    "text": "สวัสดีจ้า เข้ามาดูอีกจ้า",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 15,
+    "text": "2",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 2
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 16,
+    "text": "นาวเอาตัวนี้คะชอบสี",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 17,
+    "text": "นาววัดพุง",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 18,
+    "text": ":face-blue-smiling::face-blue-smiling::face-blue-smiling::face-blue-smiling:",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 19,
+    "text": "รับคะ",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 20,
+    "text": "6คะ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 6
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 21,
+    "text": "นาง ฝากไว้ก่อนนะคะ",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 22,
+    "text": "23 24 31 50 1 วาสินา",
+    "expected": {
+      "type": "MULTI_BUY",
+      "itemIds": [
+        23,
+        24,
+        31,
+        50,
+        1
+      ]
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 23,
+    "text": "วาสินา ส่งเลย",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 24,
+    "text": "16 อกได้สุดเท่าไหรค่ะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 25,
+    "text": "16 เอานะชอบลองดู",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 16
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 26,
+    "text": "รับตัวลายดำเมื่อกี้ค่ะ รายการที่เท่าไหร่",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 27,
+    "text": "20",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 20
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 28,
+    "text": "26",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 26
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 29,
+    "text": "รับตัวเมื่อกี้จ้า",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 30,
+    "text": "ม่วง",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 31,
+    "text": "ไม่ไช่ตัวที่เป็นสองตัว",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 32,
+    "text": "ฝากจ้า",
+    "expected": {
+      "type": "SHIPPING"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 33,
+    "text": "28",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 28
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 34,
+    "text": "นาว แขนกุดพุงเท่าไรคะ",
+    "expected": {
+      "type": "QUESTION"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 35,
+    "text": "555",
+    "expected": {
+      "type": "UNKNOWN"
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 36,
+    "text": "รับคะ52",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 52
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 37,
+    "text": "43 มานพ",
+    "expected": {
+      "type": "SINGLE_BUY",
+      "itemId": 43
+    }
+  },
+  {
+    "source": "28-10-69.csv",
+    "line": 38,
+    "text": "สวัสดีจ้า",
+    "expected": {
+      "type": "ADMIN_STOPWORD"
+    }
+  }
+]

@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.4.15 — 2026-10-30** ดูผลล่าสุดท้ายไฟล์และ [บันทึก release](../../docs/release-5.4.15.md)
+> ผลแก้ไขล่าสุด: **v5.4.16 working tree — 2026-10-31** ดู [Chat regex review](../../docs/chat-regex-review-2026-10-31.md); production release ล่าสุดยังเป็น v5.4.15
 
 ---
 
@@ -32,9 +32,15 @@ description: Mandatory verification checklist after every code change
 | 2.5 | Admin Proxy Cancel, Multi-Cancel & Safety Guard | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | รองรับยกเลิกเดี่ยวและหลายรหัสพร้อมกัน ("ยกเลิก 12 15", "12 มะระ ยกเลิก", "12 15 มะระ ยกเลิก", "มะระ ยกเลิก 12", "ยกเลิก 12 มะระ"), ห้าม Fallback เป็น `null` (Wildcard) เมื่อแอดมินระบุชื่อลูกค้าไม่ตรงกับเจ้าของรหัส, บล็อกเงื่อนไขหลอก (`conditionalCancelGuardRegex`) และใช้ `!isMultiBuyBlocked()` ป้องกัน `multiBuyRegex` แย่งจับประโยคยกเลิก/ขอดู/ถามไซส์ที่มีเลขหลายตัว |
 | 2.6 | Buy vs Question/Try/Price Disambiguation | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | อนุญาตจองเมื่อระบุสีหรือคำชม ("สีขาว34ค่ะพี่นัน", "ไม่ต้องลองก็ได้12"), บล็อกคำบ่นไซส์ (`negationGuardRegex` เช่น "40 ใส่ไม่ได้"), บล็อกตัวระบุราคา/ลักษณนาม ("ตัว 100"), และบล็อกคำบอกจำนวน (`quantityUnitRegex` เช่น "4ชิ้น", "3สี") |
 | 2.7 | Admin Notes Parity, Date Mismatch Sync & Clean Shipping Name | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js` | สกัดชื่อลูกค้าสะอาดจากคำสั่งแจ้งส่ง ("วิระวัลย์ รวมยอด" ➡️ "วิระวัลย์"), ใช้ `isAdminSizeSelectionNote()` ร่วมกันทั้ง 2 ไฟล์สำหรับ Admin Notes ("อำไพ เอาตัวอก56", "3xl อำไพ", "เสื้อเชิ้ต อก56 สมฤทธิ์"), และส่งข้อความขึ้น Firebase เสมอเมื่อพบ `isDateMismatch` เพื่อไม่ให้แชทหายจากหน้าจอ |
-| 2.8 | Strict Self-Name Auto-Learn Hardening (`extractCustomerSelfName`) | `src/utils/chatParserUtils.js` | บล็อกคำสนทนา/คำบ่น/คำทักทาย ("สวัดดีค่ะ", "ใข่ค่ะ", "เก่าค่ะ", "สบายดีค่ะ", "ลายดอก", "ตัวเล็กๆ", "เมื่อคืน", "บ่") ไม่ให้จำเข้าเป็นชื่อลูกค้า แต่ยังคงจำชื่อแนะนำตัวจริง ("บุญญาภาค่ะ", "40 บุญญาภา", "ต่าย") ได้แม่นยำ 100% |
+| 2.8 | Strict Self-Name Auto-Learn Hardening (`extractCustomerSelfName`) | `src/utils/chatParserUtils.js` | บล็อกคำสนทนา/คำบ่น/คำทักทาย ("สวัดดีค่ะ", "ใข่ค่ะ", "เก่าค่ะ", "สบายดีค่ะ", "ลายดอก", "ตัวเล็กๆ", "เมื่อคืน", "บ่") ไม่ให้จำเข้าเป็นชื่อลูกค้า แต่ยังคงจำชื่อแนะนำตัวจริง ("บุญญาภาค่ะ", "40 บุญญาภา", "ต่าย") ผ่านตัวอย่างที่ระบุ โดยไม่รับประกันชื่อทุกรูปแบบ |
 | 2.9 | Backdated Orders / Yesterday Debt Notes Audio & Extraction Invariant | `src/composables/useChatProcessor.js`, `src/utils/chatParserUtils.js`, `src/services/TextToSpeech.js` | รองรับการจองย้อนหลัง/โน้ตยอดเมื่อวานทั้งแบบชื่อนำหน้าและรหัสนำหน้า ("มะระ 39 เมื่อวาน", "39 เมื่อวาน มะระ", "ของมะระ 39 เมื่อวาน", "หนิง เมื่อวาน 41 43"): ต้องไม่งัดตัดสต็อกของไลฟ์สดปัจจุบัน, ต้องส่งขึ้น Firebase พร้อมเล่นเสียงครบทั้ง SFX chime และ TTS อ่านออกเสียง (`sfxType: isNewCustomerChat ? 'bell' : 'success'`, `ttsText: isVoiceChat ? '' : ttsMessage`), และ `ttsService.speak()` ต้องตัดชื่อลูกค้าที่ซ้ำกันตรงต้นข้อความเพื่อไม่ให้อ่านชื่อเบิ้ล 2 ครั้ง |
 | 2.10 | October 20–24, 2569 CSV Log Regex Hardening (`ยกเริก`/`ยอเลิก`, `ไม่รับ+เลข`, `บอก`/`ดอก`/`คอกลม`, `ส่งรูป`, Garment/Question Admin Notes) | `src/utils/chatParserUtils.js`, `src/composables/useChatProcessor.js` | รองรับคำพิมพ์ผิดยกเลิก ("64ยกเริก", "ม้นบางยอเลิกก่อน") และ "ไม่รับ25นะคะ"/"นาวพี่ไม่เอา38" เป็น `CANCEL_ITEM`, บล็อกเงื่อนไขรอยเปื้อน ("ผ้าเปื้อนก็ยังไม่เอา..."), รองรับการจอง ("พี่เอาใบที่120", "ใช่คะ25", "70นาว"), ป้องกันคำที่มี "อก" ("บอก", "ดอก", "คอกลม", "ออก", "นอก") ไปติด `questionRegex`, ป้องกัน "ส่งรูป"/"พรุ่งนี้ส่งรูป" ไปสร้างรอบส่งพัสดุ, และรองรับโน้ตแอดมินที่ลงท้ายด้วยชื่อลูกค้า ("กางเกงยีนส์ กุญสิญา", "ลายเขียวๆ กุญสิญา", "21 อกเท่าไหร่ สมฤทธิ์", "66 อกเท่าไหร่ วรรณี เบญ") |
+
+| 2.11 | Shared request guards | chatParserUtils.js, useChatProcessor.js | คำถามฝาก/ส่ง/ปลายทางไม่เขียน readiness/history/date; คำถามยกเลิกและโน้ตที่หลุดจองไม่ยกเลิกรายการ ใช้ helpers ร่วมกันทั้ง parser/processor |
+| 2.12 | Hold and explicit cancel IDs | chatProcessorLogRegression.test.js | ยังไม่ส่งวันเสาร์/ฝากไว้ก่อนแต่ส่งพรุ่งนี้ไม่ตั้ง deliveryDate; คืน15/ถอน15/สละสิทธิ์15 ต้องยกเลิก 15 ไม่ใช้รายการล่าสุด; คง owner/blacklist/transaction guards |
+| 2.13 | Number and name boundaries | chatLogRegression.test.js | พุง54/เอา54นิ้ว/รับ31ตัวไม่ตัดเลขบางหลักมาจอง; ได้คะ43/เอาๆ6 จองได้; คำขอลอง/เงื่อนไขจริงไม่จอง; ตัดขอบ/แอดใด้แล้วไม่เรียนเป็นชื่อ; เลขไทยและ zero-width ให้ intent เดียวกัน |
+| 2.14 | First batch and video switch | chatProcessorLogRegression.test.js | enqueue หลายข้อความก่อน reset ครั้งแรกแล้วทำครบตาม timestamp; ทุก Promise ต้องจบ; queued old-video ไม่เขียนใน new-video; ห้ามล้าง active batch ใน processSingleMessage |
+| 2.15 | Reviewed corpus and Smart Answer | reviewedChatCorpus.test.js, smartAnswerLogRegression.test.js | replay ครบ 307 แถวด้วยวันที่คงที่และ expected labels ที่ตรวจทาน แยกจาก actual processor side effects; รองรับไซด์/พุง/กี่ตัวแลว/COD และไม่ใช้สัดส่วนเป็น item ID; ไม่เก็บ raw IDs/contact ใน Git ไม่ตีความผลผ่านว่า accuracy 100% |
 
 ---
 
@@ -387,3 +393,12 @@ description: Mandatory verification checklist after every code change
 - ตรวจครบทุกหมวดโดยแยก automated/browser/source review/อุปกรณ์จริงตาม [coverage report](../../docs/release-5.4.15.md#checklist-coverage); production rules และ admin grant ตรวจแบบอ่านอย่างเดียว พร้อมใช้งานเดิม
 - Deploy 5.4.15 สำเร็จ: source c4cec82, gh-pages 8ecfc81; HTML/entry JS ทั้ง 4 หน้าตรง build, browser โหลด CSS แผงเต็มความกว้างแล้ว ไม่มี failed resources/console errors ที่หน้า login; unauthenticated data reads ถูกปฏิเสธ ดู [release report](../../docs/release-5.4.15.md#deployment)
 - เสียง/เครื่องพิมพ์/iPad จริง, PWA update บนอุปกรณ์ที่ติดตั้งอยู่ และ production password login ยังไม่ได้ทดสอบในรอบนี้
+
+
+## 💬 ผลตรวจ Chat Regex — v5.4.16 working tree (2026-10-31)
+
+- วิเคราะห์ 5 CSV ครบ 307 ข้อความ; replay เปลี่ยน 19 แถว (16 ประเภท และ 3 ชื่อ/วิธีประมวลผล) ไม่ส่ง log จริงเข้าฐานข้อมูล
+- npm test ผ่าน 730 tests/28 files รวม corpus 307 และ actual-processor side-effect/FIFO guards; npm run build ผ่าน 4 หน้า + PWA
+- test:firebase ผ่าน 23 checks กับ local Auth/RTDB; test:transcriber ผ่าน 3 tests; benchmark counts ผ่าน (300/1/0 sync calls, 2,400 → 200 resolutions)
+- เก็บ raw logs ใน ignored tmp และย้ายต้นฉบับเข้า old ด้วย hash verification/ไม่เขียนทับตาม archive manifest
+- ไม่มี deploy ในรอบนี้; live YouTube/เสียง/อุปกรณ์จริง/production password login ยังไม่ได้ตรวจ ดู [รายงานและขอบเขต](../../docs/chat-regex-review-2026-10-31.md)

@@ -56,7 +56,6 @@ import {
   cancelWithNumRegex,
   cancelNumFirstRegex,
   cancelNameKeywordNumRegex,
-  conditionalCancelGuardRegex,
   standalonePassRegex,
   shipDayOfWeekRegex,
   calcNextDayOfWeekDate,
@@ -64,7 +63,6 @@ import {
   formatDateToYYYYMMDD,
   numberWithQuestionRegex,
   negationGuardRegex,
-  thaiToArabic,
   stringToColor,
   isAdminUser,
   isDateMismatch,
@@ -75,6 +73,12 @@ import {
   isAdminSizeSelectionNote,
   isMultiBuyBlocked,
   parseCancelIds,
+  normalizeChatText,
+  isCancellationRequest,
+  isShippingRequest,
+  isShippingInquiry,
+  isTryRequest,
+  conditionalBuyRegex,
 } from "../utils/chatParserUtils";
 
 // 🚀 Pre-compiled Module-Scoped Regexes (Zero allocation per chat message)
@@ -152,6 +156,7 @@ export function useChatProcessor() {
 
       incomingBatchQueue.push({
         item,
+        videoId: systemStore.currentVideoId,
         resolve,
         reject,
         timestamp,
@@ -176,7 +181,12 @@ export function useChatProcessor() {
       incomingBatchQueue.sort((a, b) => a.timestamp - b.timestamp || a.seq - b.seq);
 
       while (incomingBatchQueue.length > 0) {
-        const { item, resolve, reject } = incomingBatchQueue.shift();
+        const { item, videoId, resolve, reject } = incomingBatchQueue.shift();
+        // Settle stale queued work, but keep every message of the new session.
+        if (videoId !== systemStore.currentVideoId) {
+          resolve();
+          continue;
+        }
         try {
           // ✅ Step-by-step Synchronous execution: await each message to completely finish stock booking transactions before next
           const res = await processSingleMessage(item);
@@ -201,7 +211,8 @@ export function useChatProcessor() {
     if (systemStore.currentVideoId !== _lastVideoId) {
       _lastVideoId = systemStore.currentVideoId;
       processingLocks.clear();
-      incomingBatchQueue.length = 0;
+      // The queue already contains this video's first poll batch. Clearing it
+      // here would discard all messages after the first and strand their promises.
       logger.log(`🔄 Session state cleared for new video: ${_lastVideoId}`);
     }
 
@@ -248,7 +259,7 @@ export function useChatProcessor() {
     }
 
     // ✅ Normalize Thai numerals → Arabic digits for regex matching
-    const normalizedMsg = thaiToArabic(msg);
+    const normalizedMsg = normalizeChatText(msg);
 
     const uid = item.authorDetails.channelId;
     const realName = item.authorDetails.displayName;
@@ -697,7 +708,7 @@ export function useChatProcessor() {
     let cancelTargetName = null;
     let cancelIds = [];
 
-    if (!conditionalCancelGuardRegex.test(normalizedMsg)) {
+    if (isCancellationRequest(normalizedMsg)) {
       // 1. Check number first patterns (e.g. "12 ยกเลิก", "12 มะระ ยกเลิก", "12 15 ยกเลิก")
       const matchNumFirst = normalizedMsg.match(cancelNumFirstRegex);
       const parsedNumFirst = matchNumFirst ? parseCancelIds(matchNumFirst[1]) : [];
@@ -783,7 +794,7 @@ export function useChatProcessor() {
 
     if (intent === "cancel") {
       // Done cancel detection, bypass shipping and other checks
-    } else if (shippingRegex.test(normalizedMsg)) {
+    } else if (isShippingRequest(normalizedMsg)) {
       intent = "shipping";
       method = "regex-ship";
 
@@ -793,10 +804,11 @@ export function useChatProcessor() {
       let autoShipUid = uid;
       let isAutoShip = false;
 
-      const shipTmrMatch = normalizedMsg.match(SHIP_TMR_REGEX);
-      const shipDateMatch = normalizedMsg.match(SHIP_DATE_REGEX);
-      const shipDayOfWeekMatch = normalizedMsg.match(shipDayOfWeekRegex);
-      const shipNowMatch = normalizedMsg.match(SHIP_NOW_REGEX);
+      const isHoldRequest = holdRegex.test(normalizedMsg);
+      const shipTmrMatch = !isHoldRequest && normalizedMsg.match(SHIP_TMR_REGEX);
+      const shipDateMatch = !isHoldRequest && normalizedMsg.match(SHIP_DATE_REGEX);
+      const shipDayOfWeekMatch = !isHoldRequest && normalizedMsg.match(shipDayOfWeekRegex);
+      const shipNowMatch = !isHoldRequest && normalizedMsg.match(SHIP_NOW_REGEX);
 
       let matchedKeyword = null;
       if (shipTmrMatch) matchedKeyword = shipTmrMatch[0];
@@ -925,7 +937,9 @@ export function useChatProcessor() {
       // --- END AUTO SHIP LOGIC ---
     } else if (
       questionRegex.test(normalizedMsg) ||
-      tryRegex.test(normalizedMsg) ||
+      isTryRequest(normalizedMsg) ||
+      isShippingInquiry(normalizedMsg) ||
+      conditionalBuyRegex.test(normalizedMsg) ||
       numberWithQuestionRegex.test(normalizedMsg) ||
       negationGuardRegex.test(normalizedMsg) ||
       sizeRangeRegex.test(normalizedMsg) ||
@@ -936,7 +950,7 @@ export function useChatProcessor() {
           ? "question-skip"
           : negationGuardRegex.test(normalizedMsg)
           ? "negation-skip"
-          : tryRegex.test(normalizedMsg)
+          : isTryRequest(normalizedMsg)
           ? "try-skip"
           : "unit-or-price-skip";
     } else {

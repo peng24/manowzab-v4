@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลแก้ไขล่าสุด: **v5.4.16 working tree — 2026-10-31** ดู [Chat regex review](../../docs/chat-regex-review-2026-10-31.md); production release ล่าสุดยังเป็น v5.4.15
+> ผลอ้างอิงล่าสุด: **v5.4.16 — 2026-10-31** ดู [Chat regex review](../../docs/chat-regex-review-2026-10-31.md) และ [release report](../../docs/release-5.4.16.md)
 
 ---
 
@@ -384,7 +384,7 @@ description: Mandatory verification checklist after every code change
 - npm test ผ่าน 321 tests; npm run build ผ่านครบ 4 หน้าและ PWA หลังปรับ UI รอบออกแบบ ยังไม่ได้ deploy ณ ตอนนั้น; เผยแพร่ภายหลังใน release 5.4.15 ตามผลล่าสุดด้านล่าง
 - ผลบนอุปกรณ์จริง/เสียง/เครื่องพิมพ์และ UI สองเครื่องยังอยู่ในขอบเขตที่ต้องตรวจเพิ่มตามรายการก่อนหน้า
 
-## 🚀 ผลตรวจ release ล่าสุด — v5.4.15 (2026-10-30)
+## 🚀 ผลตรวจ release ย้อนหลัง — v5.4.15 (2026-10-30)
 
 - รันใหม่ในรอบ release: npm test ผ่าน 321 tests/24 files, test:firebase ผ่าน 23 checks, test:transcriber ผ่าน 3 tests, build:gh ผ่านครบ 4 หน้าและ PWA
 - Benchmark counts ผ่าน: initial 300, price change 1, queue-only 0 sync calls; resolver 2,400 → 200 ครั้ง ตัวเลขเวลาแยกบันทึกใน release report และไม่ใช้แทนความเร็ว production
@@ -395,10 +395,20 @@ description: Mandatory verification checklist after every code change
 - เสียง/เครื่องพิมพ์/iPad จริง, PWA update บนอุปกรณ์ที่ติดตั้งอยู่ และ production password login ยังไม่ได้ทดสอบในรอบนี้
 
 
-## 💬 ผลตรวจ Chat Regex — v5.4.16 working tree (2026-10-31)
+## 💬 ผลตรวจก่อน release — Chat Regex v5.4.16 (2026-10-31)
 
 - วิเคราะห์ 5 CSV ครบ 307 ข้อความ; replay เปลี่ยน 19 แถว (16 ประเภท และ 3 ชื่อ/วิธีประมวลผล) ไม่ส่ง log จริงเข้าฐานข้อมูล
 - npm test ผ่าน 730 tests/28 files รวม corpus 307 และ actual-processor side-effect/FIFO guards; npm run build ผ่าน 4 หน้า + PWA
 - test:firebase ผ่าน 23 checks กับ local Auth/RTDB; test:transcriber ผ่าน 3 tests; benchmark counts ผ่าน (300/1/0 sync calls, 2,400 → 200 resolutions)
 - เก็บ raw logs ใน ignored tmp และย้ายต้นฉบับเข้า old ด้วย hash verification/ไม่เขียนทับตาม archive manifest
-- ไม่มี deploy ในรอบนี้; live YouTube/เสียง/อุปกรณ์จริง/production password login ยังไม่ได้ตรวจ ดู [รายงานและขอบเขต](../../docs/chat-regex-review-2026-10-31.md)
+- ณ รอบวิเคราะห์ยังไม่มี deploy; เผยแพร่ภายหลังตามผล release ด้านล่าง ส่วน live YouTube/เสียง/อุปกรณ์จริง/production password login ยังไม่ได้ตรวจ ดู [รายงานและขอบเขต](../../docs/chat-regex-review-2026-10-31.md)
+
+
+## 🚀 ผลตรวจ release ล่าสุด — v5.4.16 (2026-10-31)
+
+- รันใหม่ก่อนเผยแพร่: npm test ผ่าน 730 tests/28 files, test:firebase ผ่าน 23 local emulator checks, test:transcriber ผ่าน 3 tests, build:gh ผ่าน 4 หน้าและ PWA 66 precache entries
+- Benchmark counts ผ่าน: sync 300/1/0 ครั้งและ answer resolutions 2,400 → 200; เวลาจำลอง 1,222.85 → 117.14 ms ในรอบนี้ ไม่ใช่ production field metric
+- Source 088f143 และ gh-pages 88a66a2 เผยแพร่แล้ว; main/shipping/history/address ได้ HTTP 200 และ HTML/entry JS ตรง build; sw.js กับ manifest ตรง build เช่นกัน
+- Browser หน้า login โหลด main-DTiVVHIt.js, มี email/password inputs, 27 network requests สำเร็จ และไม่พบ console warnings/errors; unauthenticated stock/delivery_customers/address_book reads ถูกปฏิเสธ HTTP 401
+- กฎ/verify 2.11–2.15 อัปเดตแล้ว; raw logs ไม่อยู่ใน Git; ไฟล์ที่วิเคราะห์ 5 ไฟล์ย้ายเข้า old โดย hash ตรงและรักษาไฟล์ชื่อซ้ำเดิม
+- ตรวจครบทุกหมวดโดยแยก automated/browser/source review/ยังไม่ได้ตรวจจริงตาม [coverage report](../../docs/release-5.4.16.md#checklist-coverage); production password login, live YouTube, เสียง/iOS/เครื่องพิมพ์จริง และ installed-device PWA update ยังไม่ได้ทดสอบ

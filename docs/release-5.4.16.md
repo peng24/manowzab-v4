@@ -38,8 +38,14 @@ Passing the reviewed corpus is regression evidence, not 100% accuracy on new mes
 
 ## Rule updates
 
-Updated AI_RULES.md, GEMINI.md, .agents/AGENTS.md, the manowzab-core skill and verify.md items 2.11–2.15 to preserve shared request guards, numeric/name boundaries, hold dates, explicit cancellation IDs, reviewed fixtures and first-batch queue settlement. Release evidence will be appended after publication.
+Updated AI_RULES.md, GEMINI.md, .agents/AGENTS.md, the manowzab-core skill and verify.md items 2.11–2.15 to preserve shared request guards, numeric/name boundaries, hold dates, explicit cancellation IDs, reviewed fixtures and first-batch queue settlement. Publication evidence is recorded below.
 
 ## Deployment
 
-Prepared for publication. Source/gh-pages commits, published artifact matches and browser login-page checks are recorded after deployment.
+- Source commit 088f143 pushed to main; npm run deploy:gh completed and published gh-pages commit 88a66a2.
+- Live URL: https://peng24.github.io/manowzab-v4/ .
+- Initial Pages propagation served the previous build. Subsequent cache-busted verification passed: main, shipping/, history/ and address/ all returned HTTP 200 with HTML and entry JavaScript exactly matching the local 5.4.16 build.
+- sw.js and manifest.webmanifest returned HTTP 200 and exactly matched the local build.
+- Live browser after a cache-bypassing reload loaded main-DTiVVHIt.js and displayed email/password login inputs. All 27 observed network requests succeeded; no console warnings or errors were present on that page.
+- Unauthenticated production reads of stock, delivery_customers and address_book returned HTTP 401. No production rule, grant, password or business-data write was performed for this release.
+- Test emulator ports 9009 and 9098 were closed after verification. Production password login, live YouTube, physical audio/iOS/printer and installed-device PWA update were not tested in this release.

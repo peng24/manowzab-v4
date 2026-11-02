@@ -17,7 +17,7 @@ This skill governs all development, bug fixing, architectural changes, and deplo
 The application is an event-driven, real-time live commerce dashboard built with:
 - **Frontend**: Vue 3 (Composition API, `<script setup>`), Vite 7, Pinia 3.
 - **Persistence & Real-Time Sync**: Firebase Realtime Database (RTDB v12).
-- **Audio Engine**: Web Audio API (zero-latency synthetic SFX) + Google Cloud Text-to-Speech (`th-TH-Standard-A`) + Native `SpeechSynthesis` Fallback.
+- **Audio Engine**: Native Thai SpeechSynthesis (free default) + Web Audio SFX; opt-in Google Cloud Text-to-Speech (`th-TH-Standard-A`) + Native `SpeechSynthesis` Fallback.
 - **Hardware Integration**: Direct thermal label printing via isolated hidden iframes (130x76mm / 76x130mm).
 
 ### Core Stores & Composables
@@ -28,7 +28,7 @@ The application is an event-driven, real-time live commerce dashboard built with
 | **Chat Processing** | `useChatProcessor.js`, `chatParserUtils.js` | Lazy short-circuit regex buying strategies, 80ms micro-batch window, Thai numeral normalization ($O(1)$), admin proxies |
 | **Live Chat Sync** | `useYouTube.js`, `YouTubeLiveChat.js`, `src/stores/chat.js` | Concurrent poll batch dispatch (`Promise.allSettled`), API key rotation, Firebase real-time broadcast |
 | **Blacklist & Safety** | `src/stores/blacklist.js`, `BlacklistModal.vue` | Centralized `/blacklist` RTDB sync, space-agnostic Thai matching, zero-leak audio mute, anti-stock stealing |
-| **Audio & TTS** | `useAudio.js`, `TextToSpeech.js`, `system.js` | Unified sequential queue, 2-state voice switcher (`S` / `🤖`), shared singleton `AudioContext`, LRU cache, iOS unlock |
+| **Audio & TTS** | `useAudio.js`, `TextToSpeech.js`, `system.js` | Unified sequential queue, free Thai voice test button (Cloud toggle only in opt-in builds) (`S` / `🤖`), shared singleton `AudioContext`, LRU cache, iOS unlock |
 | **Shipping & CRM** | `ShippingManager.vue`, `addressParser.js` | Delivery dates, countdowns, smart Thai phone/zip parser, thermal labels |
 | **Device Roles** | `system.js` | Host role takeover, Active Price Detector election, presence-based key balancing |
 
@@ -44,7 +44,7 @@ Whenever touching code in this repository, you **MUST** uphold these non-negotia
 - **Never trigger overlapping audio**: All audio calls (SFX and TTS) must funnel exclusively through `queueAudio(sfxType, author, message)` in `useAudio.js`.
 - **Cross-device playback**: Audio for new incoming live chat messages must be triggered by the Firebase listener in `src/stores/chat.js`, **NOT** directly in `useChatProcessor.js` (except local welcome announcements).
 - **Time-guard incoming audio**: Only play audio for messages with `timestamp >= syncStartTime - 5000` and `isNew === true`.
-- **Zero-Stall Fallback**: If Google Cloud TTS encounters a network error, quota limit, or timeout, it must seamlessly fall back to `speakNative()` without stalling the audio queue.
+- **Zero-Stall Fallback**: In an explicitly enabled Cloud build, if Google Cloud TTS encounters a network error, quota limit, or timeout, it must seamlessly fall back to `speakNative()` without stalling the audio queue.
 - **Sanitization & Emoji Fallback**: Messages that sanitize to an empty string (stickers/emojis) must be voiced as `"ส่งสติกเกอร์"`.
 - **Thai Cardinal Number & Booking TTS Pronunciation (v5.4.13+)**: Numbers in booking chats must be converted to Thai cardinal words (`numberToThaiWords`, `replaceNumbersWithThaiWords` in `src/utils/thaiNumberWords.js`) so TTS pronounces "สิบห้า" instead of "หนึ่งห้า", with phone numbers, leading zeros, and time expressions safely preserved.
 - **Shared Singleton `AudioContext`**: Reuse `ttsService.getAudioContext()` across TTS, SFX, and celebration audio.
@@ -144,3 +144,11 @@ When the user states **"อัพเลย"**:
 - Regex changes require the reviewed anonymized 307-row corpus, boundary tests, and actual useChatProcessor side-effect tests. Expected labels must be reviewed independently of the changed parser. Keep raw logs/identifiers outside tracked fixtures; archive analyzed files only after hash checks, with no overwrite on filename collisions.
 - See docs/chat-regex-review-2026-10-31.md and /verify 2.11–2.15. Passing this corpus is regression evidence, not a claim of 100% accuracy on new chat.
 
+## Free Thai TTS Policy (2026-11-02, user-selected)
+
+- Production defaults to native Thai speech with no Google Cloud TTS billing. Do not reopen Billing, add payment methods, or activate paid providers without new explicit user approval.
+- isGoogleCloudTtsEnabled() is false unless VITE_ENABLE_GOOGLE_CLOUD_TTS is exactly true at build time. Existing Cloud keys or saved standard/neural2 preferences must never enable Cloud. Free builds migrate saved modes to native, load no Cloud keys, skip TTS key distribution/presence writes, and guard both processQueue and direct speakOnline entry points.
+- In free builds Header shows TH ฟรี and tests speech through queueAudio. The button must not toggle into a billable provider; if no Thai voice is found, show device-language installation guidance.
+- Prefer installed Thai voices (localService=true), then browser-provided Thai voices. getBestVoice returns a newly loaded voice immediately; bounded polling must continue if only non-Thai voices load first. Browser voices vary by device; never describe a remote browser voice as guaranteed offline.
+- Keep Firebase audio time/blacklist guards, Thai cardinal-number conversion, iOS unlock, shared AudioContext and sequential queue behavior. Native error/end/reset must settle pending speech without overlap or deadlock.
+- Verify free default + saved preference migration, blocked Cloud calls including direct calls, actual native queue completion, local Thai selection, delayed voices, error/reset, Header controls and absence of Google TTS endpoint/keys in the production build. These checks concern TTS charges, not unrelated Firebase/YouTube/network costs.

@@ -4,6 +4,7 @@ import { ref as dbRef, onValue, get, update, runTransaction } from "firebase/dat
 import { db } from "../composables/useFirebase";
 import pkg from "../../package.json";
 import { logger } from "../utils/logger";
+import { isGoogleCloudTtsEnabled } from "../utils/ttsConfig";
 
 export const useSystemStore = defineStore("system", () => {
   // State
@@ -19,21 +20,22 @@ export const useSystemStore = defineStore("system", () => {
   const activePriceDetectorId = ref(""); // ✅ เครื่องที่ตรวจจับราคาปัจจุบัน
   const isPriceDetector = ref(false); // ✅ เครื่องเราจับราคาอยู่หรือไม่
 
-  // ✅ Google Cloud TTS API Key - Load from .env
-  const googleApiKey = ref(import.meta.env.VITE_GOOGLE_API_KEYS || "");
+  const googleCloudTtsEnabled = isGoogleCloudTtsEnabled();
+  // Free builds neither load Cloud keys nor allow saved preferences to enable them.
+  const googleApiKey = ref(googleCloudTtsEnabled ? (import.meta.env.VITE_GOOGLE_API_KEYS || "") : "");
 
-  // ✅ TTS Voice Mode: 'standard' | 'native' (Default: 'standard' - Google Cloud Standard-A)
+  // Native speech is the default. Cloud requires explicit build-time opt-in.
   const savedMode = localStorage.getItem("manowzab_tts_voice_mode");
-  const validModes = ["standard", "native"];
-  const ttsVoiceMode = ref(validModes.includes(savedMode) ? savedMode : "standard");
-  if (savedMode === "neural2") {
-    localStorage.setItem("manowzab_tts_voice_mode", "standard");
+  const validModes = googleCloudTtsEnabled ? ["standard", "native"] : ["native"];
+  const ttsVoiceMode = ref(validModes.includes(savedMode) ? savedMode : "native");
+  if (savedMode !== ttsVoiceMode.value) {
+    localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
   }
 
   const useOnlineTts = computed({
-    get: () => ttsVoiceMode.value === "standard",
+    get: () => googleCloudTtsEnabled && ttsVoiceMode.value === "standard",
     set: (val) => {
-      ttsVoiceMode.value = val ? "standard" : "native";
+      ttsVoiceMode.value = val && googleCloudTtsEnabled ? "standard" : "native";
       localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     },
   });
@@ -42,7 +44,7 @@ export const useSystemStore = defineStore("system", () => {
   });
 
   function cycleTtsMode() {
-    ttsVoiceMode.value = ttsVoiceMode.value === "standard" ? "native" : "standard";
+    ttsVoiceMode.value = googleCloudTtsEnabled && ttsVoiceMode.value !== "standard" ? "standard" : "native";
     localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     return ttsVoiceMode.value;
   }
@@ -144,6 +146,7 @@ export const useSystemStore = defineStore("system", () => {
 
   // ✅ Auto distribute TTS Keys across machines to balance quota
   async function assignOptimalTtsKey() {
+    if (!googleCloudTtsEnabled) return;
     try {
       const keysCount = googleApiKey.value.split(",").filter(k => k.trim()).length;
       if (keysCount <= 1) return; // Nothing to distribute
@@ -185,6 +188,7 @@ export const useSystemStore = defineStore("system", () => {
 
   // ✅ Sync current TTS Key so other devices can see our usage
   function updatePresenceTtsKey() {
+      if (!googleCloudTtsEnabled) return;
       const myConnectionRef = dbRef(db, `presence/${myDeviceId.value}`);
       update(myConnectionRef, { ttsKey: activeKeyIndex.value }).catch(()=> {});
   }
@@ -232,7 +236,8 @@ export const useSystemStore = defineStore("system", () => {
     setPriceDetectorState, // ✅ Export
     assignOptimalTtsKey, // ✅ Export
     updatePresenceTtsKey, // ✅ Export
-    googleApiKey, // ✅ Export (from .env)
+    googleApiKey, // ✅ Export (only in Cloud-enabled builds)
+    googleCloudTtsEnabled,
     useOnlineTts, // ✅ Export
     ttsVoiceMode, // ✅ Export
     googleVoiceName, // ✅ Export

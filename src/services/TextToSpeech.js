@@ -2,6 +2,8 @@ import { useSystemStore } from "../stores/system";
 import { logger } from "../utils/logger";
 import { stripYouTubeEmotes } from "../data/youtubeEmotes";
 import { replaceNumbersWithThaiWords } from "../utils/thaiNumberWords";
+import { isGoogleCloudTtsEnabled } from "../utils/ttsConfig";
+import { selectThaiVoice } from "../utils/nativeVoiceUtils";
 
 // Module-scoped compiled regexes to prevent recreation in TTS sanitize loop
 const TTS_EMOJI_REGEX = /[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE00-\uFE0F\u200D\u20E3]/gu;
@@ -88,7 +90,7 @@ export class TextToSpeech {
    * Load voices
    */
   loadVoices() {
-    const vs = window.speechSynthesis.getVoices();
+    const vs = typeof window !== "undefined" ? (window.speechSynthesis?.getVoices?.() || []) : [];
 
     if (vs.length === 0) {
       return;
@@ -96,22 +98,10 @@ export class TextToSpeech {
 
     this.voices = vs;
 
-    // 🚀 O(1) Pre-cache best Thai voice on load instead of scanning array 4 times per utterance
-    this.cachedBestVoice =
-      this.voices.find(
-        (v) =>
-          v.name.includes("Google") &&
-          (v.name.includes("Thai") || v.name.includes("ไทย")),
-      ) ||
-      this.voices.find(
-        (v) => v.name.includes("Premwadee") || v.name.includes("Pattara"),
-      ) ||
-      this.voices.find((v) => v.name.includes("Narisa")) ||
-      this.voices.find((v) => v.lang.startsWith("th")) ||
-      null;
+    this.cachedBestVoice = selectThaiVoice(this.voices);
 
     // Clear poller once voices are loaded
-    if (this.poller) {
+    if (this.cachedBestVoice && this.poller) {
       clearInterval(this.poller);
       this.poller = null;
     }
@@ -147,12 +137,11 @@ export class TextToSpeech {
 
   /**
    * Get best Thai voice
-   * Priority: Google Thai > Premwadee/Pattara > Narisa > lang=th
+   * Priority: installed Thai > browser-provided Google Thai > other Thai
    */
   getBestVoice() {
-    if (this.voices.length === 0) {
+    if (!this.cachedBestVoice) {
       this.loadVoices();
-      return null;
     }
     return this.cachedBestVoice;
   }
@@ -230,6 +219,10 @@ export class TextToSpeech {
    * Speak using Google Cloud TTS API with key rotation
    */
   async speakOnline(text) {
+    if (!isGoogleCloudTtsEnabled()) {
+      this.speakNative(text);
+      return;
+    }
     const systemStore = useSystemStore();
 
     // Parse comma-separated keys
@@ -585,7 +578,7 @@ export class TextToSpeech {
     const systemStore = useSystemStore();
 
     if (
-      systemStore.useOnlineTts &&
+      isGoogleCloudTtsEnabled() && systemStore.useOnlineTts &&
       systemStore.googleApiKey &&
       !this.googleDisabledPermanently
     ) {

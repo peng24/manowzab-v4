@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 
 // Mock localStorage
@@ -29,68 +29,69 @@ vi.mock("../composables/useFirebase", () => ({
 describe("System Store - TTS Modes", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.stubEnv("VITE_ENABLE_GOOGLE_CLOUD_TTS", "false");
+    vi.stubEnv("VITE_GOOGLE_API_KEYS", "test-cloud-key-1,test-cloud-key-2");
     setActivePinia(createPinia());
   });
+  afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
-  it("defaults to 'standard' voice mode when no preference is saved", async () => {
+  it("defaults to free native speech and does not load Cloud keys", async () => {
     const { useSystemStore } = await import("../stores/system");
-    const systemStore = useSystemStore();
-
-    expect(systemStore.ttsVoiceMode).toBe("standard");
-    expect(systemStore.useOnlineTts).toBe(true);
-    expect(systemStore.googleVoiceName).toBe("th-TH-Standard-A");
+    const store = useSystemStore();
+    expect(store.ttsVoiceMode).toBe("native");
+    expect(store.useOnlineTts).toBe(false);
+    expect(store.googleCloudTtsEnabled).toBe(false);
+    expect(store.googleApiKey).toBe("");
   });
 
-  it("automatically migrates legacy 'neural2' mode to 'standard'", async () => {
-    localStorage.setItem("manowzab_tts_voice_mode", "neural2");
-
+  it.each(["standard", "neural2", "invalid"])("migrates saved %s to free native speech", async saved => {
+    localStorage.setItem("manowzab_tts_voice_mode", saved);
     const { useSystemStore } = await import("../stores/system");
-    const systemStore = useSystemStore();
-
-    expect(systemStore.ttsVoiceMode).toBe("standard");
-    expect(localStorage.getItem("manowzab_tts_voice_mode")).toBe("standard");
-  });
-
-  it("restores 'native' mode if saved in localStorage", async () => {
-    localStorage.setItem("manowzab_tts_voice_mode", "native");
-
-    const { useSystemStore } = await import("../stores/system");
-    const systemStore = useSystemStore();
-
-    expect(systemStore.ttsVoiceMode).toBe("native");
-    expect(systemStore.useOnlineTts).toBe(false);
-  });
-
-  it("cycles between 'standard' and 'native' in a 2-state loop", async () => {
-    const { useSystemStore } = await import("../stores/system");
-    const systemStore = useSystemStore();
-
-    expect(systemStore.ttsVoiceMode).toBe("standard");
-
-    // Cycle 1: standard -> native
-    const mode1 = systemStore.cycleTtsMode();
-    expect(mode1).toBe("native");
-    expect(systemStore.ttsVoiceMode).toBe("native");
-    expect(systemStore.useOnlineTts).toBe(false);
+    const store = useSystemStore();
+    expect(store.ttsVoiceMode).toBe("native");
+    expect(store.useOnlineTts).toBe(false);
     expect(localStorage.getItem("manowzab_tts_voice_mode")).toBe("native");
-
-    // Cycle 2: native -> standard
-    const mode2 = systemStore.cycleTtsMode();
-    expect(mode2).toBe("standard");
-    expect(systemStore.ttsVoiceMode).toBe("standard");
-    expect(systemStore.useOnlineTts).toBe(true);
-    expect(localStorage.getItem("manowzab_tts_voice_mode")).toBe("standard");
   });
 
-  it("updates ttsVoiceMode when useOnlineTts computed setter is used", async () => {
+  it("restores native speech on existing devices", async () => {
+    localStorage.setItem("manowzab_tts_voice_mode", "native");
     const { useSystemStore } = await import("../stores/system");
-    const systemStore = useSystemStore();
+    expect(useSystemStore().ttsVoiceMode).toBe("native");
+  });
 
-    systemStore.useOnlineTts = false;
-    expect(systemStore.ttsVoiceMode).toBe("native");
+  it("cannot switch to Cloud using either the toggle or computed setter in a free build", async () => {
+    const { useSystemStore } = await import("../stores/system");
+    const store = useSystemStore();
+    for (let i = 0; i < 3; i++) expect(store.cycleTtsMode()).toBe("native");
+    store.useOnlineTts = true;
+    expect(store.useOnlineTts).toBe(false);
+    expect(localStorage.getItem("manowzab_tts_voice_mode")).toBe("native");
+    store.ttsVoiceMode = "standard";
+    expect(store.useOnlineTts).toBe(false);
+  });
 
-    systemStore.useOnlineTts = true;
-    expect(systemStore.ttsVoiceMode).toBe("standard");
+  it("skips Cloud key distribution and presence writes in a free build", async () => {
+    const { useSystemStore } = await import("../stores/system");
+    const { get, update } = await import("firebase/database");
+    vi.mocked(get).mockClear(); vi.mocked(update).mockClear();
+    const store = useSystemStore();
+    store.googleApiKey = "key1,key2";
+    await store.assignOptimalTtsKey(); store.updatePresenceTtsKey();
+    expect(get).not.toHaveBeenCalled(); expect(update).not.toHaveBeenCalled();
+  });
+
+  it("preserves the Cloud toggle only when explicitly enabled at build time", async () => {
+    vi.stubEnv("VITE_ENABLE_GOOGLE_CLOUD_TTS", "true");
+    const { useSystemStore } = await import("../stores/system");
+    const store = useSystemStore();
+    expect(store.ttsVoiceMode).toBe("native");
+    expect(store.googleCloudTtsEnabled).toBe(true);
+    expect(store.googleApiKey).toBe("test-cloud-key-1,test-cloud-key-2");
+    expect(store.cycleTtsMode()).toBe("standard");
+    expect(store.useOnlineTts).toBe(true);
+    expect(store.cycleTtsMode()).toBe("native");
+    store.useOnlineTts = true;
+    expect(store.useOnlineTts).toBe(true);
   });
 
   it("deduplicates author prefix when message starts with author name", async () => {

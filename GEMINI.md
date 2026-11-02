@@ -106,3 +106,11 @@ We have adapted and installed developer-agent workflows from `9arm-skills` into 
 - Regex changes require the reviewed anonymized 307-row corpus, boundary tests, and actual useChatProcessor side-effect tests. Expected labels must be reviewed independently of the changed parser. Keep raw logs/identifiers outside tracked fixtures; archive analyzed files only after hash checks, with no overwrite on filename collisions.
 - See docs/chat-regex-review-2026-10-31.md and /verify 2.11–2.15. Passing this corpus is regression evidence, not a claim of 100% accuracy on new chat.
 
+## Free Thai TTS Policy (2026-11-02, user-selected)
+
+- Production defaults to native Thai speech with no Google Cloud TTS billing. Do not reopen Billing, add payment methods, or activate paid providers without new explicit user approval.
+- isGoogleCloudTtsEnabled() is false unless VITE_ENABLE_GOOGLE_CLOUD_TTS is exactly true at build time. Existing Cloud keys or saved standard/neural2 preferences must never enable Cloud. Free builds migrate saved modes to native, load no Cloud keys, skip TTS key distribution/presence writes, and guard both processQueue and direct speakOnline entry points.
+- In free builds Header shows TH ฟรี and tests speech through queueAudio. The button must not toggle into a billable provider; if no Thai voice is found, show device-language installation guidance.
+- Prefer installed Thai voices (localService=true), then browser-provided Thai voices. getBestVoice returns a newly loaded voice immediately; bounded polling must continue if only non-Thai voices load first. Browser voices vary by device; never describe a remote browser voice as guaranteed offline.
+- Keep Firebase audio time/blacklist guards, Thai cardinal-number conversion, iOS unlock, shared AudioContext and sequential queue behavior. Native error/end/reset must settle pending speech without overlap or deadlock.
+- Verify free default + saved preference migration, blocked Cloud calls including direct calls, actual native queue completion, local Thai selection, delayed voices, error/reset, Header controls and absence of Google TTS endpoint/keys in the production build. These checks concern TTS charges, not unrelated Firebase/YouTube/network costs.

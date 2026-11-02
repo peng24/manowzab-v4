@@ -67,7 +67,7 @@ description: Mandatory verification checklist after every code change
 | 4.2 | `playSfx(type)` | `src/composables/useAudio.js` | เล่น success/error/cancel ด้วย Web Audio API |
 | 4.3 | `resetVoice()` | `src/composables/useAudio.js` | หยุดเสียงทั้งหมดทันที ล้างคิว |
 | 4.4 | `unlockAudio()` | `src/composables/useAudio.js` | ปลดล็อกเสียงบน iOS/iPad |
-| 4.5 | `ttsService.speak(author, message)` | `src/services/TextToSpeech.js` | อ่านข้อความด้วย Google Cloud TTS / fallback Native TTS |
+| 4.5 | `ttsService.speak(author, message)` | `src/services/TextToSpeech.js` | ค่าเริ่มต้นอ่านด้วย Native Thai ฟรี; Cloud/fallback ใช้เฉพาะ build ที่เปิด Cloud อย่างชัดเจน |
 | 4.6 | TTS ต้องอ่านทุกข้อความที่เข้าเกณฑ์ | `src/composables/useChatProcessor.js`, `src/stores/chat.js` | Processor ต้องบันทึก `sfxType`, `phoneticName`, `ttsText` ก่อนจบเส้นทางซื้อ/ยกเลิก/โน้ต; ให้ Firebase listener ใน `chat.js` เรียก `queueAudio()` เฉพาะข้อความใหม่ตาม time guard ข้อ 4.7 ห้ามเพิ่มเสียงตรงจาก processor; ยกเว้นข้อความต้อนรับที่อนุญาตไว้, ผู้ถูกแบน และ voice-chat ตามเงื่อนไขเดิม |
 | 4.7 | Cross-Device Audio Playback | `src/stores/chat.js`, `src/composables/useChatProcessor.js` | ห้ามเรียก `queueAudio()` ตรงๆ ใน `useChatProcessor.js` (ยกเว้นเสียงต้อนรับ) เสียงทั้งหมดต้องถูกทริกเกอร์ผ่าน Firebase sync listener ใน chat store และเล่นเฉพาะแชทใหม่ (`timestamp >= syncStartTime - 5000` และ `isNew`) |
 | 4.8 | Emoji and Run Fallback | `src/composables/useChatProcessor.js` | อ่านสติกเกอร์เป็น "ส่งสติกเกอร์" เมื่อ sanitizes เป็นค่าว่าง, fallback ไป `messageRuns` เมื่อ `displayMessage` ว่าง |
@@ -75,9 +75,10 @@ description: Mandatory verification checklist after every code change
 | 4.10 | ออกเสียงชื่อลูกค้าจริงเมื่อแอดมินจองแทน (Admin Proxy TTS) | `src/composables/useChatProcessor.js` | เมื่อแอดมินพิมพ์จองให้ลูกค้า เสียง TTS จะอ่านเป็นชื่อลูกค้าเท่านั้น ไม่นำชื่อแอดมินมาอ่าน |
 | 4.11 | Shared Singleton `AudioContext` & LRU Cache | `src/services/TextToSpeech.js`, `src/composables/useAudio.js` | ใช้ `AudioContext` ร่วมกันตัวเดียว (`ttsService.getAudioContext()`) ทั้งระบบ TTS / SFX / Celebration พร้อม LRU Audio Buffer Cache (สูงสุด 200 รายการ) ลดเวลาถอดรหัสเสียงซ้ำ |
 | 4.12 | Zero-Mute Admin Notes & TTS Fallback Guarantee | `src/composables/useChatProcessor.js`, `src/stores/chat.js`, `src/services/TextToSpeech.js` | แชทโน้ตแอดมิน (`admin-note`) และคำเฉพาะแอดมิน (`admin-stopword`) ต้องส่ง `ttsText: isVoiceChat ? "" : ttsMessage` ขึ้น Firebase เสมอ และ `chat.js` ต้องมี fallback ไปที่ `messageData.text` หาก `ttsText` ว่างเปล่า เพื่อรับประกันว่าจะไม่มีข้อความใดถูกตัดเสียงอ่านทิ้ง รวมถึงตัดชื่อซ้ำที่ท้ายข้อความใน TTS (`suffixRegex`) |
-| 4.13 | TTS 2-State Toggle Switcher (`S` / `🤖`) | `src/components/Header.vue`, `src/stores/system.js` | ปุ่มสลับเสียงรองรับ 2 โหมด (`S` Google Cloud Standard `th-TH-Standard-A` ➡️ `🤖` Native TTS) พร้อมจำค่าลง `localStorage` |
-| 4.14 | Zero-Stall TTS Auto-Fallback System | `src/services/TextToSpeech.js` | หากโหมด `S` (Google Cloud TTS) ขัดข้อง หมดโควตา หรือเกิด Timeout ระบบต้องหมุน API Key และ Fallback อัตโนมัติไปยัง Native TTS (`🤖`) โดยคิวเสียงไม่ค้างและไม่สะดุด |
+| 4.13 | Free Thai Speech / Opt-in Cloud | Header.vue, system.js | ปุ่ม TH ฟรี ทดสอบเสียงผ่าน queueAudio; default และ saved standard/neural2 ต้องเป็น native ใน free build; ปุ่ม/ค่าเก่าเปิด Cloud ไม่ได้; ถ้าไม่มีเสียงไทยให้แสดงคำแนะนำติดตั้ง |
+| 4.14 | Zero-Stall TTS Auto-Fallback System | `src/services/TextToSpeech.js` | เฉพาะ build ที่เปิด Cloud: หากโหมด `S` (Google Cloud TTS) ขัดข้อง หมดโควตา หรือเกิด Timeout ระบบต้องหมุน API Key และ Fallback อัตโนมัติไปยัง Native TTS (`🤖`) โดยคิวเสียงไม่ค้างและไม่สะดุด |
 | 4.15 | Thai Cardinal Number Pronunciation (`numberToThaiWords`) | `src/utils/thaiNumberWords.js`, `src/services/TextToSpeech.js`, `src/composables/useChatProcessor.js` | อ่านตัวเลขจองสินค้าเป็นจำนวนนับภาษาไทย เช่น "15" -> "สิบห้า" ไม่ใช่อ่านแยกทีละตัว "หนึ่งห้า" พร้อมแปลง CF, ตัวเลขทับลำดับ, และปกป้องเบอร์โทรศัพท์ (08x/09x)/เวลา (13:11) |
+| 4.16 | Zero TTS charges / Native lifecycle | nativeTts.test.js, ttsStore.test.js | free build ไม่มี Cloud endpoint/keys; direct speakOnline และ legacy settings ไม่ยิง HTTP; local Thai มาก่อน browser voice; delayed voices/error/end/reset ไม่ค้าง ไม่ซ้อน; browser บันทึก start/end แยกจากการฟังด้วยหู |
 
 
 ---
@@ -261,8 +262,8 @@ description: Mandatory verification checklist after every code change
 
 | # | ฟังก์ชัน | ไฟล์ | ต้องทำงานได้ |
 |---|---|---|---|
-| 18.1 | ormatBackdatedCard(ts) | src/utils/timeFormatUtils.js, src/components/StockItemCard.vue | แสดงเฉพาะไอคอนย้อนเวลา (.backdated-inline-icon) ต่อท้ายชื่อลูกค้าโดยตรง ไม่แสดงข้อความเวลา เพื่อความกะทัดรัดและคลีนตา |
-| 18.2 | ormatBackdatedDetail(ts) & ormatNormalBookingTime(ts) | src/utils/timeFormatUtils.js, src/components/StockGrid.vue, src/components/HistoryModal.vue | ในหน้าต่างจัดการคิว (Modal) แสดงป้าย ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm เด่นชัด และรายการปกติแสดงเวลาสะอาด 🕒 HH:mm |
+| 18.1 | `formatBackdatedCard(ts)` | src/utils/timeFormatUtils.js, src/components/StockItemCard.vue | แสดงเฉพาะไอคอนย้อนเวลา (.backdated-inline-icon) ต่อท้ายชื่อลูกค้าโดยตรง ไม่แสดงข้อความเวลา เพื่อความกะทัดรัดและคลีนตา |
+| 18.2 | `formatBackdatedDetail(ts)` & `formatNormalBookingTime(ts)` | src/utils/timeFormatUtils.js, src/components/StockGrid.vue, src/components/HistoryModal.vue | ในหน้าต่างจัดการคิว (Modal) แสดงป้าย ⏳ ย้อนหลัง • วันนี้/เมื่อวาน/วันที่ HH:mm เด่นชัด และรายการปกติแสดงเวลาสะอาด 🕒 HH:mm |
 | 18.3 | getBookingTooltip(ts, isBackdated) | src/utils/timeFormatUtils.js | แสดง Tooltip สุภาพและชัดเจนเมื่อนำเมาส์ชี้ (จองย้อนหลัง: วันนี้ เวลา 13:11 น.) |
 | 18.4 | UI Sunset Amber Gradient Pill Badge | src/components/StockItemCard.vue, src/components/StockGrid.vue, src/components/HistoryModal.vue | ดีไซน์ป้ายรูปทรง Pill โทนสี Amber/Sunset เกรเดียนต์ ขอบเรืองแสง พร้อมไอคอนย้อนเวลา `fa-clock-rotate-left` |
 
@@ -412,3 +413,13 @@ description: Mandatory verification checklist after every code change
 - Browser หน้า login โหลด main-DTiVVHIt.js, มี email/password inputs, 27 network requests สำเร็จ และไม่พบ console warnings/errors; unauthenticated stock/delivery_customers/address_book reads ถูกปฏิเสธ HTTP 401
 - กฎ/verify 2.11–2.15 อัปเดตแล้ว; raw logs ไม่อยู่ใน Git; ไฟล์ที่วิเคราะห์ 5 ไฟล์ย้ายเข้า old โดย hash ตรงและรักษาไฟล์ชื่อซ้ำเดิม
 - ตรวจครบทุกหมวดโดยแยก automated/browser/source review/ยังไม่ได้ตรวจจริงตาม [coverage report](../../docs/release-5.4.16.md#checklist-coverage); production password login, live YouTube, เสียง/iOS/เครื่องพิมพ์จริง และ installed-device PWA update ยังไม่ได้ทดสอบ
+
+
+## 🔊 ผลตรวจ Native Thai TTS — v5.4.17 (2026-11-02)
+
+- ผู้ใช้เลือกไม่มีค่าบริการ TTS; ไม่เปิด Billing และไม่เปลี่ยน payment/account settings
+- npm test ผ่าน 745 tests/29 files; build:gh ผ่าน 4 หน้าและ PWA 66 entries; free build ไม่มี endpoint text:synthesize และไม่มีคีย์ Google TTS เดิมทั้งสอง
+- Browser fixture ใช้ Header, system store, useAudio และ TextToSpeech จริง ปิดเฉพาะ shipping listener ของ Header และใช้ review environment; saved standard ย้ายเป็น native และไม่มี Cloud key
+- Microsoft Pattara (Thai, localService=true) ได้ start/end ครบทั้งปุ่ม TH ฟรี และคิว สมใจ 15 / มะระ จอง 26 ตามลำดับ; Cloud request count = 0; การฟังเสียงด้วยหูและอุปกรณ์อื่นต้องตรวจแยก
+- หมวด auth/rules/stock/delivery ใช้ source เดิมและ unit suite รอบนี้ ไม่ได้รัน Firebase emulator ใหม่สำหรับการเปลี่ยน TTS นี้; ผล 23 checks ของ v5.4.16 เป็นหลักฐานย้อนหลัง
+- รายละเอียดและสถานะเผยแพร่ดู [release report](../../docs/release-5.4.17.md)

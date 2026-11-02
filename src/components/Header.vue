@@ -84,7 +84,7 @@
         </button>
       </div>
 
-      <!-- TTS Toggle - 2-State (Google Standard / Native) -->
+      <!-- Free Thai voice test; Cloud toggle exists only in explicitly enabled builds. -->
       <button
         :class="['btn']"
         :style="{
@@ -99,10 +99,13 @@
           position: 'relative',
         }"
         @click="toggleTtsMode"
+        :aria-label="systemStore.googleCloudTtsEnabled ? 'สลับเสียงอ่าน' : 'ทดลองเสียงภาษาไทยฟรี'"
         :title="
-          systemStore.ttsVoiceMode === 'standard'
+          !systemStore.googleCloudTtsEnabled
+            ? 'เสียงภาษาไทยฟรี • กดทดลองฟัง (ไม่ใช้ Google Cloud)'
+            : systemStore.ttsVoiceMode === 'standard'
             ? `Google Cloud Standard (th-TH-Standard-A) - Key #${systemStore.activeKeyIndex} Active`
-            : 'Native TTS (Offline)'
+            : 'เสียงในเครื่อง • กดเพื่อสลับเสียง'
         "
       >
         <!-- Icon -->
@@ -122,6 +125,7 @@
         >
           {{ 'S' + systemStore.activeKeyIndex }}
         </span>
+        <span v-else-if="!systemStore.googleCloudTtsEnabled" style="margin-left: 5px">TH ฟรี</span>
       </button>
 
       <!-- 💬 Live Chat Panel Toggle Button -->
@@ -295,6 +299,7 @@ import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useYouTube } from "../composables/useYouTube";
 import { useAudio } from "../composables/useAudio";
+import { ttsService } from "../services/TextToSpeech";
 import { ref as dbRef, onValue, update, set } from "firebase/database";
 import { db } from "../composables/useFirebase"; // เช็ค path ให้ตรงกับเครื่องคุณ
 import Swal from "sweetalert2";
@@ -698,6 +703,19 @@ function getVersionTooltip() {
 }
 
 function toggleTtsMode() {
+  if (!systemStore.googleCloudTtsEnabled) {
+    if (!ttsService.getBestVoice()) {
+      Swal.fire({
+        icon: "info",
+        title: "ยังไม่พบเสียงภาษาไทย",
+        text: "เพิ่มเสียงอ่านภาษาไทยในการตั้งค่าภาษาของอุปกรณ์ แล้วปิดและเปิดเบราว์เซอร์ใหม่ จากนั้นกด TH ฟรี เพื่อทดลองอีกครั้ง",
+        confirmButtonText: "เข้าใจแล้ว",
+      });
+      return;
+    }
+    queueAudio(null, "", "ทดสอบเสียงภาษาไทย พร้อมอ่านแชตแล้วค่ะ");
+    return;
+  }
   const newMode = systemStore.cycleTtsMode();
   const modeName = newMode === "standard" ? "Google Standard" : "Native TTS";
 

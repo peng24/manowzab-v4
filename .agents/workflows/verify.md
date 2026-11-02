@@ -333,6 +333,7 @@ description: Mandatory verification checklist after every code change
 | 23.4 | Published artifacts | บันทึก source commit และ gh-pages commit; build ด้วย base /manowzab-v4/; ตรวจ main, shipping/, history/, address/ ได้ HTTP 200 และ HTML/entry scripts ตรงกับ build ล่าสุด |
 | 23.5 | Production smoke check | เปิดหน้าเว็บจริงใน browser ตรวจ login inputs, console และ failed resources; ทดสอบ unauthenticated read ของ stock/delivery_customers/address_book ต้องถูกปฏิเสธ; แยกผลโหลดหน้า login ออกจากการเข้าสู่ระบบจริงและการทำงานหลังล็อกอิน |
 | 23.6 | PWA และหลายอุปกรณ์ | อัปเดตแต่ละเครื่องเป็น version เดียวกันและเข้าสู่ระบบใหม่; ลอง reload/ปิดเปิดแอป, sync ข้อมูล, revoke และการแจ้งอัปเดตโดยไม่ขัดจังหวะไลฟ์; ระบุว่าทดสอบกับ browser/emulator หรืออุปกรณ์จริง ยังไม่ถือว่าผ่าน PWA/iPad จริงจาก build อย่างเดียว |
+| 23.7 | Billing budgets / enforced limits | ตรวจ currency/monthly scope/projects/services/credits/thresholds/recipients จาก API readback พร้อม etag; alerts และ payment threshold ไม่ใช่ hard cap; ตรวจ eligibility และ response ที่ deploy จริงแยกกัน; ไม่ทดสอบด้วยการปิด production หรือสร้างค่าใช้จ่าย; หลักฐานบัญชีเก็บใน ignored local ตาม [คู่มือ](../../docs/cloud-billing-controls.md) |
 
 ---
 

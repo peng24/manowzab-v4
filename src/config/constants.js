@@ -15,6 +15,7 @@ export const CONSTANTS = {
 
     // UI & System Limits
     UI: {
+        NEW_ORDER_EFFECT_MS: 15000,
         TOAST_DURATION_MS: 2000,
         LONG_TOAST_DURATION_MS: 3000,
         ERROR_TOAST_DURATION_MS: 4000,

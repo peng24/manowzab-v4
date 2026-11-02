@@ -56,13 +56,14 @@
       <form @submit.prevent="handleSubmit" class="auth-form" novalidate>
         <!-- Email Input -->
         <div class="auth-field" :class="{ 'field-focused': focusedField === 'email' }">
-          <label class="auth-label">
+          <label class="auth-label" for="auth-email">
             <i class="fa-solid fa-envelope label-icon"></i>
             <span>อีเมลผู้ดูแลระบบ</span>
           </label>
           <div class="auth-input-wrapper">
             <input
               type="email"
+              id="auth-email"
               v-model="email"
               placeholder="admin@example.com"
               class="auth-input"
@@ -81,13 +82,14 @@
 
         <!-- Password Input -->
         <div class="auth-field" :class="{ 'field-focused': focusedField === 'password' }">
-          <label class="auth-label">
+          <label class="auth-label" for="auth-password">
             <i class="fa-solid fa-key label-icon"></i>
             <span>รหัสผ่านความปลอดภัย</span>
           </label>
           <div class="auth-input-wrapper">
             <input
               :type="showPassword ? 'text' : 'password'"
+              id="auth-password"
               v-model="password"
               placeholder="••••••••••••••••"
               class="auth-input"
@@ -101,7 +103,7 @@
               type="button"
               class="auth-eye-btn"
               @click="togglePasswordVisibility"
-              tabindex="-1"
+              :aria-label="showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
               title="แสดง/ซ่อนรหัสผ่าน"
             >
               <i

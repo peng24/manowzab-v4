@@ -1,0 +1,100 @@
+/* Operational workspace: clear states, quieter surfaces and local panel sizing. */
+.app-layout > .left-column { min-width: 0; }
+.app-layout > .chat-panel {
+  width: clamp(280px, var(--chat-panel-width, 400px), calc(100vw - 360px));
+  min-width: 0; max-width: 600px; flex: 0 0 auto; height: 100%;
+}
+.mobile-workspace-tabs { display: none; }
+.chat-audio-state { display: none; }
+.workspace-divider { flex: 0 0 10px; cursor: col-resize; touch-action: none; display: flex; align-items: center; justify-content: center; background: #101722; }
+.workspace-divider span { width: 3px; height: 40px; background: #425169; border-radius: 4px; }
+.workspace-divider:hover span, .workspace-divider:focus-visible span { background: #7dd3fc; }
+.workspace-divider:focus-visible { outline: 2px solid #7dd3fc; outline-offset: -2px; }
+.layout-resizing { user-select: none; cursor: col-resize; }
+.layout-resizing > .chat-panel { transition: none; }
+.audio-mode-control { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px; border: 1px solid #405169; background: #172233; color: #e2e8f0; box-shadow: none; }
+.audio-mode-copy { display: flex; flex-direction: column; text-align: left; line-height: 1.25; }
+.audio-mode-copy strong { font-size: 13px; font-weight: 600; }
+.audio-mode-copy small { color: #a9b6c8; font-size: 10px; }
+.audio-mode--google { border-color: #315c72; background: #132c3c; }
+.audio-mode--fallback { border-color: #8c672e; background: #352b1b; color: #fde6af; }
+.audio-mode--muted { color: #a9b6c8; background: #1c2430; }
+.audio-mode--error { border-color: #9f4559; color: #fecdd3; }
+.header-controls > .btn, .header-controls .hero-connect-container .btn, .header-controls .dropdown > .btn { min-height: 44px; }
+.hero-connect-container { box-shadow: none; background: #111d2b; }
+.hero-connect-container input { min-width: 0; }
+.header .header-controls { flex-wrap: wrap; overflow: visible; mask-image: none; -webkit-mask-image: none; }
+.header .header-controls > * { flex-shrink: 0; }
+.header .hero-connect-container { flex: 1 1 270px; min-width: 0; }
+.stock-panel .stock-item { background: #111b29; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
+.stock-panel .stock-item.sold { background: #142a28; box-shadow: none; border-color: #357461; }
+.stock-panel .stock-item.sold:hover { background: #19362f; box-shadow: none; }
+.stock-panel .stock-item.sold.new-order { animation: workspace-order-pulse 2.5s ease-in-out infinite; border-color: #e5bd63 !important; }
+.stock-panel .stock-item.sold.new-order::after { display: none; }
+.stock-panel .stock-item.sold.new-order .stock-num { animation: none; opacity: 1; }
+.stock-panel .stock-item.sold.new-order .new-order-shimmer { animation: none; }
+.stock-panel .stock-item.sold.new-order .new-order-shimmer::before { animation: workspace-order-sweep 5s ease-in-out 3; opacity: .14; }
+.stock-panel .stock-status.empty { color: #a3afbf; }
+.app-layout .chat-panel .chat-row.buy { background: #132b25 !important; border-color: #306b55 !important; box-shadow: none !important; }
+.app-layout .chat-panel .chat-row.cancel { background: #302026 !important; border-color: #86505e !important; box-shadow: none !important; }
+.app-layout .chat-panel .chat-row.shipping { background: #172738 !important; border-color: #3c6384 !important; box-shadow: none !important; }
+.app-layout .chat-panel .chat-row.admin { background: #27233a !important; border-color: #625382 !important; box-shadow: none !important; }
+.app-layout .chat-panel .chat-row.has-smart-answer:not(.admin):not(.shipping) { background: #151f2d !important; box-shadow: none !important; }
+.app-layout .chat-panel .chat-row .avatar, .app-layout .chat-panel .chat-row .btn-quick-key { box-shadow: none; }
+.dropdown-content a { min-height: 44px; }
+.dropdown-content a:focus-visible { outline: 2px solid #7dd3fc; outline-offset: -2px; }
+.app-layout .chat-panel .chat-name { min-height: 28px; display: inline-flex; align-items: center; }
+.app-layout .chat-panel .chat-row.shipping .chat-bubble { background: #20354b !important; border-color: #3c6384 !important; box-shadow: none !important; }
+@keyframes workspace-order-pulse { 0%, 100% { box-shadow: inset 0 0 0 1px #e5bd6314; } 50% { box-shadow: inset 0 0 0 1px #e5bd6373, 0 0 8px #e5bd631f; } }
+@keyframes workspace-order-sweep { 0%, 65%, 100% { left: -120%; } 90% { left: 170%; } }
+.status-cluster .status-led.ok, .status-cluster .status-item.ok { animation: none; box-shadow: none; text-shadow: none; }
+.queue-edit-fields { border: 0; padding: 0; margin: 0; min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.queue-draft-status { font-size: 12px; color: #a7cbb7; white-space: nowrap; }
+.queue-draft-status.dirty { color: #fcd58a; }
+.queue-header .queue-header-actions { flex-wrap: wrap; }
+.queue-header .btn-queue-nav { width: auto; min-height: 44px; gap: 6px; padding: 6px 10px; font-size: 12px; }
+.queue-header .btn-queue-clear, .queue-header .btn-queue-close { min-width: 44px; min-height: 44px; }
+.queue-footer button, .queue-actions button { min-height: 44px; }
+.queue-modal button:disabled { opacity: .5; cursor: wait; }
+.app-container button:focus-visible, .app-container [role="button"]:focus-visible, .queue-modal button:focus-visible, .queue-modal input:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+
+@media (max-width: 768px) {
+  .header .btn-chat-toggle { display: none; }
+  .chat-audio-state { display: block; color: #afbed1; font-size: 11px; }
+  .mobile-workspace-tabs { display: grid; grid-template-columns: 1fr 1fr; flex: 0 0 auto; gap: 6px; padding: 6px 10px; background: #0e1622; border-bottom: 1px solid #263347; }
+  .mobile-workspace-tabs button { min-height: 44px; border: 1px solid transparent; border-radius: 9px; color: #acb9cb; background: transparent; font: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .mobile-workspace-tabs button[aria-pressed="true"] { color: #e0f2fe; background: #1c3446; border-color: #385b73; }
+  .app-layout { min-height: 0; }
+  .app-layout > .workspace-divider, .app-layout > .chat-expand-floating-tab { display: none; }
+  .app-layout:not(.mobile-show-chat) > .chat-panel { display: none; }
+  .app-layout.mobile-show-chat > .left-column { display: none; }
+  .app-layout.mobile-show-chat > .chat-panel { display: flex; width: 100%; min-width: 0; max-width: none; height: 100%; border-left: 0; }
+  .app-layout > .left-column { width: 100%; }
+  .header-controls { flex-wrap: wrap; gap: 8px; padding: 10px; }
+  .header-controls .status-cluster { flex: 1 0 100%; }
+  .header-controls .hero-connect-container { flex: 1 1 100%; width: 100%; max-width: none; min-width: 0; margin: 0; }
+  .header-controls .hero-connect-container.connected .input-id, .header-controls .hero-connect-container .input-id { width: auto; flex: 1; min-width: 0; }
+  .header-controls .btn-shipping-cycle { flex: 1; }
+  .header .header-info { padding: 6px 12px; }
+  .stock-panel .stock-grid { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; padding: 10px; }
+  .stock-panel .stock-grid { grid-auto-rows: minmax(144px, auto); }
+  .stock-panel .stock-item { aspect-ratio: auto; min-height: 144px; contain-intrinsic-size: auto 144px; }
+  .stock-panel .stock-item .owner-count-badge, .stock-panel .stock-item .no-addr-indicator { min-height: 44px; min-width: 44px; justify-content: center; }
+  .app-layout .chat-panel .chat-name { min-height: 44px; }
+  .stock-header .header-main-row { flex-wrap: wrap; gap: 8px; }
+  .stock-header .quick-filter-container { width: 100%; }
+  .stock-header .stock-search-wrap { flex: 1; min-width: 0; }
+  .queue-modal { width: calc(100% - 16px); max-height: calc(100dvh - 24px); }
+  .queue-header { flex-wrap: wrap; gap: 8px; }
+  .queue-header .queue-header-actions { width: 100%; justify-content: space-between; }
+  .queue-header .queue-nav-group { flex: 1; }
+  .queue-header .btn-queue-nav { flex: 1; }
+  .queue-draft-status { width: 100%; }
+  .queue-footer { flex-wrap: wrap; }
+  .queue-footer-actions { width: 100%; }
+  .queue-footer-actions button { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-container *, .app-container *::before, .app-container *::after, .queue-modal * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

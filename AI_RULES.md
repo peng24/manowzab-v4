@@ -184,3 +184,13 @@ _Please acknowledge that you understand these rules. If I ask for a change, ensu
 - Reopening existing Billing was authorized, but no payment-method replacement, payment, credit purchase or paid add-on is implied. If Google requires card verification, have the user complete that step. Keep credentials, card details and original logs out of tracked files.
 
 - Cloud Billing controls: distinguish alert-only budgets from verified enforcement. All-account budgets and payment thresholds do not guarantee invoice ceilings; native spend caps have project/service restrictions and TTS is not currently eligible. Custom shutdown can lag and removing billing can irreversibly affect resources. Verify actual scope/recipients and any deployed response separately; keep private billing evidence out of public Git. See docs/cloud-billing-controls.md.
+
+
+## Operational workspace UX (2026-11-02)
+
+- Connection labels must reflect local connecting/poll/error/end state or actual fresh Firebase receipts; never hard-code LIVE. Successful empty polls remain healthy. Historical/duplicate chat must not refresh receipt age. Reset local timestamps when changing video or ending the authorized listener lifecycle.
+- Audio status is per-device presentation from actual Google/native playback, fallback and mute state. It must never start audio, write Firebase or change FIFO/time/blacklist guards. Preserve explicit Cloud opt-in and the existing free-build boundary.
+- Queue editing must track meaningful unsaved changes, confirm discard, serialize saves and block navigation/closing while saving. Failed writes preserve the draft and current item; announce manual edits only after persistence through queueAudio. Guard saving a draft from another video.
+- Persist mobile workspace and desktop chat width locally. Mobile shows one full workspace, uses the same chat shortcut to switch tabs, and keeps CSV accessible in the more menu. Incoming orders must not switch away from the chat tab; only an explicit item jump may reveal stock. Clean up resize/pointer/keyboard listeners.
+- Keep primary touch targets at least 44px, visible keyboard focus and usable Enter/Space actions. Check CSS cascade against existing scoped/global rules, no clipped primary controls or overlapping stock rows at 320px and above. Preserve full-width Smart Answers, thin black outlines and customer colour identity.
+- New-order emphasis lasts 15,000ms (CONSTANTS.UI.NEW_ORDER_EFFECT_MS), with gentle motion and reduced-motion support. Do not shorten it while simplifying visual effects.

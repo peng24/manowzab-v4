@@ -5,6 +5,7 @@ import { replaceNumbersWithThaiWords } from "../utils/thaiNumberWords";
 import { isGoogleCloudTtsEnabled } from "../utils/ttsConfig";
 import { selectThaiVoice } from "../utils/nativeVoiceUtils";
 import { GoogleTtsAudio } from "./GoogleTtsAudio";
+import { audioRuntime, setAudioRuntime } from './audioRuntime';
 
 // Module-scoped compiled regexes to prevent recreation in TTS sanitize loop
 const TTS_EMOJI_REGEX = /[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE00-\uFE0F\u200D\u20E3]/gu;
@@ -238,11 +239,12 @@ export class TextToSpeech {
   async speakOnline(text) {
     if (!isGoogleCloudTtsEnabled()) { this.speakNative(text); return; }
     const generation = this.playbackGeneration;
+    setAudioRuntime({ engine: 'google', phase: 'loading', fallback: false, voiceName: '' });
     let source;
     try {
       const buffer = await this.googleAudio.prepare(this.sanitize(text).substring(0, 500));
       if (generation !== this.playbackGeneration) return;
-      if (!buffer) { this.consecutiveGoogleFailures++; this.speakNative(text); return; }
+      if (!buffer) { this.consecutiveGoogleFailures++; this.speakNative(text, { fallback: useSystemStore().useOnlineTts }); return; }
       if (!await this.ensureAudioContextReady()) throw new Error("AudioContext unavailable");
       if (generation !== this.playbackGeneration) return;
       const decoded = await this.audioCtx.decodeAudioData(buffer);
@@ -257,6 +259,7 @@ export class TextToSpeech {
         ended = true;
         try { source.disconnect(); } catch { /* already disconnected */ }
         if (generation !== this.playbackGeneration) return;
+        setAudioRuntime({ phase: 'idle' });
         this.clearStuckTimer();
         const complete = this._currentOnComplete;
         this._currentOnComplete = null;
@@ -266,6 +269,7 @@ export class TextToSpeech {
         this.processQueue();
       };
       source.start(0);
+      setAudioRuntime({ engine: 'google', phase: 'speaking', fallback: false, voiceName: 'Google Standard' });
     } catch (error) {
       if (source) {
         source.onended = null;
@@ -275,7 +279,7 @@ export class TextToSpeech {
       }
       if (generation !== this.playbackGeneration) return;
       logger.warn("Google audio playback unavailable; using native speech");
-      this.speakNative(text);
+      this.speakNative(text, { fallback: useSystemStore().useOnlineTts });
     }
   }
 
@@ -285,15 +289,21 @@ export class TextToSpeech {
     return this.googleAudio.prepare(this.sanitize(text).substring(0, 500), true);
   }
 
-  retryGoogle() { this.googleAudio.retry(); }
+  retryGoogle() {
+    this.googleAudio.retry();
+    // A preference change must not mislabel an utterance that is still playing.
+    if (this.currentSource || (this.isSpeaking && audioRuntime.phase === 'speaking')) return;
+    setAudioRuntime({ engine: 'idle', phase: 'idle', fallback: false, voiceName: '' });
+  }
 
   /**
    * Speak using native browser TTS
    */
-  speakNative(text) {
+  speakNative(text, { fallback = false } = {}) {
     const generation = this.playbackGeneration;
     try {
       const voice = this.getBestVoice();
+      setAudioRuntime({ engine: 'native', phase: 'speaking', fallback, voiceName: voice?.name || '' });
 
       const utterance = new SpeechSynthesisUtterance(this.sanitize(text));
       utterance.lang = "th-TH";
@@ -313,7 +323,7 @@ export class TextToSpeech {
 
       // ✅ Guard against double-fire
       let hasEnded = false;
-      const cleanupAndAdvance = () => {
+      const cleanupAndAdvance = (failed = false) => {
         if (hasEnded) return;
         hasEnded = true;
         const index = window.ttsActiveUtterances.indexOf(utterance);
@@ -321,6 +331,7 @@ export class TextToSpeech {
           window.ttsActiveUtterances.splice(index, 1);
         }
         if (generation !== this.playbackGeneration) return;
+        setAudioRuntime({ phase: failed ? 'error' : 'idle' });
         this.clearStuckTimer();
         if (this._currentOnComplete) {
           this._currentOnComplete();
@@ -331,7 +342,7 @@ export class TextToSpeech {
       };
 
       // Handle end
-      utterance.onend = cleanupAndAdvance;
+      utterance.onend = () => cleanupAndAdvance();
 
       // Handle error
       utterance.onerror = (e) => {
@@ -340,7 +351,7 @@ export class TextToSpeech {
         } else {
           logger.warn("Native TTS interrupted");
         }
-        cleanupAndAdvance();
+        cleanupAndAdvance(true);
       };
 
       // Speak
@@ -348,6 +359,7 @@ export class TextToSpeech {
     } catch (e) {
       // ✅ Catch-all: ensure queue never stalls on unexpected errors
       logger.error("Native TTS setup failed:", e);
+      setAudioRuntime({ phase: 'error' });
       this.clearStuckTimer();
       if (this._currentOnComplete) {
         this._currentOnComplete();
@@ -378,6 +390,7 @@ export class TextToSpeech {
         // Invalidate late fetch/decode/native callbacks before stopping this item.
         this.playbackGeneration++;
         this.googleAudio.cancel();
+        setAudioRuntime({ phase: 'idle' });
         logger.warn(
           `TTS stuck for ${this.STUCK_TIMEOUT / 1000}s — auto-resetting queue`,
         );
@@ -521,6 +534,7 @@ export class TextToSpeech {
   reset() {
     this.playbackGeneration++;
     this.googleAudio.cancel();
+    setAudioRuntime({ phase: 'idle' });
     // ✅ Clear stuck timer first
     this.clearStuckTimer();
 

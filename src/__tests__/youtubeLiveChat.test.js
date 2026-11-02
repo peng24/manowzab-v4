@@ -1,5 +1,23 @@
-import { describe, it, expect } from "vitest";
-import { extractMessageRuns } from "../services/YouTubeLiveChat";
+import { describe, it, expect, vi } from "vitest";
+import { extractMessageRuns, YouTubeLiveChat } from "../services/YouTubeLiveChat";
+
+describe('successful poll heartbeat', () => {
+  it('reports healthy empty polls but does not report failed requests as successful', async () => {
+    vi.useFakeTimers();
+    const chat = new YouTubeLiveChat(['fixture-key']);
+    chat.isPolling = true; chat.liveChatId = 'fixture-chat';
+    chat.onPollSuccess = vi.fn(); chat.onMessage = vi.fn();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({ json: async () => ({ items: [], pollingIntervalMillis: 5000 }) }).mockRejectedValueOnce(new Error('offline')));
+    try {
+      await chat.loadChat();
+      expect(chat.onPollSuccess).toHaveBeenCalledTimes(1);
+      expect(chat.onMessage).not.toHaveBeenCalled();
+      clearTimeout(chat.timeoutId);
+      await chat.loadChat();
+      expect(chat.onPollSuccess).toHaveBeenCalledTimes(1);
+    } finally { chat.stopPolling(); vi.useRealTimers(); vi.unstubAllGlobals(); }
+  });
+});
 
 describe("YouTubeLiveChat - extractMessageRuns", () => {
   it("extracts plain string from textMessageDetails", () => {

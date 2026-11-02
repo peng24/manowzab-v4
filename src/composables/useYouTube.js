@@ -65,6 +65,7 @@ export function useYouTube() {
   chatService.onStatusChange = (status) => {
     systemStore.statusChat = status;
   };
+  chatService.onPollSuccess = timestamp => { systemStore.lastChatPollAt = timestamp; };
 
   let processMessageFunc = null;
 
@@ -315,6 +316,8 @@ export function useYouTube() {
   function disconnect() {
     logger.youtube("Disconnecting...");
     systemStore.isConnected = false;
+    systemStore.isConnecting = false;
+    systemStore.lastChatPollAt = 0;
 
     chatService.stopPolling();
 

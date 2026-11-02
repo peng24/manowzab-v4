@@ -22,6 +22,11 @@
       isCancelled ? 'cancelled-blink' : '',
     ]"
     @click="$emit('select', index)"
+    role="button"
+    tabindex="0"
+    :aria-label="`รายการ ${index} ${nickname || item.owner || 'ว่าง'}`"
+    @keydown.enter.self="$emit('select', index)"
+    @keydown.space.prevent.self="$emit('select', index)"
     :id="`stock-${index}`"
   >
     <div class="stock-num">{{ index }}</div>
@@ -42,6 +47,9 @@
       <div
         v-if="ownerCount >= 1"
         class="owner-count-badge"
+        role="button" tabindex="0"
+        @keydown.enter.stop.prevent="$emit('show-owner', item.owner)"
+        @keydown.space.stop.prevent="$emit('show-owner', item.owner)"
         :title="`${item.owner} จองทั้งหมด ${ownerCount} ชิ้น — คลิกเพื่อจัดการ`"
         @click.stop="$emit('show-owner', item.owner)"
       >👗 {{ ownerCount }} ตัว</div>
@@ -49,6 +57,9 @@
       <div
         v-if="!hasAddress"
         class="no-addr-indicator"
+        role="button" tabindex="0"
+        @keydown.enter.stop.prevent="$emit('show-owner', item.owner)"
+        @keydown.space.stop.prevent="$emit('show-owner', item.owner)"
         :title="`${item.owner} ยังไม่มีที่อยู่จัดส่งในระบบ`"
         @click.stop="$emit('show-owner', item.owner)"
       >

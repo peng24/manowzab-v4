@@ -245,6 +245,11 @@ description: Mandatory verification checklist after every code change
 | 16.3 | Shipping Real-Time Search & Sub-Filter Pills | `src/components/ShippingManager.vue` | ค้นหาชื่อลูกค้า/โน้ต/ที่อยู่แบบเรียลไทม์ และปุ่มกรองด่วน "⚠️ ยังไม่มีที่อยู่" และ "🖨️ ยังไม่พิมพ์" ต้องกรองตารางได้แม่นยำทั้งแบบ Desktop Table และ Mobile Cards |
 | 16.4 | Compact Connected Stream State | `src/components/Header.vue`, `src/assets/style.css` | เมื่อเชื่อมต่อไลฟ์สำเร็จ ช่อง YouTube Video ID ต้องยุบขนาดเหลือ ~95px และขยายกลับอัตโนมัติเมื่อ Hover หรือ Focus (`Shift+F` autofocus ด้วย `id="yt-video-id-input"`) |
 | 16.5 | Keyboard Shortcuts Cheat Sheet Modal (`ShortcutsModal.vue`) | `src/components/ShortcutsModal.vue`, `src/components/Header.vue`, `src/App.vue` | เปิดดูตารางคีย์ลัดระบบทั้งหมดได้ผ่านปุ่ม `⚡ Tools` หรือกด `?` / `F1` บนคีย์บอร์ด |
+| 16.6 | Truthful connection state | `LiveStatus.vue`, `liveStatus.js`, `useYouTube.js`, `chat.js` | แยก connecting/direct poll/Firebase follower/error/reconnect/end; empty poll ยัง healthy; history/duplicate ไม่อัปเดตเวลารับล่าสุด; ล้างเวลาตอนเปลี่ยนไลฟ์หรือ logout |
+| 16.7 | Actual per-device audio display | `audioRuntime.js`, `TextToSpeech.js`, `Header.vue`, `ChatPanel.vue` | Google/เสียงในเครื่อง/สำรอง/ปิดเสียงตรง engine จริง รวม recovery/reset/late callbacks; แสดงเครื่องนี้และสถานะบนแชตมือถือ; ไม่เปลี่ยน FIFO/Cloud opt-in/Firebase audio guards |
+| 16.8 | Queue draft protection | `useQueueDraft.js`, `StockGrid.vue` | dirty ครอบคลุมชื่อ/ราคา/ลำดับ; close/backdrop/Escape ยืนยันก่อนทิ้ง; save ซ้ำและ navigation ถูกล็อกระหว่างบันทึก; failure เก็บ draft/รายการและไม่ประกาศเสียง; retry/save-next สำเร็จ; ป้องกัน draft ข้ามไลฟ์ |
+| 16.9 | Responsive workspaces & sizing | `useWorkspaceLayout.js`, `system.js`, `workspace.css` | มือถือ 320/390/768px แสดงแท็บละหนึ่งพื้นที่และ CSV ผ่านเมนูเพิ่มเติม; Alt+C ไม่ทำให้หน้าว่าง; incoming order ไม่เปลี่ยนแท็บเอง แต่ explicit jump เปิดสินค้า; desktop 1024/1280px resize pointer/keyboard/persist/clamp และ cleanup listeners |
+| 16.10 | Accessible calm styling & 15-second effect | `StockItemCard.vue`, `ChatPanel.vue`, `AuthGate.vue`, `workspace.css`, `constants.js` | ปุ่มหลัก 44px/focus/Enter/Space และ focus trap modal; CSS เดิมไม่ทับจนปุ่มถูกตัดหรือการ์ดซ้อน; smart answer เต็มกรอบ/ขอบดำ/สีชื่อเดิม; new-order effect คง 15000ms และ reduced motion; ตรวจ browser จริงแยกจาก build |
 
 ---
 
@@ -456,3 +461,13 @@ description: Mandatory verification checklist after every code change
 - หน้า login ไม่มี console warnings/errors และ 27 requests แรกสำเร็จ; unauthenticated stock/delivery_customers/address_book ยัง HTTP 401; ไม่ได้ลอง production password login/ข้อมูลธุรกิจจริง
 - ยิงข้อความจำลองจากโดเมน production ด้วยคีย์จาก actual store ทั้งคู่ได้ HTTP 200 และ MP3 13,632 bytes ต่อคีย์ ใช้เวลา 341/906ms; แยกหลักฐานนี้จาก browser fixture ที่ทดสอบ actual queue/playback และจากอุปกรณ์จริง
 - npm test ผ่าน 772 tests/32 files และ build:gh ผ่าน; อัปเดตกฎ/verify 4.13/4.14/4.17/4.18 พร้อมผล Billing recovery และ deployment; ดู [รายงานรุ่น](../../docs/release-5.4.18.md)
+
+## 🎨 ผลตรวจ UX/UI — v5.4.19 (2026-11-02)
+
+- ทำครบ 6 ข้อที่อนุมัติ: connection/receipt age, เสียงตาม engine จริงแยกเครื่อง, draft คิว, responsive workspaces/resize, touch/keyboard และสี/เอฟเฟกต์ที่อ่านง่าย
+- npm test ผ่าน 800 tests/33 files; build:gh ผ่าน 4 หน้า + PWA 66 entries; test:firebase ผ่าน 23 checks กับ localhost demo project และ actual stores/two clients; test:transcriber ผ่าน 3 tests
+- Benchmark sync 300/1/0 calls และ answer resolution 2400 → 200; เวลาจำลองไม่ใช่ค่ารับประกันเว็บจริง
+- Browser actual App กับ auth/database mock เฉพาะ ignored local fixture: desktop 1024/1280 และ mobile emulation 320/390/768px, resize pointer/keyboard/persist, local preferences ต่าง contexts, CSV 83 messages, dirty discard/cancel/save failure/retry/save-next, focus trap และ Escape ผ่าน
+- จับเวลา new-order class หายที่ 15006ms; incoming order ไม่เปลี่ยน mobile chat tab; reduced motion ปิด animation; Smart Answer full-width/ขอบดำ/filter/pin/jump และ bottom pin/อ่านย้อนหลังผ่าน
+- อัปเดตกฎทั้ง 4 ไฟล์และ verify 16.6–16.10; รายละเอียดและสถานะเผยแพร่ดู [release report](../../docs/release-5.4.19.md)
+- เสียงลำโพงจริง/สองอุปกรณ์จริง/iOS/installed PWA/live YouTube/เครื่องพิมพ์ และ production password login ยังไม่ได้ทดสอบในรอบนี้; ไม่อ้างว่า unit/fixture คือการทดสอบทั้งหมดบนระบบจริง

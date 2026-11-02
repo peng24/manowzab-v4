@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TextToSpeech } from "../services/TextToSpeech";
+import { audioRuntime, setAudioRuntime } from "../services/audioRuntime";
 
 const state = vi.hoisted(() => ({ useOnlineTts: true, googleApiKey: "key-a,key-b", googleVoiceName: "th-TH-Standard-A", activeKeyIndex: 1, updatePresenceTtsKey: vi.fn() }));
 vi.mock("../stores/system", () => ({ useSystemStore: () => state }));
@@ -12,6 +13,7 @@ describe("Cloud primary actual speech service", () => {
   beforeEach(() => {
     vi.useFakeTimers(); vi.stubEnv("VITE_ENABLE_GOOGLE_CLOUD_TTS", "true");
     state.useOnlineTts = true; state.activeKeyIndex = 1;
+    setAudioRuntime({ engine: "idle", phase: "idle", fallback: false, voiceName: "" });
     sources = [];
     context = { state: "running", destination: {}, resume: vi.fn().mockResolvedValue(),
       decodeAudioData: vi.fn().mockResolvedValue({ duration: 1 }),
@@ -41,10 +43,29 @@ describe("Cloud primary actual speech service", () => {
     fetchMock.mockResolvedValue({ ok: false, status: 403, json: async () => ({ error: { details: [{ reason: "BILLING_DISABLED" }] } }) });
     const first = service.speak("", "หนึ่ง"), second = service.speak("", "สอง"); await flush();
     expect(synth.speak.mock.calls[0][0].voice.name).toBe("Microsoft Pattara");
+    expect(audioRuntime).toMatchObject({ engine: "native", phase: "speaking", fallback: true, voiceName: "Microsoft Pattara" });
     synth.speak.mock.calls[0][0].onend(); await flush();
     expect(synth.speak).toHaveBeenCalledTimes(2); expect(fetchMock).toHaveBeenCalledTimes(1);
     synth.speak.mock.calls[1][0].onend(); await Promise.all([first, second]);
     expect(service.isSpeaking).toBe(false);
+    expect(audioRuntime.phase).toBe("idle");
+  });
+
+  it("reports actual Google playback and clears fallback after recovery", async () => {
+    setAudioRuntime({ engine: "native", phase: "idle", fallback: true });
+    const task = service.speak("", "กลับมาแล้ว"); await flush();
+    expect(audioRuntime).toMatchObject({ engine: "google", phase: "speaking", fallback: false });
+    sources[0].onended(); await task;
+    expect(audioRuntime.phase).toBe("idle");
+  });
+
+  it("keeps the current native engine visible while retrying Google", async () => {
+    state.useOnlineTts = false;
+    const task = service.speak("", "เสียงในเครื่อง"); await flush();
+    service.retryGoogle();
+    expect(audioRuntime).toMatchObject({ engine: "native", phase: "speaking", fallback: false });
+    synth.speak.mock.calls[0][0].onerror({ error: "synthesis-failed" }); await task;
+    expect(audioRuntime.phase).toBe("error");
   });
 
   it("falls back when a successful HTTP response contains undecodable audio", async () => {
@@ -75,6 +96,7 @@ describe("Cloud primary actual speech service", () => {
     const previous = synth.speak.mock.calls[0][0]; service.reset(); await old;
     const next = service.speak("", "ใหม่"); await flush();
     previous.onerror({ error: "interrupted" }); previous.onend();
+    expect(audioRuntime).toMatchObject({ engine: "native", phase: "speaking" });
     expect(service.isSpeaking).toBe(true); expect(synth.speak).toHaveBeenCalledTimes(2);
     synth.speak.mock.calls[1][0].onend(); await next;
   });

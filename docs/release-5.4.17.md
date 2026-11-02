@@ -40,4 +40,9 @@ Updated AI_RULES.md, GEMINI.md, .agents/AGENTS.md, manowzab-core/SKILL.md and ve
 
 ## Deployment
 
-Prepared for publication. Source/gh-pages commits and live artifact/login-page verification will be recorded after deployment.
+- Source commit 9e1c81d pushed to main; npm run deploy:gh published gh-pages commit 90e6940.
+- Live URL: https://peng24.github.io/manowzab-v4/ . Initial propagation served the old build; subsequent cache-busted checks confirmed all four pages and entry scripts exactly matched the 5.4.17 build, HTTP 200.
+- sw.js and manifest.webmanifest also exactly matched the build.
+- Live browser loaded main-67CtCFLO.js. Setting a legacy standard preference before boot migrated it to native. The actual production system store reported version v5.4.17, mode native, Cloud enabled=false and no Cloud keys.
+- The production login page had no console warnings/errors; all 27 observed network requests succeeded. Unauthenticated stock/delivery_customers/address_book reads were still denied with HTTP 401. Production password login was not performed.
+- The local browser fixture server was stopped. No Billing/payment mutation was performed; only source and Pages publication changed. Installed-PWA upgrade, other devices, actual live YouTube and human speaker listening remain separate checks.

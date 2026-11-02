@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.4.16 — 2026-10-31** ดู [Chat regex review](../../docs/chat-regex-review-2026-10-31.md) และ [release report](../../docs/release-5.4.16.md)
+> ผลอ้างอิงล่าสุด: **v5.4.17 — 2026-11-02** ดู [release report](../../docs/release-5.4.17.md); ผล regex และ Firebase emulator ย้อนหลังดู release 5.4.16
 
 ---
 
@@ -405,7 +405,7 @@ description: Mandatory verification checklist after every code change
 - ณ รอบวิเคราะห์ยังไม่มี deploy; เผยแพร่ภายหลังตามผล release ด้านล่าง ส่วน live YouTube/เสียง/อุปกรณ์จริง/production password login ยังไม่ได้ตรวจ ดู [รายงานและขอบเขต](../../docs/chat-regex-review-2026-10-31.md)
 
 
-## 🚀 ผลตรวจ release ล่าสุด — v5.4.16 (2026-10-31)
+## 🚀 ผลตรวจ release ย้อนหลัง — v5.4.16 (2026-10-31)
 
 - รันใหม่ก่อนเผยแพร่: npm test ผ่าน 730 tests/28 files, test:firebase ผ่าน 23 local emulator checks, test:transcriber ผ่าน 3 tests, build:gh ผ่าน 4 หน้าและ PWA 66 precache entries
 - Benchmark counts ผ่าน: sync 300/1/0 ครั้งและ answer resolutions 2,400 → 200; เวลาจำลอง 1,222.85 → 117.14 ms ในรอบนี้ ไม่ใช่ production field metric
@@ -423,3 +423,12 @@ description: Mandatory verification checklist after every code change
 - Microsoft Pattara (Thai, localService=true) ได้ start/end ครบทั้งปุ่ม TH ฟรี และคิว สมใจ 15 / มะระ จอง 26 ตามลำดับ; Cloud request count = 0; การฟังเสียงด้วยหูและอุปกรณ์อื่นต้องตรวจแยก
 - หมวด auth/rules/stock/delivery ใช้ source เดิมและ unit suite รอบนี้ ไม่ได้รัน Firebase emulator ใหม่สำหรับการเปลี่ยน TTS นี้; ผล 23 checks ของ v5.4.16 เป็นหลักฐานย้อนหลัง
 - รายละเอียดและสถานะเผยแพร่ดู [release report](../../docs/release-5.4.17.md)
+
+
+## 🚀 ผลตรวจ release ล่าสุด — v5.4.17 (2026-11-02)
+
+- Source 9e1c81d และ gh-pages 90e6940 เผยแพร่แล้ว; ทั้ง 4 หน้า/entry scripts, sw.js และ manifest ตรง build; ทุกหน้าได้ HTTP 200
+- เว็บจริงโหลด main-67CtCFLO.js และ actual system store แสดง v5.4.17, mode=native, cloudEnabled=false, ไม่มี Cloud keys; จำลอง saved standard ก่อน boot แล้วเปลี่ยนเป็น native สำเร็จ
+- หน้า login ไม่มี console warnings/errors; 27 network requests สำเร็จ; unauthenticated stock/delivery_customers/address_book ถูกปฏิเสธ HTTP 401
+- กฎโหมดฟรี/verify 4.5/4.13/4.14/4.16 อัปเดตแล้ว; ไม่เปิด Billing หรือเปลี่ยนการชำระเงิน; fixture server หยุดแล้ว
+- ผ่าน 745 tests/29 files และ browser speech events ตามผลด้านบน; ไม่มีการอ้างว่าทดสอบเสียงด้วยหู/อุปกรณ์อื่นหรือ production password login แล้ว ดู [ขอบเขตครบทุกหมวด](../../docs/release-5.4.17.md#checklist-coverage)

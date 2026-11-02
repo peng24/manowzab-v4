@@ -446,3 +446,12 @@ description: Mandatory verification checklist after every code change
 - อัปเดตกฎทั้ง 4 ไฟล์และ verify 4.13/4.14/4.17/4.18 แล้ว; ก่อน deploy รันใหม่ npm test ผ่าน 772 tests/32 files และ build:gh ผ่าน; ผลเผยแพร่บันทึกด้านล่างเมื่อสำเร็จ
 - Live browser fixture สอง isolated contexts ใช้คีย์จริง #1/#2 และ services จริงกับข้อความจำลอง: HTTP 200 สองข้อความต่อ context, Cloud start/end ครบ FIFO, max active source=1, ไม่ fallback และ error=null; header latency 286–583ms และ gap จำลองสภาพแวดล้อมนี้ 2–5ms ไม่ใช่ค่ารับประกัน production
 - ผล Firebase emulator ของรุ่นก่อนเป็นหลักฐานย้อนหลัง รอบนี้รัน unit/regression และ browser fixture; เสียงผ่านลำโพงจริง สองอุปกรณ์จริง iPad/installed PWA/เครื่องพิมพ์/live YouTube และ production password login ยังไม่ได้ทดสอบ ดู [ขอบเขตและขั้นตอนต่อ](../../docs/release-5.4.18.md)
+
+
+## 🚀 ผลตรวจ release ล่าสุด — v5.4.18 (2026-11-02)
+
+- Source 0574a37 / gh-pages 6e9bab0 เผยแพร่แล้ว; main/shipping/history/address และ entry scripts ตรง build, HTTP 200; sw.js และ manifest ตรงเช่นกัน
+- เว็บจริงโหลด main-CYE8PLUZ.js; actual store version v5.4.18, mode standard, Cloud enabled=true; จำลอง saved native ของรุ่นเดิมแล้ว migrate เป็น standard สำเร็จ
+- หน้า login ไม่มี console warnings/errors และ 27 requests แรกสำเร็จ; unauthenticated stock/delivery_customers/address_book ยัง HTTP 401; ไม่ได้ลอง production password login/ข้อมูลธุรกิจจริง
+- ยิงข้อความจำลองจากโดเมน production ด้วยคีย์จาก actual store ทั้งคู่ได้ HTTP 200 และ MP3 13,632 bytes ต่อคีย์ ใช้เวลา 341/906ms; แยกหลักฐานนี้จาก browser fixture ที่ทดสอบ actual queue/playback และจากอุปกรณ์จริง
+- npm test ผ่าน 772 tests/32 files และ build:gh ผ่าน; อัปเดตกฎ/verify 4.13/4.14/4.17/4.18 พร้อมผล Billing recovery และ deployment; ดู [รายงานรุ่น](../../docs/release-5.4.18.md)

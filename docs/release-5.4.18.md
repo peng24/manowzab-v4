@@ -36,4 +36,14 @@ Updated AI_RULES.md, GEMINI.md, .agents/AGENTS.md, manowzab-core/SKILL.md and ve
 
 Billing recovery and live validation are complete. A second browser fixture uses the real Google endpoint with the existing local keys, actual application services and synthetic text; it keeps review Firebase configuration and does not write production business data. Two isolated contexts use key indices 1 and 2 respectively, each making two HTTP 200 requests and receiving two Cloud start/end pairs in FIFO order, no native fallback and no remaining error. Maximum active sources is 1 per context; measured header latency is 286–583ms and the inter-message gaps are approximately 2–5ms with prefetch. These local measurements are not production guarantees. Human speaker listening, physical two-device/iPad behavior and installed-PWA upgrades remain unverified.
 
-Deployment is authorized and proceeds only after the full suite and Pages build pass; final publication evidence is recorded below.
+Deployment completed after the full suite and Pages build passed. Publication evidence follows.
+
+
+## Deployment
+
+- Source commit `0574a37` pushed to main; `npm run deploy:gh` published gh-pages commit `6e9bab0`.
+- Published URL: https://peng24.github.io/manowzab-v4/ . All four HTML pages and their entry scripts returned HTTP 200 and exactly matched the final build. `sw.js` and `manifest.webmanifest` also matched.
+- Fresh production browser loaded `main-CYE8PLUZ.js`. A saved native preference with the old migration policy removed became standard automatically. Actual store: version v5.4.18, Cloud enabled=true, Standard voice and keys present (values not logged).
+- The production login page had email/password fields, no console warnings/errors and all 27 observed initial network requests succeeded. Unauthenticated stock/delivery_customers/address_book remained denied with HTTP 401. Production password login and business-data workflows were not exercised.
+- Direct synthetic synthesis from the production origin using the actual store's two keys returned HTTP 200 for both, 13,632 audio bytes each, 341ms and 906ms full response time. This verifies production-origin API access in addition to the actual-service live playback fixture. No customer chat or business-data write was used.
+- Temporary live-key fixture was removed and four local browser fixture tabs closed after testing. Original logs and credentials remain outside tracked files. The user's physical two-device speakers, installed-PWA update and iOS behavior remain separate checks.

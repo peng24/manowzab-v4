@@ -40,4 +40,8 @@ Updated `AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowza
 
 ## Deployment
 
-Pending final artifact audit and publication verification.
+- Source commit `594def4` pushed to main; GitHub Pages published commit `1760466`.
+- https://peng24.github.io/manowzab-v4/ serves 5.4.19. All four HTML pages and entry scripts match the final build byte-for-byte; `sw.js` and `manifest.webmanifest` match as well. Initial verification caught the previous Pages files during propagation; the subsequent full check passed.
+- Fresh production browser loaded `main-B72hritM.js`; actual store reports v5.4.19, Cloud enabled and standard mode. Login labels and password visibility control work; no password login or protected business workflow was attempted. The visibility test used a synthetic non-credential string, cleared it, and restored the hidden-password setting.
+- No console warnings/errors; 28 observed initial requests returned 200/304. Unauthenticated stock/delivery_customers/address_book requests remain denied with HTTP 401.
+- Cloud/free artifact audit passed: free bundle contains neither synthesis endpoint nor the existing TTS keys. Temporary fixture tabs closed and the task-owned localhost server stopped. Physical-device limitations remain as documented above.

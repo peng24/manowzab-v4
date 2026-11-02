@@ -471,3 +471,10 @@ description: Mandatory verification checklist after every code change
 - จับเวลา new-order class หายที่ 15006ms; incoming order ไม่เปลี่ยน mobile chat tab; reduced motion ปิด animation; Smart Answer full-width/ขอบดำ/filter/pin/jump และ bottom pin/อ่านย้อนหลังผ่าน
 - อัปเดตกฎทั้ง 4 ไฟล์และ verify 16.6–16.10; รายละเอียดและสถานะเผยแพร่ดู [release report](../../docs/release-5.4.19.md)
 - เสียงลำโพงจริง/สองอุปกรณ์จริง/iOS/installed PWA/live YouTube/เครื่องพิมพ์ และ production password login ยังไม่ได้ทดสอบในรอบนี้; ไม่อ้างว่า unit/fixture คือการทดสอบทั้งหมดบนระบบจริง
+
+## 🚀 ผลเผยแพร่ล่าสุด — v5.4.19 (2026-11-02)
+
+- Source 594def4 / gh-pages 1760466; หลังรอ Pages propagation ตรวจ main/shipping/history/address และ entry scripts ตรง build ทั้งหมด, sw.js/manifest ตรง และ HTTP 200
+- เว็บจริงโหลด main-B72hritM.js; actual store v5.4.19, Cloud enabled=true, mode=standard; login labels/password visibility ผ่าน, 28 requests ได้ 200/304, ไม่มี console warnings/errors
+- unauthenticated stock/delivery_customers/address_book ยังคงถูกปฏิเสธ HTTP 401; ไม่ได้ลอง production password login หรือเขียนข้อมูลธุรกิจจริง
+- Cloud/free artifact audit และ diff check ผ่าน; fixture tabs ปิดและ localhost server ของงานหยุดแล้ว; ขอบเขตการตรวจและอุปกรณ์จริงที่ยังไม่ทดสอบดู [release report](../../docs/release-5.4.19.md)

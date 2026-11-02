@@ -82,57 +82,6 @@ describe("Live Chat Collapsible Feature", () => {
     expect(localStorage.getItem("manowzab_chat_collapsed")).toBe("false");
   });
 
-  it("persists workspace preferences locally without writing shared settings", async () => {
-    const { useSystemStore } = await import("../stores/system");
-    const { update } = await import("firebase/database");
-    update.mockClear();
-    const system = useSystemStore();
-    system.setChatCollapsed(true);
-    system.setMobilePanel('chat');
-    system.setChatPanelWidth(900, 1024);
-    expect(system.isChatCollapsed).toBe(false);
-    expect(system.chatPanelWidth).toBe(600);
-    expect(localStorage.getItem('manowzab_mobile_panel')).toBe('chat');
-    setActivePinia(createPinia());
-    expect(useSystemStore().mobilePanel).toBe('chat');
-    expect(useSystemStore().chatPanelWidth).toBe(600);
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it("switches mobile workspaces with the chat shortcut without leaving an empty collapsed pane", async () => {
-    vi.stubGlobal('window', { matchMedia: () => ({ matches: true }) });
-    try {
-      const { useSystemStore } = await import("../stores/system");
-      const system = useSystemStore();
-      system.toggleChatCollapse();
-      expect(system.mobilePanel).toBe('chat');
-      expect(system.isChatCollapsed).toBe(false);
-      system.toggleChatCollapse();
-      expect(system.mobilePanel).toBe('stock');
-    } finally { vi.unstubAllGlobals(); }
-  });
-
-  it("updates receipt age only for fresh unique Firebase messages, including muted banned chat", async () => {
-    const { useSystemStore } = await import("../stores/system");
-    const { useChatStore } = await import("../stores/chat");
-    const { onChildAdded } = await import("firebase/database");
-    const system = useSystemStore(), chat = useChatStore();
-    const cleanup = chat.syncFromFirebase('receipt-fixture');
-    const receive = onChildAdded.mock.calls.at(-1)[1];
-    const now = Date.now();
-    const deliver = message => receive({ val: () => message });
-    deliver({ id: 'old', timestamp: now - 60000, text: 'ประวัติ' });
-    expect(system.lastChatReceivedAt).toBe(0);
-    const fresh = { id: 'new', timestamp: now, text: 'ใหม่', isBanned: true };
-    deliver(fresh);
-    expect(system.lastChatReceivedAt).toBeGreaterThanOrEqual(now);
-    system.lastChatReceivedAt = 123;
-    deliver(fresh);
-    expect(system.lastChatReceivedAt).toBe(123);
-    expect(chat.messages).toHaveLength(2);
-    cleanup();
-  });
-
   it("tracks unread messages when collapsed and resets when expanded", async () => {
     const { useSystemStore } = await import("../stores/system");
     const { useChatStore } = await import("../stores/chat");

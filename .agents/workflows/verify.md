@@ -245,11 +245,11 @@ description: Mandatory verification checklist after every code change
 | 16.3 | Shipping Real-Time Search & Sub-Filter Pills | `src/components/ShippingManager.vue` | ค้นหาชื่อลูกค้า/โน้ต/ที่อยู่แบบเรียลไทม์ และปุ่มกรองด่วน "⚠️ ยังไม่มีที่อยู่" และ "🖨️ ยังไม่พิมพ์" ต้องกรองตารางได้แม่นยำทั้งแบบ Desktop Table และ Mobile Cards |
 | 16.4 | Compact Connected Stream State | `src/components/Header.vue`, `src/assets/style.css` | เมื่อเชื่อมต่อไลฟ์สำเร็จ ช่อง YouTube Video ID ต้องยุบขนาดเหลือ ~95px และขยายกลับอัตโนมัติเมื่อ Hover หรือ Focus (`Shift+F` autofocus ด้วย `id="yt-video-id-input"`) |
 | 16.5 | Keyboard Shortcuts Cheat Sheet Modal (`ShortcutsModal.vue`) | `src/components/ShortcutsModal.vue`, `src/components/Header.vue`, `src/App.vue` | เปิดดูตารางคีย์ลัดระบบทั้งหมดได้ผ่านปุ่ม `⚡ Tools` หรือกด `?` / `F1` บนคีย์บอร์ด |
-| 16.6 | Truthful connection state | `LiveStatus.vue`, `liveStatus.js`, `useYouTube.js`, `chat.js` | แยก connecting/direct poll/Firebase follower/error/reconnect/end; empty poll ยัง healthy; history/duplicate ไม่อัปเดตเวลารับล่าสุด; ล้างเวลาตอนเปลี่ยนไลฟ์หรือ logout |
-| 16.7 | Actual per-device audio display | `audioRuntime.js`, `TextToSpeech.js`, `Header.vue`, `ChatPanel.vue` | Google/เสียงในเครื่อง/สำรอง/ปิดเสียงตรง engine จริง รวม recovery/reset/late callbacks; แสดงเครื่องนี้และสถานะบนแชตมือถือ; ไม่เปลี่ยน FIFO/Cloud opt-in/Firebase audio guards |
-| 16.8 | Queue draft protection | `useQueueDraft.js`, `StockGrid.vue` | dirty ครอบคลุมชื่อ/ราคา/ลำดับ; close/backdrop/Escape ยืนยันก่อนทิ้ง; save ซ้ำและ navigation ถูกล็อกระหว่างบันทึก; failure เก็บ draft/รายการและไม่ประกาศเสียง; retry/save-next สำเร็จ; ป้องกัน draft ข้ามไลฟ์ |
-| 16.9 | Responsive workspaces & sizing | `useWorkspaceLayout.js`, `system.js`, `workspace.css` | มือถือ 320/390/768px แสดงแท็บละหนึ่งพื้นที่และ CSV ผ่านเมนูเพิ่มเติม; Alt+C ไม่ทำให้หน้าว่าง; incoming order ไม่เปลี่ยนแท็บเอง แต่ explicit jump เปิดสินค้า; desktop 1024/1280px resize pointer/keyboard/persist/clamp และ cleanup listeners |
-| 16.10 | Accessible calm styling & 15-second effect | `StockItemCard.vue`, `ChatPanel.vue`, `AuthGate.vue`, `workspace.css`, `constants.js` | ปุ่มหลัก 44px/focus/Enter/Space และ focus trap modal; CSS เดิมไม่ทับจนปุ่มถูกตัดหรือการ์ดซ้อน; smart answer เต็มกรอบ/ขอบดำ/สีชื่อเดิม; new-order effect คง 15000ms และ reduced motion; ตรวจ browser จริงแยกจาก build |
+| 16.6 | Restored UI baseline | `App.vue`, `Header.vue`, `ChatPanel.vue`, `StockGrid.vue`, `StockItemCard.vue`, `AuthGate.vue` | ตามคำขอล่าสุด คืน UX/UI เป็น v5.4.18; เทียบ source b50aca2 ยกเว้น changelog; ไม่ใช้ข้อกำหนด UI v5.4.19 ที่ถูกยกเลิก |
+| 16.7 | Preserve TTS and parser on UI rollback | `TextToSpeech.js`, `GoogleTtsAudio.js`, `useAudio.js`, chat/parser tests | Google Standard/native fallback/opt-in/free boundary/FIFO/deadlines และ regex ตรง v5.4.18; รันทดสอบปัจจุบัน ไม่ใช้จำนวน 800 tests ของ v5.4.19 อ้างแทน |
+| 16.8 | Original queue UX | `StockGrid.vue` | เปิด/แก้ไข/บันทึก/เลื่อนรายการตาม source v5.4.18; draft UI/dirty guard ของ v5.4.19 ถูกถอนตาม rollback และผลทดสอบเดิมเป็นประวัติเท่านั้น |
+| 16.9 | Original responsive layout | `App.vue`, `Header.vue`, `ChatPanel.vue`, `system.js` | คืน chat collapse และ layout เดิม; ไม่มี mobile workspace tabs/desktop resizer/workspace.css หรือ references ของฟีเจอร์ที่ถอน; ตรวจ browser และ PWA artifacts หลังเผยแพร่ |
+| 16.10 | Original appearance and order effect | `StockGrid.vue`, `ChatPanel.vue`, `StockItemCard.vue` | สี/แสง/ปุ่มเดิมตรง v5.4.18, Smart Answer เต็มกรอบและขอบดำยังอยู่, new-order timer เดิม 15000ms; เลข release เพิ่มต่อเนื่องเพื่อให้ client ตรวจพบ rollback update |
 
 ---
 
@@ -478,3 +478,13 @@ description: Mandatory verification checklist after every code change
 - เว็บจริงโหลด main-B72hritM.js; actual store v5.4.19, Cloud enabled=true, mode=standard; login labels/password visibility ผ่าน, 28 requests ได้ 200/304, ไม่มี console warnings/errors
 - unauthenticated stock/delivery_customers/address_book ยังคงถูกปฏิเสธ HTTP 401; ไม่ได้ลอง production password login หรือเขียนข้อมูลธุรกิจจริง
 - Cloud/free artifact audit และ diff check ผ่าน; fixture tabs ปิดและ localhost server ของงานหยุดแล้ว; ขอบเขตการตรวจและอุปกรณ์จริงที่ยังไม่ทดสอบดู [release report](../../docs/release-5.4.19.md)
+
+## ↩️ ผลตรวจคืน UX/UI v5.4.18 — release v5.4.20 (2026-11-02)
+
+- ผู้ใช้ขอย้อน UX/UI กลับ v5.4.18: source ใต้ src ตรง b50aca2 ยกเว้น changelog และเก็บ trailing whitespace 1 จุด; diff แบบ ignore-space-at-eol ยืนยันตรงกัน
+- ถอน UX v5.4.19 และ tests/helpers ที่ใช้เฉพาะฟีเจอร์ที่ถอน; ไม่คืน parser/TTS ไปก่อน v5.4.18 และไม่แก้ Billing/ข้อมูลธุรกิจ; ใช้ release 5.4.20 เพื่อให้ client ตรวจพบ update
+- npm test ผ่าน 772 tests/32 files, build:gh ผ่าน 4 หน้า/PWA 66 entries และ free-check build/audit ผ่าน; changelog 20 entries; diff check ผ่าน
+- Firebase Emulator ผ่าน 23 checks ด้วย actual stores/two clients ใน localhost demo project หลังเริ่ม Auth แยกแก้ startup timeout ของรอบแรก
+- Browser fixture actual App กับ mock auth/database: desktop 1280px/mobile emulation 390px เห็น layout/ปุ่ม/สี/คิวเดิม ไม่มี tabs/resizer/status ใหม่; collapse เปิดปิดได้; แก้ชื่อและบันทึกคิวได้; Smart Answer เต็มกรอบ/ขอบดำ/filter/pin ยังทำงาน; timer รายการใหม่เดิม 15000ms
+- อัปเดตกฎทั้ง 4 ไฟล์และ verify 16.6–16.10 ให้ตรง baseline ล่าสุด; ผล 800 tests และ UX checks ของ v5.4.19 ด้านบนเป็นประวัติ ไม่ใช่ข้อกำหนด active หลัง rollback
+- ยังไม่ได้ทดสอบ production password login, live YouTube/Google synthesis, สองอุปกรณ์/เสียง/iPad/เครื่องพิมพ์/installed PWA จริงในรอบนี้; ดู [release report](../../docs/release-5.4.20.md)

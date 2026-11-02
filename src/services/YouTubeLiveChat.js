@@ -14,7 +14,6 @@ export class YouTubeLiveChat {
     this.onMessage = null; // Callback function
     this.onError = null; // Callback for errors
     this.onStatusChange = null; // Callback for status updates ('ok' | 'err')
-    this.onPollSuccess = null; // Successful poll heartbeat, including an empty chat batch.
     this.onRecovery = null; // Callback when polling recovers after errors
     this.onKeyRotate = null; // ✅ Callback to sync key index externally
 
@@ -196,7 +195,6 @@ export class YouTubeLiveChat {
       this.wasInErrorState = false;
 
       if (this.onStatusChange) this.onStatusChange("ok");
-      this.onPollSuccess?.(Date.now());
 
       // Update Polling Interval from API
       if (data.pollingIntervalMillis) {

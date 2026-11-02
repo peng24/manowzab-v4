@@ -2,7 +2,6 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 import "./assets/style.css";
-import "./assets/workspace.css";
 import "lenis/dist/lenis.css";
 import vueLenisPlugin from "lenis/vue";
 import { vSmoothScroll } from "./composables/useSmoothScroll";

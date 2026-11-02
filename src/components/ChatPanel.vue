@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-panel" id="chat-workspace" :class="{ 'collapsed': systemStore.isChatCollapsed }">
+  <div class="chat-panel" :class="{ 'collapsed': systemStore.isChatCollapsed }">
     <!-- 🌟 Redesigned Modern Live Chat Header Bar -->
     <div class="chat-header-bar">
       <div class="chat-header-left">
@@ -7,8 +7,10 @@
           <i class="fa-solid fa-comments chat-icon"></i>
           <span class="chat-title">Live Chat</span>
         </div>
-        <LiveStatus />
-        <span class="chat-audio-state">{{ audioDisplay.label }} · เครื่องนี้</span>
+        <span class="chat-live-pill" title="กำลังเชื่อมต่อสตรีมสด">
+          <span class="pulse-dot"></span>
+          <span class="live-text">LIVE</span>
+        </span>
       </div>
 
       <div class="chat-header-actions">
@@ -18,9 +20,7 @@
           class="chat-act-btn btn-sound"
           :class="{ 'is-muted': !systemStore.isSoundOn }"
           @click="toggleSound"
-          :aria-label="systemStore.isSoundOn ? 'ปิดเสียงเครื่องนี้' : 'เปิดเสียงเครื่องนี้'"
-          :aria-pressed="systemStore.isSoundOn"
-          :title="`${audioDisplay.detail} • เครื่องนี้เท่านั้น • คลิก${systemStore.isSoundOn ? 'ปิด' : 'เปิด'}เสียง หรือ Shift+M`"
+          :title="systemStore.isSoundOn ? 'เสียงอ่าน: เปิด (คลิกเพื่อปิด หรือ Shift+M)' : 'เสียงอ่าน: ปิด (คลิกเพื่อเปิด หรือ Shift+M)'"
         >
           <i :class="systemStore.isSoundOn ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark'"></i>
           <span class="act-label">{{ systemStore.isSoundOn ? 'เสียง' : 'ปิด' }}</span>
@@ -40,7 +40,7 @@
         <!-- 📥 CSV Export -->
         <button
           type="button"
-          class="chat-act-btn btn-csv chat-desktop-action"
+          class="chat-act-btn btn-csv"
           @click="exportCSV"
           title="ส่งออกแชททั้งหมดเป็นไฟล์ CSV"
         >
@@ -48,18 +48,12 @@
           <span class="act-label">CSV</span>
         </button>
 
-        <div class="chat-act-divider chat-desktop-action"></div>
-        <details class="chat-more-actions">
-          <summary aria-label="เมนูเพิ่มเติมของแชต" title="เพิ่มเติม"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></summary>
-          <div class="chat-more-menu">
-            <button type="button" @click="exportFromMenu"><i class="fa-solid fa-file-csv" aria-hidden="true"></i> ส่งออกแชต CSV</button>
-          </div>
-        </details>
+        <div class="chat-act-divider"></div>
 
         <!-- ⇥ Collapse / Hide Chat -->
         <button
           type="button"
-          class="chat-act-btn btn-collapse chat-desktop-action"
+          class="chat-act-btn btn-collapse"
           @click="systemStore.toggleChatCollapse"
           title="ซ่อนช่องแชท (Alt + C) เพื่อขยายตารางสต็อกเต็มจอ"
         >
@@ -348,11 +342,8 @@
               <span class="chat-time">{{ formatTime(chat.timestamp) }}</span>
               <span
                 class="chat-name"
-                :style="{ backgroundColor: chat.color || '#b8c7dc' }"
+                :style="{ backgroundColor: chat.color }"
                 @click="editNickname(chat)"
-                role="button" tabindex="0"
-                @keydown.enter.prevent="editNickname(chat)"
-                @keydown.space.prevent="editNickname(chat)"
                 title="คลิกเพื่อแก้ไขข้อมูลลูกค้า (ชื่อเล่น, ที่อยู่, ช่องทางติดต่อ)"
               >
                 {{ chat.displayName }}
@@ -497,12 +488,6 @@
   </div>
 </template>
 <script setup>
-import { audioRuntime, getAudioDisplay } from "../services/audioRuntime";
-import LiveStatus from './LiveStatus.vue';
-function exportFromMenu(event) {
-  event.currentTarget.closest('details')?.removeAttribute('open');
-  exportCSV();
-}
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from "vue";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
@@ -534,7 +519,6 @@ import { useSmartAnswerLookup } from "../composables/useSmartAnswerLookup";
 const chatStore = useChatStore();
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
-const audioDisplay = computed(() => getAudioDisplay(systemStore, audioRuntime));
 const customerStore = useCustomerStore();
 const blacklistStore = useBlacklistStore();
 const { resetVoice, playSfx } = useAudio();
@@ -3503,52 +3487,4 @@ async function refreshChat() {
   border-color: rgba(251, 113, 133, 0.55);
   color: #fecdd3;
 }
-</style>
-
-<style scoped>
-.chat-header-bar { flex-wrap: nowrap; gap: 8px; padding: 10px 12px; align-items: flex-start; background: #101923; box-shadow: none; }
-.chat-header-left { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-.chat-header-actions { gap: 4px; flex-shrink: 0; }
-.chat-title { font-size: 15px; }
-.chat-act-btn { min-height: 44px; min-width: 44px; padding: 7px; background: #1b2837; box-shadow: none; }
-.chat-act-btn .act-label { display: none; }
-.chat-act-divider { display: none; }
-.chat-more-actions { display: none; position: relative; }
-.chat-more-actions summary { list-style: none; min-height: 44px; width: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid #354257; border-radius: 8px; cursor: pointer; color: #dce6f3; background: #1b2837; }
-.chat-more-actions summary::-webkit-details-marker { display: none; }
-.chat-more-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; width: 190px; padding: 6px; background: #162334; border: 1px solid #405169; border-radius: 10px; box-shadow: 0 12px 24px #0008; }
-.chat-more-menu button { display: flex; align-items: center; gap: 8px; min-height: 44px; width: 100%; padding: 8px; background: transparent; color: #e2e8f0; border: 0; border-radius: 6px; font: inherit; font-size: 13px; cursor: pointer; }
-.chat-more-menu button:hover { background: #24374d; }
-.chat-intent-tabs { overflow-x: auto; scrollbar-width: thin; padding: 6px 10px; gap: 6px; flex-shrink: 0; background: #101923; }
-.chat-tab { min-height: 44px; flex-shrink: 0; font-size: 13px; }
-.chat-row, .chat-row.has-smart-answer:not(.admin):not(.shipping) { background: #151f2d; border-color: #314155; box-shadow: none; }
-.chat-row:hover { background: #192637; box-shadow: none; }
-.chat-row.buy { background: #132b25; border-color: #306b55; box-shadow: none; }
-.chat-row.cancel { background: #302026; border-color: #86505e; }
-.chat-row.shipping { background: #172738; border-color: #3c6384; }
-.chat-row.admin { background: #27233a; border-color: #625382; }
-.chat-row .chat-bubble { background: #1b2838; border-color: #344255; box-shadow: none; }
-.chat-row.buy .chat-bubble { background: #1a382d; }
-.chat-row.cancel .chat-bubble { background: #3c2931; }
-.chat-row.shipping .chat-bubble { background: #20354b; }
-.chat-row.admin .chat-bubble { background: #302c45; }
-.chat-row .avatar { box-shadow: none; }
-.chat-row .chat-text { font-weight: 500; line-height: 1.6; }
-.smart-answer-card, .smart-answer-card.tone-emerald { background: #162d2c; box-shadow: none; }
-.smart-answer-card.tone-amber { background: #30291e; }
-.smart-answer-card.tone-violet { background: #27263a; }
-.smart-answer-headline { font-size: 15px; }
-.smart-answer-subline { font-size: 13px; color: #bdcadb; }
-.smart-pin-btn, .has-smart-answer .btn-quick-key { min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
-.smart-pill { min-height: 44px; padding: 8px 12px; font-size: 13px; }
-.chat-row .btn-author-filter { min-width: 44px; min-height: 44px; }
-.force-process-btn, .has-smart-answer .force-process-btn { opacity: 1; position: static; transform: none; margin: 4px 0 0; display: flex; justify-content: flex-end; }
-.btn-quick-key { min-height: 44px; min-width: 44px; }
-.chat-panel button:focus-visible, .chat-more-actions summary:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 2px; }
-@media (max-width: 768px) {
-  .chat-desktop-action { display: none; }
-  .chat-more-actions { display: block; }
-  .chat-header-bar { padding: 10px; }
-}
-@media (prefers-reduced-motion: reduce) { .chat-panel *, .chat-panel *::before, .chat-panel *::after { animation: none !important; transition: none !important; } }
 </style>

@@ -5,14 +5,10 @@ import { db } from "../composables/useFirebase";
 import pkg from "../../package.json";
 import { logger } from "../utils/logger";
 import { isGoogleCloudTtsEnabled } from "../utils/ttsConfig";
-import { clampChatWidth } from "../utils/workspaceLayout";
 
 export const useSystemStore = defineStore("system", () => {
   // State
   const isConnected = ref(false);
-  const isConnecting = ref(false);
-  const lastChatReceivedAt = ref(0);
-  const lastChatPollAt = ref(0);
   const currentVideoId = ref("");
   const viewerCount = ref(0);
   const subscriberCount = ref(0); // ✅ ยอดผู้ติดตามช่อง YouTube
@@ -62,24 +58,8 @@ export const useSystemStore = defineStore("system", () => {
 
   // ✅ Live Chat Panel Collapsible State (Saved to localStorage)
   const isChatCollapsed = ref(localStorage.getItem("manowzab_chat_collapsed") === "true");
-  const mobilePanel = ref(localStorage.getItem('manowzab_mobile_panel') === 'chat' ? 'chat' : 'stock');
-  if (mobilePanel.value === 'chat' && typeof window !== 'undefined' && window.matchMedia?.('(max-width: 768px)')?.matches) setChatCollapsed(false);
-  const chatPanelWidth = ref(clampChatWidth(localStorage.getItem('manowzab_chat_width')));
-  function setMobilePanel(panel) {
-    mobilePanel.value = panel === 'chat' ? 'chat' : 'stock';
-    localStorage.setItem('manowzab_mobile_panel', mobilePanel.value);
-    if (mobilePanel.value === 'chat') setChatCollapsed(false);
-  }
-  function setChatPanelWidth(width, viewport) {
-    chatPanelWidth.value = clampChatWidth(width, viewport);
-    localStorage.setItem('manowzab_chat_width', String(chatPanelWidth.value));
-  }
 
   function toggleChatCollapse() {
-    if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 768px)')?.matches) {
-      setMobilePanel(mobilePanel.value === 'chat' ? 'stock' : 'chat');
-      return;
-    }
     isChatCollapsed.value = !isChatCollapsed.value;
     localStorage.setItem("manowzab_chat_collapsed", isChatCollapsed.value ? "true" : "false");
     logger.log(`💬 Chat panel ${isChatCollapsed.value ? "collapsed" : "expanded"}`);
@@ -237,9 +217,6 @@ export const useSystemStore = defineStore("system", () => {
 
   return {
     isConnected,
-    isConnecting,
-    lastChatReceivedAt,
-    lastChatPollAt,
     currentVideoId,
     viewerCount,
     subscriberCount, // ✅ Export
@@ -276,10 +253,6 @@ export const useSystemStore = defineStore("system", () => {
     isChatCollapsed, // ✅ Export
     toggleChatCollapse, // ✅ Export
     setChatCollapsed, // ✅ Export
-    mobilePanel,
-    setMobilePanel,
-    chatPanelWidth,
-    setChatPanelWidth,
   };
 });
 

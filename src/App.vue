@@ -6,12 +6,8 @@
     <!-- Protected Application Views -->
     <template v-else>
       <UpdatePrompt />
-      <nav class="mobile-workspace-tabs" aria-label="พื้นที่ทำงานของเครื่องนี้">
-        <button type="button" :aria-pressed="systemStore.mobilePanel === 'stock'" aria-controls="stock-workspace" @click="systemStore.setMobilePanel('stock')"><i class="fa-solid fa-table-cells" aria-hidden="true"></i> สินค้า</button>
-        <button type="button" :aria-pressed="systemStore.mobilePanel === 'chat'" aria-controls="chat-workspace" @click="systemStore.setMobilePanel('chat')"><i class="fa-solid fa-comments" aria-hidden="true"></i> แชต</button>
-      </nav>
-      <div class="app-layout" :class="{ 'chat-collapsed': systemStore.isChatCollapsed, 'mobile-show-chat': systemStore.mobilePanel === 'chat', 'layout-resizing': isResizing }" :style="{ '--chat-panel-width': `${systemStore.chatPanelWidth}px` }">
-        <div class="left-column" id="stock-workspace">
+      <div class="app-layout" :class="{ 'chat-collapsed': systemStore.isChatCollapsed }">
+        <div class="left-column">
           <Header />
 
           <div v-if="systemStore.isAway" class="away-banner">
@@ -39,7 +35,6 @@
           </div>
           <NoteBanner />
         </div>
-        <div v-if="!systemStore.isChatCollapsed" class="workspace-divider" role="separator" tabindex="0" aria-label="ปรับความกว้างแชต ใช้ลูกศรซ้ายหรือขวา" aria-orientation="vertical" :aria-valuenow="displayedWidth" :aria-valuemin="280" :aria-valuemax="maxWidth" @pointerdown="startResize" @keydown="resizeByKey"><span></span></div>
         <ChatPanel />
 
         <!-- 🚀 Floating Modern Expand Tab (Visible when Chat is Collapsed) -->
@@ -95,7 +90,6 @@ import { useVoiceLearningStore } from "./stores/voiceLearning";
 import { useCustomerStore } from "./stores/customer";
 import { syncDeliveryCustomerForOwner } from "./utils/deliverySync";
 import { useDeliveryReconciliation } from "./composables/useDeliveryReconciliation";
-import { useWorkspaceLayout } from './composables/useWorkspaceLayout';
 import { useBlacklistStore } from "./stores/blacklist";
 import { useChatProcessor } from "./composables/useChatProcessor";
 
@@ -108,11 +102,6 @@ const PhoneticManager = defineAsyncComponent(() => import("./components/Phonetic
 
 const authStore = useAuthStore();
 const systemStore = useSystemStore();
-const { isResizing, displayedWidth, maxWidth, startResize, resizeByKey } = useWorkspaceLayout(systemStore);
-watch(() => systemStore.currentVideoId, () => {
-  systemStore.lastChatReceivedAt = 0;
-  systemStore.lastChatPollAt = 0;
-});
 const stockStore = useStockStore();
 const chatStore = useChatStore();
 const nicknameStore = useNicknameStore();
@@ -179,9 +168,6 @@ watch(
 let listenerGeneration = 0;
 function stopAppListeners() {
   ++listenerGeneration;
-  systemStore.lastChatReceivedAt = 0;
-  systemStore.lastChatPollAt = 0;
-  systemStore.isConnecting = false;
   cleanupFns.splice(0).forEach(fn => fn?.());
   stockStore.stopStockSync();
 }

@@ -33,8 +33,6 @@
           class="version-badge"
           :title="getVersionTooltip()"
           @click="showChangelog"
-          role="button" tabindex="0"
-          @keydown.enter="showChangelog" @keydown.space.prevent="showChangelog"
           style="cursor: pointer; margin-left: 5px;"
         >
           {{ systemStore.version }}
@@ -76,19 +74,58 @@
           :disabled="isConnecting"
           style="margin-left: 4px;"
         >
-          {{ isConnecting ? "กำลังเชื่อมต่อ…" : systemStore.isConnected ? "ตัดการเชื่อมต่อ" : "เชื่อมต่อ" }}
+          {{
+            systemStore.isConnected
+              ? "DISCONNECT"
+              : isConnecting
+                ? "..."
+                : "CONNECT"
+          }}
         </button>
       </div>
 
+      <!-- Free Thai voice test; Cloud toggle exists only in explicitly enabled builds. -->
       <button
-        type="button"
-        :class="['btn', 'audio-mode-control', `audio-mode--${audioDisplay.tone}`]"
+        :class="['btn']"
+        :style="{
+          background: systemStore.ttsVoiceMode === 'standard'
+            ? 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)'
+            : 'linear-gradient(135deg, #4B5563 0%, #374151 100%)',
+          boxShadow: systemStore.ttsVoiceMode === 'standard'
+            ? '0 4px 15px rgba(0, 114, 255, 0.4)'
+            : 'none',
+          border: 'none',
+          color: 'white',
+          position: 'relative',
+        }"
         @click="toggleTtsMode"
-        :aria-label="`${audioDisplay.label} • เครื่องนี้ • ${!systemStore.isSoundOn ? 'เปิดเสียง' : systemStore.googleCloudTtsEnabled ? 'สลับโหมดเสียงหลัก' : 'ทดลองเสียงฟรี'}`"
-        :title="`${audioDisplay.detail} • เครื่องนี้เท่านั้น • ${!systemStore.isSoundOn ? 'กดเปิดเสียง' : systemStore.googleCloudTtsEnabled ? 'กดสลับโหมดเสียงหลัก' : 'กดทดลองฟังเสียงฟรี'}`"
+        :aria-label="systemStore.googleCloudTtsEnabled ? 'สลับเสียงอ่าน' : 'ทดลองเสียงภาษาไทยฟรี'"
+        :title="
+          !systemStore.googleCloudTtsEnabled
+            ? 'เสียงภาษาไทยฟรี • กดทดลองฟัง (ไม่ใช้ Google Cloud)'
+            : systemStore.ttsVoiceMode === 'standard'
+            ? `Google Cloud Standard (th-TH-Standard-A) - Key #${systemStore.activeKeyIndex} Active`
+            : 'เสียงในเครื่อง • กดเพื่อสลับเสียง'
+        "
       >
-        <i :class="audioDisplay.tone === 'muted' ? 'fa-solid fa-volume-xmark' : audioDisplay.tone === 'google' ? 'fa-solid fa-cloud' : 'fa-solid fa-volume-high'" aria-hidden="true"></i>
-        <span class="audio-mode-copy"><strong>{{ systemStore.googleCloudTtsEnabled ? audioDisplay.label : 'TH ฟรี' }}</strong><small>เครื่องนี้</small></span>
+        <!-- Icon -->
+        <i
+          :class="[
+            systemStore.useOnlineTts
+              ? 'fa-solid fa-cloud'
+              : 'fa-solid fa-robot',
+          ]"
+          style="font-size: 1.1em; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
+        ></i>
+
+        <!-- Mode & Key Index Number -->
+        <span
+          v-if="systemStore.useOnlineTts"
+          style="margin-left: 5px; font-size: 1.05em; font-weight: bold; font-family: monospace; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
+        >
+          {{ 'S' + systemStore.activeKeyIndex }}
+        </span>
+        <span v-else-if="!systemStore.googleCloudTtsEnabled" style="margin-left: 5px">TH ฟรี</span>
       </button>
 
       <!-- 💬 Live Chat Panel Toggle Button -->
@@ -127,11 +164,11 @@
               <div class="dropdown-group-title">
                 <i class="fa-solid fa-tower-broadcast"></i> แชท & ไลฟ์สตรีม
               </div>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="systemStore.toggleChatCollapse" class="menu-chat-toggle">
+              <a @click="systemStore.toggleChatCollapse" class="menu-chat-toggle">
                 <i :class="systemStore.isChatCollapsed ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'"></i>
                 <span>{{ systemStore.isChatCollapsed ? "แสดงแชทสด (เปิดข้าง)" : "ซ่อนแชทสด (เต็มจอ)" }}</span>
               </a>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="downloadCSV" class="menu-csv">
+              <a @click="downloadCSV" class="menu-csv">
                 <i class="fa-solid fa-file-csv"></i>
                 <span>บันทึกแชท (CSV)</span>
               </a>
@@ -142,15 +179,15 @@
               <div class="dropdown-group-title">
                 <i class="fa-solid fa-volume-high"></i> เสียง & คำอ่าน
               </div>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="openPhoneticMgr" class="menu-phonetic">
+              <a @click="openPhoneticMgr" class="menu-phonetic">
                 <i class="fa-solid fa-microphone-lines"></i>
                 <span>จัดการคำอ่าน (TTS)</span>
               </a>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="testVoice" class="menu-voice">
+              <a @click="testVoice" class="menu-voice">
                 <i class="fa-solid fa-volume-high"></i>
                 <span>ทดสอบเสียง</span>
               </a>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="toggleAwayMode" class="menu-away" :class="{ active: systemStore.isAway }">
+              <a @click="toggleAwayMode" class="menu-away" :class="{ active: systemStore.isAway }">
                 <i class="fa-solid fa-moon"></i>
                 <span>{{ systemStore.isAway ? "ปิดโหมดพาลูกนอน" : "โหมดพาลูกนอน" }}</span>
               </a>
@@ -161,11 +198,11 @@
               <div class="dropdown-group-title">
                 <i class="fa-solid fa-chart-pie"></i> ข้อมูล & จัดส่ง
               </div>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="handleOpenHistory" class="menu-history">
+              <a @click="handleOpenHistory" class="menu-history">
                 <i class="fa-solid fa-clock-rotate-left"></i>
                 <span>ประวัติการจอง</span>
               </a>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="openLiveSummary" class="menu-summary">
+              <a @click="openLiveSummary" class="menu-summary">
                 <i class="fa-solid fa-trophy" style="color: #f59e0b;"></i>
                 <span>สรุปผลการขายไลฟ์</span>
               </a>
@@ -192,27 +229,27 @@
               <div class="dropdown-group-title">
                 <i class="fa-solid fa-gears"></i> ระบบ & ทั่วไป
               </div>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="openShortcuts" class="menu-shortcuts">
+              <a @click="openShortcuts" class="menu-shortcuts">
                 <i class="fa-solid fa-keyboard" style="color: #38bdf8;"></i>
                 <span>รวมคีย์ลัดระบบ (?)</span>
               </a>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="openBlacklistModal" class="menu-blacklist">
+              <a @click="openBlacklistModal" class="menu-blacklist">
                 <i class="fa-solid fa-user-slash" style="color: #f87171;"></i>
                 <span>จัดการ Blacklist</span>
               </a>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="openNoteEditor" class="menu-note">
+              <a @click="openNoteEditor" class="menu-note">
                 <i class="fa-solid fa-note-sticky"></i>
                 <span>จัดการ Note</span>
               </a>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="toggleFullScreen" class="menu-screen">
+              <a @click="toggleFullScreen" class="menu-screen">
                 <i class="fa-solid fa-expand"></i>
                 <span>เต็มจอ</span>
               </a>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="forceUpdate" class="menu-update">
+              <a @click="forceUpdate" class="menu-update">
                 <i class="fa-solid fa-rotate"></i>
                 <span>บังคับอัปเดต</span>
               </a>
-              <a role="button" tabindex="0" @keydown.enter.prevent="$event.currentTarget.click()" @keydown.space.prevent="$event.currentTarget.click()" @click="handleLogout" class="menu-logout" style="color: #f87171;">
+              <a @click="handleLogout" class="menu-logout" style="color: #f87171;">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 <span>ออกจากระบบ</span>
               </a>
@@ -263,7 +300,6 @@ import { useStockStore } from "../stores/stock";
 import { useYouTube } from "../composables/useYouTube";
 import { useAudio } from "../composables/useAudio";
 import { ttsService } from "../services/TextToSpeech";
-import { audioRuntime, getAudioDisplay } from "../services/audioRuntime";
 import { ref as dbRef, onValue, update, set } from "firebase/database";
 import { db } from "../composables/useFirebase"; // เช็ค path ให้ตรงกับเครื่องคุณ
 import Swal from "sweetalert2";
@@ -317,8 +353,7 @@ function handleOpenHistory() {
 
 const videoId = ref("");
 const showDropdown = ref(false);
-const isConnecting = computed({ get: () => systemStore.isConnecting, set: value => { systemStore.isConnecting = value; } });
-const audioDisplay = computed(() => getAudioDisplay(systemStore, audioRuntime));
+const isConnecting = ref(false);
 const shippingData = ref({});
 const dropdownRef = ref(null);
 const dropdownStyle = ref({});
@@ -668,11 +703,6 @@ function getVersionTooltip() {
 }
 
 function toggleTtsMode() {
-  if (!systemStore.isSoundOn) {
-    systemStore.isSoundOn = true;
-    queueAudio(null, "", "เปิดเสียงเครื่องนี้แล้วค่ะ");
-    return;
-  }
   if (!systemStore.googleCloudTtsEnabled) {
     if (!ttsService.getBestVoice()) {
       Swal.fire({

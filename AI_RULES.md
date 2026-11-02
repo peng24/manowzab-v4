@@ -185,12 +185,10 @@ _Please acknowledge that you understand these rules. If I ask for a change, ensu
 
 - Cloud Billing controls: distinguish alert-only budgets from verified enforcement. All-account budgets and payment thresholds do not guarantee invoice ceilings; native spend caps have project/service restrictions and TTS is not currently eligible. Custom shutdown can lag and removing billing can irreversibly affect resources. Verify actual scope/recipients and any deployed response separately; keep private billing evidence out of public Git. See docs/cloud-billing-controls.md.
 
+## Operational workspace UI baseline (2026-11-02 rollback)
 
-## Operational workspace UX (2026-11-02)
-
-- Connection labels must reflect local connecting/poll/error/end state or actual fresh Firebase receipts; never hard-code LIVE. Successful empty polls remain healthy. Historical/duplicate chat must not refresh receipt age. Reset local timestamps when changing video or ending the authorized listener lifecycle.
-- Audio status is per-device presentation from actual Google/native playback, fallback and mute state. It must never start audio, write Firebase or change FIFO/time/blacklist guards. Preserve explicit Cloud opt-in and the existing free-build boundary.
-- Queue editing must track meaningful unsaved changes, confirm discard, serialize saves and block navigation/closing while saving. Failed writes preserve the draft and current item; announce manual edits only after persistence through queueAudio. Guard saving a draft from another video.
-- Persist mobile workspace and desktop chat width locally. Mobile shows one full workspace, uses the same chat shortcut to switch tabs, and keeps CSV accessible in the more menu. Incoming orders must not switch away from the chat tab; only an explicit item jump may reveal stock. Clean up resize/pointer/keyboard listeners.
-- Keep primary touch targets at least 44px, visible keyboard focus and usable Enter/Space actions. Check CSS cascade against existing scoped/global rules, no clipped primary controls or overlapping stock rows at 320px and above. Preserve full-width Smart Answers, thin black outlines and customer colour identity.
-- New-order emphasis lasts 15,000ms (CONSTANTS.UI.NEW_ORDER_EFFECT_MS), with gentle motion and reduced-motion support. Do not shorten it while simplifying visual effects.
+- The user reverted the entire v5.4.19 UX/UI to the v5.4.18 baseline. Use source b50aca2 (same application source as the published v5.4.18, plus documentation) as the reference. Restore its layout, colours, controls, chat collapse and queue interaction. Do not reintroduce the v5.4.19 tabs/resizer/status panels/draft UI without a new request.
+- Retain v5.4.18 Google Standard primary/native fallback, Cloud opt-in/free-build boundaries, FIFO, prefetch/deadlines, regex corpus, Firebase authentication and delivery invariants. A UI rollback must not downgrade these or mutate business data or Billing.
+- Original new-order emphasis remains 15,000ms in StockGrid.vue. Keep the full-width Smart Answer and thin black outline from the v5.4.18 baseline.
+- Publish rollback builds with a new increasing release version so installed clients can detect an update. Clearly distinguish the restored UI baseline from the release number; preserve historical release notes and their evidence.
+- Verify baseline source parity excluding changelog, current unit suite and builds, then check published artifacts/PWA. V5.4.19-only acceptance checks and its historical 800-test result no longer describe the active UI. Report physical-device/production-login checks separately.

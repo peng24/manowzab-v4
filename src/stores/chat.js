@@ -255,10 +255,6 @@ export const useChatStore = defineStore("chat", () => {
         // Add message through the existing addMessage function
         // This handles deduplication and logging
         addMessage(messageData);
-        // Receipt time is local UI state; old history must not appear as fresh chat.
-        if (isNew && messageData.timestamp >= syncStartTime - 5000) {
-          useSystemStore().lastChatReceivedAt = Date.now();
-        }
 
         // ✅ 🛡️ Blacklist Guard: Never play audio (TTS/SFX) for banned users
         let isUserBanned = messageData.isBanned || messageData.type === "banned";

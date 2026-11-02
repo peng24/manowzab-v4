@@ -167,7 +167,7 @@
         class="queue-modal-overlay"
         @click.self="closeModal"
       >
-        <div class="queue-modal" role="dialog" aria-modal="true" aria-label="แก้ไขรายการสินค้า" :aria-busy="isSaving">
+        <div class="queue-modal">
           <div class="queue-header">
             <div class="queue-header-left">
               <div class="queue-title-badge">
@@ -187,25 +187,23 @@
               </div>
             </div>
             <div class="queue-header-actions">
-              <span class="queue-draft-status" :class="{ dirty: isDirty }" role="status">{{ isSaving ? 'กำลังบันทึก…' : isDirty ? 'ยังไม่บันทึก' : 'บันทึกแล้ว' }}</span>
               <div class="queue-nav-group">
-                <button class="btn-queue-nav" :disabled="isSaving" @click="saveAndNavigate('prev')" title="บันทึกและไปรายการก่อนหน้า (ลูกศรซ้าย)">
-                  <i class="fa-solid fa-chevron-left"></i><span>บันทึก · ก่อนหน้า</span>
+                <button class="btn-queue-nav" @click="saveAndNavigate('prev')" title="บันทึกและไปรายการก่อนหน้า (ลูกศรซ้าย)">
+                  <i class="fa-solid fa-chevron-left"></i>
                 </button>
-                <button class="btn-queue-nav" :disabled="isSaving" @click="saveAndNavigate('next')" title="บันทึกและไปรายการถัดไป (ลูกศรขวา)">
-                  <span>บันทึก · ถัดไป</span><i class="fa-solid fa-chevron-right"></i>
+                <button class="btn-queue-nav" @click="saveAndNavigate('next')" title="บันทึกและไปรายการถัดไป (ลูกศรขวา)">
+                  <i class="fa-solid fa-chevron-right"></i>
                 </button>
               </div>
-              <button class="btn-queue-clear" :disabled="isSaving" @click="clearItemData" title="ล้างข้อมูลรายการนี้">
+              <button class="btn-queue-clear" @click="clearItemData" title="ล้างข้อมูลรายการนี้">
                 <i class="fa-solid fa-broom"></i>
                 <span>ล้าง</span>
               </button>
-              <button class="btn-queue-close" :disabled="isSaving" @click="closeModal" title="ปิดหน้าต่าง">
+              <button class="btn-queue-close" @click="closeModal" title="ปิดหน้าต่าง">
                 <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
           </div>
-          <fieldset class="queue-edit-fields" :disabled="isSaving">
           <div class="queue-body">
             <div class="queue-list">
               <div
@@ -342,12 +340,11 @@
               <button class="btn-queue-add" @click="manualReserve">
                 <i class="fa-solid fa-user-plus"></i> เพิ่มชื่อ
               </button>
-              <button class="btn-queue-save" @click="saveQueueChanges()">
+              <button class="btn-queue-save" @click="saveQueueChanges">
                 <i class="fa-solid fa-check-double"></i> บันทึกการแก้ไข
               </button>
             </div>
           </div>
-          </fieldset>
         </div>
       </div>
     </Teleport>
@@ -364,8 +361,6 @@ import { useNicknameStore } from "../stores/nickname";
 import { useCustomerStore } from "../stores/customer";
 import { useAudio } from "../composables/useAudio";
 import { useSmoothScroll } from "../composables/useSmoothScroll";
-import { useQueueDraft } from "../composables/useQueueDraft";
-import { CONSTANTS } from "../config/constants";
 import { ref as dbRef, onValue, get, remove, update, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
@@ -672,7 +667,7 @@ let cleanupOwnerModal = null;
 function handleExternalJumpToItem(e) {
   const itemId = parseInt(e?.detail?.itemId, 10);
   if (itemId && itemId >= 1) {
-    scrollToItem(itemId, true);
+    scrollToItem(itemId);
   }
 }
 
@@ -719,34 +714,6 @@ const showModal = ref(false);
 const editingId = ref(null);
 const editingPrice = ref(0);
 const tempQueue = ref([]);
-let modalVideoId = '';
-let modalReturnFocus = null;
-const draft = useQueueDraft({
-  price: editingPrice,
-  queue: tempQueue,
-  confirmDiscard: async () => {
-    const result = await Swal.fire({
-      title: 'มีการแก้ไขที่ยังไม่บันทึก',
-      text: 'หากปิดตอนนี้ การแก้ไขในหน้าต่างนี้จะถูกทิ้ง',
-      icon: 'warning', showCancelButton: true,
-      confirmButtonText: 'ทิ้งการแก้ไข', cancelButtonText: 'กลับไปแก้ไข',
-      confirmButtonColor: '#b45309', allowOutsideClick: false, returnFocus: false,
-    });
-    if (!result.isConfirmed) nextTick(() => document.querySelector('.queue-modal .queue-input')?.focus());
-    return result.isConfirmed;
-  },
-  close: () => {
-    showModal.value = false;
-    nextTick(() => { if (modalReturnFocus?.isConnected) modalReturnFocus.focus(); });
-  },
-});
-const { isDirty, isSaving } = draft;
-function protectDraftOnUnload(event) {
-  if (showModal.value && (isDirty.value || isSaving.value)) { event.preventDefault(); event.returnValue = ''; }
-}
-onMounted(() => window.addEventListener('beforeunload', protectDraftOnUnload));
-onUnmounted(() => window.removeEventListener('beforeunload', protectDraftOnUnload));
-
 let draggingIndex = null;
 
 // ✅ Autocomplete State
@@ -1441,7 +1408,7 @@ watch(
         newOrdersTimers[num] = setTimeout(() => {
           newOrders.value.delete(num);
           delete newOrdersTimers[num];
-        }, CONSTANTS.UI.NEW_ORDER_EFFECT_MS);
+        }, 15000);
         scrollToItem(num);
       }
     });
@@ -1471,8 +1438,7 @@ watch(
   { deep: true },
 );
 
-function scrollToItem(num, revealStock = false) {
-  if (revealStock) systemStore.setMobilePanel('stock');
+function scrollToItem(num) {
   if (num > gridDisplayLimit.value) {
     gridDisplayLimit.value = Math.min(stockStore.stockSize, num + 20);
   }
@@ -1483,7 +1449,6 @@ function scrollToItem(num, revealStock = false) {
     nextTick(() => {
       const el = document.getElementById(`stock-${num}`);
       if (el) {
-        if (revealStock) el.focus({ preventScroll: true });
         if (gridSmoothScroll?.lenis?.value && gridContainer.value) {
           const cHeight = gridContainer.value.clientHeight || 400;
           const elHeight = el.clientHeight || 85;
@@ -1532,9 +1497,6 @@ function openQueueModal(num) {
     });
   }
 
-  modalVideoId = systemStore.currentVideoId;
-  if (!showModal.value) modalReturnFocus = document.activeElement;
-  draft.capture();
   showModal.value = true;
   nextTick(() => {
     if (queueInputRefs.value[0]) {
@@ -1545,7 +1507,7 @@ function openQueueModal(num) {
 }
 
 function closeModal() {
-  return draft.requestClose();
+  showModal.value = false;
 }
 
 function clearItemData() {
@@ -1679,7 +1641,6 @@ function handleAutocompleteKeydown(event, index) {
       saveQueueChanges();
     }
   } else if (event.key === "Escape") {
-    if (activeAutocompleteIdx.value !== null && suggestions.length > 0) event.stopPropagation();
     activeAutocompleteIdx.value = null;
     highlightedSuggestionIdx.value = -1;
   }
@@ -1696,8 +1657,7 @@ function highlightMatch(text, query) {
   return safeText.replace(regex, '<span class="autocomplete-highlight">$1</span>');
 }
 
-async function persistQueueChanges() {
-  if (!modalVideoId || modalVideoId !== systemStore.currentVideoId) throw new Error("ไลฟ์เปลี่ยนแล้ว กรุณาเปิดรายการใหม่ก่อนบันทึก");
+async function saveQueueChanges(preventClose = false) {
   const num = editingId.value;
   // Re-fetch latest state at save time to prevent race conditions
   const currentDbItem = getStockItem(num);
@@ -1744,11 +1704,20 @@ async function persistQueueChanges() {
     }
   }
 
-  let announcement = '';
+  // Logic Update: Smart TTS handling
   if (oldOwnerName && !newOwnerName) {
-    announcement = `ยกเลิกรายการที่ ${num} ค่ะ`;
-  } else if (oldOwnerName && newOwnerName && oldOwnerName !== newOwnerName && currentDbItem.uid !== newData.uid) {
-    announcement = `${oldOwnerName} หลุดจอง ${newOwnerName}`;
+    // Case 1: Cancel (Deleted)
+    playSfx();
+    queueAudio(null, "", `ยกเลิกรายการที่ ${num} ค่ะ`);
+  } else if (oldOwnerName && newOwnerName && oldOwnerName !== newOwnerName) {
+    // Case 2: Name Changed
+    playSfx();
+    const isSamePerson = currentDbItem.uid === newData.uid;
+    if (!isSamePerson) {
+      queueAudio(null, "", `${oldOwnerName} หลุดจอง ${newOwnerName}`);
+    } else {
+      logger.log("✏️ Typo fix detected. Silent update.");
+    }
   }
 
   // แก้ไขบั๊กไม่ยอมลบชื่อคนจองเวลามีราคา
@@ -1766,25 +1735,23 @@ async function persistQueueChanges() {
     });
   }
 
-  if (announcement) queueAudio(oldOwnerName && !newOwnerName ? 'cancel' : 'success', '', announcement);
-}
-
-async function saveQueueChanges(preventClose = false) {
-  try {
-    const saved = await draft.save(persistQueueChanges, { closeAfter: preventClose !== true });
-    if (saved && preventClose !== true) {
-      Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
-    }
-    return saved;
-  } catch (error) {
-    await Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: error.message || 'กรุณาลองอีกครั้ง การแก้ไขยังอยู่ในหน้าต่างนี้', returnFocus: false });
-    nextTick(() => document.querySelector('.queue-modal .queue-input')?.focus());
-    return false;
+  if (preventClose === true) {
+    return;
   }
+
+  closeModal();
+  Swal.fire({
+    icon: "success",
+    title: "บันทึกแล้ว",
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 1500,
+  });
 }
 
 async function saveAndNavigate(direction) {
-  if (!await saveQueueChanges(true)) return; // A failed save must never navigate away.
+  await saveQueueChanges(true); // Save but prevent modal close
 
   let nextId = editingId.value;
   if (direction === 'prev') {
@@ -1807,25 +1774,16 @@ async function saveAndNavigate(direction) {
 }
 
 function handleGlobalKeydown(e) {
-  if (!showModal.value || isSaving.value || draft.isConfirming.value || Swal.isVisible()) return;
-  if (e.key === 'Tab') {
-    const dialog = document.querySelector('.queue-modal');
-    const controls = [...(dialog?.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]') || [])].filter(el => el.offsetParent !== null);
-    if (controls.length && e.shiftKey && e.target === controls[0]) { e.preventDefault(); controls.at(-1).focus(); }
-    else if (controls.length && !e.shiftKey && e.target === controls.at(-1)) { e.preventDefault(); controls[0].focus(); }
-    return;
-  }
-  if (e.key === 'Escape') { e.preventDefault(); closeModal(); return; }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveQueueChanges(); return; }
+  if (!showModal.value) return;
 
   if (e.key === 'ArrowLeft') {
     // If they are in a text input, let them move cursor
-    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
+    if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
     
     e.preventDefault();
     saveAndNavigate('prev');
   } else if (e.key === 'ArrowRight') {
-    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
+    if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
 
     e.preventDefault();
     saveAndNavigate('next');

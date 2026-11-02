@@ -12,7 +12,7 @@
 - **State Management:** Pinia
 - **Backend:** Firebase Realtime Database
 - **CSS:** Custom vanilla CSS
-- **TTS:** Native Thai speech (free default); opt-in Google Cloud TTS (`th-TH-Standard-A`, mode `S`) + Native TTS (`🤖`, fallback) with shared singleton Web Audio API `AudioContext` and LRU Audio Buffer Cache.
+- **TTS:** Google Cloud Standard in approved opt-in builds (native in free builds); Google Cloud TTS (`th-TH-Standard-A`, mode `S`) + Native TTS (`🤖`, fallback) with shared singleton Web Audio API `AudioContext` and LRU Audio Buffer Cache.
 
 ## 3. 🚨 CRITICAL RULES (DO NOT BREAK)
 
@@ -26,7 +26,7 @@
 
 1.  **iPad/iOS Compatibility:** The system uses a 3-layer audio unlock strategy (`iosAudioUnlock.js`, `unlockAudio()`, `ensureAudioContextReady()`). **NEVER REMOVE THIS.**
 2.  **Singleton Pattern & Shared `AudioContext`:** Always use the shared `ttsService` instance and its shared `AudioContext` (`ttsService.getAudioContext()`).
-3.  **Cloud Opt-In Only — Multi-Tier Fallback:** Google Cloud Standard TTS (`S`, >2s timeout fallback + key rotation) ➡️ Native TTS (`🤖`). After consecutive Google failures across all keys, switch to Native automatically.
+3.  **Cloud Opt-In Only — Multi-Tier Fallback:** Google Cloud Standard TTS (`S`, 2s total network deadline) ➡️ Native TTS (`🤖`). Use bounded retries and cooldown; see the current Thai TTS Policy below.
 4.  **Unified Audio Queue:** ALL audio (SFX + TTS) must go through `queueAudio()` in `useAudio.js`. **DO NOT** call `ttsService.speak()` directly — it bypasses the queue and causes audio overlap.
 
 ### 🔑 API Key Rotation
@@ -93,7 +93,7 @@
 ## 4. Key File Structures
 
 - `src/services/TextToSpeech.js`: Core TTS logic (Google Standard + Native, key rotation, LRU buffer cache, shared `AudioContext`).
-- `src/composables/useAudio.js`: Unified SFX + TTS queue (sequential, 20s safety timeout).
+- `src/composables/useAudio.js`: Unified SFX + TTS queue (sequential, 35s safety timeout).
 - `src/composables/useChatProcessor.js`: Chat intent detection (Lazy short-circuit Regex, 80ms micro-batch queue, multi-buy, cancel, admin proxy).
 - `src/stores/stock.js`: Stock management (Firebase transaction sync, auto-expand, queue system, throttled & deduplicated history sync).
 - `src/stores/customer.js`: Centralized reference-counted `delivery_customers` & `address_book` listeners, $O(1)$ lookup maps, and live cache hooks for `deliverySync.js`.
@@ -117,7 +117,7 @@
 | --- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **แชทสด แสดงทุกข้อความตามลำดับจริง**                     | ข้อความทุกข้อความจาก YouTube Live Chat ต้องแสดงผลในหน้าจอตามลำดับเวลาจริง ห้ามหาย ห้ามสลับลำดับ (รวบเป็น Batch 80ms เดียวต่อรอบ Poll)          |
 | 2   | **อ่านแชทสด ต้องอ่านทุกข้อความ**                         | TTS ต้องอ่านทุกข้อความที่เข้ามา รวมถึงข้อความที่จองซ้ำ/จองล็อค/emoji ต้องผ่าน `chat.js` Firebase sync listener เข้า `queueAudio()` ครบทุกจุด   |
-| 3   | **ระบบสลับ API Key ใช้ได้ทั้ง YouTube API / Google TTS** | API Key rotation ต้องทำงานสมบูรณ์ทั้ง `useYouTube.js`, `YouTubeLiveChat.js` และ `TextToSpeech.js` โดยใช้ `systemStore.currentKeyIndex` ร่วมกัน |
+| 3   | **ระบบสลับ API Key ใช้ได้ทั้ง YouTube API / Google TTS** | API Key rotation ต้องทำงานสมบูรณ์ทั้ง `useYouTube.js`, `YouTubeLiveChat.js` และ `TextToSpeech.js` โดยแยก YouTube `currentKeyIndex` กับ TTS `activeKeyIndex`; การหมุนคีย์ไม่เพิ่มโควต้ารวมของโปรเจกต์ |
 | 4   | **ระบบจอง: มากกว่า 1 คน = ต่อคิว**                       | เมื่อมีคนจองรายการเดียวกันมากกว่า 1 คน ต้องเพิ่มเข้า queue ตามลำดับ ไม่ใช่ทับกัน                                                               |
 | 5   | **ขยายรายการจองอัตโนมัติ**                               | เมื่อมีการจองเกินจำนวนรายการที่กำหนด ให้ขยายรายการเป็นชุด (เช่น กำหนด 50 จองที่ 56 → ขยายเป็น 60)                                              |
 | 6   | **รองรับเลขไทย**                                         | เมื่อมีการจองด้วยเลขไทย (เช่น "๕๖") ต้องแปลงเป็นเลขอารบิกและจองได้ตามปกติ                                                                      |
@@ -173,11 +173,12 @@ _Please acknowledge that you understand these rules. If I ask for a change, ensu
 - Regex changes require the reviewed anonymized 307-row corpus, boundary tests, and actual useChatProcessor side-effect tests. Expected labels must be reviewed independently of the changed parser. Keep raw logs/identifiers outside tracked fixtures; archive analyzed files only after hash checks, with no overwrite on filename collisions.
 - See docs/chat-regex-review-2026-10-31.md and /verify 2.11–2.15. Passing this corpus is regression evidence, not a claim of 100% accuracy on new chat.
 
-## Free Thai TTS Policy (2026-11-02, user-selected)
+## Thai TTS Policy (2026-11-02, latest user approval)
 
-- Production defaults to native Thai speech with no Google Cloud TTS billing. Do not reopen Billing, add payment methods, or activate paid providers without new explicit user approval.
-- isGoogleCloudTtsEnabled() is false unless VITE_ENABLE_GOOGLE_CLOUD_TTS is exactly true at build time. Existing Cloud keys or saved standard/neural2 preferences must never enable Cloud. Free builds migrate saved modes to native, load no Cloud keys, skip TTS key distribution/presence writes, and guard both processQueue and direct speakOnline entry points.
-- In free builds Header shows TH ฟรี and tests speech through queueAudio. The button must not toggle into a billable provider; if no Thai voice is found, show device-language installation guidance.
-- Prefer installed Thai voices (localService=true), then browser-provided Thai voices. getBestVoice returns a newly loaded voice immediately; bounded polling must continue if only non-Thai voices load first. Browser voices vary by device; never describe a remote browser voice as guaranteed offline.
-- Keep Firebase audio time/blacklist guards, Thai cardinal-number conversion, iOS unlock, shared AudioContext and sequential queue behavior. Native error/end/reset must settle pending speech without overlap or deadlock.
-- Verify free default + saved preference migration, blocked Cloud calls including direct calls, actual native queue completion, local Thai selection, delayed voices, error/reset, Header controls and absence of Google TTS endpoint/keys in the production build. These checks concern TTS charges, not unrelated Firebase/YouTube/network costs.
+- The earlier v5.4.17 free-native release remains documented as historical. The user subsequently chose the original Google Cloud Standard voice as primary, Microsoft Pattara as fallback, and both devices speaking. This installation may explicitly opt in with VITE_ENABLE_GOOGLE_CLOUD_TTS=true; do not silently enable Cloud in other/free builds. Billing/payment readiness is separate from code readiness; never report live Cloud success from mocks or a successful build.
+- Free builds retain their native migration, no Cloud keys/calls/presence writes, and TH ฟรี test button. Saved preferences alone cannot enable Cloud. Approved Cloud builds migrate to standard once via manowzab_tts_cloud_policy=cloud-primary-2026-11-02, then preserve a subsequent manual native choice independently on each device.
+- GoogleTtsAudio prepares bytes only: no playback or queue advancement. Deduplicate in-flight text/voice, cap background requests at current + next two, preserve bounded LRU copies, and share formatting/sanitization with foreground speech. Never drop queued chat to reduce latency.
+- Bound Google fetch plus response-body loading across all keys to 2000ms total (1500ms/key maximum). Invalid-key/network failures may rotate within that deadline. BILLING_DISABLED and HTTP 429 enter cooldown without cycling keys to evade account/project limits. Retry after 60s for Billing or 10s for other failures, or explicitly retry from the mode control; retain native fallback throughout.
+- Reset invalidates fetch/decode/resume/native callbacks before stopping audio and clears queued work. A watchdog invalidates the current item before continuing the remaining FIFO queue. Old outer-queue finally handlers must not change the state of a new queue. Keep shared AudioContext, iOS unlock, Thai cardinal words, emoji fallback and Firebase time/blacklist guards.
+- Native fallback prefers installed Thai voices (Microsoft Pattara on this Windows device), then other Thai voices. Availability varies by device. Verify request limits, cache/dedup, deadlines, Billing/quota recovery, cancellation, old callbacks, actual playback FIFO and two isolated clients. Distinguish mocked Cloud payload/browser engine events from live synthesis and listening on physical devices.
+- Reopening existing Billing was authorized, but no payment-method replacement, payment, credit purchase or paid add-on is implied. If Google requires card verification, have the user complete that step. Keep credentials, card details and original logs out of tracked files.

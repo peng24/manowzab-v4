@@ -717,6 +717,7 @@ function toggleTtsMode() {
     return;
   }
   const newMode = systemStore.cycleTtsMode();
+  ttsService.retryGoogle();
   const modeName = newMode === "standard" ? "Google Standard" : "Native TTS";
 
   logger.log("🔊 Switched to:", modeName);

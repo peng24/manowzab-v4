@@ -38,6 +38,7 @@ if (typeof window !== "undefined") {
 // ✅ Global Unified Audio Queue (persists across re-renders)
 const audioQueue = [];
 let isAudioProcessing = false;
+let audioGeneration = 0;
 
 // ✅ Phase 1.2: Track {osc, gain} pairs instead of oscillators alone
 // เพื่อให้สามารถ disconnect gain node ได้ด้วย ป้องกัน AudioNode leak ใน Web Audio graph
@@ -116,6 +117,7 @@ export function useAudio() {
    * @returns {Promise} Resolves immediately after starting the sound
    */
   function playSfx(type = "success") {
+    const generation = audioGeneration;
     return new Promise(async (resolve) => {
       try {
         if (!systemStore.isSoundOn) {
@@ -132,7 +134,7 @@ export function useAudio() {
             ]).catch(() => console.warn("SFX AudioContext resume timeout"));
           }
         }
-        if (!audioCtx) {
+        if (!audioCtx || generation !== audioGeneration) {
           return;
         }
 
@@ -264,10 +266,12 @@ export function useAudio() {
   }
 
   function playSleepSound() {
+    const generation = audioGeneration;
     return new Promise(async (resolve) => {
       try {
         // Wait for native speech synthesis to finish before playing the sleep chime
         await waitForSpeechToFinish();
+        if (generation !== audioGeneration) { resolve(); return; }
 
         if (audioCtx && audioCtx.state === "suspended") {
           if (typeof navigator !== "undefined" && navigator.userActivation && !navigator.userActivation.hasBeenActive) {
@@ -280,7 +284,7 @@ export function useAudio() {
           }
         }
 
-        if (!audioCtx) {
+        if (!audioCtx || generation !== audioGeneration) {
           resolve();
           return;
         }
@@ -288,6 +292,7 @@ export function useAudio() {
         if (!sleepAudioBuffer) {
           await ensureSleepAudioLoaded().catch(() => {});
         }
+        if (generation !== audioGeneration) { resolve(); return; }
 
         if (sleepAudioBuffer) {
           const source = audioCtx.createBufferSource();
@@ -344,6 +349,7 @@ export function useAudio() {
   }
 
   function resetVoice() {
+    audioGeneration++;
     // 1. Clear the global unified audio queue
     audioQueue.length = 0;
 
@@ -384,17 +390,29 @@ export function useAudio() {
   // ✅ Fixed: Safety timeout + finally block to prevent deadlock on iPad
   const QUEUE_SAFETY_TIMEOUT = 35000; // 35s max per item
 
+  function prefetchNextAudio() {
+    if (!systemStore.isSoundOn || !systemStore.useOnlineTts) return;
+    for (const task of audioQueue.slice(0, 2)) {
+      if (!task.message || task.prefetchStarted) continue;
+      task.prefetchStarted = true;
+      ttsService.prefetchSpeech(task.author, task.message).catch(() => {});
+    }
+  }
+
   async function processAudioQueue() {
     if (isAudioProcessing || audioQueue.length === 0) return;
     isAudioProcessing = true;
+    const generation = audioGeneration;
 
     const task = audioQueue.shift();
+    prefetchNextAudio();
 
     try {
       // 1. Play SFX and wait for it to finish
       if (task.sfxType) {
         await playSfx(task.sfxType);
       }
+      if (generation !== audioGeneration) return;
 
       // 2. Play TTS and wait for it to finish (with safety timeout)
       if (task.message) {
@@ -416,9 +434,11 @@ export function useAudio() {
       console.error("Audio Queue Error:", err);
     } finally {
       // ✅ ALWAYS reset — prevents permanent deadlock
-      isAudioProcessing = false;
-      // ✅ Use setTimeout to avoid stack overflow on very large queues
-      setTimeout(() => processAudioQueue(), 0);
+      if (generation === audioGeneration) {
+        isAudioProcessing = false;
+        // ✅ Use setTimeout to avoid stack overflow on very large queues
+        setTimeout(() => processAudioQueue(), 0);
+      }
     }
   }
 
@@ -427,6 +447,7 @@ export function useAudio() {
     if (!systemStore.isSoundOn) return;
     const delayAfter = typeof options === "number" ? options : options?.delayAfter || 0;
     audioQueue.push({ sfxType, author, message, delayAfter });
+    prefetchNextAudio();
     processAudioQueue();
   }
 

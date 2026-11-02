@@ -24,10 +24,14 @@ export const useSystemStore = defineStore("system", () => {
   // Free builds neither load Cloud keys nor allow saved preferences to enable them.
   const googleApiKey = ref(googleCloudTtsEnabled ? (import.meta.env.VITE_GOOGLE_API_KEYS || "") : "");
 
-  // Native speech is the default. Cloud requires explicit build-time opt-in.
+  // Free builds use native speech; approved Cloud builds restore Standard once.
   const savedMode = localStorage.getItem("manowzab_tts_voice_mode");
   const validModes = googleCloudTtsEnabled ? ["standard", "native"] : ["native"];
-  const ttsVoiceMode = ref(validModes.includes(savedMode) ? savedMode : "native");
+  const cloudPolicy = "cloud-primary-2026-11-02";
+  const restoreCloud = googleCloudTtsEnabled && localStorage.getItem("manowzab_tts_cloud_policy") !== cloudPolicy;
+  const defaultMode = googleCloudTtsEnabled ? "standard" : "native";
+  const ttsVoiceMode = ref(restoreCloud ? "standard" : validModes.includes(savedMode) ? savedMode : defaultMode);
+  if (restoreCloud) localStorage.setItem("manowzab_tts_cloud_policy", cloudPolicy);
   if (savedMode !== ttsVoiceMode.value) {
     localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
   }

@@ -84,14 +84,26 @@ describe("System Store - TTS Modes", () => {
     vi.stubEnv("VITE_ENABLE_GOOGLE_CLOUD_TTS", "true");
     const { useSystemStore } = await import("../stores/system");
     const store = useSystemStore();
-    expect(store.ttsVoiceMode).toBe("native");
+    expect(store.ttsVoiceMode).toBe("standard");
     expect(store.googleCloudTtsEnabled).toBe(true);
     expect(store.googleApiKey).toBe("test-cloud-key-1,test-cloud-key-2");
-    expect(store.cycleTtsMode()).toBe("standard");
-    expect(store.useOnlineTts).toBe(true);
     expect(store.cycleTtsMode()).toBe("native");
+    expect(store.useOnlineTts).toBe(false);
+    expect(store.cycleTtsMode()).toBe("standard");
     store.useOnlineTts = true;
     expect(store.useOnlineTts).toBe(true);
+  });
+
+  it("restores Cloud once on devices migrated to native, then preserves a manual native choice", async () => {
+    vi.stubEnv("VITE_ENABLE_GOOGLE_CLOUD_TTS", "true");
+    localStorage.setItem("manowzab_tts_voice_mode", "native");
+    const { useSystemStore } = await import("../stores/system");
+    const first = useSystemStore();
+    expect(first.ttsVoiceMode).toBe("standard");
+    expect(localStorage.getItem("manowzab_tts_cloud_policy")).toBe("cloud-primary-2026-11-02");
+    first.cycleTtsMode();
+    setActivePinia(createPinia());
+    expect(useSystemStore().ttsVoiceMode).toBe("native");
   });
 
   it("deduplicates author prefix when message starts with author name", async () => {

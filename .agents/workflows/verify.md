@@ -75,10 +75,12 @@ description: Mandatory verification checklist after every code change
 | 4.10 | ออกเสียงชื่อลูกค้าจริงเมื่อแอดมินจองแทน (Admin Proxy TTS) | `src/composables/useChatProcessor.js` | เมื่อแอดมินพิมพ์จองให้ลูกค้า เสียง TTS จะอ่านเป็นชื่อลูกค้าเท่านั้น ไม่นำชื่อแอดมินมาอ่าน |
 | 4.11 | Shared Singleton `AudioContext` & LRU Cache | `src/services/TextToSpeech.js`, `src/composables/useAudio.js` | ใช้ `AudioContext` ร่วมกันตัวเดียว (`ttsService.getAudioContext()`) ทั้งระบบ TTS / SFX / Celebration พร้อม LRU Audio Buffer Cache (สูงสุด 200 รายการ) ลดเวลาถอดรหัสเสียงซ้ำ |
 | 4.12 | Zero-Mute Admin Notes & TTS Fallback Guarantee | `src/composables/useChatProcessor.js`, `src/stores/chat.js`, `src/services/TextToSpeech.js` | แชทโน้ตแอดมิน (`admin-note`) และคำเฉพาะแอดมิน (`admin-stopword`) ต้องส่ง `ttsText: isVoiceChat ? "" : ttsMessage` ขึ้น Firebase เสมอ และ `chat.js` ต้องมี fallback ไปที่ `messageData.text` หาก `ttsText` ว่างเปล่า เพื่อรับประกันว่าจะไม่มีข้อความใดถูกตัดเสียงอ่านทิ้ง รวมถึงตัดชื่อซ้ำที่ท้ายข้อความใน TTS (`suffixRegex`) |
-| 4.13 | Free Thai Speech / Opt-in Cloud | Header.vue, system.js | ปุ่ม TH ฟรี ทดสอบเสียงผ่าน queueAudio; default และ saved standard/neural2 ต้องเป็น native ใน free build; ปุ่ม/ค่าเก่าเปิด Cloud ไม่ได้; ถ้าไม่มีเสียงไทยให้แสดงคำแนะนำติดตั้ง |
-| 4.14 | Zero-Stall TTS Auto-Fallback System | `src/services/TextToSpeech.js` | เฉพาะ build ที่เปิด Cloud: หากโหมด `S` (Google Cloud TTS) ขัดข้อง หมดโควตา หรือเกิด Timeout ระบบต้องหมุน API Key และ Fallback อัตโนมัติไปยัง Native TTS (`🤖`) โดยคิวเสียงไม่ค้างและไม่สะดุด |
+| 4.13 | Free / approved Cloud preference | Header.vue, system.js, ttsStore.test.js | free build คง TH ฟรี/native และไม่มี Cloud keys; Cloud opt-in ย้าย native เป็น standard ครั้งเดียวตาม policy แล้วรักษาการเลือก native ภายหลัง; แต่ละเครื่องตั้งค่าอิสระ |
+| 4.14 | Cloud deadline / recovery | GoogleTtsAudio.js, TextToSpeech.js | Cloud opt-in: รอ fetch+body รวมทุกคีย์ไม่เกิน 2s; invalid key/network หมุนภายในงบเวลา; Billing/429 หยุดหมุนและพัก 60s/10s; ใช้ native ต่อคิว แล้ว retry อัตโนมัติ/ปุ่มสลับเสียง |
 | 4.15 | Thai Cardinal Number Pronunciation (`numberToThaiWords`) | `src/utils/thaiNumberWords.js`, `src/services/TextToSpeech.js`, `src/composables/useChatProcessor.js` | อ่านตัวเลขจองสินค้าเป็นจำนวนนับภาษาไทย เช่น "15" -> "สิบห้า" ไม่ใช่อ่านแยกทีละตัว "หนึ่งห้า" พร้อมแปลง CF, ตัวเลขทับลำดับ, และปกป้องเบอร์โทรศัพท์ (08x/09x)/เวลา (13:11) |
 | 4.16 | Zero TTS charges / Native lifecycle | nativeTts.test.js, ttsStore.test.js | free build ไม่มี Cloud endpoint/keys; direct speakOnline และ legacy settings ไม่ยิง HTTP; local Thai มาก่อน browser voice; delayed voices/error/end/reset ไม่ค้าง ไม่ซ้อน; browser บันทึก start/end แยกจากการฟังด้วยหู |
+| 4.17 | Prefetch / cache / FIFO | GoogleTtsAudio.js, useAudio.js, cloudTts.test.js | เตรียม current+next2 ไม่เล่นเสียง; dedup ข้อความ/voice และ copy buffer; queueAudio เล่นตามลำดับ ไม่มีเสียงซ้อน/ข้อความหล่น; muted/native ไม่ prefetch |
+| 4.18 | Reset / stale callbacks / two clients | cloudTts.test.js, audioQueuePrefetch.test.js | reset ระหว่าง fetch/decode/resume/SFX และ watchdog ต้องกัน callback เก่า; คิวใหม่ไม่ถูก finally เก่ารบกวน; ทดสอบสอง browser contexts แยกผลจากอุปกรณ์จริงและ live Google |
 
 
 ---
@@ -432,3 +434,15 @@ description: Mandatory verification checklist after every code change
 - หน้า login ไม่มี console warnings/errors; 27 network requests สำเร็จ; unauthenticated stock/delivery_customers/address_book ถูกปฏิเสธ HTTP 401
 - กฎโหมดฟรี/verify 4.5/4.13/4.14/4.16 อัปเดตแล้ว; ไม่เปิด Billing หรือเปลี่ยนการชำระเงิน; fixture server หยุดแล้ว
 - ผ่าน 745 tests/29 files และ browser speech events ตามผลด้านบน; ไม่มีการอ้างว่าทดสอบเสียงด้วยหู/อุปกรณ์อื่นหรือ production password login แล้ว ดู [ขอบเขตครบทุกหมวด](../../docs/release-5.4.17.md#checklist-coverage)
+
+
+## 🔊 ผลตรวจรุ่นเตรียมเผยแพร่ — v5.4.18 (2026-11-02)
+
+- npm test ผ่าน 772 tests/32 files รวม loader, actual TTS service, outer FIFO/reset และ migration ครั้งเดียว; corpus แชต 307 แถวยังผ่าน
+- build:gh ผ่านครบ 4 หน้าและ PWA 66 entries; free-check build ผ่าน และ artifact audit ยืนยัน free bundle ไม่มี synthesize endpoint/คีย์ TTS เดิม
+- Browser fixture ใช้ Header/system/useAudio/TextToSpeech จริงในสอง isolated contexts: Cloud opt-in ย้าย native เป็น standard และเล่นสองข้อความตามลำดับ สูงสุด 1 source ต่อ context; โหลดข้อความถัดไปก่อนเสียงแรกจบ ช่องว่างจำลองประมาณ 4ms
+- Mock Billing failure ทำให้ Microsoft Pattara อ่านสองข้อความสำรอง มี start/end ครบตามลำดับและคิวจบ; payload Cloud ใน fixture เป็น MP3 จำลอง จึงไม่ใช่หลักฐานว่า live Google ใช้งานได้
+- ช่วงเตรียมพบ HTTP 403 BILLING_DISABLED; หลังผู้ใช้แก้บัตรเอง ตรวจ Billing open=true และทั้งสองคีย์ HTTP 200 ได้ MP3 11,520 bytes (mono 24kHz, 1.44s), full response 538/478ms; agent ไม่ได้ชำระเงิน เปลี่ยนบัตร ซื้อเครดิต หรือเปลี่ยน Billing
+- อัปเดตกฎทั้ง 4 ไฟล์และ verify 4.13/4.14/4.17/4.18 แล้ว; ก่อน deploy รันใหม่ npm test ผ่าน 772 tests/32 files และ build:gh ผ่าน; ผลเผยแพร่บันทึกด้านล่างเมื่อสำเร็จ
+- Live browser fixture สอง isolated contexts ใช้คีย์จริง #1/#2 และ services จริงกับข้อความจำลอง: HTTP 200 สองข้อความต่อ context, Cloud start/end ครบ FIFO, max active source=1, ไม่ fallback และ error=null; header latency 286–583ms และ gap จำลองสภาพแวดล้อมนี้ 2–5ms ไม่ใช่ค่ารับประกัน production
+- ผล Firebase emulator ของรุ่นก่อนเป็นหลักฐานย้อนหลัง รอบนี้รัน unit/regression และ browser fixture; เสียงผ่านลำโพงจริง สองอุปกรณ์จริง iPad/installed PWA/เครื่องพิมพ์/live YouTube และ production password login ยังไม่ได้ทดสอบ ดู [ขอบเขตและขั้นตอนต่อ](../../docs/release-5.4.18.md)

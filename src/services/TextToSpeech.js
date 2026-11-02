@@ -4,6 +4,7 @@ import { stripYouTubeEmotes } from "../data/youtubeEmotes";
 import { replaceNumbersWithThaiWords } from "../utils/thaiNumberWords";
 import { isGoogleCloudTtsEnabled } from "../utils/ttsConfig";
 import { selectThaiVoice } from "../utils/nativeVoiceUtils";
+import { GoogleTtsAudio } from "./GoogleTtsAudio";
 
 // Module-scoped compiled regexes to prevent recreation in TTS sanitize loop
 const TTS_EMOJI_REGEX = /[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE00-\uFE0F\u200D\u20E3]/gu;
@@ -32,13 +33,29 @@ export class TextToSpeech {
     this.stuckTimer = null; // ✅ Safety timer to detect stuck state
     this.STUCK_TIMEOUT = 30000; // ✅ 30 seconds max per utterance
     this.consecutiveGoogleFailures = 0; // ✅ Track consecutive Google TTS failures
-    this.MAX_CONSECUTIVE_FAILURES = 5; // ✅ Switch to Native permanently after N failures
-    this.googleDisabledPermanently = false; // ✅ Flag for permanent Native mode
+    this.playbackGeneration = 0;
     this.speakingCheckRetries = 0; // ✅ Track retries when waiting for native speaking state
     this.cachedBestVoice = null; // 🚀 O(1) Cached Thai Voice reference
     this.audioCache = new Map(); // 🚀 LRU In-Memory Audio Buffer Cache (Max 50 items)
     this.sanitizeCache = new Map(); // 🚀 LRU Memoization Cache for text sanitization (Max 300 items)
     this.phoneticCache = new Map(); // 🚀 LRU Memoization Cache for phonetic customer names (Max 500 items)
+
+    this.googleAudio = new GoogleTtsAudio({
+      getConfig: () => {
+        const store = useSystemStore();
+        return { enabled: isGoogleCloudTtsEnabled() && store.useOnlineTts,
+          keys: (store.googleApiKey || "").split(",").map(key => key.trim()).filter(Boolean),
+          voice: store.googleVoiceName || "th-TH-Standard-A", activeKey: store.activeKeyIndex || 1 };
+      },
+      getCached: key => this.getCachedAudio(key),
+      setCached: (key, buffer) => this.setCachedAudio(key, buffer),
+      onKeySuccess: index => {
+        this.consecutiveGoogleFailures = 0;
+        const store = useSystemStore();
+        if (store.activeKeyIndex !== index) { store.activeKeyIndex = index; store.updatePresenceTtsKey(); }
+      },
+      warn: message => logger.warn(message),
+    });
 
     // Bind methods
     this.processQueue = this.processQueue.bind(this);
@@ -219,204 +236,62 @@ export class TextToSpeech {
    * Speak using Google Cloud TTS API with key rotation
    */
   async speakOnline(text) {
-    if (!isGoogleCloudTtsEnabled()) {
-      this.speakNative(text);
-      return;
-    }
-    const systemStore = useSystemStore();
-
-    // Parse comma-separated keys
-    const rawKeys = systemStore.googleApiKey;
-    const keys = rawKeys
-      .split(",")
-      .map((k) => k.trim())
-      .filter((k) => k);
-
-    // Check if any keys exist
-    if (keys.length === 0) {
-      logger.warn("No Google API Keys found, falling back to Native TTS");
-      this.speakNative(text);
-      return;
-    }
-
-    // Sanitize and limit text
-    const sanitized = this.sanitize(text);
-    const safeText = sanitized.substring(0, 500);
-
-    logger.tts(
-      `Google Cloud TTS: ${safeText.substring(0, 50)}... (${keys.length} keys available)`,
-    );
-
-    const voiceName = systemStore.googleVoiceName || "th-TH-Standard-A";
-    const cacheKey = `google:${voiceName}:${safeText}`;
-    const cachedBuffer = this.getCachedAudio(cacheKey);
-
-    if (cachedBuffer) {
-      const isReady = await this.ensureAudioContextReady();
-      if (isReady) {
-        try {
-          const audioBuffer = await this.audioCtx.decodeAudioData(cachedBuffer);
-          this.currentSource = this.audioCtx.createBufferSource();
-          this.currentSource.buffer = audioBuffer;
-          this.currentSource.connect(this.audioCtx.destination);
-
-          let hasEnded = false;
-          const advanceQueue = () => {
-            if (hasEnded) return;
-            hasEnded = true;
-            this.clearStuckTimer();
-            if (this._currentOnComplete) {
-              this._currentOnComplete();
-              this._currentOnComplete = null;
-            }
-            this.isSpeaking = false;
-            this.currentSource = null;
-            this.processQueue();
-          };
-
-          this.currentSource.onended = advanceQueue;
-          this.currentSource.start(0);
-
-          this.consecutiveGoogleFailures = 0;
-          logger.tts(`Google Cloud TTS Cache Hit (0ms): ${safeText.substring(0, 30)}`);
-          return;
-        } catch (cachedErr) {
-          logger.warn("Cached Google TTS playback failed, fetching fresh:", cachedErr);
-        }
+    if (!isGoogleCloudTtsEnabled()) { this.speakNative(text); return; }
+    const generation = this.playbackGeneration;
+    let source;
+    try {
+      const buffer = await this.googleAudio.prepare(this.sanitize(text).substring(0, 500));
+      if (generation !== this.playbackGeneration) return;
+      if (!buffer) { this.consecutiveGoogleFailures++; this.speakNative(text); return; }
+      if (!await this.ensureAudioContextReady()) throw new Error("AudioContext unavailable");
+      if (generation !== this.playbackGeneration) return;
+      const decoded = await this.audioCtx.decodeAudioData(buffer);
+      if (generation !== this.playbackGeneration) return;
+      source = this.audioCtx.createBufferSource();
+      this.currentSource = source;
+      source.buffer = decoded;
+      source.connect(this.audioCtx.destination);
+      let ended = false;
+      source.onended = () => {
+        if (ended) return;
+        ended = true;
+        try { source.disconnect(); } catch { /* already disconnected */ }
+        if (generation !== this.playbackGeneration) return;
+        this.clearStuckTimer();
+        const complete = this._currentOnComplete;
+        this._currentOnComplete = null;
+        this.currentSource = null;
+        this.isSpeaking = false;
+        complete?.();
+        this.processQueue();
+      };
+      source.start(0);
+    } catch (error) {
+      if (source) {
+        source.onended = null;
+        try { source.stop(); } catch { /* not started */ }
+        try { source.disconnect(); } catch { /* already disconnected */ }
+        if (this.currentSource === source) this.currentSource = null;
       }
-    }
-
-    // Rotate keys sequentially, starting from the machine's assigned activeKeyIndex
-    const startIndex = (systemStore.activeKeyIndex || 1) - 1;
-
-    for (let count = 0; count < keys.length; count++) {
-      const i = (startIndex + count) % keys.length;
-      const currentKey = keys[i];
-
-      try {
-        logger.tts(`Trying key ${i + 1}/${keys.length}...`);
-
-        // Snappy 3.0s timeout per key for rapid failover
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-        // Call Google Cloud TTS API
-        const response = await fetch(
-          `https://texttospeech.googleapis.com/v1/text:synthesize?key=${currentKey}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              input: { text: safeText },
-              voice: {
-                languageCode: "th-TH",
-                name: voiceName,
-              },
-              audioConfig: {
-                audioEncoding: "MP3",
-                speakingRate: 1.0,
-                pitch: 0.0,
-              },
-            }),
-            signal: controller.signal,
-          },
-        );
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`API Error: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Convert Base64 to ArrayBuffer for AudioContext decoding
-        const binaryString = atob(data.audioContent);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let j = 0; j < len; j++) {
-          bytes[j] = binaryString.charCodeAt(j);
-        }
-
-        // Save raw audio buffer to LRU cache
-        this.setCachedAudio(cacheKey, bytes.buffer);
-
-        // Ensure AudioContext is running
-        const isReady = await this.ensureAudioContextReady();
-        if (!isReady) {
-          logger.warn("AudioContext not running after resume — falling back to Native");
-          this.consecutiveGoogleFailures++;
-          this.speakNative(text);
-          return;
-        }
-
-        try {
-          const audioBuffer = await this.audioCtx.decodeAudioData(bytes.buffer);
-          this.currentSource = this.audioCtx.createBufferSource();
-          this.currentSource.buffer = audioBuffer;
-          this.currentSource.connect(this.audioCtx.destination);
-
-          let hasEnded = false;
-          const advanceQueue = () => {
-            if (hasEnded) return;
-            hasEnded = true;
-            this.clearStuckTimer();
-            if (this._currentOnComplete) {
-              this._currentOnComplete();
-              this._currentOnComplete = null;
-            }
-            this.isSpeaking = false;
-            this.currentSource = null;
-            this.processQueue();
-          };
-
-          this.currentSource.onended = advanceQueue;
-          this.currentSource.start(0);
-
-          // Update active key index in store and sync if fallback key succeeded
-          const systemStore2 = useSystemStore();
-          if (systemStore2.activeKeyIndex !== i + 1) {
-            systemStore2.activeKeyIndex = i + 1;
-            systemStore2.updatePresenceTtsKey();
-          }
-
-          // Reset failure counter on success
-          this.consecutiveGoogleFailures = 0;
-          logger.success(`Google TTS success with key ${i + 1}`);
-          return;
-        } catch (decodeErr) {
-          logger.error("Audio decode error:", decodeErr);
-          this.speakNative(text);
-          return;
-        }
-      } catch (error) {
-        // 🚨 CASE 1: Timeout
-        if (error.name === "AbortError") {
-          logger.warn(`Key ${i + 1} timed out.`);
-        } else {
-          // 🚨 CASE 2: API Error (403 Quota / 500)
-          logger.warn(`Key ${i + 1} failed: ${error.message}`);
-        }
-
-        // If this was the last key tried, fallback to Native TTS
-        if (count === keys.length - 1) {
-          this.consecutiveGoogleFailures++;
-          logger.error(
-            `All Google Keys failed (${this.consecutiveGoogleFailures}/${this.MAX_CONSECUTIVE_FAILURES} consecutive fails). Seamlessly switching to Native TTS.`,
-          );
-          this._checkPermanentSwitch();
-          this.speakNative(text);
-        }
-      }
+      if (generation !== this.playbackGeneration) return;
+      logger.warn("Google audio playback unavailable; using native speech");
+      this.speakNative(text);
     }
   }
+
+  prefetchSpeech(author, message) {
+    const text = this.formatSpeechText(author, message);
+    if (!text) return Promise.resolve(null);
+    return this.googleAudio.prepare(this.sanitize(text).substring(0, 500), true);
+  }
+
+  retryGoogle() { this.googleAudio.retry(); }
 
   /**
    * Speak using native browser TTS
    */
   speakNative(text) {
+    const generation = this.playbackGeneration;
     try {
       const voice = this.getBestVoice();
 
@@ -445,6 +320,7 @@ export class TextToSpeech {
         if (index > -1) {
           window.ttsActiveUtterances.splice(index, 1);
         }
+        if (generation !== this.playbackGeneration) return;
         this.clearStuckTimer();
         if (this._currentOnComplete) {
           this._currentOnComplete();
@@ -499,6 +375,9 @@ export class TextToSpeech {
     this.clearStuckTimer();
     this.stuckTimer = setTimeout(() => {
       if (this.isSpeaking) {
+        // Invalidate late fetch/decode/native callbacks before stopping this item.
+        this.playbackGeneration++;
+        this.googleAudio.cancel();
         logger.warn(
           `TTS stuck for ${this.STUCK_TIMEOUT / 1000}s — auto-resetting queue`,
         );
@@ -523,21 +402,6 @@ export class TextToSpeech {
         this.processQueue();
       }
     }, this.STUCK_TIMEOUT);
-  }
-
-  /**
-   * ✅ Check if Google TTS should be permanently disabled
-   */
-  _checkPermanentSwitch() {
-    if (
-      this.consecutiveGoogleFailures >= this.MAX_CONSECUTIVE_FAILURES &&
-      !this.googleDisabledPermanently
-    ) {
-      this.googleDisabledPermanently = true;
-      logger.error(
-        `Google TTS failed ${this.consecutiveGoogleFailures} times consecutively — switching to Native TTS permanently for this session.`,
-      );
-    }
   }
 
   /**
@@ -568,8 +432,10 @@ export class TextToSpeech {
     const text = typeof item === "string" ? item : item.text;
     this._currentOnComplete = typeof item === "object" ? item.onComplete : null;
 
+    const generation = this.playbackGeneration;
     // ✅ Auto-resume AudioContext before speaking (iPad idle recovery)
     await this.ensureAudioContextReady();
+    if (generation !== this.playbackGeneration) return;
 
     // ✅ Start stuck detection timer
     this.startStuckTimer();
@@ -579,8 +445,7 @@ export class TextToSpeech {
 
     if (
       isGoogleCloudTtsEnabled() && systemStore.useOnlineTts &&
-      systemStore.googleApiKey &&
-      !this.googleDisabledPermanently
+      systemStore.googleApiKey
     ) {
       this.speakOnline(text);
     } else {
@@ -592,7 +457,7 @@ export class TextToSpeech {
    * Add message to queue and return a Promise that resolves when speech finishes.
    * @returns {Promise<void>}
    */
-  speak(author, message) {
+  formatSpeechText(author, message) {
     let sanitized = this.sanitize(message);
 
     // ✅ If message had content but got sanitized to empty (e.g. emoji-only),
@@ -601,7 +466,7 @@ export class TextToSpeech {
       sanitized = "ส่งสติกเกอร์";
     }
 
-    if (!sanitized) return Promise.resolve();
+    if (!sanitized) return "";
 
     // Combine author and message
     let messageBody = sanitized;
@@ -631,7 +496,12 @@ export class TextToSpeech {
       }
     }
 
-    const textToSpeak = author ? `${author} ... ${messageBody}` : messageBody;
+    return author ? `${author} ... ${messageBody}` : messageBody;
+  }
+
+  speak(author, message) {
+    const textToSpeak = this.formatSpeechText(author, message);
+    if (!textToSpeak) return Promise.resolve();
 
     return new Promise((resolve) => {
       // Add to queue with a completion callback
@@ -649,6 +519,8 @@ export class TextToSpeech {
    * Reset TTS
    */
   reset() {
+    this.playbackGeneration++;
+    this.googleAudio.cancel();
     // ✅ Clear stuck timer first
     this.clearStuckTimer();
 

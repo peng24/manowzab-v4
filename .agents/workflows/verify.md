@@ -488,3 +488,10 @@ description: Mandatory verification checklist after every code change
 - Browser fixture actual App กับ mock auth/database: desktop 1280px/mobile emulation 390px เห็น layout/ปุ่ม/สี/คิวเดิม ไม่มี tabs/resizer/status ใหม่; collapse เปิดปิดได้; แก้ชื่อและบันทึกคิวได้; Smart Answer เต็มกรอบ/ขอบดำ/filter/pin ยังทำงาน; timer รายการใหม่เดิม 15000ms
 - อัปเดตกฎทั้ง 4 ไฟล์และ verify 16.6–16.10 ให้ตรง baseline ล่าสุด; ผล 800 tests และ UX checks ของ v5.4.19 ด้านบนเป็นประวัติ ไม่ใช่ข้อกำหนด active หลัง rollback
 - ยังไม่ได้ทดสอบ production password login, live YouTube/Google synthesis, สองอุปกรณ์/เสียง/iPad/เครื่องพิมพ์/installed PWA จริงในรอบนี้; ดู [release report](../../docs/release-5.4.20.md)
+
+## 🚀 ผลเผยแพร่ UX/UI แบบ v5.4.18 — release v5.4.20 (2026-11-02)
+
+- Source 6d247e9 / gh-pages 7b1efa3 เผยแพร่แล้ว; ตรวจ HTML/entry scripts main/shipping/history/address, sw.js และ manifest ตรง final build หลังรอ Pages propagation
+- เว็บจริงโหลด main-CsYnv42a.js; store v5.4.20, Cloud enabled=true/mode standard และไม่มี state mobilePanel/chatPanelWidth ของ UI ที่ถอน; หน้า login ไม่มี console warnings/errors
+- unauthenticated stock/delivery_customers/address_book ยังคง HTTP 401; ยังไม่ได้ production password login หรือเขียนข้อมูลธุรกิจจริง
+- localhost fixture/Auth/RTDB หยุดแล้ว (5190/9098/9009 ไม่ listen); หลัง emulator ผ่าน 23 checks มี Vite dependency-scan cancellation ตอน teardown ซึ่งแยกจากผล build/test ที่ผ่าน ดู [release report](../../docs/release-5.4.20.md)

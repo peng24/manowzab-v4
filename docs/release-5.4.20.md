@@ -30,4 +30,7 @@ Updated `AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowza
 ## Additional integration and deployment
 
 - Firebase Emulator: 23 checks passed against local Auth 9098 / RTDB 9009 and demo-manowzab-review, including actual-store authorization/revocation, queue promotion and two-client delivery concurrency. Initial combined startup timed out waiting for Auth; starting Auth separately and rerunning the same integration suite succeeded. Expected permission-denied cases are passing security tests. No production data was written.
-- Publication verification pending.
+- After all 23 checks passed, the temporary Vite verification server logged an outdated dependency-scan cancellation during teardown. This was a closed-server background scan, not a failed test; the separate production builds completed successfully.
+- Source commit `6d247e9` pushed to main; GitHub Pages published commit `7b1efa3`. All four HTML pages and entry scripts match the final build byte-for-byte, as do `sw.js` and `manifest.webmanifest`. The initial check ran during Pages propagation and the subsequent full check passed.
+- Fresh production browser loads `main-CsYnv42a.js`; actual system store reports v5.4.20, Cloud enabled, standard mode, and no v5.4.19 mobilePanel/chatPanelWidth fields. The login page has no console warnings/errors. Protected production login and business workflows were not exercised.
+- Unauthenticated stock/delivery_customers/address_book reads remain denied with HTTP 401. The fixture tab is closed and localhost ports 5190/9098/9009 are no longer listening.

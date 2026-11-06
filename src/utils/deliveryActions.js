@@ -27,10 +27,6 @@ export async function completeDelivery(customer, reviewedLegacy = null) {
         Object.entries(fallbackItems[vid]).sort(([a], [b]) => a.localeCompare(b))]);
       // History may have been pruned; count-only legacy records must remain shippable.
       if (snapshot.exists?.() && found !== count) {
-        // A partial/expanded stock is ambiguous: never silently ship or replace its count.
-        if (found > 0 || count <= 0) {
-          throw new Error(`ข้อมูลสินค้าเปลี่ยนแปลง: รอบ ${vid} บันทึกไว้ ${count} ชิ้น แต่พบ ${found} ชิ้น กรุณาตรวจรายการในประวัติก่อนยืนยันอีกครั้ง`);
-        }
         missingSessions[vid] = count;
       }
     }
@@ -90,7 +86,7 @@ export async function markDone(customer) {
       if (!(error instanceof LegacyDeliveryReviewError)) throw error;
       const reviewAnswer = await Swal.fire({
         icon: 'warning', title: 'ตรวจยอดสินค้าเก่าก่อนบันทึก',
-        text: `รายการของ ${customer.name} รวม ${customer.itemCount || 0} ชิ้น มีสินค้าเก่า ${error.missingCount} ชิ้นที่ยังมียอดค้างส่ง แต่ไม่พบรายละเอียดในกระดานเดิม หากตรวจพัสดุแล้วว่าส่งครบตามยอดนี้ ให้ยืนยัน ระบบจะเก็บยอดเดิมและประวัติไว้ หากจำนวนไม่ตรงให้ยกเลิกเพื่อตรวจสอบ`,
+        text: `รายการของ ${customer.name} รวม ${customer.itemCount || 0} ชิ้น มีสินค้าเก่า ${error.missingCount} ชิ้นที่ยอดค้างส่งไม่ตรงกับกระดานเดิม (เช่น เคยทยอยส่งบางส่วนไปแล้ว) หากตรวจพัสดุแล้วว่าส่งครบตามยอดนี้ ให้ยืนยัน ระบบจะเก็บยอดเดิมและประวัติไว้ หากจำนวนไม่ตรงให้ยกเลิกเพื่อตรวจสอบ`,
         showCancelButton: true, confirmButtonText: `ยืนยันส่งครบ ${customer.itemCount || 0} ชิ้น`,
         cancelButtonText: 'ยกเลิกเพื่อตรวจสอบ', confirmButtonColor: '#10b981',
       });

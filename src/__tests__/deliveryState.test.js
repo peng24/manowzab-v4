@@ -123,6 +123,19 @@ describe('delivery lifecycle', () => {
     const restored = undoDeliveryState(newlyBooked, 'cycle-1', 4000);
     expect(restored).toMatchObject({ status: 'pending', itemCount: 3, totalPrice: 250, totalBookings: 0 });
   });
+  it('marks extra historical board items fulfilled without inflating count-only snapshot on undo', () => {
+    const original = { name: ownerName, status: 'pending', itemCount: 2, totalPrice: 200,
+      sessions: { aAs6hsbgtpg: { count: 2, totalPrice: 200, status: 'pending' } } };
+    const sixBoard = Object.fromEntries([1, 2, 3, 4, 5, 6].map(id => [id, { owner: ownerName, uid: 'u', time: id * 100, price: 100 }]));
+    const fallback = { aAs6hsbgtpg: bookingItems(sixBoard, ownerName) };
+    const done = completeDeliveryState(original, structuredClone(original), 2000, 'cycle-1', fallback);
+    expect(done).toMatchObject({ status: 'done', itemCount: 0, totalBookings: 2 });
+    expect(Object.keys(done.sessions.aAs6hsbgtpg.fulfilledItems)).toHaveLength(6);
+    expect(sync(done, 'aAs6hsbgtpg', sixBoard)).toMatchObject({ status: 'done', itemCount: 0, totalBookings: 2 });
+    const restored = undoDeliveryState(done, 'cycle-1', 3000);
+    expect(restored).toMatchObject({ status: 'pending', itemCount: 2, totalPrice: 200, totalBookings: 0 });
+    expect(restored.sessions.aAs6hsbgtpg).toMatchObject({ status: 'pending', count: 2, totalPrice: 200, items: {} });
+  });
   it('rejects a renamed customer while reviewing legacy stock', () => {
     const original = sync(null);
     expect(completeDeliveryState({ ...original, name: 'Other' }, original, 2000, 'cycle')).toBeUndefined();

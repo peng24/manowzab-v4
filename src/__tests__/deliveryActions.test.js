@@ -115,6 +115,35 @@ describe('shared shipping actions and real stock-sync entry point', () => {
     await restoreDelivery(customer());
     expect(customer()).toMatchObject({ status: 'pending', itemCount: 10, totalPrice: 1000, totalBookings: 0 });
   });
+  it('completes and restores legacy sessions when historical stock has extra or partial matching items (e.g. aAs6hsbgtpg 2 saved vs 6 found)', async () => {
+    const { default: Swal } = await import('sweetalert2');
+    state.records[path] = { name: 'อาทิตยา', status: 'pending', itemCount: 10, sessions: {
+      live: { count: 2, totalPrice: 200, status: 'pending', items: {
+        32: { bookingKey: '32:100', price: 100 }, 42: { bookingKey: '42:200', price: 100 },
+      } },
+      aAs6hsbgtpg: { count: 2, totalPrice: 200, status: 'pending' },
+      old2: { count: 4, totalPrice: 400, status: 'pending' },
+      old3: { count: 2, totalPrice: 200, status: 'pending' },
+    } };
+    state.stock['stock/aAs6hsbgtpg'] = Object.fromEntries(
+      [1, 2, 3, 4, 5, 6].map(id => [id, { owner: 'อาทิตยา', uid: 'u', time: id * 100, price: 100 }]),
+    );
+    state.stock['stock/old2'] = { 1: { owner: 'อาทิตยา', uid: 'u', time: 100, price: 100 } };
+    state.stock['stock/old3'] = { 1: { owner: 'Other', time: 100 } };
+    setLiveDeliveryCustomersCache({ u: state.records[path] });
+    const expected = customer();
+    await expect(completeDelivery(expected)).rejects.toThrow('ข้อมูลสินค้าเปลี่ยนแปลง');
+    expect(customer().itemCount).toBe(10);
+    await markDone(expected);
+    expect(Swal.fire).toHaveBeenCalledWith(expect.objectContaining({ confirmButtonText: 'ยืนยันส่งครบ 10 ชิ้น' }));
+    expect(customer()).toMatchObject({ status: 'done', itemCount: 0, totalBookings: 10,
+      lastDoneSnapshot: { legacyCountConfirmed: { aAs6hsbgtpg: 2, old2: 4, old3: 2 } } });
+    await syncDeliveryCustomerForOwner('อาทิตยา', 'u', 'aAs6hsbgtpg', state.stock['stock/aAs6hsbgtpg']);
+    expect(customer()).toMatchObject({ status: 'done', itemCount: 0, totalBookings: 10 });
+    await restoreDelivery(customer());
+    expect(customer()).toMatchObject({ status: 'pending', itemCount: 10, totalPrice: 1000, totalBookings: 0 });
+    expect(customer().sessions.aAs6hsbgtpg).toMatchObject({ status: 'pending', count: 2, totalPrice: 200, items: {} });
+  });
   it('does not change data when the legacy review is cancelled', async () => {
     const { default: Swal } = await import('sweetalert2');
     state.records[path] = { name: 'Buyer', status: 'pending', itemCount: 2, sessions: { old: { count: 2 } } };

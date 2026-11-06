@@ -51,7 +51,8 @@ export function syncDeliverySession(current, { ownerName, videoId, items, paymen
   const legacyBaseline = previous?.status === 'done'
     ? Object.fromEntries(Object.entries(items).filter(([, item]) => !current.updatedAt || item.bookedAt <= current.updatedAt))
     : {};
-  const fulfilled = normalizeItems(previous?.fulfilledItems || legacyBaseline);
+  const existingFulfilled = normalizeItems(previous?.fulfilledItems);
+  const fulfilled = Object.keys(existingFulfilled).length ? existingFulfilled : normalizeItems(legacyBaseline);
   const pending = Object.fromEntries(Object.entries(items)
     .filter(([id, item]) => fulfilled[id]?.bookingKey !== item.bookingKey));
   if (Object.keys(pending).length) {
@@ -95,10 +96,15 @@ export function completeDeliveryState(current, expected, now, doneId, fallbackIt
   const sessions = {};
   for (const [vid, session] of Object.entries(next.sessions || {})) {
     if (!session || session.status === 'done') continue;
-    const items = normalizeItems(session.items || fallbackItems[vid]);
+    const sessionItems = normalizeItems(session.items);
+    const boardItems = normalizeItems(fallbackItems[vid]);
+    const items = Object.keys(sessionItems).length
+      ? sessionItems
+      : (Object.keys(boardItems).length === (Number(session.count) || 0) ? boardItems : {});
     sessions[vid] = { ...session, items };
     next.sessions[vid] = {
-      ...session, items, status: 'done', fulfilledItems: { ...normalizeItems(session.fulfilledItems), ...items },
+      ...session, items, status: 'done',
+      fulfilledItems: { ...normalizeItems(session.fulfilledItems), ...items, ...boardItems },
     };
   }
   const hasSessions = Object.keys(sessions).length > 0;

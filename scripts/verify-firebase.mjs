@@ -192,16 +192,20 @@ try {
     assert.equal((await current()).totalBookings, 0);
     assert.equal((await current()).itemCount, 2);
   });
-  await check('Actual legacy shipping review preserves ten items and prevents duplicate completion', async () => {
+  await check('Actual legacy shipping review preserves ten items (including partial/extra stock) and prevents duplicate completion', async () => {
     const { completeDelivery, restoreDelivery } = await server.ssrLoadModule('/src/utils/deliveryActions.js');
     const legacyPath = 'delivery_customers/review-legacy';
     const legacy = { name: 'Legacy Buyer', status: 'pending', itemCount: 10, sessions: {
       recent: { count: 2, totalPrice: 200, status: 'pending', items: {
         32: { bookingKey: '32:100', price: 100 }, 42: { bookingKey: '42:200', price: 100 },
       } },
-      'review-legacy-old': { count: 8, totalPrice: 800, status: 'pending' },
+      aAs6hsbgtpg: { count: 2, totalPrice: 200, status: 'pending' },
+      'review-legacy-old': { count: 6, totalPrice: 600, status: 'pending' },
     } };
     await adminWrite(legacyPath, legacy);
+    await adminWrite('stock/aAs6hsbgtpg', Object.fromEntries(
+      [1, 2, 3, 4, 5, 6].map(id => [id, { owner: 'Legacy Buyer', uid: 'buyer', time: id * 100, price: 100 }]),
+    ));
     await adminWrite('stock/review-legacy-old', { 1: { owner: 'Other', time: 100 } });
     const expected = { id: 'review-legacy', ...legacy };
     let review;
@@ -211,7 +215,7 @@ try {
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     const done = (await get(ref(appFirebase.db, legacyPath))).val();
     assert.equal(done.totalBookings, 10);
-    assert.equal(done.lastDoneSnapshot.legacyCountConfirmed['review-legacy-old'], 8);
+    assert.deepEqual(done.lastDoneSnapshot.legacyCountConfirmed, { aAs6hsbgtpg: 2, 'review-legacy-old': 6 });
     await restoreDelivery({ id: 'review-legacy', ...done });
     const restored = (await get(ref(appFirebase.db, legacyPath))).val();
     assert.equal(restored.itemCount, 10);

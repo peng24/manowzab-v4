@@ -192,6 +192,32 @@ try {
     assert.equal((await current()).totalBookings, 0);
     assert.equal((await current()).itemCount, 2);
   });
+  await check('Actual legacy shipping review preserves ten items and prevents duplicate completion', async () => {
+    const { completeDelivery, restoreDelivery } = await server.ssrLoadModule('/src/utils/deliveryActions.js');
+    const legacyPath = 'delivery_customers/review-legacy';
+    const legacy = { name: 'Legacy Buyer', status: 'pending', itemCount: 10, sessions: {
+      recent: { count: 2, totalPrice: 200, status: 'pending', items: {
+        32: { bookingKey: '32:100', price: 100 }, 42: { bookingKey: '42:200', price: 100 },
+      } },
+      'review-legacy-old': { count: 8, totalPrice: 800, status: 'pending' },
+    } };
+    await adminWrite(legacyPath, legacy);
+    await adminWrite('stock/review-legacy-old', { 1: { owner: 'Other', time: 100 } });
+    const expected = { id: 'review-legacy', ...legacy };
+    let review;
+    try { await completeDelivery(expected); assert.fail('Legacy review should be required'); }
+    catch (error) { assert.equal(error.missingCount, 8); review = error.review; }
+    const results = await Promise.allSettled([completeDelivery(expected, review), completeDelivery(expected, review)]);
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    const done = (await get(ref(appFirebase.db, legacyPath))).val();
+    assert.equal(done.totalBookings, 10);
+    assert.equal(done.lastDoneSnapshot.legacyCountConfirmed['review-legacy-old'], 8);
+    await restoreDelivery({ id: 'review-legacy', ...done });
+    const restored = (await get(ref(appFirebase.db, legacyPath))).val();
+    assert.equal(restored.itemCount, 10);
+    assert.equal(restored.totalPrice, 1000);
+    assert.equal(restored.totalBookings, 0);
+  });
   await check('Revoking an administrator grant blocks subsequent writes', async () => {
     await adminWrite(`admin_users/${b.user.uid}`, false);
     await assert.rejects(set(ref(other.db, 'stock/review'), { test: 'revoked' }));

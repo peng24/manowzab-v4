@@ -140,3 +140,9 @@ When the user specifies **"อัพเลย"** (Deploy now), automatically exe
 - Original new-order emphasis remains 15,000ms in StockGrid.vue. Keep the full-width Smart Answer and thin black outline from the v5.4.18 baseline.
 - Publish rollback builds with a new increasing release version so installed clients can detect an update. Clearly distinguish the restored UI baseline from the release number; preserve historical release notes and their evidence.
 - Verify baseline source parity excluding changelog, current unit suite and builds, then check published artifacts/PWA. V5.4.19-only acceptance checks and its historical 800-test result no longer describe the active UI. Report physical-device/production-login checks separately.
+
+## Legacy shipment review (2026-11-06)
+
+- When a count-only pending session still has stock but no remaining bookings matching the customer, do not silently discard its saved count or block forever with a retry message. Require an explicit physical-count review in the shared markDone action, then re-read stock and retain the atomic reviewed-customer guard. Partial/extra matching stock remains blocked for reconciliation.
+- Keep the original shipment count, total price, cycle ID and undo snapshot; record explicitly reviewed missing sessions in lastDoneSnapshot.legacyCountConfirmed. Exclude already fulfilled identities from legacy fallback. Cancel, failed reads, stale stock/customer review and duplicate confirmations must not change the shipment.
+- Undo of a count-only shipment must preserve its original quantity/value even if a new identified booking arrived before undo. Never claim physical dispatch from tests; production completion requires the operator confirming the actual parcel count.

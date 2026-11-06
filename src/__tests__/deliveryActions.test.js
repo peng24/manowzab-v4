@@ -92,6 +92,63 @@ describe('shared shipping actions and real stock-sync entry point', () => {
     await restoreDelivery(customer());
     expect(customer()).toMatchObject({ itemCount: 1, totalBookings: 0 });
   });
+  it('requires an explicit review for missing legacy ownership, then completes all ten items once', async () => {
+    const { default: Swal } = await import('sweetalert2');
+    state.records[path] = { name: 'Buyer', status: 'pending', itemCount: 10, sessions: {
+      live: { count: 2, totalPrice: 200, status: 'pending', items: {
+        32: { bookingKey: '32:100', price: 100 }, 42: { bookingKey: '42:200', price: 100 },
+      } },
+      old1: { count: 4, totalPrice: 400, status: 'pending' },
+      old2: { count: 2, totalPrice: 200, status: 'pending' },
+      old3: { count: 2, totalPrice: 200, status: 'pending' },
+    } };
+    for (const vid of ['old1', 'old2', 'old3']) state.stock[`stock/${vid}`] = { 1: { owner: 'Other', time: 100 } };
+    const expected = customer();
+    await expect(completeDelivery(expected)).rejects.toThrow('ข้อมูลสินค้าเปลี่ยนแปลง');
+    expect(customer().itemCount).toBe(10);
+    await markDone(expected);
+    expect(Swal.fire).toHaveBeenCalledWith(expect.objectContaining({ confirmButtonText: 'ยืนยันส่งครบ 10 ชิ้น' }));
+    expect(customer()).toMatchObject({ status: 'done', itemCount: 0, totalBookings: 10,
+      lastDoneSnapshot: { legacyCountConfirmed: { old1: 4, old2: 2, old3: 2 } } });
+    await expect(completeDelivery(expected)).rejects.toThrow();
+    expect(customer().totalBookings).toBe(10);
+    await restoreDelivery(customer());
+    expect(customer()).toMatchObject({ status: 'pending', itemCount: 10, totalPrice: 1000, totalBookings: 0 });
+  });
+  it('does not change data when the legacy review is cancelled', async () => {
+    const { default: Swal } = await import('sweetalert2');
+    state.records[path] = { name: 'Buyer', status: 'pending', itemCount: 2, sessions: { old: { count: 2 } } };
+    state.stock['stock/old'] = { 1: { owner: 'Other' } };
+    const before = structuredClone(state.records);
+    Swal.fire.mockResolvedValueOnce({ isConfirmed: true }).mockResolvedValueOnce({ isConfirmed: false });
+    await markDone(customer());
+    expect(state.records).toEqual(before);
+  });
+  it('rejects stock changes while the legacy review is open', async () => {
+    const { default: Swal } = await import('sweetalert2');
+    state.records[path] = { name: 'Buyer', status: 'pending', itemCount: 2, sessions: { old: { count: 2 } } };
+    state.stock['stock/old'] = { 1: { owner: 'Other' } };
+    Swal.fire.mockResolvedValueOnce({ isConfirmed: true }).mockImplementationOnce(async () => {
+      state.stock['stock/old'] = { ...stock, 2: { ...stock[1], time: 200 } };
+      return { isConfirmed: true };
+    });
+    await markDone(customer());
+    expect(customer()).toMatchObject({ status: 'pending', itemCount: 2 });
+    expect(Swal.fire).toHaveBeenLastCalledWith(expect.objectContaining({ icon: 'error' }));
+  });
+  it('rejects customer changes while the legacy review is open', async () => {
+    const { default: Swal } = await import('sweetalert2');
+    state.records[path] = { name: 'Buyer', status: 'pending', itemCount: 2, sessions: { old: { count: 2 } } };
+    state.stock['stock/old'] = { 1: { owner: 'Other' } };
+    Swal.fire.mockResolvedValueOnce({ isConfirmed: true }).mockImplementationOnce(async () => {
+      state.records[path].sessions.new = { count: 1 };
+      state.records[path].itemCount = 3;
+      return { isConfirmed: true };
+    });
+    await markDone(customer());
+    expect(customer()).toMatchObject({ status: 'pending', itemCount: 3 });
+    expect(Swal.fire).toHaveBeenLastCalledWith(expect.objectContaining({ icon: 'error' }));
+  });
   it('reports write failures without claiming a successful completion', async () => {
     const { runTransaction } = await import('firebase/database');
     const { default: Swal } = await import('sweetalert2');

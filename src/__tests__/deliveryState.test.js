@@ -116,6 +116,17 @@ describe('delivery lifecycle', () => {
     const customer = { name: ownerName, itemCount: 2, totalPrice: 300, status: 'pending' };
     expect(undoDeliveryState(complete(customer), 'cycle-1', 3000)).toMatchObject({ itemCount: 2, totalPrice: 300, totalBookings: 0 });
   });
+  it('preserves a count-only historical shipment when a new booking arrives before undo', () => {
+    const original = { name: ownerName, status: 'pending', itemCount: 2, sessions: { live: { count: 2, totalPrice: 200 } } };
+    const done = complete(original);
+    const newlyBooked = sync(done, 'live', { 3: { owner: ownerName, time: 3000, price: 50 } });
+    const restored = undoDeliveryState(newlyBooked, 'cycle-1', 4000);
+    expect(restored).toMatchObject({ status: 'pending', itemCount: 3, totalPrice: 250, totalBookings: 0 });
+  });
+  it('rejects a renamed customer while reviewing legacy stock', () => {
+    const original = sync(null);
+    expect(completeDeliveryState({ ...original, name: 'Other' }, original, 2000, 'cycle')).toBeUndefined();
+  });
 
   it('does not invent an undo cycle for historical records without metadata', () => {
     expect(undoDeliveryState({ status: 'done', totalBookings: 10 }, null, 3000)).toBeUndefined();

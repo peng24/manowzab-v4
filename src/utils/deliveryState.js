@@ -89,6 +89,7 @@ function activeSignature(customer) {
 export function completeDeliveryState(current, expected, now, doneId, fallbackItems = {}) {
   if (!current) return current; // Firebase may first invoke a transaction with an empty cache.
   if (current.status === 'done' || activeSignature(current) !== activeSignature(expected) ||
+      current.name !== expected.name ||
       (current.itemCount || 0) !== (expected.itemCount || 0)) return;
   const next = cloneRecord(current);
   const sessions = {};
@@ -101,8 +102,8 @@ export function completeDeliveryState(current, expected, now, doneId, fallbackIt
     };
   }
   const hasSessions = Object.keys(sessions).length > 0;
-  const count = hasSessions ? Object.values(sessions).reduce((sum, s) => sum + (s.count || 0), 0) : (current.itemCount || 0);
-  const totalPrice = hasSessions ? Object.values(sessions).reduce((sum, s) => sum + (s.totalPrice || 0), 0) : (current.totalPrice || 0);
+  const count = hasSessions ? Object.values(sessions).reduce((sum, s) => sum + (Number(s.count) || 0), 0) : (Number(current.itemCount) || 0);
+  const totalPrice = hasSessions ? Object.values(sessions).reduce((sum, s) => sum + (Number(s.totalPrice) || 0), 0) : (Number(current.totalPrice) || 0);
   next.lastDoneSnapshot = { sessions, itemCount: count, totalPrice };
   next.lastDoneSessions = Object.keys(sessions);
   next.lastDoneCount = count;
@@ -139,9 +140,17 @@ export function undoDeliveryState(current, expectedDoneId, now) {
     const active = next.sessions[vid];
     const newItems = active?.status !== 'done' ? normalizeItems(active?.items) : {};
     const items = { ...normalizeItems(original.items), ...newItems };
+    // A legacy shipment can have a count without identities. Adding a new booking
+    // before undo must not replace that original count with only the new item.
+    const originalTotals = itemTotals(original.items);
+    const mergedTotals = itemTotals(items);
+    const missingCount = Math.max(0, (Number(original.count) || 0) - originalTotals.count);
     next.sessions[vid] = {
       ...original, status: 'pending', items,
-      ...(Object.keys(items).length ? itemTotals(items) : {}),
+      ...(Object.keys(items).length ? {
+        count: mergedTotals.count + missingCount,
+        totalPrice: mergedTotals.totalPrice + (missingCount ? Math.max(0, (Number(original.totalPrice) || 0) - originalTotals.totalPrice) : 0),
+      } : {}),
     };
   }
   recalculateDelivery(next);

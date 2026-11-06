@@ -154,6 +154,7 @@ description: Mandatory verification checklist after every code change
 | 10.11 | Delivery Strip Filter | `src/components/StockGrid.vue` | กรองแสดงเฉพาะลูกค้าที่มีวันจัดส่งแล้ว (`!!c.deliveryDate`) |
 | 10.12 | ตรวจจับแชทแจ้งส่ง ("ส่ง", "ส่งเลย", ฯลฯ) | `src/composables/useChatProcessor.js` | เมื่อลูกค้าพิมพ์ "ส่ง", "ส่งเลย", "ส่งครับ", "ส่งค่ะ" ฯลฯ ให้ตั้งวันส่งเป็นวันนี้อัตโนมัติ |
 | 10.13 | ระบบอ่านรายชื่อจัดส่งเมื่อไลฟ์จบ (`announceShippingCustomers`, `getShippingRequestedCustomers`) | `src/utils/deliverySync.js`, `src/composables/useYouTube.js`, `src/components/Header.vue` | อ่านเฉพาะรายชื่อลูกค้าที่บันทึกใน `delivery_customers` ที่มีวันจัดส่ง (`deliveryDate`) และสถานะยังไม่เสร็จ (`status !== 'done'`) ตรงกับตารางหน้าจอ "เฉพาะคนที่แจ้งส่ง" 100% พร้อมเรียงลำดับตามวันส่ง และตัดชื่อแอดมินออก |
+| 10.15 | Legacy missing-identity review | `deliveryActions.test.js`, `deliveryState.test.js`, `scripts/verify-firebase.mjs` | ยอดเก่า 8 + ใหม่ 2: แจ้งให้ตรวจพัสดุและยืนยัน 10 ก่อนส่ง; ยกเลิกไม่เขียน; อ่าน stock ซ้ำและปฏิเสธ snapshot เปลี่ยน/กดซ้ำ; partial/extra stock ยังต้องตรวจ; เก็บ legacyCountConfirmed และ undo คืนยอดเดิมพร้อมของใหม่ ห้ามลด 10 เหลือ 2 อัตโนมัติ |
 | 10.14 | ปุ่มอ่านรายชื่อจัดส่ง TTS ซ้ำใน Live Summary Modal | `src/components/LiveSummaryModal.vue` | มีปุ่ม `🔊 อ่านรายชื่อจัดส่ง (TTS)` ในหน้าต่างสรุปผลการขาย ให้กดฟังรายชื่อลูกค้าที่ต้องส่งซ้ำได้ตลอดเวลา |
 
 ---

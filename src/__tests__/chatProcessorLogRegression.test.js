@@ -119,4 +119,43 @@ describe('actual chat processor log safety', () => {
     expect(state.stock.processOrder.mock.calls.map(call => call[0])).toEqual([9]);
     await Promise.all([old, active]);
   });
+
+  it.each([
+    'ได้แล้วคะมาตอนฝนตกตั้งไว้บนตู้จดหมายไม่โทรบอกเลย คนส่งคนเดียวกันแน่เลย',
+    'นาววันนี้ทำไมไม่เหมือนเดิมพี่พิมพ์ส่งได้ได้เหมือนเดิม',
+  ])('does not trigger shipping readiness or delivery date on คนส่ง / พิมพ์ส่ง: %s', async text => {
+    await process(text);
+    expect(state.update).not.toHaveBeenCalled();
+    expect(state.push).not.toHaveBeenCalled();
+    expect(state.stock.processOrder).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    '65 นะคะคุณอ้อยถามว่า 65',
+    '52ยายใส่ดัยบ่อนาง',
+    'ขายให่แม่มัย',
+  ])('does not book stock on reported or dialect questions: %s', async text => {
+    const chat = await process(text);
+    expect(state.stock.processOrder).not.toHaveBeenCalled();
+    expect(chat.type).toBe('question');
+  });
+
+  it.each([
+    ['77สีขาวค่ะ 60', 77],
+    ['สนใจรายการที่9', 9],
+    ['ปุยฝ้ายอยากได้เสื้อตัวเบอร์ 5 นะคะ:person-turqouise-waving::person-turqouise-waving::person-turqouise-waving::person-turqouise-waving::person-turqouise-waving::face-blue-wide-eyes::face-blue-wide-eyes::face-blue-wide-eyes::face-blue-wide-eyes:', 5],
+  ])('books the intended item for Oct 31 – Nov 7 order patterns: %s', async (text, id) => {
+    await process(text);
+    expect(state.stock.processOrder).toHaveBeenCalledTimes(1);
+    expect(state.stock.processOrder.mock.calls[0][0]).toBe(id);
+  });
+
+  it.each([
+    ['วาสนา แก้วใหญ่ 31 อกเท่าไหร่', 'วาสนา แก้วใหญ่'],
+    ['อาทิตยา 50 อกเท่าไหร่', 'อาทิตยา'],
+  ])('processes name-first admin chest-size note with proxyCustomerName and without booking stock: %s', async (text, customerName) => {
+    const chat = await process(text, true);
+    expect(state.stock.processOrder).not.toHaveBeenCalled();
+    expect(chat).toMatchObject({ type: 'note', noteCategory: 'size-selection', proxyCustomerName: customerName });
+  });
 });

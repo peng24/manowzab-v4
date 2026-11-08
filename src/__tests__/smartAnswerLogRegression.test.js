@@ -24,4 +24,19 @@ describe('Smart Answer — reviewed log questions', () => {
     ('does not invent an item number from a body measurement: %s', text => {
       expect(extractQueriedItemId(text)).toBeNull();
     });
+  it.each([
+    ['นาว59อกเท่าไหร่', 59],
+    ['วาสนา แก้วใหญ่ 31 อกเท่าไหร่', 31],
+    ['อาทิตยา 50 อกเท่าไหร่', 50],
+    ['◌าวขอดู26ผ้ายืดมั้ย', 26],
+    ['นาวพี่ใส่ได้ไหมคะ27', 27],
+    ['52ยายใส่ดัยบ่อนาง', 52],
+  ])('extracts item ID from Oct 31 – Nov 7 seller/customer item spec & fit queries: %s', (text, expectedId) => {
+    expect(isSmartQuestionText(text)).toBe(true);
+    expect(extractQueriedItemId(text)).toBe(expectedId);
+  });
+  it('recognizes double Sara E order count inquiry (ของพี่กี่ตัวเเล้วส่งเลย)', () => {
+    expect(isSmartQuestionText('ของพี่กี่ตัวเเล้วส่งเลย')).toBe(true);
+    expect(resolveSmartAnswer(chat('ของพี่กี่ตัวเเล้วส่งเลย'), context)).toMatchObject({ category: 'orders' });
+  });
 });

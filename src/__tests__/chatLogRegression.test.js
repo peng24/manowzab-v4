@@ -90,4 +90,87 @@ describe('reviewed chat log regressions — 2026-10-31', () => {
     expect(parseIntentDetails('\u200bรับ ๔๓\u200b')).toMatchObject({ type: 'SINGLE_BUY', itemId: 43 });
     expect(parseIntentDetails('เอาๆ 6 7')).toMatchObject({ type: 'MULTI_BUY', itemIds: [6, 7] });
   });
+
+  // Reviewed Oct 31 – Nov 7, 2026 CSV logs (261 rows anonymized)
+  it.each([
+    'ได้แล้วคะมาตอนฝนตกตั้งไว้บนตู้จดหมายไม่โทรบอกเลย คนส่งคนเดียวกันแน่เลย',
+    'นาววันนี้ทำไมไม่เหมือนเดิมพี่พิมพ์ส่งได้ได้เหมือนเดิม',
+  ])('does not misclassify courier/typing mentions (คนส่ง/พิมพ์ส่ง) as shipping: %s', text => {
+    expect(parseIntentDetails(text).type).toBe('UNKNOWN');
+  });
+
+  it('recognizes payment channel inquiry (พร้อมโอน โอนทางไหนค่ะ) as QUESTION, not SHIPPING', () => {
+    expect(parseIntentDetails('พร้อมโอน โอนทางไหนค่ะ')).toMatchObject({ type: 'QUESTION', method: 'shipping-inquiry' });
+  });
+
+  it('recognizes packing hold request (ยังไม่ต้องแพ็คนะ) as SHIPPING hold-keyword', () => {
+    expect(parseIntentDetails('คุณนาว ขององุ่นยังไม่ต้องแพ็คนะ ถ้าทันรอบซัก ค่อยซักมาให้ ก่อนส่ง')).toMatchObject({
+      type: 'SHIPPING',
+      method: 'hold-keyword',
+    });
+  });
+
+  it.each([
+    'ขายให่แม่มัย',
+    '52ยายใส่ดัยบ่อนาง',
+    '65 นะคะคุณอ้อยถามว่า 65',
+    'นาวพี่ใส่ได้ไหมคะ27',
+    '38รอบพุงคะ',
+    'นาว59อกเท่าไหร่',
+  ])('recognizes dialect/fit/reported questions as QUESTION, never BUY: %s', text => {
+    expect(parseIntentDetails(text).type).toBe('QUESTION');
+    expect(extractCustomerSelfName(text)).toBeNull();
+  });
+
+  it.each([
+    ['77สีขาวค่ะ 60', 77],
+    ['สนใจรายการที่9', 9],
+    ['ปุยฝ้ายอยากได้เสื้อตัวเบอร์ 5 นะคะ:person-turqouise-waving::person-turqouise-waving::person-turqouise-waving::person-turqouise-waving::person-turqouise-waving::face-blue-wide-eyes::face-blue-wide-eyes::face-blue-wide-eyes::face-blue-wide-eyes:', 5],
+    ['ของน้องปุยฝ้ายองค์ที่ 5 ค่ะ:face-orange-raised-eyebrow::face-orange-raised-eyebrow::face-orange-raised-eyebrow::face-orange-raised-eyebrow:', 5],
+  ])('recognizes color-inserted polite buy, สนใจรายการที่, and emote-heavy orders: %s', (text, id) => {
+    expect(parseIntentDetails(text)).toMatchObject({ type: 'SINGLE_BUY', itemId: id });
+  });
+
+  it('normalizes spaced double Sara E typo (เ เม่เอา4ตัว) and blocks quantity-unit from booking', () => {
+    expect(parseIntentDetails('เ เม่เอา4ตัว')).toMatchObject({ type: 'UNKNOWN', method: 'quantity-unit-guard' });
+  });
+
+  it.each([
+    ['วาสนา แก้วใหญ่ 31 อกเท่าไหร่', 'วาสนา แก้วใหญ่'],
+    ['อาทิตยา 50 อกเท่าไหร่', 'อาทิตยา'],
+  ])('recognizes name-first admin chest-size question note: %s', (text, customerName) => {
+    expect(isAdminSizeSelectionNote(text)).toBe(true);
+    expect(extractAdminCustomerName(text)).toBe(customerName);
+    expect(parseIntentDetails(text)).toMatchObject({
+      type: 'ADMIN_NOTE',
+      noteCategory: 'size-selection',
+      customerName,
+    });
+  });
+
+  it.each([
+    ['วรรณี เบญ ลอง 48 ให้ดูหน่อย', 48, 'วรรณี เบญ'],
+    ['วรรณี เบญ ลอฃ 17 ให้ดูหน่อย', 17, 'วรรณี เบญ'],
+  ])('recognizes admin try proxy with typo ลอฃ and extracts customerName: %s', (text, id, customerName) => {
+    expect(parseIntentDetails(text)).toMatchObject({ type: 'TRY_ITEM', itemId: id });
+    expect(extractAdminCustomerName(text)).toBe(customerName);
+  });
+
+  it('recognizes dotted circle typo in try request (◌าวขอดู26ผ้ายืดมั้ย)', () => {
+    expect(parseIntentDetails('◌าวขอดู26ผ้ายืดมั้ย')).toMatchObject({ type: 'TRY_ITEM', itemId: 26 });
+  });
+
+  it.each([
+    'ไม่มีคู่แข่ง', 'มาเร็วจัง', 'ได้แล้ว', 'อ๋อค่ะ', 'ที่ถือค่ะ',
+    'อีกตัวนึง', 'รับจร้า', 'ลูก', 'กุมภาพันธ์', 'รอก่อนคะ',
+    'อิอิ', 'จอบเบิ่งอยู่เด้อ', 'สไปรท๋ออกมาเลย', 'รับคะ พี่เล็งไว้คะ5555',
+  ])('does not learn Oct 31 – Nov 7 conversational phrases as customer names: %s', text => {
+    expect(extractCustomerSelfName(text)).toBeNull();
+    expect(extractAdminCustomerName(text)).toBeNull();
+  });
+
+  it('preserves genuine self-introduction บุญทรัพย์ from Nov 1 log', () => {
+    expect(extractCustomerSelfName('บุญทรัพย์')).toBe('บุญทรัพย์');
+    expect(parseIntentDetails('บุญทรัพย์')).toMatchObject({ type: 'SELF_INTRO', customerName: 'บุญทรัพย์' });
+  });
 });

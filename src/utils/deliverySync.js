@@ -334,3 +334,80 @@ export async function announceShippingCustomers(videoId = null, options = {}) {
     { delayAfter: 500 },
   );
 }
+
+let _restoreInFlight = null;
+
+/**
+ * Self-heals customer records in delivery_customers that were accidentally deleted
+ * by the legacy trash button while their profile still exists in address_book.
+ */
+export async function restoreDeletedAddressBookCustomers() {
+  if (_restoreInFlight) return _restoreInFlight;
+  _restoreInFlight = (async () => {
+    try {
+      const [delSnap, bookSnap] = await Promise.all([
+        get(dbRef(db, "delivery_customers")),
+        get(dbRef(db, "address_book")),
+      ]);
+      const delData = delSnap?.val() || {};
+      const bookData = bookSnap?.val() || {};
+
+      const existingNormNames = new Set();
+      Object.values(delData).forEach((cust) => {
+        if (cust && cust.name) {
+          const n = normalizeCustomerName(cust.name);
+          if (n) existingNormNames.add(n);
+        }
+      });
+
+      const now = Date.now();
+      let restoredCount = 0;
+
+      for (const [normKey, bookEntry] of Object.entries(bookData)) {
+        if (!bookEntry || typeof bookEntry !== "object" || !bookEntry.name) continue;
+        const cleanName = String(bookEntry.name).trim();
+        if (!cleanName || isAdminUser(cleanName)) continue;
+
+        const normName = normalizeCustomerName(cleanName);
+        if (!normName || existingNormNames.has(normName)) continue;
+
+        const safeKey = `cust_${normKey.replace(/[.#$[\]/\s]+/g, "_")}`;
+        if (delData[safeKey]) continue;
+
+        existingNormNames.add(normName);
+        await runTransaction(dbRef(db, `delivery_customers/${safeKey}`), (current) => {
+          if (current !== null && current !== undefined) return;
+          return {
+            name: cleanName,
+            status: "pending",
+            deliveryDate: null,
+            itemCount: 0,
+            totalPrice: 0,
+            note: "",
+            paymentType: bookEntry.paymentType || "",
+            contactChannel: bookEntry.contactChannel || "",
+            recipientName: bookEntry.recipientName || "",
+            phone: bookEntry.phone || "",
+            address: bookEntry.address || "",
+            postalCode: bookEntry.postalCode || "",
+            addresses: bookEntry.addresses || null,
+            selectedAddressId: bookEntry.selectedAddressId || null,
+            labelPrinted: false,
+            labelPrintedAt: null,
+            createdAt: bookEntry.updatedAt || now,
+            updatedAt: now,
+          };
+        });
+        restoredCount++;
+      }
+
+      return restoredCount;
+    } catch (e) {
+      logger.warn("restoreDeletedAddressBookCustomers error:", e);
+      return 0;
+    } finally {
+      _restoreInFlight = null;
+    }
+  })();
+  return _restoreInFlight;
+}

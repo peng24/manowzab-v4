@@ -175,3 +175,16 @@ export function undoDeliveryState(current, expectedDoneId, now) {
   delete next.lastDoneId;
   return next;
 }
+
+export function unscheduleDeliveryState(current, now) {
+  if (!current) return current;
+  const next = cloneRecord(current);
+  next.deliveryDate = null;
+  next.labelPrinted = false;
+  next.labelPrintedAt = null;
+  if (next.status !== 'done') {
+    next.status = 'pending';
+  }
+  next.updatedAt = now;
+  return next;
+}

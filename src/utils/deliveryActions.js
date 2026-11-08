@@ -1,7 +1,7 @@
 import Swal from 'sweetalert2';
 import { ref as dbRef, get, runTransaction } from 'firebase/database';
 import { db } from '../composables/useFirebase';
-import { bookingItems, completeDeliveryState, deliveryUndoKey, undoDeliveryState } from './deliveryState';
+import { bookingItems, completeDeliveryState, deliveryUndoKey, undoDeliveryState, unscheduleDeliveryState } from './deliveryState';
 
 class LegacyDeliveryReviewError extends Error {
   constructor(review, missingCount) {
@@ -102,4 +102,43 @@ export async function markDone(customer) {
 export async function undoDone(customer) {
   try { await restoreDelivery(customer); }
   catch (error) { await notifyError(error); }
+}
+
+export async function unscheduleDelivery(customerOrId) {
+  const id = typeof customerOrId === 'object' ? customerOrId?.id : customerOrId;
+  if (!id) throw new Error('ไม่พบรหัสลูกค้า');
+  const now = Date.now();
+  const result = await runTransaction(dbRef(db, `delivery_customers/${id}`),
+    current => unscheduleDeliveryState(current, now));
+  if (!result.committed || !result.snapshot.exists()) {
+    throw new Error('ไม่พบข้อมูลลูกค้าในระบบ กรุณาตรวจสอบรายการล่าสุด');
+  }
+}
+
+export async function removeFromShippingList(customerOrId, name = '') {
+  const id = typeof customerOrId === 'object' ? customerOrId?.id : customerOrId;
+  const displayName = (typeof customerOrId === 'object' ? customerOrId?.name : name) || id;
+  const answer = await Swal.fire({
+    title: `นำ "${displayName}" ออกจากรายการจัดส่ง?`,
+    text: 'ยกเลิกวันนัดส่งและย้ายไปเก็บไว้ใน "ฝากสินค้า" (ไม่ลบรายชื่อออกจากระบบ ข้อมูลลูกค้าและยอดสะสมจะอยู่ครบถ้วน)',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'นำออกจากรายการจัดส่ง',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#f59e0b',
+  });
+  if (!answer.isConfirmed) return;
+  try {
+    await unscheduleDelivery(id);
+    await Swal.fire({
+      icon: 'success',
+      title: 'นำออกจากรายการจัดส่งแล้ว (ย้ายไปฝากสินค้า)',
+      toast: true,
+      position: 'top-end',
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  } catch (error) {
+    await notifyError(error);
+  }
 }

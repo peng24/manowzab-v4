@@ -364,7 +364,7 @@
                   <button
                     class="action-btn del-btn"
                     @click="deleteCustomer(c.id, c.name)"
-                    title="ลบ"
+                    title="นำออกจากรายการจัดส่ง (ย้ายไปฝากสินค้า)"
                   >🗑️</button>
                 </div>
               </td>
@@ -474,7 +474,7 @@
                 <button
                   class="action-btn del-btn"
                   @click="deleteCustomer(c.id, c.name)"
-                  title="ลบ"
+                  title="นำออกจากรายการจัดส่ง (ย้ายไปฝากสินค้า)"
                 >🗑️</button>
               </div>
             </div>
@@ -520,13 +520,14 @@
 
 <script setup>
 import { ref, computed, inject, onMounted, onUnmounted, watch, defineAsyncComponent } from "vue";
-import { ref as dbRef, onValue, update, remove, get } from "firebase/database";
+import { ref as dbRef, onValue, update, get } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useCustomerStore } from "../stores/customer";
 import Swal from "sweetalert2";
-import { markDone, undoDone } from "../utils/deliveryActions";
+import { markDone, undoDone, removeFromShippingList } from "../utils/deliveryActions";
+import { restoreDeletedAddressBookCustomers } from "../utils/deliverySync";
 import ThaiDatePicker from "./ThaiDatePicker.vue";
 
 // 🚀 Performance: Lazy load modals on demand
@@ -671,6 +672,8 @@ onMounted(() => {
 
   const unsubCycle = systemStore.initShippingCycleListener();
   if (unsubCycle) cleanupFns.push(unsubCycle);
+
+  restoreDeletedAddressBookCustomers();
 });
 
 onUnmounted(() => {
@@ -874,6 +877,12 @@ const uniqueCustomerNames = computed(() => {
   allCustomers.value.forEach(c => {
     if (c.name) names.add(c.name);
   });
+
+  if (addressBook.value) {
+    Object.values(addressBook.value).forEach(b => {
+      if (b && b.name) names.add(b.name);
+    });
+  }
   
   if (stockStore.stockData) {
     Object.values(stockStore.stockData).forEach(item => {
@@ -991,7 +1000,10 @@ function addManualCustomer() {
 
   // Find if customer already exists to update them instead of duplicating
   let targetUid = "manual-" + Date.now();
-  const existingCustomer = allCustomers.value.find(c => c.name === name && c.status !== "done");
+  const targetNorm = normalizeName(name);
+  const existingCustomer =
+    allCustomers.value.find(c => normalizeName(c.name) === targetNorm && c.status !== "done") ||
+    allCustomers.value.find(c => normalizeName(c.name) === targetNorm);
   if (existingCustomer) {
     targetUid = existingCustomer.id;
   }
@@ -1323,20 +1335,7 @@ async function toggleContactChannel(customer) {
 }
 
 function deleteCustomer(id, name) {
-  Swal.fire({
-    title: `ลบ "${name}"?`,
-    text: "ข้อมูลจะหายถาวร",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "ลบเลย",
-    cancelButtonText: "ยกเลิก",
-    confirmButtonColor: "#d32f2f",
-  }).then((r) => {
-    if (r.isConfirmed) {
-      remove(dbRef(db, `delivery_customers/${id}`));
-      Swal.fire({ icon: "success", title: "ลบแล้ว", toast: true, position: "top-end", timer: 1500, showConfirmButton: false });
-    }
-  });
+  return removeFromShippingList(id, name);
 }
 </script>
 

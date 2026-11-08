@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { completeDelivery, restoreDelivery, markDone, undoDone } from '../utils/deliveryActions';
-import { syncDeliveryCustomerForOwner, setLiveDeliveryCustomersCache, setLiveAddressBookCache } from '../utils/deliverySync';
+import { completeDelivery, restoreDelivery, markDone, undoDone, unscheduleDelivery, removeFromShippingList } from '../utils/deliveryActions';
+import { syncDeliveryCustomerForOwner, setLiveDeliveryCustomersCache, setLiveAddressBookCache, restoreDeletedAddressBookCustomers } from '../utils/deliverySync';
 
 const state = vi.hoisted(() => ({ records: {}, stock: {}, retry: false }));
 vi.mock('../composables/useFirebase', () => ({ db: {} }));
@@ -197,5 +197,72 @@ describe('shared shipping actions and real stock-sync entry point', () => {
     const { default: Swal } = await import('sweetalert2');
     await undoDone({ id: 'u', status: 'done' });
     expect(Swal.fire).toHaveBeenLastCalledWith(expect.objectContaining({ icon: 'error' }));
+  });
+
+  it('removes a customer from the shipping schedule without deleting their record from delivery_customers', async () => {
+    const { default: Swal } = await import('sweetalert2');
+    state.records[path] = {
+      name: 'อาทิตยา',
+      status: 'pending',
+      deliveryDate: '2026-11-06',
+      labelPrinted: true,
+      labelPrintedAt: 1234,
+      itemCount: 10,
+      totalPrice: 1000,
+      totalBookings: 5,
+      paymentType: 'cod',
+      contactChannel: 'phone',
+      recipientName: 'คุณอาทิตยา',
+      sessions: { aAs6hsbgtpg: { status: 'pending', count: 2, totalPrice: 200 } },
+    };
+    Swal.fire.mockResolvedValueOnce({ isConfirmed: true }).mockResolvedValueOnce({});
+    await removeFromShippingList('u', 'อาทิตยา');
+    expect(state.records[path]).toBeDefined();
+    expect(customer()).toMatchObject({
+      name: 'อาทิตยา',
+      status: 'pending',
+      deliveryDate: null,
+      labelPrinted: false,
+      labelPrintedAt: null,
+      itemCount: 10,
+      totalPrice: 1000,
+      totalBookings: 5,
+      paymentType: 'cod',
+      contactChannel: 'phone',
+      recipientName: 'คุณอาทิตยา',
+    });
+    expect(customer().sessions.aAs6hsbgtpg.count).toBe(2);
+  });
+
+  it('self-heals customers in address_book whose delivery_customers entry was previously deleted', async () => {
+    state.stock['delivery_customers'] = {
+      existing: { name: 'วาสนา แก้วใหญ่', status: 'pending', deliveryDate: '2026-11-10', itemCount: 3 },
+    };
+    state.stock['address_book'] = {
+      อาทิตยา: {
+        name: 'อาทิตยา',
+        recipientName: 'คุณอาทิตยา',
+        paymentType: 'cod',
+        contactChannel: 'phone',
+        address: '99/9 กทม 10110',
+        phone: '0812345678',
+      },
+      วาสนา_แก้วใหญ่: {
+        name: 'วาสนา แก้วใหญ่',
+        paymentType: 'cod',
+      },
+    };
+    const restoredCount = await restoreDeletedAddressBookCustomers();
+    expect(restoredCount).toBe(1);
+    expect(state.records['delivery_customers/cust_อาทิตยา']).toMatchObject({
+      name: 'อาทิตยา',
+      status: 'pending',
+      deliveryDate: null,
+      itemCount: 0,
+      paymentType: 'cod',
+      contactChannel: 'phone',
+      recipientName: 'คุณอาทิตยา',
+      address: '99/9 กทม 10110',
+    });
   });
 });

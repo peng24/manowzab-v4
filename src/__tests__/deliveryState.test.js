@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bookingItems, syncDeliverySession, completeDeliveryState, undoDeliveryState, deliveryUndoKey, isOutstandingBooking } from '../utils/deliveryState';
+import { bookingItems, syncDeliverySession, completeDeliveryState, undoDeliveryState, unscheduleDeliveryState, deliveryUndoKey, isOutstandingBooking } from '../utils/deliveryState';
 
 const ownerName = 'Buyer';
 const board = { 1: { owner: ownerName, uid: 'u', time: 100, price: 100 }, 2: { owner: ownerName, uid: 'u', time: 200, price: 200 } };
@@ -172,5 +172,38 @@ describe('delivery lifecycle', () => {
     const copy = structuredClone(original);
     complete(original);
     expect(original).toEqual(copy);
+  });
+
+  it('unschedules deliveryDate and print flags while keeping the customer record and bookings intact', () => {
+    const scheduled = {
+      ...sync(null),
+      deliveryDate: '2026-11-06',
+      labelPrinted: true,
+      labelPrintedAt: 1500,
+      totalBookings: 8,
+      paymentType: 'cod',
+      contactChannel: 'phone',
+      recipientName: 'คุณอาทิตยา',
+      address: '123 ถ.สุขุมวิท',
+      note: 'ส่งด่วน',
+    };
+    const unscheduled = unscheduleDeliveryState(scheduled, 2500);
+    expect(unscheduled).toMatchObject({
+      name: ownerName,
+      status: 'pending',
+      deliveryDate: null,
+      labelPrinted: false,
+      labelPrintedAt: null,
+      itemCount: 2,
+      totalPrice: 300,
+      totalBookings: 8,
+      paymentType: 'cod',
+      contactChannel: 'phone',
+      recipientName: 'คุณอาทิตยา',
+      address: '123 ถ.สุขุมวิท',
+      note: 'ส่งด่วน',
+      updatedAt: 2500,
+    });
+    expect(unscheduled.sessions.live.count).toBe(2);
   });
 });

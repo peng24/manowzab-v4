@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.4.17 — 2026-11-02** ดู [release report](../../docs/release-5.4.17.md); ผล regex และ Firebase emulator ย้อนหลังดู release 5.4.16
+> ผลอ้างอิงล่าสุด: **v5.4.25 — 2026-11-09** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -498,3 +498,26 @@ description: Mandatory verification checklist after every code change
 - เว็บจริงโหลด main-CsYnv42a.js; store v5.4.20, Cloud enabled=true/mode standard และไม่มี state mobilePanel/chatPanelWidth ของ UI ที่ถอน; หน้า login ไม่มี console warnings/errors
 - unauthenticated stock/delivery_customers/address_book ยังคง HTTP 401; ยังไม่ได้ production password login หรือเขียนข้อมูลธุรกิจจริง
 - localhost fixture/Auth/RTDB หยุดแล้ว (5190/9098/9009 ไม่ listen); หลัง emulator ผ่าน 23 checks มี Vite dependency-scan cancellation ตอน teardown ซึ่งแยกจากผล build/test ที่ผ่าน ดู [release report](../../docs/release-5.4.20.md)
+
+## 📦 ผลตรวจ Legacy Shipment Review & Non-Destructive Shipping Removal — v5.4.21–v5.4.23 (2026-11-06 ถึง 2026-11-08)
+
+- **v5.4.21–v5.4.22 (Legacy Shipment Review)**: รองรับการกดส่งแล้ว (`✅` `markDone`) เมื่อรอบเก่าที่มีแต่จำนวนรวม (`count > 0`, ไม่มี `items` array) มีรายการใน `stock/${videoId}` ไม่ตรงกับยอดที่บันทึกไว้ (เช่น บันทึกไว้ 2 ชิ้น แต่พบในกระดาน 0 หรือ 6 ชิ้นจากรอบก่อนหน้า เช่น `aAs6hsbgtpg` ของคุณอาทิตยา) โดยเปิดหน้าต่างให้ตรวจพัสดุและยืนยันยอดจริงแทนการบล็อก พร้อมบันทึก `fulfilledItems` เพื่อไม่ให้ยอดเก่าดีดกลับมาค้างส่ง และคงยอดเดิมเมื่อกดย้อนสถานะ (`↩️`)
+- **v5.4.23 (Non-Destructive Shipping Removal)**: แก้ปุ่มถังขยะ (`🗑️` `deleteCustomer` / `removeFromShippingList`) ใน `ShippingManager.vue` และ `ShippingPage.vue` ไม่ให้ลบรายชื่อออกจาก `delivery_customers` เด็ดขาด เปลี่ยนเป็น `unscheduleDeliveryState` (`deliveryDate: null`, `labelPrinted: false`, `labelPrintedAt: null`, คง `status: 'pending'`) เพื่อย้ายกลับไปหมวด `🛋️ ฝากสินค้า` โดยคงรายชื่อ ยอดสะสม ที่อยู่ และประวัติครบ 100% พร้อม `restoreDeletedAddressBookCustomers()` กู้คืนรายชื่อที่มีอยู่ใน `address_book` แต่เคยถูกลบออกจาก `delivery_customers`
+
+## 💬 ผลตรวจ Chat Log Regex Hardening — v5.4.24 (2026-11-08)
+
+- วิเคราะห์ไฟล์แชทสดจริง 5 ไลฟ์ (31 ต.ค. – 7 พ.ย. 2569 รวม 261 แถว): ป้องกัน `คนส่ง`/`พิมพ์ส่ง` ไปติด `SHIPPING`, รองรับ `ยังไม่ต้องแพ็ค` เป็น `holdRegex`, แยก `พร้อมโอน โอนทางไหนค่ะ` เป็น `QUESTION`, รองรับคำถามภาษาถิ่น/ฝากถาม (`ขายให่แม่มัย`, `52ยายใส่ดัยบ่อนาง`, `65 นะคะคุณอ้อยถามว่า 65`), รองรับการจองที่มีสีคั่นหรืออีโมจิ YouTube ยาว (`77สีขาวค่ะ 60`, `สนใจรายการที่9`, `:emote:...`), รองรับโน้ตแอดมินชื่อนำหน้าถามอก (`วาสนา แก้วใหญ่ 31 อกเท่าไหร่`) และบล็อกวลีสนทนาไม่ให้จำผิดเป็นชื่อลูกค้า
+
+## 🏷️ ผลตรวจใบปะหน้าพัสดุความร้อน (Thermal Shipping Label Typography & Clean Address) — v5.4.25 (2026-11-09)
+
+- **สาเหตุที่แก้ไข**:
+  1. ถอด `'TH Sarabun New'` ออกจาก `font-family` ทั้งหมดใน `src/components/ShippingLabelModal.vue` เพราะบนเครื่อง Windows ที่ติดตั้งฟอนต์ดังกล่าวไว้ เมื่อ Google Font (`Sarabun`) ใน `iframe` ขนาด `0x0` โหลดไม่ทันภายใน 250ms เบราว์เซอร์จะตกลงไปใช้ `TH Sarabun New` ซึ่งทำให้ตัวอักษรไทยเล็กลงและบางลง ~35% ที่ขนาด `pt` เดียวกัน
+  2. ปรับ `iframe` สำหรับพิมพ์ใน `handlePrint()` ให้มีขนาดเท่ากระดาษจริงนอกจอ (`width: pageWidth; height: pageHeight; left: -9999px; visibility: hidden;`) และรอทั้งเหตุการณ์ `load` ของ `<link id="label-font-link">` ร่วมกับ `document.fonts.ready` (มี timeout guard 800ms) ก่อนสั่ง `print()`
+  3. แก้ไข `@page { size: 130mm 76mm landscape; }` ซึ่งผิดไวยากรณ์ W3C CSS Paged Media (ห้ามใส่ `<length> <length>` ร่วมกับ `landscape`) เป็น `@page { size: ${pageWidth} ${pageHeight}; margin: 0mm; }` ที่ถูกต้องตามมาตรฐาน
+  4. ขยายขนาดและเพิ่มความหนาตัวอักษรสำหรับเครื่องพิมพ์ความร้อน 203 DPI (`receiver-name: 16.5pt / 700`, `receiver-addr: 13.5pt / 600` พร้อมย่ออัตโนมัติเมื่อที่อยู่ยาวเกิน 85/130 ตัวอักษร, `receiver-zip: 18pt / 800`, `receiver-phone: 13.5pt / 700`, `sender-name: 12pt / 700`, `meta-payment-row: 12.5pt / 800`)
+  5. เพิ่ม `cleanShippingLabelAddress` ใน `src/utils/addressParser.js` และเชื่อมกับ `getCustomerCleanAddress` ใน `src/components/ShippingLabelModal.vue` เพื่อตัดชื่อผู้รับนำหน้า เบอร์โทรศัพท์ และรหัสไปรษณีย์ที่ซ้ำซ้อนอยู่ในบรรทัดที่อยู่ออกอัตโนมัติ (ทดสอบ regression เคส `คุณสายบัว บุญพิมล 156/2 หมู่5 ต.บางทราย อ.เมือง จ.ชลบุรี 20000 โทร.061-941-9895` ➔ `156/2 หมู่5 ต.บางทราย อ.เมือง จ.ชลบุรี`)
+- **ผลตรวจ Automated & Build**:
+  - `npm test` ผ่าน **838 tests ใน 32 ไฟล์** (รวม `src/__tests__/addressParser.test.js` 20 tests ตรวจ `cleanShippingLabelAddress` และตรวจ source ของ `ShippingLabelModal.vue` ว่าไม่มี `'TH Sarabun New'`, ไม่มี `@page ... mm ... mm landscape`, และมีขนาดฟอนต์ `16.5pt` / `13.5pt` / `18pt` ครบถ้วน)
+  - `npm run build` และ `npm run build:gh` ผ่านครบ 4 หน้า (`index.html`, `shipping/index.html`, `history/index.html`, `address/index.html`) และ PWA 65 precache entries
+  - อัปเดตกฎโปรเจกต์ครบทั้ง 4 ไฟล์ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) และรายการตรวจสอบข้อ `6.6`, `15.4`, `15.5`, `15.9` ใน `.agents/workflows/verify.md`
+  - **ยังต้องตรวจด้วยอุปกรณ์จริง**: การสั่งพิมพ์ออกเครื่องพิมพ์สติกเกอร์ความร้อนจริงหน้างานหลังรีเฟรชเป็น `v5.4.25`

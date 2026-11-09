@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   parseSingleAddress,
   parseMultipleAddresses,
   formatPhoneNumber,
   extractPhone,
   extractPostalCode,
-  normalizeName
+  normalizeName,
+  cleanShippingLabelAddress
 } from '../utils/addressParser';
 
 describe('Smart Address Parser Suite', () => {
@@ -178,6 +181,42 @@ describe('Smart Address Parser Suite', () => {
       expect(results[0].phone).toBe('083-111-2233');
       expect(results[1].name).toBe('พี่เต๋า');
       expect(results[1].phone).toBe('084-222-3344');
+    });
+  });
+
+  describe('cleanShippingLabelAddress & Thermal Print Typography Invariants', () => {
+    it('strips duplicate recipient name, phone number, and postal code on shipping labels (คุณสายบัว บุญพิมล regression)', () => {
+      const cleaned = cleanShippingLabelAddress({
+        rawAddress: 'คุณสายบัว บุญพิมล 156/2 หมู่5 ต.บางทราย อ.เมือง จ.ชลบุรี 20000 โทร.061-941-9895',
+        recipientName: 'คุณสายบัว บุญพิมล',
+        phone: '061-941-9895',
+        postalCode: '20000',
+      });
+      expect(cleaned).toBe('156/2 หมู่5 ต.บางทราย อ.เมือง จ.ชลบุรี');
+    });
+
+    it('preserves address body when recipient name or phone is not duplicated', () => {
+      const cleaned = cleanShippingLabelAddress({
+        rawAddress: '191 หมู่ 3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000',
+        recipientName: 'พี่ไหม',
+        phone: '081-234-5678',
+        postalCode: '34000',
+      });
+      expect(cleaned).toBe('191 หมู่ 3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี');
+    });
+
+    it('enforces high-legibility thermal label typography without TH Sarabun New or invalid @page syntax', () => {
+      const modalPath = path.resolve(process.cwd(), 'src/components/ShippingLabelModal.vue');
+      const modalSource = fs.readFileSync(modalPath, 'utf8');
+
+      // Must NOT include 'TH Sarabun New' which shrinks Thai text by ~35% on Windows when webfont load races
+      expect(modalSource).not.toContain('TH Sarabun New');
+      // Must NOT combine explicit width/height with 'landscape' keyword in @page { size: ... }
+      expect(modalSource).not.toMatch(/@page\s*\{[^}]*size:\s*[^;]*mm\s+[^;]*mm\s+landscape/i);
+      // Must use bold, legible thermal print sizes (16.5pt receiver name, 13.5pt receiver address, 18pt zip)
+      expect(modalSource).toContain('font-size: 16.5pt;');
+      expect(modalSource).toContain('font-size: 13.5pt;');
+      expect(modalSource).toContain('font-size: 18pt;');
     });
   });
 });

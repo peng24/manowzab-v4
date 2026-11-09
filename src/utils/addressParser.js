@@ -296,3 +296,54 @@ export function parseMultipleAddresses(fullText) {
 
   return results;
 }
+
+/**
+ * Cleans a shipping label address string so recipient name, phone number, and postal code
+ * are not duplicated on the address line when already rendered on dedicated lines.
+ * @param {object} params
+ * @param {string} params.rawAddress
+ * @param {string} [params.recipientName]
+ * @param {string} [params.phone]
+ * @param {string} [params.postalCode]
+ * @returns {string}
+ */
+export function cleanShippingLabelAddress({ rawAddress = '', recipientName = '', phone = '', postalCode = '' } = {}) {
+  let addr = String(rawAddress || '').trim();
+  if (!addr) return '';
+
+  const recipient = String(recipientName || '').trim();
+  if (recipient) {
+    const escapedRecipient = recipient.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const withoutPrefix = addr.replace(
+      new RegExp(`^(?:ชื่อผู้รับ|ผู้รับ|ชื่อ|คุณ)?\\s*[:\\-]?\\s*${escapedRecipient}(?:\\s+|[,:\\-]+)`, 'i'),
+      ''
+    ).trim();
+    if (withoutPrefix) {
+      addr = withoutPrefix;
+    }
+  }
+
+  const normalizedPhone = String(phone || '').trim();
+  if (normalizedPhone) {
+    const phoneDigits = normalizedPhone.replace(NON_DIGIT_REGEX, '');
+    if (phoneDigits.length >= 9) {
+      const flexPhonePattern = phoneDigits.split('').join('[-.\\s]*');
+      const withoutPhone = addr.replace(
+        new RegExp(`(?:เบอร์(?:\\s*โทร)?|โทร(?:\\.)?|Tel(?:\\.)?|Phone(?:\\.)?)?\\s*[:\\-]?\\s*${flexPhonePattern}`, 'gi'),
+        ' '
+      ).replace(MULTI_SPACE_REGEX, ' ').trim();
+      if (withoutPhone) {
+        addr = withoutPhone;
+      }
+    }
+  }
+
+  const zip = String(postalCode || '').trim();
+  if (zip) {
+    const escapedZip = zip.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    addr = addr.replace(new RegExp(`\\s*\\b${escapedZip}\\b\\s*$`), '').trim();
+    addr = addr.replace(new RegExp(`\\b${escapedZip}\\b(?=\\s|$)`), '').replace(MULTI_SPACE_REGEX, ' ').trim();
+  }
+
+  return addr;
+}

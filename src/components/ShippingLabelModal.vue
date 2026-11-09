@@ -362,7 +362,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
-import { normalizeName } from "../utils/addressParser";
+import { normalizeName, cleanShippingLabelAddress } from "../utils/addressParser";
 import CustomerAddressModal from "./CustomerAddressModal.vue";
 import Swal from "sweetalert2";
 
@@ -672,11 +672,12 @@ function getCustomerZip(customer) {
 }
 
 function getCustomerCleanAddress(customer) {
-  const addr = getCustomerAddress(customer) || "";
-  const zip = getCustomerZip(customer);
-  if (!zip) return addr;
-  // Remove duplicate zip code from the address string
-  return addr.replace(new RegExp(`\\b${zip}\\b(?![/\\d])`, "g"), "").replace(/\s+/g, " ").trim();
+  return cleanShippingLabelAddress({
+    rawAddress: getCustomerAddress(customer) || "",
+    recipientName: getRecipientDisplayName(customer),
+    phone: getCustomerPhone(customer),
+    postalCode: getCustomerZip(customer),
+  });
 }
 
 // 👤 System Name Display Helper (จำกัดความยาวไม่ให้ยาวเกินไปบนใบปะหน้า)
@@ -933,35 +934,50 @@ function handlePrint() {
     oldIframe.remove();
   }
 
+  const isLandscape = orientation.value === "landscape";
+  let baseW = 76;
+  let baseH = 130;
+  if (paperSize.value === "thermal-100x150") {
+    baseW = 100;
+    baseH = 150;
+  } else if (paperSize.value === "thermal-80x100") {
+    baseW = 80;
+    baseH = 100;
+  }
+  const pageWidth = isLandscape ? `${baseH}mm` : `${baseW}mm`;
+  const pageHeight = isLandscape ? `${baseW}mm` : `${baseH}mm`;
+
+  // Give iframe real off-screen dimensions so browser lays out and downloads @font-face before print()
   const iframe = document.createElement("iframe");
   iframe.id = "manowzab-label-print-frame";
   iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
+  iframe.style.left = "-9999px";
+  iframe.style.top = "0";
+  iframe.style.width = pageWidth;
+  iframe.style.height = pageHeight;
   iframe.style.border = "0";
+  iframe.style.visibility = "hidden";
+  iframe.style.pointerEvents = "none";
   iframe.style.zIndex = "-9999";
   document.body.appendChild(iframe);
 
-  const isLandscape = orientation.value === "landscape";
-  const pageWidth = isLandscape ? "130mm" : "76mm";
-  const pageHeight = isLandscape ? "76mm" : "130mm";
   const senderName = sender.value.name || "มะนาวแซ่บ";
   const senderPhone = sender.value.phone || "095-155-5706";
   const senderAddress = (sender.value.address || "191 หมู่3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000").replace(/\n/g, "<br>");
   const thankYou = sender.value.thankYouText || "🙏 ขอบคุณที่อุดหนุนนะคะ ❤️";
 
   const cardsHtml = printableCustomers.value
-    .map((customer, idx) => {
+    .map((customer) => {
       const recipient = getRecipientDisplayName(customer);
       const address = getCustomerCleanAddress(customer) || "⚠️ ยังไม่มีที่อยู่จัดส่ง";
       const zip = getCustomerZip(customer);
       const phone = getCustomerPhone(customer) || "-";
-      const isCod = isCodCustomer(customer);
       const paymentDisplay = getPaymentTypeDisplay(customer);
       const systemName = getSystemNameDisplay(customer);
       const contactChannelDisplay = getContactChannelShort(customer);
+      const nameSizeClass = recipient.length > 26 ? "name-long" : "";
+      const addrSizeClass =
+        address.length > 130 ? "addr-xlong" : address.length > 85 ? "addr-long" : "";
 
       if (isLandscape) {
         return `
@@ -985,8 +1001,8 @@ function handlePrint() {
 
                 <!-- Right: Receiver -->
                 <div class="ls-receiver">
-                  <div class="receiver-name">${recipient}</div>
-                  <div class="receiver-addr">${address}</div>
+                  <div class="receiver-name ${nameSizeClass}">${recipient}</div>
+                  <div class="receiver-addr ${addrSizeClass}">${address}</div>
                   ${zip ? `<div class="receiver-zip">${zip}</div>` : ""}
                   <div class="receiver-phone">โทร ${phone}</div>
                 </div>
@@ -1008,8 +1024,8 @@ function handlePrint() {
               </div>
 
               <div class="port-receiver">
-                <div class="receiver-name">${recipient}</div>
-                <div class="receiver-addr">${address}</div>
+                <div class="receiver-name ${nameSizeClass}">${recipient}</div>
+                <div class="receiver-addr ${addrSizeClass}">${address}</div>
                 ${zip ? `<div class="receiver-zip">${zip}</div>` : ""}
                 <div class="receiver-phone">โทร ${phone}</div>
               </div>
@@ -1036,11 +1052,11 @@ function handlePrint() {
       <head>
         <meta charset="utf-8">
         <title>พิมพ์ใบปะหน้าพัสดุ - ${senderName}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <link id="label-font-link" href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@500;600;700;800&display=swap" rel="stylesheet">
         <style>
           @page {
-            size: ${pageWidth} ${pageHeight} ${isLandscape ? "landscape" : "portrait"};
-            margin: 0;
+            size: ${pageWidth} ${pageHeight};
+            margin: 0mm;
           }
           * {
             box-sizing: border-box;
@@ -1048,12 +1064,15 @@ function handlePrint() {
             padding: 0;
           }
           html, body {
+            width: ${pageWidth};
             margin: 0;
             padding: 0;
             background: #ffffff;
-            font-family: 'Sarabun', 'TH Sarabun New', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Sarabun', 'Kanit', 'Leelawadee UI', 'Tahoma', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
           }
           .print-page {
             width: ${pageWidth};
@@ -1079,7 +1098,7 @@ function handlePrint() {
             height: 100%;
             border: none;
             border-radius: 0;
-            padding: 4mm 6mm 1mm 6mm;
+            padding: 3.5mm 5.5mm 1.2mm 5.5mm;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -1091,17 +1110,18 @@ function handlePrint() {
           .card-grid {
             display: flex;
             width: 100%;
-            gap: 6mm;
+            gap: 4.5mm;
             flex: 1;
+            min-height: 0;
           }
           .ls-sender {
-            width: 32%;
-            font-size: 8.5pt;
-            line-height: 1.4;
+            width: 33%;
+            font-size: 9.5pt;
+            line-height: 1.35;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding-top: 1mm;
+            padding-top: 0.5mm;
             padding-bottom: 1.5mm;
           }
           .sender-top-info {
@@ -1109,19 +1129,20 @@ function handlePrint() {
             flex-direction: column;
           }
           .sender-name {
-            font-size: 10.5pt;
-            font-weight: 600;
+            font-size: 12pt;
+            font-weight: 700;
             margin-bottom: 2px;
+            line-height: 1.25;
           }
           .sender-addr {
-            font-size: 8.5pt;
-            font-weight: 400;
+            font-size: 9.5pt;
+            font-weight: 500;
             margin-top: 2px;
-            line-height: 1.4;
+            line-height: 1.35;
           }
           .sender-phone {
-            font-size: 8.5pt;
-            font-weight: 500;
+            font-size: 10pt;
+            font-weight: 600;
             margin-top: 3px;
           }
           .ls-meta-bottom {
@@ -1130,44 +1151,46 @@ function handlePrint() {
             display: flex;
             flex-direction: column;
             gap: 0.5mm;
-            font-size: 9pt;
-            line-height: 1.3;
+            font-size: 11pt;
+            line-height: 1.25;
           }
           .meta-system-name {
-            font-size: 9pt;
+            font-size: 11pt;
             color: #000000;
-            font-weight: 500;
+            font-weight: 700;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 36mm;
+            max-width: 39mm;
           }
           .meta-payment-row {
-            font-size: 9pt;
+            font-size: 12.5pt;
             color: #000000;
-            font-weight: 500;
+            font-weight: 800;
+            letter-spacing: 0.3px;
           }
           .ls-receiver {
             flex: 1;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
-            padding-bottom: 7.5mm;
+            padding-bottom: 5.5mm;
             padding-top: 0;
             padding-left: 0;
             word-break: break-word;
             overflow-wrap: break-word;
+            min-width: 0;
           }
           .port-sender {
-            font-size: 8.5pt;
-            line-height: 1.4;
+            font-size: 9.5pt;
+            line-height: 1.35;
           }
           .port-receiver {
             flex: 1;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
-            padding-bottom: 10mm;
+            padding-bottom: 7mm;
             padding-top: 0;
             word-break: break-word;
             overflow-wrap: break-word;
@@ -1179,38 +1202,51 @@ function handlePrint() {
             display: flex;
             flex-direction: column;
             gap: 0.5mm;
-            font-size: 9pt;
-            line-height: 1.3;
+            font-size: 11pt;
+            line-height: 1.25;
           }
           .port-meta-bottom .meta-system-name {
-            max-width: 60mm;
+            max-width: 64mm;
           }
           .receiver-name {
-            font-size: 13.5pt;
-            font-weight: 600;
-            line-height: 1.3;
+            font-size: 16.5pt;
+            font-weight: 700;
+            line-height: 1.25;
             margin-bottom: 3px;
           }
+          .receiver-name.name-long {
+            font-size: 14.5pt;
+          }
           .receiver-addr {
+            font-size: 13.5pt;
+            line-height: 1.38;
+            font-weight: 600;
+          }
+          .receiver-addr.addr-long {
+            font-size: 12pt;
+            line-height: 1.34;
+          }
+          .receiver-addr.addr-xlong {
             font-size: 11pt;
-            line-height: 1.45;
-            font-weight: 400;
+            line-height: 1.3;
           }
           .receiver-zip {
             margin-top: 3px;
-            font-size: 14pt;
-            font-weight: 600;
-            letter-spacing: 1.5px;
+            font-size: 18pt;
+            font-weight: 800;
+            letter-spacing: 2px;
+            line-height: 1.15;
           }
           .receiver-phone {
-            font-size: 11pt;
-            font-weight: 500;
+            font-size: 13.5pt;
+            font-weight: 700;
             margin-top: 3px;
+            line-height: 1.25;
           }
           .card-footer {
             text-align: center;
-            font-size: 9pt;
-            font-weight: 400;
+            font-size: 10pt;
+            font-weight: 600;
             margin-top: auto;
             padding-top: 0;
             padding-bottom: 0.5mm;
@@ -1227,8 +1263,21 @@ function handlePrint() {
   if (printTimeout) clearTimeout(printTimeout);
   printTimeout = setTimeout(async () => {
     try {
+      const fontLink = doc.getElementById("label-font-link");
+      if (fontLink && !fontLink.sheet) {
+        await Promise.race([
+          new Promise((resolve) => {
+            fontLink.addEventListener("load", resolve, { once: true });
+            fontLink.addEventListener("error", resolve, { once: true });
+          }),
+          new Promise((resolve) => setTimeout(resolve, 800)),
+        ]);
+      }
       if (iframe.contentWindow && iframe.contentWindow.document.fonts) {
-        await iframe.contentWindow.document.fonts.ready;
+        await Promise.race([
+          iframe.contentWindow.document.fonts.ready,
+          new Promise((resolve) => setTimeout(resolve, 800)),
+        ]);
       }
     } catch (e) {}
     iframe.contentWindow.focus();
@@ -1249,7 +1298,7 @@ function handlePrint() {
       console.error("Error auto-updating labelPrinted status:", err);
     }
     printTimeout = null;
-  }, 250);
+  }, 150);
 }
 
 onUnmounted(() => {
@@ -1889,7 +1938,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  font-family: "Sarabun", "TH Sarabun New", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Sarabun", "Kanit", "Leelawadee UI", "Tahoma", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   page-break-after: always;
 }
@@ -2014,21 +2063,21 @@ onMounted(() => {
 }
 
 .ls-sender-name {
-  font-weight: 600;
-  font-size: 1.02em;
+  font-weight: 700;
+  font-size: 1.08em;
   margin-bottom: 2px;
 }
 
 .ls-sender-addr {
-  font-size: 0.88em;
-  font-weight: 400;
+  font-size: 0.92em;
+  font-weight: 500;
   margin-top: 2px;
-  line-height: 1.4;
+  line-height: 1.38;
 }
 
 .ls-sender-phone {
-  font-weight: 500;
-  font-size: 0.88em;
+  font-weight: 600;
+  font-size: 0.94em;
   margin-top: 3px;
 }
 
@@ -2044,15 +2093,15 @@ onMounted(() => {
 }
 
 .ls-meta-text {
-  font-size: 0.95em;
+  font-size: 1.02em;
   line-height: 1.35;
   color: #111827;
-  font-weight: 500;
+  font-weight: 700;
   word-break: break-word;
 }
 
 .ls-meta-text.system-name {
-  font-weight: 500;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2081,7 +2130,8 @@ onMounted(() => {
   cursor: pointer;
   display: inline-block;
   width: fit-content;
-  font-weight: 500;
+  font-size: 1.1em;
+  font-weight: 800;
   transition: opacity 0.15s;
 }
 
@@ -2135,30 +2185,30 @@ onMounted(() => {
 }
 
 .ls-receiver-name {
-  font-size: 1.18em;
-  font-weight: 600;
-  line-height: 1.3;
+  font-size: 1.35em;
+  font-weight: 700;
+  line-height: 1.25;
   margin-bottom: 3px;
   color: #000000;
 }
 
 .ls-receiver-addr {
-  font-size: 1.02em;
-  line-height: 1.45;
-  font-weight: 400;
+  font-size: 1.12em;
+  line-height: 1.4;
+  font-weight: 600;
   color: #000000;
 }
 
 .ls-receiver-zip {
   margin-top: 4px;
-  font-size: 1.22em;
-  font-weight: 600;
-  letter-spacing: 1.5px;
+  font-size: 1.4em;
+  font-weight: 800;
+  letter-spacing: 2px;
 }
 
 .ls-receiver-phone {
-  font-size: 1.02em;
-  font-weight: 500;
+  font-size: 1.12em;
+  font-weight: 700;
   margin-top: 3px;
   color: #000000;
 }
@@ -2173,24 +2223,24 @@ onMounted(() => {
 }
 
 .label-sender-block {
-  font-size: 0.82em;
+  font-size: 0.85em;
   line-height: 1.4;
 }
 
 .sender-name-line {
-  font-weight: 600;
-  font-size: 1.02em;
+  font-weight: 700;
+  font-size: 1.08em;
 }
 
 .sender-addr-line {
-  font-size: 0.88em;
-  font-weight: 400;
+  font-size: 0.92em;
+  font-weight: 500;
   margin-top: 2px;
 }
 
 .sender-phone-line {
-  font-weight: 500;
-  font-size: 0.88em;
+  font-weight: 600;
+  font-size: 0.95em;
   margin-top: 3px;
 }
 
@@ -2204,35 +2254,35 @@ onMounted(() => {
 }
 
 .receiver-name {
-  font-size: 1.18em;
-  font-weight: 600;
+  font-size: 1.32em;
+  font-weight: 700;
   margin-bottom: 3px;
 }
 
 .receiver-address {
-  font-size: 1.02em;
-  line-height: 1.45;
-  font-weight: 400;
+  font-size: 1.12em;
+  line-height: 1.42;
+  font-weight: 600;
 }
 
 .receiver-zipcode {
   margin-top: 4px;
-  font-size: 1.22em;
-  font-weight: 600;
-  letter-spacing: 1.5px;
+  font-size: 1.4em;
+  font-weight: 800;
+  letter-spacing: 2px;
 }
 
 .receiver-phone {
   margin-top: 3px;
-  font-size: 1.02em;
-  font-weight: 500;
+  font-size: 1.12em;
+  font-weight: 700;
 }
 
 /* Bottom Thank You Bar */
 .label-thankyou-footer {
   text-align: center;
-  font-size: 0.82em;
-  font-weight: 400;
+  font-size: 0.88em;
+  font-weight: 600;
   color: #000000;
   padding-top: 4px;
   margin-top: auto;
@@ -2364,7 +2414,7 @@ onMounted(() => {
 
   /* Exact 130x76 mm landscape page setup */
   @page {
-    size: 130mm 76mm landscape;
+    size: 130mm 76mm;
     margin: 0mm;
   }
 }

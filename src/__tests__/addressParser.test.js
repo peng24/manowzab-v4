@@ -213,10 +213,10 @@ describe('Smart Address Parser Suite', () => {
       expect(modalSource).not.toContain('TH Sarabun New');
       // Must NOT combine explicit width/height with 'landscape' keyword in @page { size: ... }
       expect(modalSource).not.toMatch(/@page\s*\{[^}]*size:\s*[^;]*mm\s+[^;]*mm\s+landscape/i);
-      // Must use bold, legible thermal print sizes (16.5pt receiver name, 13.5pt receiver address, 18pt zip)
-      expect(modalSource).toContain('font-size: 16.5pt;');
-      expect(modalSource).toContain('font-size: 13.5pt;');
-      expect(modalSource).toContain('font-size: 18pt;');
+      // Must calibrate thermal print sizes to match on-screen preview (13.5pt receiver name, 11pt address, 14pt zip) with optional font scaling
+      expect(modalSource).toContain('fSize(13.5)');
+      expect(modalSource).toContain('fSize(11)');
+      expect(modalSource).toContain('fSize(14)');
     });
   });
 });

@@ -234,7 +234,7 @@ description: Mandatory verification checklist after every code change
 | 15.6 | สั่งพิมพ์รายบุคคล (`openPrintForCustomer`) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue`, `src/components/ShippingLabelModal.vue` | เมื่อกดปุ่ม `🖨️` ที่แถวลูกค้า ต้องเปิดหน้าต่างพิมพ์และเลือกเฉพาะลูกค้ารายนั้น (1 คน) เสมอ แม้ลูกค้าจะยังไม่ได้ระบุวันส่ง |
 | 15.7 | บันทึกสถานะ "พิมพ์แล้ว" (`togglePrinted`, `toggleCustomerPrinted`) | `src/components/ShippingManager.vue`, `src/pages/ShippingPage.vue`, `src/components/ShippingLabelModal.vue` | อัปเดต `labelPrinted: boolean` และ `labelPrintedAt: timestamp` ลง Firebase ทันทีเมื่อคลิกสลับ หรือเมื่อสั่งพิมพ์ใบปะหน้าเสร็จสิ้น |
 | 15.8 | Customer Selector & Filter Chips | `src/components/ShippingLabelModal.vue` | ค้นหาชื่อผู้รับ, เลือก/ยกเลิกทั้งหมด, กรองเฉพาะที่ยังไม่พิมพ์ (`unprinted`) และสลับเลือกรายชื่อแบบ Checkbox ได้อย่างอิสระ |
-| 15.9 | Clean Borderless High-Legibility Label Layout (130x76mm / 76x130mm) | `src/components/ShippingLabelModal.vue` | ดีไซน์สะอาดตา ไร้กรอบดำ ผู้ส่งอยู่ซ้าย ผู้รับอยู่ขวา ตัวหนังสือขนาดใหญ่คมชัดสำหรับเครื่องพิมพ์ความร้อน 203 DPI (`16.5pt` ชื่อผู้รับ, `13.5pt` ที่อยู่พร้อมย่ออัตโนมัติเมื่อที่อยู่ยาว, `18pt` รหัสไปรษณีย์, `12.5pt` COD/โอน) และข้อความขอบคุณอยู่กึ่งกลางล่างสุด |
+| 15.9 | Clean Borderless WYSIWYG Label Layout (130x76mm / 76x130mm) | `src/components/ShippingLabelModal.vue` | ดีไซน์สะอาดตา ไร้กรอบดำ ผู้ส่งอยู่ซ้าย ผู้รับอยู่ขวา ขนาดตัวหนังสือสั่งพิมพ์เทียบสัดส่วน 1:1 พอดีเป๊ะตามพรีวิวบนหน้าจอ (`13.5pt` ชื่อผู้รับ, `11pt` ที่อยู่พร้อมย่ออัตโนมัติเมื่อที่อยู่ยาว, `14pt` รหัสไปรษณีย์, `9.5pt` COD/โอน, `10pt` ผู้ส่ง) พร้อมตัวเลือกปรับสเกลฟอนต์ (`labelFontScale`: พอดีตามพรีวิว / กะทัดรัด / ตัวใหญ่) |
 | 15.10 | Multi-Address & Custom Recipient Name | `src/components/CustomerAddressModal.vue` | แยกชื่อผู้รับจริง (`recipientName`) จากชื่อ CF และรองรับการบันทึกหลายที่อยู่ต่อ 1 ลูกค้าลง Address Book |
 
 ---
@@ -521,3 +521,28 @@ description: Mandatory verification checklist after every code change
   - `npm run build` และ `npm run build:gh` ผ่านครบ 4 หน้า (`index.html`, `shipping/index.html`, `history/index.html`, `address/index.html`) และ PWA 65 precache entries
   - อัปเดตกฎโปรเจกต์ครบทั้ง 4 ไฟล์ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) และรายการตรวจสอบข้อ `6.6`, `15.4`, `15.5`, `15.9` ใน `.agents/workflows/verify.md`
   - **ยังต้องตรวจด้วยอุปกรณ์จริง**: การสั่งพิมพ์ออกเครื่องพิมพ์สติกเกอร์ความร้อนจริงหน้างานหลังรีเฟรชเป็น `v5.4.25`
+
+## 🏷️ การปรับเทียบขนาดฟอนต์ใบปะหน้าสั่งพิมพ์ให้ตรงตามพรีวิว 1:1 (WYSIWYG Shipping Label Font Calibration) — v5.4.26 (2026-11-10)
+
+- **สาเหตุที่แก้ไข**:
+  ผู้ใช้แจ้งฟีดแบ็กจากการใช้งานจริงกับเครื่องพิมพ์บลูทูธความร้อน (A70 Pro) ว่า *"ใบปะหน้า ตอนพรีวิวขนาดตัวหนังสือพอดี แต่พอสั่งปริ้นตัวหนังสือใหญ่ไป อยากได้ขนาดตอนพรีวิว"*
+  จากการตรวจสอบพบว่าในเวอร์ชัน 5.4.25 ขนาดฟอนต์สั่งพิมพ์ใน `handlePrint()` ถูกปรับขยายเป็น `16.5pt` / `13.5pt` / `18pt` ซึ่งคิดเป็นสัดส่วนสูงกว่าขนาดบนพรีวิวการ์ดหน้าจอถึง 20%–36% ส่งผลให้ข้อความตัวใหญ่แน่นเกินไปเมื่อเปิดหน้าต่างสั่งพิมพ์ของเบราว์เซอร์
+- **สิ่งที่ดำเนินการ**:
+  1. คำนวณอัตราส่วนเรขาคณิตระหว่างการ์ดพรีวิวบนหน้าจอ (580px x 339px) กับขนาดกระดาษพิมพ์จริง (130mm x 76mm = 368.5pt x 215.4pt) ทำให้ได้สเกลแปลงขนาดพิกเซลพรีวิวเป็น `pt` สิ่งพิมพ์ที่แม่นยำ `0.635 pt/px`
+  2. ปรับขนาดฟอนต์สั่งพิมพ์เริ่มต้นให้สอดคล้องกับพรีวิวแบบ 1:1:
+     - ชื่อผู้รับ (`receiver-name`): `13.5pt` (ชื่อยาว `11.5pt`)
+     - ที่อยู่ผู้รับ (`receiver-addr`): `11pt` (ที่อยู่ยาว `9.8pt` / ยาวพิเศษ `8.8pt`)
+     - รหัสไปรษณีย์ (`receiver-zip`): `14pt` (ความหนา 800 ชัดเจน)
+     - เบอร์โทรผู้รับ (`receiver-phone`): `11pt`
+     - ข้อมูลผู้ส่ง (`sender-name: 10pt`, `sender-addr: 8.5pt`, `sender-phone: 8.5pt`)
+     - ข้อมูลระบบและสถานะจัดส่งมุมล่างซ้าย (`meta-system-name: 9pt`, `meta-payment-row: 9.5pt`)
+     - ข้อความขอบคุณ (`card-footer`): `9pt`
+  3. เพิ่มตัวเลือกสเกลขนาดตัวอักษร (`labelFontScale`) ในแถบเมนูตัวเลือกของ `ShippingLabelModal.vue`:
+     - `"preview"`: พอดีตามพรีวิว (แนะนำ / ค่าเริ่มต้น 100%)
+     - `"compact"`: กะทัดรัด (ย่อ -10%)
+     - `"large"`: ตัวใหญ่ (+20%)
+     บันทึกลง `localStorage` (`manowzab_label_font_scale`) อัตโนมัติ โดยสเกลนี้จะปรับทั้งพรีวิวบนจอและหน้าสั่งพิมพ์พร้อมกันแบบ WYSIWYG
+- **ผลตรวจ Automated & Build**:
+  - `npm test` ผ่าน **838 tests ใน 32 ไฟล์**
+  - `npm run build` ผ่าน 100% ครบทุก entry point
+  - อัปเดตกฎและเอกสารสถาปัตยกรรมครบถ้วน (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`, `.agents/workflows/verify.md`)

@@ -163,6 +163,16 @@
             </select>
           </div>
 
+          <!-- Font Size Scale Selection -->
+          <div class="slm-select-wrap">
+            <label><i class="fa-solid fa-text-height"></i> ขนาดตัวหนังสือ:</label>
+            <select v-model="labelFontScale" class="slm-select" @change="saveFontScale">
+              <option value="preview">พอดีตามพรีวิว (แนะนำ)</option>
+              <option value="compact">กะทัดรัด (ย่อ -10%)</option>
+              <option value="large">ตัวใหญ่ (+20%)</option>
+            </select>
+          </div>
+
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <!-- Export to Excel Button for Printer App -->
             <button class="slm-export-excel-btn" @click="exportExcelForApp" title="ส่งออกไฟล์เพื่อนำเข้าไปเปิดในแอปเครื่องพิมพ์">
@@ -224,7 +234,11 @@
           v-for="customer in printableCustomers"
           :key="customer.id"
           class="shipping-label-card"
-          :class="['label-' + paperSize, orientation === 'landscape' ? 'layout-landscape' : 'layout-portrait']"
+          :class="[
+            'label-' + paperSize,
+            orientation === 'landscape' ? 'layout-landscape' : 'layout-portrait',
+            'font-scale-' + labelFontScale
+          ]"
         >
           <!-- 📚 Multi-Address Banner in Preview (Excluded from print) -->
           <div
@@ -388,10 +402,15 @@ defineEmits(["close"]);
 const filterType = ref("unprinted"); // 'unprinted' | 'today' | 'pack-tonight' | 'all-requested'
 const orientation = ref("landscape"); // 'landscape' (แนวนอน 130x76mm) | 'portrait' (แนวตั้ง 76x130mm)
 const paperSize = ref("thermal-76x130"); // Default 76x130mm
+const labelFontScale = ref(localStorage.getItem("manowzab_label_font_scale") || "preview"); // 'preview' | 'compact' | 'large'
 const showSenderConfig = ref(false);
 const selectedIds = ref([]);
 const searchQuery = ref("");
 const selectedCustomerForAddress = ref(null);
+
+function saveFontScale() {
+  localStorage.setItem("manowzab_label_font_scale", labelFontScale.value);
+}
 
 const currentCustomerForModal = computed(() => {
   if (!selectedCustomerForAddress.value) return null;
@@ -966,6 +985,9 @@ function handlePrint() {
   const senderAddress = (sender.value.address || "191 หมู่3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000").replace(/\n/g, "<br>");
   const thankYou = sender.value.thankYouText || "🙏 ขอบคุณที่อุดหนุนนะคะ ❤️";
 
+  const fontMultiplier = labelFontScale.value === "compact" ? 0.9 : labelFontScale.value === "large" ? 1.2 : 1.0;
+  const fSize = (basePt) => `${(basePt * fontMultiplier).toFixed(1)}pt`;
+
   const cardsHtml = printableCustomers.value
     .map((customer) => {
       const recipient = getRecipientDisplayName(customer);
@@ -1116,7 +1138,7 @@ function handlePrint() {
           }
           .ls-sender {
             width: 33%;
-            font-size: 9.5pt;
+            font-size: ${fSize(8.5)};
             line-height: 1.35;
             display: flex;
             flex-direction: column;
@@ -1129,19 +1151,19 @@ function handlePrint() {
             flex-direction: column;
           }
           .sender-name {
-            font-size: 12pt;
+            font-size: ${fSize(10)};
             font-weight: 700;
             margin-bottom: 2px;
             line-height: 1.25;
           }
           .sender-addr {
-            font-size: 9.5pt;
+            font-size: ${fSize(8.5)};
             font-weight: 500;
             margin-top: 2px;
             line-height: 1.35;
           }
           .sender-phone {
-            font-size: 10pt;
+            font-size: ${fSize(8.5)};
             font-weight: 600;
             margin-top: 3px;
           }
@@ -1151,11 +1173,11 @@ function handlePrint() {
             display: flex;
             flex-direction: column;
             gap: 0.5mm;
-            font-size: 11pt;
+            font-size: ${fSize(9)};
             line-height: 1.25;
           }
           .meta-system-name {
-            font-size: 11pt;
+            font-size: ${fSize(9)};
             color: #000000;
             font-weight: 700;
             white-space: nowrap;
@@ -1164,7 +1186,7 @@ function handlePrint() {
             max-width: 39mm;
           }
           .meta-payment-row {
-            font-size: 12.5pt;
+            font-size: ${fSize(9.5)};
             color: #000000;
             font-weight: 800;
             letter-spacing: 0.3px;
@@ -1182,7 +1204,7 @@ function handlePrint() {
             min-width: 0;
           }
           .port-sender {
-            font-size: 9.5pt;
+            font-size: ${fSize(8.5)};
             line-height: 1.35;
           }
           .port-receiver {
@@ -1202,50 +1224,50 @@ function handlePrint() {
             display: flex;
             flex-direction: column;
             gap: 0.5mm;
-            font-size: 11pt;
+            font-size: ${fSize(9)};
             line-height: 1.25;
           }
           .port-meta-bottom .meta-system-name {
             max-width: 64mm;
           }
           .receiver-name {
-            font-size: 16.5pt;
+            font-size: ${fSize(13.5)};
             font-weight: 700;
             line-height: 1.25;
             margin-bottom: 3px;
           }
           .receiver-name.name-long {
-            font-size: 14.5pt;
+            font-size: ${fSize(11.5)};
           }
           .receiver-addr {
-            font-size: 13.5pt;
+            font-size: ${fSize(11)};
             line-height: 1.38;
             font-weight: 600;
           }
           .receiver-addr.addr-long {
-            font-size: 12pt;
+            font-size: ${fSize(9.8)};
             line-height: 1.34;
           }
           .receiver-addr.addr-xlong {
-            font-size: 11pt;
+            font-size: ${fSize(8.8)};
             line-height: 1.3;
           }
           .receiver-zip {
             margin-top: 3px;
-            font-size: 18pt;
+            font-size: ${fSize(14)};
             font-weight: 800;
             letter-spacing: 2px;
             line-height: 1.15;
           }
           .receiver-phone {
-            font-size: 13.5pt;
+            font-size: ${fSize(11)};
             font-weight: 700;
             margin-top: 3px;
             line-height: 1.25;
           }
           .card-footer {
             text-align: center;
-            font-size: 10pt;
+            font-size: ${fSize(9)};
             font-weight: 600;
             margin-top: auto;
             padding-top: 0;
@@ -1955,6 +1977,14 @@ onMounted(() => {
   max-width: 380px;
   min-height: 520px;
   aspect-ratio: 76 / 130;
+}
+
+.shipping-label-card.font-scale-compact {
+  font-size: 0.9em;
+}
+
+.shipping-label-card.font-scale-large {
+  font-size: 1.2em;
 }
 
 /* 📚 Multi-Address Banner in Preview Cards */

@@ -295,26 +295,10 @@ export function useChatProcessor() {
         const priceVal = parseInt(match[2]);
 
         if (itemId > 0 && itemId <= MAX_ITEM_ID && priceVal >= 0) {
-          // Update Stock Price (pass isAuto = true to bypass self-learning loop)
+          // Update Stock Price silently directly to stockStore (bypass self-learning loop)
           await stockStore.updateStockPrice(itemId, priceVal, true);
-          logger.success(`🎙️ Voice Price Detected: Item ${itemId} set to ฿${priceVal}`);
-
-          // Post a special price_update message to chat
-          chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
-            id: item.id || `voice-price-${Date.now()}`,
-            text: msg,
-            authorName: "ระบบเสียงสด (AI)",
-            displayName: "ตั้งราคาอัตโนมัติ 💰",
-            realName: "เสียงพูดแม่ค้า",
-            uid: uid,
-            avatar: avatar,
-            isAdmin: true,
-            type: "price_update",
-            sfxType: "success",
-            ttsText: `รหัส ${numberToThaiWords(itemId)} ตั้งราคา ${numberToThaiWords(priceVal)} บาท`,
-            detectionMethod: "voice-price-extractor",
-            timestamp: new Date(item.snippet.publishedAt).getTime(),
-          });
+          logger.success(`🎙️ Voice Price Detected: Item ${itemId} set to ฿${priceVal} (Silent: No chat, No TTS)`);
+          // Do NOT post to chat and do NOT trigger TTS announcement
           return;
         }
       }

@@ -36,6 +36,12 @@ export const useChatStore = defineStore("chat", () => {
       return;
     }
 
+    // 🔇 Silent Price Update Guard: Do not display price update announcements in chat
+    if (message.type === "price_update" || message.id?.startsWith("ai-price-") || message.id?.startsWith("voice-price-")) {
+      seenMessageIds.value[message.id] = true;
+      return;
+    }
+
     // ✅ Resolve current nickname dynamically from nicknameStore
     try {
       const nicknameStore = useNicknameStore();
@@ -250,6 +256,12 @@ export const useChatStore = defineStore("chat", () => {
     const listener = onChildAdded(chatQuery, (snapshot) => {
       const messageData = snapshot.val();
       if (messageData) {
+        // 🔇 Silent Price Update Guard: Never show in chat and never play audio (TTS/SFX)
+        if (messageData.type === "price_update" || messageData.id?.startsWith("ai-price-") || messageData.id?.startsWith("voice-price-")) {
+          seenMessageIds.value[messageData.id] = true;
+          return;
+        }
+
         const isNew = !seenMessageIds.value[messageData.id];
 
         // Add message through the existing addMessage function

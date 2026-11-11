@@ -414,9 +414,9 @@ function isUnsavedOwner(name) {
   align-items: center;
   justify-content: center;
   font-size: 0.76em;
-  color: #34d399;
-  background: rgba(6, 78, 59, 0.75);
-  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #fde047;
+  background: rgba(120, 53, 15, 0.75);
+  border: 1px solid rgba(251, 191, 36, 0.6);
   padding: 1.5px 7px;
   border-radius: 10px;
   font-weight: 700;
@@ -425,14 +425,15 @@ function isUnsavedOwner(name) {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: all 0.2s ease;
   white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .stock-price-pill:hover {
-  background: rgba(5, 150, 105, 0.9);
+  background: rgba(217, 119, 6, 0.95);
   color: #ffffff;
-  border-color: #34d399;
+  border-color: #fde047;
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.45);
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.5);
 }
 
 .stock-item.cancelled-blink {

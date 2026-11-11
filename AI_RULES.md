@@ -29,6 +29,12 @@
 3.  **Cloud Opt-In Only — Multi-Tier Fallback:** Google Cloud Standard TTS (`S`, 2s total network deadline) ➡️ Native TTS (`🤖`). Use bounded retries and cooldown; see the current Thai TTS Policy below.
 4.  **Unified Audio Queue:** ALL audio (SFX + TTS) must go through `queueAudio()` in `useAudio.js`. **DO NOT** call `ttsService.speak()` directly — it bypasses the queue and causes audio overlap.
 
+### 🔇 Zero Price Announcement Chat & Mute Price TTS (v5.4.30+)
+
+1.  **Silent Price Sync:** AI-detected prices (via live audio stream or chat processor) update stock items silently to the stock card pill (`.stock-price-pill`) via Firebase RTDB `stock/{videoId}/{item}/price`.
+2.  **Zero Chat & Zero TTS:** Price updates must NEVER post announcement messages to chat (`chats/{videoId}`) and NEVER trigger TTS or SFX audio playback across connected devices.
+3.  **Strict Filter:** `src/stores/chat.js` and `src/components/ChatPanel.vue` strictly filter out any incoming or historical price announcement messages (`isPriceAnnouncementMessage`) across all chat tabs.
+
 ### 🔑 API Key Rotation
 
 1.  **Unified System:** YouTube API (`useYouTube.js`) and `YouTubeLiveChat.js` share `systemStore.currentKeyIndex` via `onKeyRotate` callback.

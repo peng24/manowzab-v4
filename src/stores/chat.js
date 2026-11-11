@@ -10,6 +10,25 @@ import { useBlacklistStore } from "./blacklist";
 import { archiveChatEntries, getAllChatEntries, clearChatEntries } from "../utils/chatIdb";
 import { extractAdminCustomerName } from "../utils/chatParserUtils";
 
+export function isPriceAnnouncementMessage(m) {
+  if (!m) return false;
+  return (
+    m.type === "price_update" ||
+    m.id?.startsWith("ai-price-") ||
+    m.id?.startsWith("voice-price-") ||
+    m.text?.includes("[AI ตั้งราคา]") ||
+    m.realName === "AI ระบบเสียง" ||
+    m.authorName === "AI ระบบเสียง" ||
+    m.authorName === "ระบบตรวจจับราคา (AI)" ||
+    m.authorName === "ระบบเสียงสด (AI)" ||
+    m.displayName === "ตรวจจับราคา 🎙️" ||
+    m.displayName === "ตั้งราคาอัตโนมัติ 💰" ||
+    m.detectionMethod === "realtime-live-ai" ||
+    m.detectionMethod === "voice-price-extractor" ||
+    m.uid === "voice-chat-uid"
+  );
+}
+
 export const useChatStore = defineStore("chat", () => {
   const MAX_MESSAGES = 500;
   const MAX_SEEN_IDS = 2000;
@@ -37,7 +56,7 @@ export const useChatStore = defineStore("chat", () => {
     }
 
     // 🔇 Silent Price Update Guard: Do not display price update announcements in chat
-    if (message.type === "price_update" || message.id?.startsWith("ai-price-") || message.id?.startsWith("voice-price-")) {
+    if (isPriceAnnouncementMessage(message)) {
       seenMessageIds.value[message.id] = true;
       return;
     }
@@ -257,7 +276,7 @@ export const useChatStore = defineStore("chat", () => {
       const messageData = snapshot.val();
       if (messageData) {
         // 🔇 Silent Price Update Guard: Never show in chat and never play audio (TTS/SFX)
-        if (messageData.type === "price_update" || messageData.id?.startsWith("ai-price-") || messageData.id?.startsWith("voice-price-")) {
+        if (isPriceAnnouncementMessage(messageData)) {
           seenMessageIds.value[messageData.id] = true;
           return;
         }

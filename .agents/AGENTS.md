@@ -92,7 +92,12 @@
 
 14. **Stock Grid Price Display & Inline Editing Invariant (v5.4.27+)**:
     - In StockItemCard.vue, when item.price && Number(item.price) > 0, display the price as a clean, high-visibility golden yellow pill badge (.stock-price-pill, e.g. ฿80) within .card-meta-row (rendering for both booked items and unsold items with pre-set price). When price is null, 0, or missing, the price badge is completely hidden to eliminate visual clutter. Clicking the price badge triggers item selection and opens the Queue Modal.
-    - In StockGrid.vue, the Queue Modal provides an interactive .price-input-section allowing direct price input (editingPrice), quick-set pills (50.-, 60.-, 80.-, 100.-, 120.-, 150.-), and a clear button to remove/unset price. Updates persist atomically via stockStore.updateItemData which auto-syncs 	otalPrice in delivery_customers. In StockGrid.vue search, queries matching prices highlight and filter corresponding cards.
+    - In StockGrid.vue, the Queue Modal provides an interactive .price-input-section allowing direct price input (editingPrice), quick-set pills (50.-, 60.-, 80.-, 100.-, 120.-, 150.-), and a clear button to remove/unset price. Updates persist atomically via stockStore.updateItemData which auto-syncs totalPrice in delivery_customers. In StockGrid.vue search, queries matching prices highlight and filter corresponding cards.
+
+15. **Zero Price Announcement Chat & Mute Price TTS Invariant (v5.4.30+)**:
+    - AI-detected prices (via live audio stream or chat processor) update stock items silently to the stock card pill (.stock-price-pill) via Firebase RTDB `stock/{videoId}/{item}/price`.
+    - It must NEVER post announcement messages to chat (`chats/{videoId}`) and NEVER trigger TTS or SFX audio playback across connected devices.
+    - `src/stores/chat.js` and `src/components/ChatPanel.vue` strictly filter out any incoming or historical price announcement messages (`isPriceAnnouncementMessage`) across all chat tabs.
 
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:

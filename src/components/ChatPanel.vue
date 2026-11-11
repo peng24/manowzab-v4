@@ -489,7 +489,7 @@
 </template>
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from "vue";
-import { useChatStore } from "../stores/chat";
+import { useChatStore, isPriceAnnouncementMessage } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useCustomerStore } from "../stores/customer";
@@ -843,9 +843,9 @@ const filteredActiveChatters = computed(() => {
 
 // 🚀 Performance: Single-pass Filter & Pagination to avoid intermediate array allocations
 const visibleMessages = computed(() => {
-  const total = chatStore.messages.length;
-  const start = Math.max(0, total - displayLimit.value);
-  return chatStore.messages.slice(start);
+  const validMsgs = chatStore.messages.filter((m) => !isPriceAnnouncementMessage(m));
+  const start = Math.max(0, validMsgs.length - displayLimit.value);
+  return validMsgs.slice(start);
 });
 
 const filteredVisibleMessages = computed(() => {
@@ -857,14 +857,16 @@ const filteredVisibleMessages = computed(() => {
   const hasAuthorFilter = authorSet.size > 0;
 
   if (tab === "all" && !hasAuthorFilter) {
-    const start = Math.max(0, total - limit);
-    return allMsgs.slice(start);
+    const validMsgs = allMsgs.filter((m) => !isPriceAnnouncementMessage(m));
+    const start = Math.max(0, validMsgs.length - limit);
+    return validMsgs.slice(start);
   }
 
   // Filter backwards to get the latest matching limit messages
   const result = [];
   for (let i = total - 1; i >= 0 && result.length < limit; i--) {
     const m = allMsgs[i];
+    if (isPriceAnnouncementMessage(m)) continue;
 
     // 1. Author Filter Check (O(1))
     if (hasAuthorFilter) {

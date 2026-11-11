@@ -548,3 +548,18 @@ description: Mandatory verification checklist after every code change
   - `npm test` ผ่าน **838 tests ใน 32 ไฟล์**
   - `npm run build` ผ่าน 100% ครบทุก entry point
   - อัปเดตกฎและเอกสารสถาปัตยกรรมครบถ้วน (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`, `.agents/workflows/verify.md`)
+
+## 🔇 Zero Price Announcement Chat & Mute Price TTS Guarantee — v5.4.31 (2026-11-11)
+
+- **สาเหตุที่แก้ไข**:
+  ในการทดสอบระบบตรวจจับราคาและขนาดสินค้าด้วย AI แบบเรียลไทม์ มีข้อความระบบแจ้งราคา เช่น `🎙️ [AI ตั้งราคา] รายการที่ 3 ราคา ฿50` จาก `AI ระบบเสียง` ส่งเข้าช่องแชทและมีเสียงอ่าน TTS แทรกระหว่างไลฟ์ ผู้ใช้ต้องการให้ราคาอัปเดตขึ้นบนการ์ดสินค้าอย่างเงียบสนิท ไม่ต้องพูดอ่านออกเสียง และไม่ให้แสดงกล่องข้อความเหล่านี้ในช่องแชท
+- **สิ่งที่ดำเนินการ**:
+  1. ตัดการส่งข้อความแจ้งราคาเข้า Firebase `chats/{videoId}` ออกจากทั้ง Python Transcriber (`live_stream_detector.py`, `firebase_sync.py`) และ Web Chat Processor (`useChatProcessor.js`)
+  2. เพิ่มฟังก์ชันตรวจจับและกรองข้อความแจ้งราคาแบบเบ็ดเสร็จ `isPriceAnnouncementMessage(m)` ใน `src/stores/chat.js` และ `src/components/ChatPanel.vue`
+  3. ดักจับทุกคุณลักษณะของข้อความแจ้งราคา (`type === 'price_update'`, `id` ขึ้นต้นด้วย `ai-price-` หรือ `voice-price-`, `text` มี `[AI ตั้งราคา]`, ผู้ส่งเป็น `AI ระบบเสียง`, `ระบบตรวจจับราคา (AI)`, `ระบบเสียงสด (AI)`, หรือ `detectionMethod` เป็น `realtime-live-ai` / `voice-price-extractor`)
+  4. กรองข้อความทั้งในขั้นตอนรับเข้า (`addMessage`, `onChildAdded`) และการเรนเดอร์ใน UI (`visibleMessages`, `filteredVisibleMessages`) เพื่อให้กล่องข้อความที่เคยส่งไปแล้วในอดีตถูกซ่อนสนิทเมื่อเปิดหน้าเว็บ
+  5. ตัดการส่งเข้าคิวเสียง `queueAudio` เพื่อรับประกันไม่มีเสียงอ่านราคาพูดแทรก 100%
+- **ผลตรวจ Automated & Build**:
+  - `npm test` ผ่าน **840 tests ใน 32 ไฟล์**
+  - `npm run build:gh` ผ่านครบ 4 หน้าและ PWA 65 precache entries
+  - อัปเดตกฎโปรเจกต์ครบถ้วน (`AI_RULES.md`, `.agents/AGENTS.md`, `.agents/workflows/verify.md`)

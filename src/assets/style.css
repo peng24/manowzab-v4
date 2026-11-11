@@ -1672,6 +1672,61 @@ body {
   color: #888;
 }
 
+.btn-clear-price {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.82em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-clear-price:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+.quick-price-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.quick-price-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  color: #fde68a;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.82em;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-price-btn:hover {
+  background: rgba(251, 191, 36, 0.2);
+  border-color: #fbbf24;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.quick-price-btn.active {
+  background: #fbbf24;
+  border-color: #f59e0b;
+  color: #000000;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
 /* ✅ Queue List */
 .queue-list {
   display: flex;

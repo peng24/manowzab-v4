@@ -205,6 +205,43 @@
             </div>
           </div>
           <div class="queue-body">
+            <!-- 🏷️ Price Section (แสดงและแก้ไขราคาสินค้า) -->
+            <div class="price-input-section">
+              <label class="price-label">
+                <i class="fa-solid fa-tag"></i> ราคาสินค้า
+              </label>
+              <div class="price-input-row">
+                <input
+                  type="number"
+                  v-model.number="editingPrice"
+                  ref="priceInputRef"
+                  class="price-input-field"
+                  placeholder="0 (ยังไม่ระบุ)"
+                  min="0"
+                  step="10"
+                  @keyup.enter="saveQueueChanges"
+                />
+                <span class="price-unit">บาท</span>
+                <button
+                  v-if="editingPrice > 0"
+                  type="button"
+                  class="btn-clear-price"
+                  @click="editingPrice = 0"
+                  title="ล้างราคาออก (ไม่ระบุราคา)"
+                >
+                  <i class="fa-solid fa-xmark"></i> ลบราคา
+                </button>
+              </div>
+              <div class="quick-price-pills">
+                <button type="button" class="quick-price-btn" :class="{ active: editingPrice === 50 }" @click="editingPrice = 50">50.-</button>
+                <button type="button" class="quick-price-btn" :class="{ active: editingPrice === 60 }" @click="editingPrice = 60">60.-</button>
+                <button type="button" class="quick-price-btn" :class="{ active: editingPrice === 80 }" @click="editingPrice = 80">80.-</button>
+                <button type="button" class="quick-price-btn" :class="{ active: editingPrice === 100 }" @click="editingPrice = 100">100.-</button>
+                <button type="button" class="quick-price-btn" :class="{ active: editingPrice === 120 }" @click="editingPrice = 120">120.-</button>
+                <button type="button" class="quick-price-btn" :class="{ active: editingPrice === 150 }" @click="editingPrice = 150">150.-</button>
+              </div>
+            </div>
+
             <div class="queue-list">
               <div
                 v-if="tempQueue.length === 0"
@@ -485,6 +522,13 @@ const visibleItemIds = computed(() => {
           return qOwner.includes(query) || qNick.includes(query);
         });
       }
+      if (!isMatch && item?.price) {
+        const cleanPrice = String(item.price);
+        const searchPrice = query.replace(/^[฿b]/i, '').trim();
+        if (searchPrice && (cleanPrice === searchPrice || cleanPrice.includes(searchPrice))) {
+          isMatch = true;
+        }
+      }
 
       if (!isMatch) continue;
       // Match found: include in results (bypassing window capping so user can find all matches)
@@ -713,6 +757,7 @@ watch(
 const showModal = ref(false);
 const editingId = ref(null);
 const editingPrice = ref(0);
+const priceInputRef = ref(null);
 const tempQueue = ref([]);
 let draggingIndex = null;
 

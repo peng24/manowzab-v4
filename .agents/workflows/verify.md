@@ -57,6 +57,8 @@ description: Mandatory verification checklist after every code change
 | 3.6 | `updateItemData(num, newData)` | `src/stores/stock.js` | อัปเดตราคา/ไซส์ + sync Overlay |
 | 3.7 | `saveQueueChanges()` | `src/components/StockGrid.vue` | เวลายกเลิกจอง (ลบรายชื่อทิ้งทั้งหมด) หากมีการตั้งราคาไว้ ต้องเคลียร์ข้อมูลเจ้าของ/คิวเป็น null แต่ยังคงราคาไว้ (แก้บั๊กชื่อค้าง) |
 | 3.8 | Throttled History Sync | `src/stores/stock.js` | การบันทึกสถิติลง `history/${videoId}` ต้องใช้ Throttle (5s debounce) ป้องกันการยิง Firebase ถี่เกินไป |
+| 3.9 | Stock Price Pill Badge | src/components/StockItemCard.vue | แสดงป้ายราคาเขียวมรกต .stock-price-pill เมื่อ item.price > 0 (ทั้งสินค้าที่จองแล้วและยังว่างอยู่) และซ่อนสนิทเมื่อไม่มีราคา คลิกเพื่อเปิด Queue Modal แก้ไขราคา |
+| 3.10 | Queue Modal Price Editor & Quick Pills | src/components/StockGrid.vue | สามารถกรอกแก้ไขราคา editingPrice พร้อมปุ่มลัดราคา 50.-, 60.-, 80.-, 100.-, 120.-, 150.- และปุ่มล้างราคา บันทึกแล้วอัปเดตสต็อกและคำนวณ 	otalPrice ของลูกค้าอัตโนมัติ |
 
 ---
 

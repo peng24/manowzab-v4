@@ -27,6 +27,7 @@ vi.mock("firebase/database", () => ({
     return vi.fn();
   }),
   set: vi.fn().mockResolvedValue(true),
+  get: vi.fn().mockResolvedValue({ val: () => null }),
   update: vi.fn().mockResolvedValue(true),
   remove: vi.fn().mockResolvedValue(true),
   runTransaction: vi.fn().mockResolvedValue({ committed: true }),
@@ -223,6 +224,55 @@ describe("Stock Store", () => {
       await stockStore.clearAllStock();
       expect(remove).toHaveBeenCalled();
       expect(stockStore.stockData).toEqual({});
+    });
+
+    it("updates stock item price cleanly and preserves price in stockData", async () => {
+      const { useSystemStore } = await import("../stores/system");
+      const systemStore = useSystemStore();
+      systemStore.currentVideoId = "test_vid_123";
+
+      const stockStore = useStockStore();
+      stockStore.stockData = {
+        1: { owner: "ลูกค้า1", uid: "u1", price: null },
+        2: { owner: null, uid: null, price: null },
+      };
+
+      await stockStore.updateStockPrice(1, 80, true);
+      expect(stockStore.stockData[1].price).toBe(80);
+
+      await stockStore.updateStockPrice(2, 120, true);
+      expect(stockStore.stockData[2].price).toBe(120);
+    });
+
+    it("updates item data with price and preserves price when clearing owner", async () => {
+      const { useSystemStore } = await import("../stores/system");
+      const systemStore = useSystemStore();
+      systemStore.currentVideoId = "test_vid_123";
+
+      const stockStore = useStockStore();
+      stockStore.stockData = {
+        5: { owner: "สมหมาย", uid: "u5", price: 100 },
+      };
+
+      // Edit price to 150
+      await stockStore.updateItemData(5, {
+        owner: "สมหมาย",
+        uid: "u5",
+        price: 150,
+      }, true);
+      expect(stockStore.stockData[5].price).toBe(150);
+
+      // Clear owner but keep price
+      await stockStore.updateItemData(5, {
+        owner: null,
+        uid: null,
+        price: 150,
+        queue: null,
+        time: null,
+        source: null,
+      }, true);
+      expect(stockStore.stockData[5].owner).toBeNull();
+      expect(stockStore.stockData[5].price).toBe(150);
     });
   });
 });

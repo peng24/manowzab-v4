@@ -38,27 +38,33 @@
       ></i>
     </div>
 
-    <div class="card-meta-row" v-if="item.owner">
+    <div class="card-meta-row" v-if="item.owner || (item.price && Number(item.price) > 0)">
       <div
-        v-if="ownerCount >= 1"
+        v-if="item.owner && ownerCount >= 1"
         class="owner-count-badge"
         :title="`${item.owner} จองทั้งหมด ${ownerCount} ชิ้น — คลิกเพื่อจัดการ`"
         @click.stop="$emit('show-owner', item.owner)"
       >👗 {{ ownerCount }} ตัว</div>
 
       <div
-        v-if="!hasAddress"
+        v-if="item.owner && !hasAddress"
         class="no-addr-indicator"
         :title="`${item.owner} ยังไม่มีที่อยู่จัดส่งในระบบ`"
         @click.stop="$emit('show-owner', item.owner)"
       >
         <i class="fa-solid fa-location-dot"></i> รอที่อยู่
       </div>
-    </div>
 
-    <!-- <div v-if="item.price" class="stock-price">
-      {{ item.price }} บาท
-    </div> -->
+      <!-- 💰 Price Pill: Hidden when missing, prominent & clean when set -->
+      <div
+        v-if="item.price && Number(item.price) > 0"
+        class="stock-price-pill"
+        :title="`ราคาสินค้า: ฿${Number(item.price).toLocaleString()} บาท (คลิกเพื่อแก้ไข)`"
+        @click.stop="$emit('select', index)"
+      >
+        ฿{{ Number(item.price).toLocaleString() }}
+      </div>
+    </div>
 
     <div v-if="queueLength > 0" class="queue-badge">
       +{{ queueLength }}
@@ -401,6 +407,32 @@ function isUnsavedOwner(name) {
   border-color: #f87171;
   color: #ffffff;
   transform: translateY(-1px);
+}
+
+.stock-price-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76em;
+  color: #34d399;
+  background: rgba(6, 78, 59, 0.75);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  padding: 1.5px 7px;
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.stock-price-pill:hover {
+  background: rgba(5, 150, 105, 0.9);
+  color: #ffffff;
+  border-color: #34d399;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.45);
 }
 
 .stock-item.cancelled-blink {

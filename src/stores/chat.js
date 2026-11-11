@@ -25,7 +25,8 @@ export function isPriceAnnouncementMessage(m) {
     m.displayName === "ตั้งราคาอัตโนมัติ 💰" ||
     m.detectionMethod === "realtime-live-ai" ||
     m.detectionMethod === "voice-price-extractor" ||
-    m.uid === "voice-chat-uid"
+    m.uid === "voice-chat-uid" ||
+    (m.uid && typeof m.uid === "string" && m.uid.includes("voice-chat"))
   );
 }
 
@@ -300,18 +301,21 @@ export const useChatStore = defineStore("chat", () => {
 
         // ✅ Play audio for NEW messages in real-time across all connected devices (Bypassed if banned)
         if (isNew && !isUserBanned && messageData.timestamp >= syncStartTime - 5000) {
-          const { queueAudio } = useAudio();
-          const isVoiceChat = messageData.uid === "voice-chat-uid" || (messageData.uid && messageData.uid.includes("voice-chat"));
+          const isVoiceChat = messageData.uid === "voice-chat-uid" || (messageData.uid && typeof messageData.uid === "string" && messageData.uid.includes("voice-chat"));
 
-          // ✅ Never skip reading: use ttsText if available and non-empty, otherwise fallback to message text (unless voice chat)
+          // 🔇 Voice chats & price announcements must NEVER play audio (neither SFX nor TTS)
+          if (isVoiceChat || isPriceAnnouncementMessage(messageData)) {
+            return;
+          }
+
+          const { queueAudio } = useAudio();
+
+          // ✅ Never skip reading: use ttsText if available and non-empty, otherwise fallback to message text
           let textToRead = (messageData.ttsText !== undefined && messageData.ttsText !== null && messageData.ttsText !== "")
             ? messageData.ttsText
-            : (isVoiceChat ? "" : (messageData.text || ""));
+            : (messageData.text || "");
 
-          // Ignore voice chats with no intent
-          if (!(isVoiceChat && !messageData.type)) {
-            queueAudio(messageData.sfxType, messageData.phoneticName, textToRead);
-          }
+          queueAudio(messageData.sfxType, messageData.phoneticName, textToRead);
         }
       }
     });

@@ -298,10 +298,10 @@ export function useChatProcessor() {
           // Update Stock Price silently directly to stockStore (bypass self-learning loop)
           await stockStore.updateStockPrice(itemId, priceVal, true);
           logger.success(`🎙️ Voice Price Detected: Item ${itemId} set to ฿${priceVal} (Silent: No chat, No TTS)`);
-          // Do NOT post to chat and do NOT trigger TTS announcement
-          return;
         }
       }
+      // 🛑 Voice Chat must NEVER fall through to customer chat/buy/cancel/TTS processing!
+      return;
     }
 
     // Check Nickname

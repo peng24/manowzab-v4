@@ -63,6 +63,35 @@ describe("Stock Store", () => {
     expect(stockStore.milestones).toEqual({ fifty: false, eighty: false, hundred: false });
   });
 
+  describe("totalSales computed property", () => {
+    it("calculates total sales for sold items with valid prices", () => {
+      const stockStore = useStockStore();
+      expect(stockStore.totalSales).toBe(0);
+
+      stockStore.stockData = {
+        1: { owner: "อุไรวรรณ", price: 60 },
+        2: { owner: null, price: 50 }, // empty card, not sold
+        3: { owner: "พี่ศรัญญา", price: "60" }, // string price
+        4: { owner: "", price: 80 }, // empty owner, not sold
+        18: { owner: "ปอ", price: 60 },
+        19: { owner: "ปอ" }, // sold but price not set yet
+      };
+
+      // 60 + 60 + 60 = 180
+      expect(stockStore.totalSales).toBe(180);
+    });
+
+    it("handles empty or zero prices gracefully", () => {
+      const stockStore = useStockStore();
+      stockStore.stockData = {
+        1: { owner: "ลูกค้า A", price: 0 },
+        2: { owner: "ลูกค้า B", price: -10 },
+        3: { owner: "ลูกค้า C", price: "invalid" },
+      };
+      expect(stockStore.totalSales).toBe(0);
+    });
+  });
+
   describe("findMostRecentItemForUser with 1-minute time limit", () => {
     it("returns latest item if booked within 1 minute (60,000 ms)", () => {
       const stockStore = useStockStore();

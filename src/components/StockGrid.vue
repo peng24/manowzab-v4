@@ -25,7 +25,14 @@
           <div class="sale-percent-badge" :class="[percentColorClass, { 'pulse': isPulsingPercent }]">
             {{ animatedPercentage }}%
           </div>
-          <span class="motivational-badge" :key="motivationalText">{{ motivationalText }}</span>
+          <div
+            class="total-sales-badge"
+            :class="{ 'pulse': isPulsingSales }"
+            :title="salesTooltip"
+          >
+            <span class="sales-label">ยอด:</span>
+            <span class="sales-amount">฿{{ animatedTotalSales.toLocaleString() }}</span>
+          </div>
         </div>
 
         <!-- 📦 Delivery Strip (moved right after sales stats) -->
@@ -840,9 +847,51 @@ const percentColorClass = computed(() => {
   return 'pct-complete';
 });
 
+// 💰 Real-time Sales Revenue (Live Session Sold Price)
+const totalSales = computed(() => stockStore.totalSales ?? 0);
+
+const soldItemsWithPriceCount = computed(() => {
+  if (!stockStore.stockData) return 0;
+  return Object.values(stockStore.stockData).filter(
+    (item) => item && item.owner && item.price && Number(item.price) > 0,
+  ).length;
+});
+
+const salesTooltip = computed(() => {
+  const sold = soldCount.value;
+  const priced = soldItemsWithPriceCount.value;
+  const total = totalSales.value.toLocaleString();
+  if (sold === 0) return "ยังไม่มียอดขายในไลฟ์ปัจจุบัน";
+  if (priced < sold) {
+    return `ยอดขายรวมในไลฟ์ปัจจุบัน: ฿${total} (ตั้งราคาแล้ว ${priced}/${sold} รายการ)`;
+  }
+  return `ยอดขายรวมในไลฟ์ปัจจุบัน: ฿${total} (ขายแล้วทั้งหมด ${sold} รายการ)`;
+});
+
+const animatedTotalSales = ref(totalSales.value);
+let salesAnimFrame = null;
+const isPulsingSales = ref(false);
+let pulsingSalesTimer = null;
+
+watch(totalSales, (newVal, oldVal) => {
+  if (salesAnimFrame) cancelAnimationFrame(salesAnimFrame);
+  const from = oldVal ?? 0;
+  isPulsingSales.value = true;
+  if (pulsingSalesTimer) clearTimeout(pulsingSalesTimer);
+  pulsingSalesTimer = setTimeout(() => {
+    isPulsingSales.value = false;
+    pulsingSalesTimer = null;
+  }, 600);
+  salesAnimFrame = animateValue(from, newVal, 500, (v) => {
+    animatedTotalSales.value = v;
+  });
+}, { immediate: true });
+
 onUnmounted(() => {
   if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
   if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
+  if (salesAnimFrame) cancelAnimationFrame(salesAnimFrame);
+  if (pulsingSalesTimer) clearTimeout(pulsingSalesTimer);
   // ✅ Cleanup cancelled & new item timers
   Object.values(cancelledTimers).forEach(t => clearTimeout(t));
   Object.values(newOrdersTimers).forEach(t => clearTimeout(t));
@@ -2152,7 +2201,56 @@ watch(
   100% { left: 100%; }
 }
 
-/* ✅ Motivational Badge */
+/* 💰 Total Sales Badge (Replaces legacy motivational text) */
+.total-sales-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.88em;
+  font-weight: 700;
+  padding: 1px 9px;
+  border-radius: 20px;
+  background: rgba(180, 83, 9, 0.35);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), 0 0 8px rgba(251, 191, 36, 0.18);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+  cursor: default;
+  user-select: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.total-sales-badge:hover {
+  background: rgba(217, 119, 6, 0.45);
+  border-color: #fde047;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+  transform: translateY(-1px);
+}
+
+.total-sales-badge.pulse {
+  animation: pulse-sales 0.5s ease-out;
+}
+
+@keyframes pulse-sales {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.12); box-shadow: 0 0 14px rgba(251, 191, 36, 0.6); }
+  100% { transform: scale(1); }
+}
+
+.total-sales-badge .sales-label {
+  color: #fef08a;
+  font-size: 0.82em;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.total-sales-badge .sales-amount {
+  color: #fde047;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(253, 224, 71, 0.35);
+}
+
 .motivational-badge {
   font-size: 0.8em;
   font-weight: 700;
@@ -2667,6 +2765,14 @@ watch(
     padding: 2px 6px;
   }
   .stats-label {
+    display: none;
+  }
+  .total-sales-badge {
+    font-size: 0.8em;
+    padding: 1px 6px;
+    gap: 2px;
+  }
+  .total-sales-badge .sales-label {
     display: none;
   }
   .motivational-badge {

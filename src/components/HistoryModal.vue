@@ -98,7 +98,14 @@
                       <div class="sale-percent-badge" :class="[percentColorClass, { 'pulse': isPulsingPercent }]">
                         {{ animatedPercentage }}%
                       </div>
-                      <span class="motivational-badge">{{ motivationalText }}</span>
+                      <div
+                        class="total-sales-badge"
+                        :class="{ 'pulse': isPulsingSales }"
+                        :title="historySalesTooltip"
+                      >
+                        <span class="sales-label">ยอด:</span>
+                        <span class="sales-amount">฿{{ animatedHistoryTotalSales.toLocaleString() }}</span>
+                      </div>
                     </div>
 
                     <div class="header-actions">
@@ -495,6 +502,8 @@ onUnmounted(() => {
   if (typeof Swal !== "undefined" && Swal.isVisible()) {
     Swal.close();
   }
+  if (historySalesAnimFrame) cancelAnimationFrame(historySalesAnimFrame);
+  if (pulsingSalesTimer) clearTimeout(pulsingSalesTimer);
   window.removeEventListener('keydown', handleGlobalKeydown);
 });
 
@@ -696,6 +705,45 @@ const percentColorClass = computed(() => {
   if (pct <= 80) return 'pct-high';
   return 'pct-complete';
 });
+
+// 💰 Historical Session Sales Revenue
+const historyTotalSales = computed(() => {
+  if (selectedItem.value && selectedItem.value.totalSales !== undefined && selectedItem.value.totalSales > 0) {
+    return selectedItem.value.totalSales;
+  }
+  let sum = 0;
+  Object.values(allOrders.value || {}).forEach((item) => {
+    if (item && item.owner && item.price) {
+      const p = parseInt(item.price, 10);
+      if (!isNaN(p) && p > 0) sum += p;
+    }
+  });
+  return sum;
+});
+
+const animatedHistoryTotalSales = ref(historyTotalSales.value);
+let historySalesAnimFrame = null;
+const isPulsingSales = ref(false);
+let pulsingSalesTimer = null;
+
+const historySalesTooltip = computed(() => {
+  const total = historyTotalSales.value.toLocaleString();
+  return `ยอดขายรวมในไลฟ์นี้: ฿${total} (${soldCount.value} รายการ)`;
+});
+
+watch(historyTotalSales, (newVal, oldVal) => {
+  if (historySalesAnimFrame) cancelAnimationFrame(historySalesAnimFrame);
+  const from = oldVal ?? 0;
+  isPulsingSales.value = true;
+  if (pulsingSalesTimer) clearTimeout(pulsingSalesTimer);
+  pulsingSalesTimer = setTimeout(() => {
+    isPulsingSales.value = false;
+    pulsingSalesTimer = null;
+  }, 600);
+  historySalesAnimFrame = animateValue(from, newVal, 500, (v) => {
+    animatedHistoryTotalSales.value = v;
+  });
+}, { immediate: true });
 
 const motivationalText = computed(() => {
   const percentage = soldPercentage.value;
@@ -2018,6 +2066,56 @@ async function openCleanupModal() {
 @keyframes mini-shimmer-slide {
   0% { left: -100%; }
   100% { left: 100%; }
+}
+
+/* 💰 Total Sales Badge */
+.total-sales-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.88em;
+  font-weight: 700;
+  padding: 1px 9px;
+  border-radius: 20px;
+  background: rgba(180, 83, 9, 0.35);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), 0 0 8px rgba(251, 191, 36, 0.18);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+  cursor: default;
+  user-select: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.total-sales-badge:hover {
+  background: rgba(217, 119, 6, 0.45);
+  border-color: #fde047;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+  transform: translateY(-1px);
+}
+
+.total-sales-badge.pulse {
+  animation: pulse-sales 0.5s ease-out;
+}
+
+@keyframes pulse-sales {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.12); box-shadow: 0 0 14px rgba(251, 191, 36, 0.6); }
+  100% { transform: scale(1); }
+}
+
+.total-sales-badge .sales-label {
+  color: #fef08a;
+  font-size: 0.82em;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.total-sales-badge .sales-amount {
+  color: #fde047;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(253, 224, 71, 0.35);
 }
 
 .motivational-badge {

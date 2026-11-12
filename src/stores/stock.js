@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { triggerCelebration } from "../utils/celebration";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import {
   ref as dbRef,
   onValue,
@@ -33,6 +33,22 @@ export const useStockStore = defineStore("stock", () => {
   let currentUnsubscribe = null;
 
   /**
+   * Total sales revenue (฿) of all claimed items with valid prices in the active live stock
+   */
+  const totalSales = computed(() => {
+    let sum = 0;
+    Object.values(stockData.value || {}).forEach((item) => {
+      if (item && item.owner && item.price) {
+        const p = parseInt(item.price, 10);
+        if (!isNaN(p) && p > 0) {
+          sum += p;
+        }
+      }
+    });
+    return sum;
+  });
+
+  /**
    * Connects to the stock node in Firebase for a specific video.
    * @param {string} videoId - The YouTube Video ID or 'demo'.
    * @returns {Function} Cleanup function to unsubscribe listeners.
@@ -59,13 +75,13 @@ export const useStockStore = defineStore("stock", () => {
       stockData.value = val;
 
       if (videoId && videoId !== "demo") {
-        let totalSales = 0;
+        let calculatedSales = 0;
         let totalItems = 0;
 
         Object.values(val).forEach((item) => {
           if (item.owner && item.price) {
             const p = parseInt(item.price, 10);
-            totalSales += isNaN(p) ? 0 : p;
+            calculatedSales += isNaN(p) ? 0 : p;
             totalItems++;
           } else if (item.owner) {
             // Count items that have an owner even if price is missing
@@ -100,14 +116,14 @@ export const useStockStore = defineStore("stock", () => {
         }
 
         // ✅ Throttle history writes & skip if totals haven't changed
-        if (totalSales !== lastHistorySales || totalItems !== lastHistoryItems) {
+        if (calculatedSales !== lastHistorySales || totalItems !== lastHistoryItems) {
           if (historyWriteTimeout) clearTimeout(historyWriteTimeout);
           historyWriteTimeout = setTimeout(() => {
-            lastHistorySales = totalSales;
+            lastHistorySales = calculatedSales;
             lastHistoryItems = totalItems;
             const historyRef = dbRef(db, `history/${videoId}`);
             update(historyRef, {
-              totalSales: totalSales,
+              totalSales: calculatedSales,
               totalItems: totalItems,
               lastUpdated: Date.now(),
             }).catch((err) => console.error("History Sync Error:", err));
@@ -517,6 +533,7 @@ export const useStockStore = defineStore("stock", () => {
       stockData.value[num] = {};
     }
     stockData.value[num].price = price;
+    stockData.value = { ...stockData.value };
 
     return update(dbRef(db), { [path]: price }).catch((err) => {
       console.warn(`[StockStore] Sync price to Firebase failed (${targetVideoId}/${num}):`, err);
@@ -595,6 +612,7 @@ export const useStockStore = defineStore("stock", () => {
     stopStockSync,
     stockData,
     stockSize,
+    totalSales,
     milestones,
     connectToStock,
     processOrder,

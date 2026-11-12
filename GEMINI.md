@@ -49,6 +49,10 @@ These instructions help customize interactions with the Gemini agent for this sp
 7. **ระบบตรวจจับราคาและเบอร์สินค้าแบบสลับลำดับและมีชื่อคั่น (Permutation & Intervening Name Detection):**
    - ต้องรองรับการพูดสลับลำดับของแม่ค้าทั้ง 6 รูปแบบ เช่น `[เบอร์] + [ชื่อ] + [ราคา]`, `[ราคา] + [เบอร์]`, `[ชื่อ] + [เบอร์] + [ราคา]` โดยใช้ `extract_code_price_permutations()`
    - ป้องกัน False Positives โดยใช้ Negative Lookahead กรองหน่วย `บาท/ตัว/คน/วัน/%` ออกจากตัวเลขเบอร์สินค้า และตรวจสอบราคาในชุดราคามาตรฐาน (`VALID_PRICES`)
+8. **แสดงยอดขายรวมไลฟ์ปัจจุบันแทนข้อความไฟเริ่มติดแล้ว (Live Session Sales Revenue Badge):**
+   - ใน `StockGrid.vue` (และ `HistoryModal.vue`) เปลี่ยนตำแหน่งข้อความเดิม ("🔥 ไฟเริ่มติดแล้ว!") เป็นป้ายยอดขายรวม `.total-sales-badge` (`ยอด: ฿...`) สีทองเรืองแสง
+   - คำนวณจาก `useStockStore.totalSales` โดยรวมเฉพาะสินค้าที่ขายแล้ว (`item.owner` มีค่า) และมีราคาที่ถูกต้อง (`item.price > 0`) สินค้าที่ว่างอยู่ไม่ถูกนำมาคำนวณ
+   - รองรับตัวเลขอัปเดตแบบแอนิเมชันลื่นไหล (`animateValue`), Pulse Effect (`isPulsingSales`), Tooltip สรุปจำนวนชิ้น, และ Responsive ซ่อนคำว่า `ยอด:` บนมือถือ (`<= 768px`) เพื่อความกะทัดรัด
 
 - **Stability First**: This is a production Vue 3 application used for Live Commerce. Never break existing features, especially the real-time Firebase sync, stock booking queues, and the audio/TTS queue.
 - **Read the Rules**: Always review [AI_RULES.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/AI_RULES.md) before implementing logic changes.

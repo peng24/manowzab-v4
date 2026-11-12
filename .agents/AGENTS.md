@@ -1,5 +1,49 @@
 # Manowzab Command Center Project Rules
 
+### 📌 กฎเหล็กประจำระบบ: ห้ามทำอะไร (DO NOT) & ให้ทำอะไร (MUST DO)
+*(อัปเดตล่าสุด: 12 พ.ย. 69 — ปฏิบัติตามอย่างเคร่งครัดและอัปเดตต่อเนื่องทุกครั้งที่มีการเปลี่ยนแปลง)*
+
+#### 🚫 สิ่งที่ห้ามทำเด็ดขาด (DO NOT / NEVER)
+1. **ห้ามส่งเสียงราคา และห้ามประกาศราคาลงช่องแชท (Zero Price TTS & Zero Chat Invariant):**
+   - ราคาที่ AI ตรวจจับได้จากการฟังเสียงสดหรือย้อนหลัง **ห้าม** โพสต์ลง `chats/{videoId}`
+   - **ห้าม** ออกเสียง TTS / SFX ราคา และห้ามรบกวนช่องแชททุกแท็บ ให้บันทึกราคาเงียบๆ (Silent Sync) เข้าไปที่ป้ายราคาสีทอง `.stock-price-pill` บนการ์ดสต็อกเท่านั้น
+2. **ห้ามจับภาพสินค้าในตอนนี้ (Image Capture Paused):**
+   - พักการจับภาพสินค้าไว้ก่อน ตามคำสั่งผู้ใช้ เน้นเฉพาะการฟังเสียงตรวจจับราคาและไซส์อย่างแม่นยำเท่านั้น
+3. **ห้ามลบโค้ดการทำงานเดิมโดยพลการ (Modification Policy):**
+   - ห้ามลบฟีเจอร์เดิม ให้ใช้แนวทาง Additive Enhancements เสมอ
+4. **ห้ามใช้วันที่ปัจจุบันเป็นค่าเริ่มต้น เมื่อประมวลผลไลฟ์ย้อนหลัง (Replay Exact Date Invariant):**
+   - ห้ามลงราคาผิดวันที่ หรือทับวันปัจจุบัน ต้องตรงตามวันที่ไลฟ์จริงเสมอ เช่น ลิงก์ไลฟ์วันที่ 11 พ.ย. 69 ต้องลงราคาในสต็อกและประวัติของวันที่ 11 พ.ย. 69 เท่านั้น
+5. **ห้ามใช้ `subprocess` โดยไม่ระบุ `encoding='utf-8'` บน Windows:**
+   - ห้ามละเลย encoding เมื่อเรียก yt-dlp/ffmpeg ใน Python เพื่อป้องกันภาษาไทยกลายเป็นอักษรต่างดาว
+6. **ห้ามดึง URL ตรงของ GoogleVideo (`yt-dlp -g`) มาใส่ FFmpeg ในโหมดไลฟ์ย้อนหลัง:**
+   - เพราะไฟล์เป็น DASH Segment จะทำให้สตรีมตัดจบหลัง 5 วินาที ต้องใช้ท่อ Pipe (`yt-dlp -o - | ffmpeg`) และบัฟเฟอร์ `read_exact_bytes` เสมอ
+7. **ห้ามลบลูกค้าออกจากฐานข้อมูลเมื่อกดปุ่มถังขยะในหน้าส่งของ (Non-destructive Shipping Removal):**
+   - `remove(dbRef(db, 'delivery_customers/...'))` ห้ามทำเด็ดขาด ให้เคลียร์เฉพาะวันส่ง (`unscheduleDeliveryState`) ย้ายไป "ฝากสินค้า" โดยข้อมูลการจองและที่อยู่ยังอยู่ครบ 100%
+8. **ห้ามเรียก `ttsService.speak()` ตรงๆ โดยไม่ผ่านคิว:**
+   - เสียงทุกอย่างต้องเข้า `queueAudio()` ใน `useAudio.js` เท่านั้น เพื่อป้องกันเสียงทับซ้อน
+9. **ห้ามให้ลูกค้าที่ถูกแบน (Blacklist) จองสินค้าหรือมีเสียงอ่าน:**
+   - ลูกค้าที่อยู่ในแบล็กลิสต์ต้องไม่มีเสียงอ่าน และไม่สามารถแย่งสต็อกได้
+10. **ห้ามใส่ฟอนต์ 'TH Sarabun New' ในสลิปพิมพ์ความร้อน (Thermal Label):**
+    - เพราะทำให้สระภาษาไทยหดเล็กลง 35% บน Windows ให้ใช้ 'Sarabun', 'Kanit', ...
+
+#### ✅ สิ่งที่ต้องทำเสมอ (MUST DO / ALWAYS)
+1. **คิดและอัปเดตกฎ + `/verify` อัตโนมัติทุกครั้ง (Proactive Rule & `/verify` Auto-Evolution):**
+   - หลังแก้ไขโค้ดทุกครั้ง ต้องวิเคราะห์และอัปเดตไฟล์กฎ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) และ `.agents/workflows/verify.md` โดยอัตโนมัติโดยไม่ต้องรอให้สั่ง พร้อมรายงานให้ผู้ใช้ทราบทุกครั้ง
+2. **ระบบตรวจจับราคาไลฟ์ย้อนหลังตรงตามวันที่จริง (Replay Price Detection & Exact Date Sync):**
+   - รองรับการใส่ลิงก์ YouTube ย้อนหลัง, Video ID, หรือระบุวันที่ เช่น `11 พ.ย. 69`
+   - ตรวจสอบและสร้าง `history/{videoId}` และ `settings/{videoId}/stockSize` ใน Firebase ให้ตรงวันที่
+   - ซิงค์ราคาเงียบๆ ไปที่ `stock/{videoId}/{item}/price` และคำนวณยอดขายรวมใน `history/{videoId}` อัตโนมัติ
+   - แสดงป้ายราคาใน `HistoryModal.vue` และมีปุ่ม "เปิดที่หน้าหลัก" ให้สลับ `system/activeVideo` มาที่หน้าจอหลักได้ใน 1 คลิก
+3. **เมื่อผู้ใช้สั่ง "อัพเลย" ให้รันไปป์ไลน์อัตโนมัติจนจบ:**
+   - `/verify` (พร้อมอัปเดตกฎ/`/verify`) ➔ `/update` (bump version & changelog) ➔ `git commit & push` ➔ `npm run deploy` ขึ้น GitHub Pages ทันที
+4. **รักษาความเสถียร 60fps และ Centralized Customer Store:**
+   - ใช้ `useCustomerStore` จุดเดียวสำหรับ `delivery_customers` และ `address_book`
+5. **แปลงตัวเลขเป็นคำอ่านภาษาไทย (Thai Cardinal Numbers):**
+   - แปลงเลขเบอร์สินค้าและราคาเป็นคำอ่านภาษาไทย เช่น 15 -> "สิบห้า", 120 -> "หนึ่งร้อยยี่สิบ" เพื่อให้อ่านออกเสียงอย่างเป็นธรรมชาติ
+6. **บันทึก Log การวิเคราะห์ทุกเซสชัน:**
+   - บันทึก `.log`, `.jsonl`, และ `_summary.json` ทุกครั้งเพื่อใช้ปรับปรุงความแม่นยำอย่างต่อเนื่อง
+
+
 ## 🔊 Audio and TTS Sync Invariant
 1. **Cross-Device Audio Playback**: All audio events (TTS and SFX) must be synchronized across devices.
    - Do **NOT** call `queueAudio()` directly inside `useChatProcessor.js` (except for status welcome announcements).

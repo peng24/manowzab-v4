@@ -145,3 +145,10 @@ We have adapted and installed developer-agent workflows from `9arm-skills` into 
 - Use valid W3C `@page { size: <width> <height>; margin: 0mm; }` syntax (never combine two explicit `<length>` values with the `landscape` keyword such as `size: 130mm 76mm landscape;`, which browsers reject as invalid CSS Paged Media syntax).
 - Maintain high-legibility thermal font sizes calibrated 1:1 with on-screen preview (`receiver-name: 13.5pt / 700`, `receiver-addr: 11pt / 600` with adaptive long-address sizing, `receiver-zip: 14pt / 800`, `receiver-phone: 11pt / 700`, `sender-name: 10pt / 700`, `meta-payment-row: 9.5pt / 800`, `card-footer: 9pt / 600`) and support user-selectable font scaling (`preview` 100% default / `compact` 90% / `large` 120%) persisted in `localStorage('manowzab_label_font_scale')` so print output matches preview proportions.
 - `cleanShippingLabelAddress` (`getCustomerCleanAddress`) must strip duplicate leading recipient names, embedded phone numbers, and 5-digit postal codes from the address body when those fields are already rendered on dedicated lines.
+
+## Replay Price Detection & Exact Date Sync (2026-11-12)
+
+- Manowzab AI (`run_live_launcher.py`) supports fast accelerated detection on past live streams (VOD / Replay) from YouTube URLs or Thai date queries (e.g. `11 พ.ย. 69`).
+- `SessionResolver` auto-resolves live dates (from YouTube title/upload_date or Thai date queries), ensures `history/{videoId}` exists in Firebase with title and date timestamp, runs fast accelerated replay without `-re`, syncs detected prices directly to `stock/{videoId}/{item}/price`, and recalculates totals in `history/{videoId}`.
+- In `HistoryModal.vue`, display the price badge (`.stock-price`) whenever `item.price && Number(item.price) > 0` for both sold and unsold items.
+- Provide `openOnMainBoard()` action in `HistoryModal.vue` allowing the operator to switch `system/activeVideo` in Firebase and open the historical live session directly on the main dashboard in 1 click.

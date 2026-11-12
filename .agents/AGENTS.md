@@ -99,6 +99,11 @@
     - It must NEVER post announcement messages to chat (`chats/{videoId}`) and NEVER trigger TTS or SFX audio playback across connected devices.
     - `src/stores/chat.js` and `src/components/ChatPanel.vue` strictly filter out any incoming or historical price announcement messages (`isPriceAnnouncementMessage`) across all chat tabs.
 
+16. **Historical Live Session & Replay Price Sync Invariant (v5.4.33+)**:
+    - In `HistoryModal.vue`, display the price badge (`.stock-price`) whenever `item.price && Number(item.price) > 0` for both sold and unsold items.
+    - Provide `openOnMainBoard()` action in `HistoryModal.vue` allowing the operator to switch `system/activeVideo` in Firebase and open the historical live session directly on the main dashboard in 1 click.
+    - In `live-product-capture-ai`, `SessionResolver` auto-resolves live dates (from YouTube title/upload_date or Thai date string queries), ensures `history/{videoId}` exists in Firebase with title and date timestamp, runs fast accelerated replay without `-re`, syncs detected prices directly to `stock/{videoId}/{item}/price`, and recalculates totals in `history/{videoId}`.
+
 ## 🚀 Mandatory Version Update Rule (`/update`)
 Every time the system version is bumped:
 1. **Bump Version in `package.json`** using Semantic Versioning (MAJOR.MINOR.PATCH).

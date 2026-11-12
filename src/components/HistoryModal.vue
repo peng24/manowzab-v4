@@ -102,6 +102,9 @@
                     </div>
 
                     <div class="header-actions">
+                      <button class="btn btn-primary btn-sm" @click="openOnMainBoard" title="เปิดไลฟ์นี้ขึ้นกระดานหลัก">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดที่หน้าหลัก
+                      </button>
                       <button class="btn btn-warning btn-sm" @click="confirmClearHistoryStock" title="ล้างกระดานประวัติ">
                         <i class="fa-solid fa-eraser"></i> ล้างกระดาน
                       </button>
@@ -248,7 +251,7 @@
                           👗 {{ getOwnerCount(item.owner, item.uid) }} ตัว
                         </div>
                         
-                        <div v-if="!item.isEmpty && item.price" class="stock-price">
+                        <div v-if="item.price && Number(item.price) > 0" class="stock-price">
                           {{ item.price }} บาท
                         </div>
 
@@ -407,10 +410,14 @@ import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
 import { normalizeCustomerName, isProxyUid, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
 import { formatBackdatedDetail, formatNormalBookingTime, getBookingTooltip } from "../utils/timeFormatUtils";
+import { useSystemStore } from "../stores/system";
+import { useStockStore } from "../stores/stock";
 import Swal from "sweetalert2";
 
 const emit = defineEmits(["close"]);
 const history = useHistory();
+const systemStore = useSystemStore();
+const stockStore = useStockStore();
 const baseUrl = import.meta.env.BASE_URL || "/";
 
 const selectedId = ref(null);
@@ -525,6 +532,31 @@ async function selectLive(item) {
     }
   });
   sessionListeners.push(unsubSize);
+}
+
+async function openOnMainBoard() {
+  if (!selectedId.value) return;
+  const vid = selectedId.value;
+  systemStore.currentVideoId = vid;
+  stockStore.connectToStock(vid);
+  try {
+    await set(dbRef(db, "system/activeVideo"), vid);
+    if (selectedItem.value?.title) {
+      await set(dbRef(db, "system/activeVideoTitle"), selectedItem.value.title);
+    }
+  } catch (err) {
+    console.error("Sync activeVideo error:", err);
+  }
+  emit("close");
+  Swal.fire({
+    icon: "success",
+    title: "เปิดไลฟ์ที่หน้าหลักแล้ว",
+    text: `เปิดกระดานสำหรับ ${selectedItem.value?.title || vid}`,
+    timer: 1500,
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+  });
 }
 
 // Convert orders object to array

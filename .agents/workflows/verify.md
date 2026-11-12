@@ -61,6 +61,7 @@ description: Mandatory verification checklist after every code change
 | 3.9 | Stock Price Pill Badge | src/components/StockItemCard.vue | แสดงป้ายราคาสีเหลืองทอง .stock-price-pill เมื่อ item.price > 0 (ทั้งสินค้าที่จองแล้วและยังว่างอยู่) และซ่อนสนิทเมื่อไม่มีราคา คลิกเพื่อเปิด Queue Modal แก้ไขราคา |
 | 3.10 | Queue Modal Price Editor & Quick Pills | src/components/StockGrid.vue | สามารถกรอกแก้ไขราคา editingPrice พร้อมปุ่มลัดราคา 50.-, 60.-, 80.-, 100.-, 120.-, 150.- และปุ่มล้างราคา บันทึกแล้วอัปเดตสต็อกและคำนวณ totalPrice ของลูกค้าอัตโนมัติ |
 | 3.11 | Historical Live Session & Replay Price Sync | `src/components/HistoryModal.vue` | ในประวัติย้อนหลัง แสดงป้ายราคา .stock-price สำหรับทั้งสินค้าที่จองแล้วและยังว่างอยู่ (item.price > 0), พร้อมปุ่ม 'เปิดที่หน้าหลัก' (openOnMainBoard) สำหรับสลับ session activeVideo ไปหน้ากระดานหลักทันที |
+| 3.12 | Spoken Permutation & Intervening Customer Name Price Detection | `live-product-capture-ai` (`product_parser.py`, `live_stream_detector.py`) | รองรับการพูดสลับลำดับทั้ง 6 รูปแบบของแม่ค้า (เช่น เบอร์+ชื่อ+ราคา, ราคา+เบอร์, ชื่อ+เบอร์+ราคา) พร้อมกรอง False Positive ป้องกันค่าส่ง/จำนวนตัว ไม่ให้ทับเบอร์สินค้า |
 
 ---
 

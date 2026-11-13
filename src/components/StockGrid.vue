@@ -71,7 +71,7 @@
               type="text"
               v-model="stockSearchQuery"
               class="stock-search-input"
-              placeholder="ค้นหาชื่อ/เบอร์..."
+              placeholder="ค้นหาชื่อ/เบอร์"
               @keyup.enter="handleStockSearchEnter"
               @keydown.esc="stockSearchQuery = ''"
             />
@@ -87,13 +87,12 @@
           </div>
 
           <div class="quick-filter-dropdown-wrap">
-            <select v-model="activeFilter" class="quick-filter-select" :class="'qf-' + activeFilter">
-              <option value="all">🌐 ทั้งหมด</option>
-              <option value="sold">🛒 ขายแล้ว</option>
-              <option value="vacant">⚪ ยังว่าง</option>
-              <option value="queue">⏳ มีคิว</option>
+            <select v-model="activeFilter" class="quick-filter-select" :class="'qf-' + activeFilter" aria-label="กรองรายการสต็อก">
+              <option value="all">ทั้งหมด</option>
+              <option value="sold">ขายแล้ว</option>
+              <option value="vacant">ยังว่าง</option>
+              <option value="queue">มีคิว</option>
             </select>
-            <i class="fa-solid fa-chevron-down dropdown-arrow"></i>
           </div>
         </div>
       </div>
@@ -1485,12 +1484,15 @@ watch(
       return;
     }
 
-    // ✅ Detect new orders
+    // ✅ Detect new orders & queue promotions (empty -> sold, or owner changed via queue)
     Object.keys(newVal).forEach((key) => {
       const num = parseInt(key);
       const newItem = newVal[key];
       const oldItem = oldVal?.[key];
-      if (newItem.owner && (!oldItem || !oldItem.owner)) {
+      const isNewOrPromoted =
+        newItem.owner &&
+        (!oldItem || !oldItem.owner || oldItem.owner !== newItem.owner);
+      if (isNewOrPromoted) {
         // ถ้าเป็น order ใหม่ ให้เคลียร์ cancelled state ออก (กรณีคิวเลื่อนขึ้น)
         if (cancelledItems.value.has(num)) {
           clearTimeout(cancelledTimers[num]);
@@ -2056,11 +2058,10 @@ watch(
 
 .stock-header {
   position: relative;
-  padding: 6px 12px;
-  background: linear-gradient(180deg, rgba(11, 15, 23, 0.98) 0%, rgba(13, 17, 28, 0.95) 100%);
-  border-bottom: 1px solid rgba(251, 191, 36, 0.12);
+  padding: 6px 14px;
+  background: rgba(13, 18, 28, 0.94);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   min-height: 40px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
 
@@ -2091,10 +2092,9 @@ watch(
 }
 
 .stat-sold {
-  color: #00e676;
-  font-size: 1.3em;
-  font-weight: bold;
-  text-shadow: 0 0 8px rgba(0, 230, 118, 0.3);
+  color: #34d399;
+  font-size: 1.25em;
+  font-weight: 700;
   margin: 0 2px;
   font-variant-numeric: tabular-nums;
 }
@@ -2201,18 +2201,18 @@ watch(
   100% { left: 100%; }
 }
 
-/* 💰 Total Sales Badge (Replaces legacy motivational text) */
+/* 💰 Total Sales Badge (Champagne Gold Quiet Luxury) */
 .total-sales-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.88em;
+  font-size: 0.9em;
   font-weight: 700;
-  padding: 1px 9px;
-  border-radius: 20px;
-  background: rgba(180, 83, 9, 0.35);
-  border: 1px solid rgba(251, 191, 36, 0.55);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), 0 0 8px rgba(251, 191, 36, 0.18);
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(229, 184, 105, 0.12);
+  border: 1px solid rgba(229, 184, 105, 0.42);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.3px;
@@ -2222,9 +2222,9 @@ watch(
 }
 
 .total-sales-badge:hover {
-  background: rgba(217, 119, 6, 0.45);
-  border-color: #fde047;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+  background: rgba(229, 184, 105, 0.22);
+  border-color: #f3cf7a;
+  box-shadow: 0 2px 8px rgba(229, 184, 105, 0.22);
   transform: translateY(-1px);
 }
 
@@ -2234,21 +2234,20 @@ watch(
 
 @keyframes pulse-sales {
   0% { transform: scale(1); }
-  40% { transform: scale(1.12); box-shadow: 0 0 14px rgba(251, 191, 36, 0.6); }
+  40% { transform: scale(1.1); box-shadow: 0 0 12px rgba(229, 184, 105, 0.45); }
   100% { transform: scale(1); }
 }
 
 .total-sales-badge .sales-label {
-  color: #fef08a;
+  color: #e5b869;
   font-size: 0.82em;
   font-weight: 600;
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
 .total-sales-badge .sales-amount {
-  color: #fde047;
+  color: #f8dfa0;
   font-weight: 800;
-  text-shadow: 0 0 8px rgba(253, 224, 71, 0.35);
 }
 
 .motivational-badge {
@@ -2441,11 +2440,11 @@ watch(
   display: grid;
   grid-template-columns: repeat(
     auto-fill,
-    minmax(125px, 1fr)
+    minmax(132px, 1fr)
   );
-  gap: 12px;
+  gap: 10px;
   align-content: start; /* ✅ Pack items neatly from top to bottom */
-  padding: 16px;
+  padding: 14px;
   padding-bottom: calc(16px + env(safe-area-inset-bottom));
   overflow-y: auto;
   flex: 1;
@@ -2990,59 +2989,47 @@ watch(
 }
 
 .quick-filter-select {
-  appearance: none;
-  -webkit-appearance: none;
-  background: rgba(26, 32, 44, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
-  padding: 6px 32px 6px 14px;
-  font-weight: 700;
+  color-scheme: dark;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-weight: 600;
   font-family: "Kanit", sans-serif;
-  font-size: 0.88em;
+  font-size: 0.86em;
   cursor: pointer;
   outline: none;
-  transition: all 0.25s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s ease;
 }
 
 .quick-filter-select.qf-all {
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.5);
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.08);
 }
 
 .quick-filter-select.qf-sold {
-  color: #f59e0b;
-  border-color: rgba(245, 158, 11, 0.5);
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
 }
 
 .quick-filter-select.qf-vacant {
   color: #e2e8f0;
-  border-color: rgba(226, 232, 240, 0.35);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
+  border-color: rgba(226, 232, 240, 0.28);
 }
 
 .quick-filter-select.qf-queue {
-  color: #c084fc;
-  border-color: rgba(192, 132, 252, 0.5);
-  box-shadow: 0 0 12px rgba(192, 132, 252, 0.25);
+  color: #d8b4fe;
+  border-color: rgba(192, 132, 252, 0.35);
+  background: rgba(192, 132, 252, 0.08);
 }
 
 .quick-filter-select option {
-  background: #1e293b;
-  color: #fff;
+  background: #131823;
+  color: #f8fafc;
   font-weight: 600;
   padding: 10px;
-}
-
-.quick-filter-dropdown-wrap .dropdown-arrow {
-  position: absolute;
-  right: 12px;
-  font-size: 0.75em;
-  color: #94a3b8;
-  pointer-events: none;
 }
 
 /* 🔍 Stock Search Box */
@@ -3062,26 +3049,28 @@ watch(
 }
 
 .stock-search-input {
-  background: rgba(26, 32, 44, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
-  padding: 6px 28px 6px 30px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 5px 24px 5px 29px;
   font-weight: 500;
   font-family: "Kanit", sans-serif;
-  font-size: 0.86em;
+  font-size: 0.85em;
   color: #f1f5f9;
-  width: 135px;
+  width: 150px;
   outline: none;
-  transition: all 0.25s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s ease;
+}
+
+.stock-search-input::placeholder {
+  color: #94a3b8;
 }
 
 .stock-search-input:focus {
-  width: 175px;
-  border-color: rgba(56, 189, 248, 0.6);
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
-  background: rgba(15, 23, 42, 0.95);
+  width: 185px;
+  border-color: rgba(243, 200, 117, 0.55);
+  box-shadow: 0 0 0 2px rgba(243, 200, 117, 0.14);
+  background: rgba(15, 21, 32, 0.95);
 }
 
 .stock-search-clear {

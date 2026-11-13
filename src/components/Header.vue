@@ -86,18 +86,7 @@
 
       <!-- Free Thai voice test; Cloud toggle exists only in explicitly enabled builds. -->
       <button
-        :class="['btn']"
-        :style="{
-          background: systemStore.ttsVoiceMode === 'standard'
-            ? 'linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)'
-            : 'linear-gradient(135deg, #4B5563 0%, #374151 100%)',
-          boxShadow: systemStore.ttsVoiceMode === 'standard'
-            ? '0 4px 15px rgba(0, 114, 255, 0.4)'
-            : 'none',
-          border: 'none',
-          color: 'white',
-          position: 'relative',
-        }"
+        :class="['btn', 'btn-tts-mode', { 'is-cloud': systemStore.ttsVoiceMode === 'standard' }]"
         @click="toggleTtsMode"
         :aria-label="systemStore.googleCloudTtsEnabled ? 'สลับเสียงอ่าน' : 'ทดลองเสียงภาษาไทยฟรี'"
         :title="
@@ -115,17 +104,16 @@
               ? 'fa-solid fa-cloud'
               : 'fa-solid fa-robot',
           ]"
-          style="font-size: 1.1em; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
         ></i>
 
         <!-- Mode & Key Index Number -->
         <span
           v-if="systemStore.useOnlineTts"
-          style="margin-left: 5px; font-size: 1.05em; font-weight: bold; font-family: monospace; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2))"
+          class="tts-mode-code"
         >
           {{ 'S' + systemStore.activeKeyIndex }}
         </span>
-        <span v-else-if="!systemStore.googleCloudTtsEnabled" style="margin-left: 5px">TH ฟรี</span>
+        <span v-else-if="!systemStore.googleCloudTtsEnabled" style="margin-left: 2px">TH ฟรี</span>
       </button>
 
       <!-- 💬 Live Chat Panel Toggle Button -->
@@ -148,8 +136,10 @@
       </button>
 
       <div class="dropdown" ref="dropdownRef">
-        <button class="btn btn-sim" :class="{ active: showDropdown }" @click.stop="toggleDropdown">
-          ⚡ Tools <i class="fa-solid fa-caret-down"></i>
+        <button class="btn btn-sim" :class="{ active: showDropdown }" @click.stop="toggleDropdown" title="เมนูเครื่องมือและการตั้งค่า">
+          <i class="fa-solid fa-sliders"></i>
+          <span class="tools-label">เครื่องมือ</span>
+          <i class="fa-solid fa-caret-down"></i>
         </button>
  
         <Teleport to="body">
@@ -279,15 +269,14 @@
         :class="['status-dot', systemStore.isConnected ? 'online' : '']"
       ></div>
       <div class="live-viewers">
-        👁️ {{ systemStore.viewerCount.toLocaleString() }}
+        <i class="fa-regular fa-eye"></i> {{ systemStore.viewerCount.toLocaleString() }}
       </div>
       <div class="live-title">
         <span v-if="systemStore.isLiveFinished" class="finished-badge clickable" @click="openLiveSummary" title="คลิกเพื่อดูสรุปผลการขายประจำไลฟ์">
-          🔴 ไลฟ์จบแล้ว (ดูสรุป)
+          <span class="finished-dot"></span> ไลฟ์จบแล้ว (ดูสรุป)
         </span>
         {{ systemStore.liveTitle }}
       </div>
-
     </div>
   </div>
 </template>

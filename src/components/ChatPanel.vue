@@ -56,9 +56,9 @@
           class="chat-act-btn btn-collapse"
           @click="systemStore.toggleChatCollapse"
           title="ซ่อนช่องแชท (Alt + C) เพื่อขยายตารางสต็อกเต็มจอ"
+          aria-label="ซ่อนช่องแชท"
         >
           <i class="fa-solid fa-angles-right"></i>
-          <span class="act-label">ซ่อน</span>
         </button>
       </div>
     </div>
@@ -66,14 +66,14 @@
     <!-- 🏷️ Chat Intent Filter Tabs -->
     <div class="chat-intent-tabs">
       <button class="chat-tab" :class="{ active: selectedChatTab === 'all' }" @click="selectedChatTab = 'all'">ทั้งหมด</button>
-      <button class="chat-tab tab-cf" :class="{ active: selectedChatTab === 'buy' }" @click="selectedChatTab = 'buy'">🛒 จอง (CF)</button>
-      <button class="chat-tab tab-shipping" :class="{ active: selectedChatTab === 'shipping' }" @click="selectedChatTab = 'shipping'">🚚 ส่ง</button>
-      <button class="chat-tab tab-cancel" :class="{ active: selectedChatTab === 'cancel' }" @click="selectedChatTab = 'cancel'">❌ ยกเลิก</button>
+      <button class="chat-tab tab-cf" :class="{ active: selectedChatTab === 'buy' }" @click="selectedChatTab = 'buy'">จอง (CF)</button>
+      <button class="chat-tab tab-shipping" :class="{ active: selectedChatTab === 'shipping' }" @click="selectedChatTab = 'shipping'">ส่ง</button>
+      <button class="chat-tab tab-cancel" :class="{ active: selectedChatTab === 'cancel' }" @click="selectedChatTab = 'cancel'">ยกเลิก</button>
       <button class="chat-tab tab-question" :class="{ active: selectedChatTab === 'question' }" @click="selectedChatTab = 'question'" title="แสดงเฉพาะคำถามลูกค้าและข้อมูลช่วยตอบแม่ค้า">
-        💡 คำถาม
+        คำถาม
         <span v-if="questionTabCount > 0" class="tab-count-pill">{{ questionTabCount }}</span>
       </button>
-      <button class="chat-tab tab-admin" :class="{ active: selectedChatTab === 'admin' }" @click="selectedChatTab = 'admin'">⚡ แอดมิน</button>
+      <button class="chat-tab tab-admin" :class="{ active: selectedChatTab === 'admin' }" @click="selectedChatTab = 'admin'">แอดมิน</button>
       <button
         type="button"
         class="chat-tab tab-author"
@@ -81,8 +81,8 @@
         @click="showAuthorDropdown = !showAuthorDropdown"
         title="เลือกรายชื่อลูกค้าที่ต้องการดูแชท"
       >
-        <i class="fa-solid fa-users-viewfinder"></i>
-        <span>{{ selectedAuthors.length > 0 ? `กรองชื่อ (${selectedAuthors.length})` : 'กรองตามชื่อ' }}</span>
+        <i class="fa-solid fa-filter"></i>
+        <span>{{ selectedAuthors.length > 0 ? `ชื่อ (${selectedAuthors.length})` : 'กรองชื่อ' }}</span>
       </button>
     </div>
 
@@ -328,12 +328,6 @@
             >
               💡 ถาม
             </span>
-            <span
-              v-else-if="chat.type === 'spam'"
-              class="status-badge-under badge-spam status-emoji-only"
-            >
-              💬
-            </span>
           </div>
 
           <!-- Message Bubble Right -->
@@ -342,11 +336,11 @@
               <span class="chat-time">{{ formatTime(chat.timestamp) }}</span>
               <span
                 class="chat-name"
-                :style="{ backgroundColor: chat.color }"
                 @click="editNickname(chat)"
                 title="คลิกเพื่อแก้ไขข้อมูลลูกค้า (ชื่อเล่น, ที่อยู่, ช่องทางติดต่อ)"
               >
-                {{ chat.displayName }}
+                <span class="chat-name-dot" :style="{ backgroundColor: chat.color || '#94a3b8' }"></span>
+                <span class="chat-name-text">{{ chat.displayName }}</span>
               </span>
 
               <!-- 🏷️ Customer Status Micro-Badges Cluster (Address, Channel, Payment) -->
@@ -1037,7 +1031,7 @@ async function confirmToggleBan(chat) {
   }
 }
 
-// 🎨 Helper: Generate vibrant, unified background tint and accent border from customer signature color
+// 🎨 Helper: Generate calm Quiet Luxury tint and subtle left accent from customer signature color
 function getChatRowStyle(chat) {
   if (!chat) return {};
   // Priority actions use dedicated class themes (buy, shipping, cancel, admin)
@@ -1048,37 +1042,29 @@ function getChatRowStyle(chat) {
   const rawColor = chat.color;
   if (!rawColor) return {};
 
-  let tint25 = "rgba(56, 189, 248, 0.25)";
-  let tint30 = "rgba(56, 189, 248, 0.30)";
-  let tint55 = "rgba(56, 189, 248, 0.55)";
-  let tint22 = "rgba(56, 189, 248, 0.22)";
+  let tint06 = "rgba(148, 163, 184, 0.06)";
+  let tint16 = "rgba(148, 163, 184, 0.16)";
 
   if (rawColor.startsWith("hsl")) {
-    tint25 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.25)");
-    tint30 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.30)");
-    tint55 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.55)");
-    tint22 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.22)");
+    tint06 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.06)");
+    tint16 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.18)");
   } else if (rawColor.startsWith("#")) {
     const hex = rawColor.replace("#", "");
     if (hex.length === 6) {
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
       const b = parseInt(hex.substring(4, 6), 16);
-      tint25 = `rgba(${r}, ${g}, ${b}, 0.25)`;
-      tint30 = `rgba(${r}, ${g}, ${b}, 0.30)`;
-      tint55 = `rgba(${r}, ${g}, ${b}, 0.55)`;
-      tint22 = `rgba(${r}, ${g}, ${b}, 0.22)`;
+      tint06 = `rgba(${r}, ${g}, ${b}, 0.06)`;
+      tint16 = `rgba(${r}, ${g}, ${b}, 0.18)`;
     }
   }
 
   return {
-    borderLeft: `4.5px solid ${rawColor}`,
-    borderColor: tint55,
-    background: `linear-gradient(135deg, ${tint25} 0%, rgba(15, 23, 42, 0.75) 100%)`,
-    boxShadow: `0 4px 16px ${tint22}`,
-    "--bubble-bg": tint30,
-    "--bubble-border": tint55,
-    "--bubble-glow": tint22,
+    borderLeft: `3px solid ${rawColor}`,
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    background: `linear-gradient(135deg, ${tint06} 0%, rgba(13, 18, 28, 0.85) 100%)`,
+    "--bubble-bg": "rgba(18, 24, 38, 0.84)",
+    "--bubble-border": tint16,
   };
 }
 
@@ -1719,14 +1705,13 @@ async function refreshChat() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: linear-gradient(180deg, rgba(11, 15, 23, 0.98) 0%, rgba(13, 17, 28, 0.95) 100%);
-  border-bottom: 1px solid rgba(251, 191, 36, 0.12);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  padding: 7px 10px;
+  background: rgba(13, 18, 28, 0.96);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   position: relative;
   z-index: 20;
-  gap: 8px;
-  min-height: 46px;
+  gap: 6px;
+  min-height: 44px;
   box-sizing: border-box;
 }
 
@@ -1734,29 +1719,27 @@ async function refreshChat() {
 .chat-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .chat-title-group {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
 }
 
 .chat-icon {
-  font-size: 1.15em;
-  color: #38bdf8;
-  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.45));
+  font-size: 1em;
+  color: #e5b869;
 }
 
 .chat-title {
   font-family: "Kanit", sans-serif;
   font-weight: 700;
-  font-size: 1.05em;
-  letter-spacing: 0.3px;
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  font-size: 0.94em;
+  letter-spacing: 0.2px;
+  color: #f8fafc;
 }
 
 .chat-live-pill {
@@ -1765,7 +1748,7 @@ async function refreshChat() {
   gap: 4px;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.35);
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 20px;
   user-select: none;
 }
@@ -1800,17 +1783,18 @@ async function refreshChat() {
 .chat-header-actions {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .chat-act-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 9px;
+  gap: 4px;
+  padding: 5px 8px;
   border-radius: 8px;
-  font-size: 0.82em;
+  font-size: 0.78em;
   font-weight: 600;
   font-family: "Kanit", sans-serif;
   cursor: pointer;
@@ -1827,45 +1811,40 @@ async function refreshChat() {
 
 /* 🔊 Sound Button */
 .chat-act-btn.btn-sound {
-  background: rgba(16, 185, 129, 0.12);
-  color: #34d399;
-  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(16, 185, 129, 0.1);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.24);
 }
 
 .chat-act-btn.btn-sound:hover {
-  background: rgba(16, 185, 129, 0.24);
+  background: rgba(16, 185, 129, 0.2);
   color: #ffffff;
-  border-color: #10b981;
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
-  transform: translateY(-1px);
+  border-color: rgba(52, 211, 153, 0.55);
 }
 
 .chat-act-btn.btn-sound.is-muted {
-  background: rgba(100, 116, 139, 0.15);
+  background: rgba(148, 163, 184, 0.1);
   color: #94a3b8;
-  border-color: rgba(100, 116, 139, 0.25);
+  border-color: rgba(148, 163, 184, 0.2);
 }
 
 .chat-act-btn.btn-sound.is-muted:hover {
-  background: rgba(239, 68, 68, 0.18);
-  color: #fca5a5;
-  border-color: rgba(239, 68, 68, 0.4);
-  transform: translateY(-1px);
+  background: rgba(244, 63, 94, 0.14);
+  color: #fda4af;
+  border-color: rgba(244, 63, 94, 0.35);
 }
 
 /* ⏹ Stop Voice Button */
 .chat-act-btn.btn-stop {
-  background: rgba(245, 158, 11, 0.12);
-  color: #fbbf24;
-  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(229, 184, 105, 0.1);
+  color: #f3cf7a;
+  border-color: rgba(229, 184, 105, 0.24);
 }
 
 .chat-act-btn.btn-stop:hover {
-  background: rgba(245, 158, 11, 0.24);
+  background: rgba(229, 184, 105, 0.2);
   color: #ffffff;
-  border-color: #f59e0b;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
-  transform: translateY(-1px);
+  border-color: rgba(229, 184, 105, 0.55);
 }
 
 .chat-act-btn.btn-stop:active {
@@ -1874,41 +1853,37 @@ async function refreshChat() {
 
 /* 📥 CSV Export Button */
 .chat-act-btn.btn-csv {
-  background: rgba(59, 130, 246, 0.12);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .chat-act-btn.btn-csv:hover {
-  background: rgba(59, 130, 246, 0.24);
+  background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  border-color: #3b82f6;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
-  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 /* Separator */
 .chat-act-divider {
   width: 1px;
-  height: 18px;
-  background: rgba(255, 255, 255, 0.12);
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
   margin: 0 2px;
   flex-shrink: 0;
 }
 
 /* ⇥ Collapse Button */
 .chat-act-btn.btn-collapse {
-  background: rgba(244, 63, 94, 0.14);
-  color: #fb7185;
-  border-color: rgba(244, 63, 94, 0.3);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .chat-act-btn.btn-collapse:hover {
-  background: rgba(244, 63, 94, 0.28);
-  color: #ffffff;
-  border-color: #f43f5e;
-  box-shadow: 0 0 12px rgba(244, 63, 94, 0.35);
-  transform: translateX(2px);
+  background: rgba(244, 63, 94, 0.14);
+  color: #fda4af;
+  border-color: rgba(244, 63, 94, 0.35);
 }
 
 .chat-act-btn.btn-collapse i {
@@ -1950,79 +1925,96 @@ async function refreshChat() {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
   position: relative;
 }
 
 .chat-row:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.045);
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* 🛒 Luxury Emerald Glass Card (Buy / CF) */
+/* 🛒 Quiet Luxury Emerald (Buy / CF) */
 .chat-row.buy {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(245, 158, 11, 0.08) 100%) !important;
-  border: 1.5px solid rgba(16, 185, 129, 0.6) !important;
-  border-left: 4.5px solid #10b981 !important;
-  box-shadow: 0 4px 18px rgba(16, 185, 129, 0.22) !important;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(15, 23, 30, 0.85) 100%) !important;
+  border: 1px solid rgba(16, 185, 129, 0.38) !important;
+  border-left: 3.5px solid #10b981 !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22) !important;
 }
 
 .chat-row.buy .chat-bubble {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  color: #ffffff;
+  background: rgba(16, 185, 129, 0.10);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #f8fafc;
   font-weight: 600;
-  font-size: 1.02em;
 }
 
-/* ❌ Coral Amber Glass Card (Cancel) */
+/* ❌ Quiet Luxury Rose (Cancel) */
 .chat-row.cancel {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(220, 38, 38, 0.08) 100%) !important;
-  border: 1.5px solid rgba(239, 68, 68, 0.6) !important;
-  border-left: 4.5px solid #ef4444 !important;
-  box-shadow: 0 4px 18px rgba(239, 68, 68, 0.22) !important;
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.14) 0%, rgba(28, 17, 24, 0.85) 100%) !important;
+  border: 1px solid rgba(244, 63, 94, 0.42) !important;
+  border-left: 3.5px solid #f43f5e !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22) !important;
 }
 
 .chat-row.cancel .chat-bubble {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #ffffff;
+  background: rgba(244, 63, 94, 0.10);
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  color: #f8fafc;
 }
 
-/* 📦 Shipping Message (Royal Violet) */
+/* 📦 Shipping Message */
 .chat-row.shipping {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(126, 34, 206, 0.08) 100%) !important;
-  border: 1.5px solid rgba(168, 85, 247, 0.6) !important;
-  border-left: 4.5px solid #a855f7 !important;
-  box-shadow: 0 4px 18px rgba(168, 85, 247, 0.22) !important;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(21, 18, 34, 0.85) 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+  border-left: 3.5px solid #a855f7 !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2) !important;
 }
 
 .chat-row.shipping .chat-bubble {
-  background: rgba(168, 85, 247, 0.18);
-  border: 1px solid rgba(168, 85, 247, 0.35);
-  color: #ffffff;
+  background: rgba(168, 85, 247, 0.10);
+  border: 1px solid rgba(168, 85, 247, 0.24);
+  color: #f8fafc;
 }
 
 /* 👑 Admin / Proxy Message */
 .chat-row.admin {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(124, 77, 255, 0.08) 100%) !important;
-  border: 1.5px solid rgba(245, 158, 11, 0.5) !important;
-  border-left: 4.5px solid #fbbf24 !important;
-  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.18) !important;
+  background: linear-gradient(135deg, rgba(229, 184, 105, 0.12) 0%, rgba(24, 21, 18, 0.85) 100%) !important;
+  border: 1px solid rgba(229, 184, 105, 0.35) !important;
+  border-left: 3.5px solid #e5b869 !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2) !important;
 }
 
 .chat-row.admin .chat-bubble {
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #ffffff;
+  background: rgba(229, 184, 105, 0.09);
+  border: 1px solid rgba(229, 184, 105, 0.24);
+  color: #f8fafc;
 }
 
 
 /* ✅ TransitionGroup Animations */
 .chat-list-enter-active {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.chat-list-enter-active.buy {
+  animation: chatBuyHighlight 1.6s ease-out;
+}
+
+.chat-list-enter-active.cancel {
+  animation: chatCancelHighlight 1.6s ease-out;
+}
+
+@keyframes chatBuyHighlight {
+  0% { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.75), 0 6px 24px rgba(16, 185, 129, 0.38); }
+  100% { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22); }
+}
+
+@keyframes chatCancelHighlight {
+  0% { box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.8), 0 6px 24px rgba(244, 63, 94, 0.38); }
+  100% { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22); }
 }
 
 .chat-list-leave-active {
@@ -2031,12 +2023,12 @@ async function refreshChat() {
 
 .chat-list-enter-from {
   opacity: 0;
-  transform: translateY(15px);
+  transform: translateY(14px) scale(0.98);
 }
 
 .chat-list-leave-to {
   opacity: 0;
-  transform: translateX(-15px);
+  transform: translateX(-12px);
 }
 
 .avatar-col {
@@ -2145,9 +2137,9 @@ async function refreshChat() {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 4px;
-  margin-bottom: 5px;
-  font-size: 0.85em;
+  gap: 5px;
+  margin-bottom: 6px;
+  font-size: 0.98rem;
   min-width: 0;
   width: 100%;
 }
@@ -2161,13 +2153,18 @@ async function refreshChat() {
 }
 
 .chat-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.98em;
   font-weight: 700;
-  color: #000;
-  padding: 1.5px 8px;
-  border-radius: 12px;
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  padding: 2px 10px 2px 8px;
+  border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2175,9 +2172,24 @@ async function refreshChat() {
   flex: 0 1 auto;
 }
 
+.chat-name-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.chat-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-name:hover {
-  transform: scale(1.03);
-  opacity: 0.95;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(229, 184, 105, 0.45);
+  transform: translateY(-0.5px);
 }
 
 .real-name {
@@ -2197,33 +2209,35 @@ async function refreshChat() {
 }
 
 .chat-bubble {
-  background-color: var(--bubble-bg, rgba(20, 27, 45, 0.75));
-  border: 1.5px solid var(--bubble-border, rgba(255, 255, 255, 0.12));
+  background-color: var(--bubble-bg, rgba(20, 26, 40, 0.78));
+  border: 1px solid var(--bubble-border, rgba(255, 255, 255, 0.09));
   color: #ffffff;
-  padding: 10px 14px;
-  border-radius: 4px 14px 14px 14px;
-  font-size: 0.98em;
-  line-height: 1.45;
+  padding: 11px 14px;
+  border-radius: 6px 14px 14px 14px;
+  font-size: 1.18rem;
+  line-height: 1.48;
   position: relative;
-  box-shadow: 0 4px 14px var(--bubble-glow, rgba(0, 0, 0, 0.2));
-  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
 }
 
 .chat-text {
+  flex: 1;
+  min-width: 0;
   color: #ffffff;
   font-weight: 600;
-  text-shadow:
-    -1px -1px 0 #000000,
-     0px -1px 0 #000000,
-     1px -1px 0 #000000,
-    -1px  0px 0 #000000,
-     1px  0px 0 #000000,
-    -1px  1px 0 #000000,
-     0px  1px 0 #000000,
-     1px  1px 0 #000000,
-     0px  2px 4px rgba(0, 0, 0, 0.9);
-  letter-spacing: 0.3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  letter-spacing: 0.15px;
   word-break: break-word;
+}
+
+.chat-row.buy .chat-text,
+.chat-row.cancel .chat-text {
+  font-size: 1.04em;
+  font-weight: 700;
 }
 
 /* ✅ Status Badges (Independent) */
@@ -2240,41 +2254,34 @@ async function refreshChat() {
 }
 
 .badge-buy {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: #ffffff;
-  border: 1px solid rgba(52, 211, 153, 0.5);
-  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
 .badge-cancel {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  color: #ffffff;
-  border: 1px solid rgba(248, 113, 113, 0.5);
-  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.45);
+  background: rgba(244, 63, 94, 0.16);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.42);
 }
 
 .badge-shipping {
-  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
-  color: #ffffff;
-  border: 1px solid rgba(192, 132, 252, 0.5);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.45);
+  background: rgba(168, 85, 247, 0.16);
+  color: #d8b4fe;
+  border: 1px solid rgba(168, 85, 247, 0.4);
 }
 
 
 .badge-question {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  background: rgba(56, 189, 248, 0.15);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.38);
 }
 
 .badge-note {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  color: #ffffff;
-  border: 1px solid rgba(251, 191, 36, 0.5);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.45);
+  background: rgba(229, 184, 105, 0.16);
+  color: #f3cf7a;
+  border: 1px solid rgba(229, 184, 105, 0.42);
 }
 
 .status-emoji-only {
@@ -2297,26 +2304,29 @@ async function refreshChat() {
 }
 
 .force-process-btn {
-  position: absolute;
-  right: -35px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
+  flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  transform: scale(0.95);
 }
 
-/* ✅ Desktop: Show on hover */
+/* ✅ Desktop: Show cleanly on row hover without covering text */
 @media (min-width: 1025px) {
-  .chat-bubble:hover .force-process-btn {
+  .chat-row:hover .force-process-btn {
     opacity: 1;
+    transform: scale(1);
   }
 }
 
-/* ✅ Mobile/Tablet: Always show with medium opacity */
+/* ✅ Mobile/Tablet: Subtle compact icon-only action without overlapping text */
 @media (max-width: 1024px) {
   .force-process-btn {
-    opacity: 0.6;
-    right: -32px; /* Slightly closer on mobile */
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  .force-process-btn .quick-key-label {
+    display: none;
   }
 }
 
@@ -3225,18 +3235,18 @@ async function refreshChat() {
 }
 
 .smart-hud-headline {
-  font-size: 0.96em;
+  font-size: 1.08rem;
   font-weight: 800;
   color: #ffffff;
-  line-height: 1.35;
+  line-height: 1.4;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .smart-hud-subline {
-  font-size: 0.80em;
+  font-size: 0.92rem;
   color: #e2e8f0;
   margin-top: 2px;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .smart-hud-timer-bar {
@@ -3411,17 +3421,17 @@ async function refreshChat() {
 .smart-answer-headline {
   flex: 1;
   min-width: 0;
-  font-size: 0.92rem;
+  font-size: 1.06rem;
   font-weight: 700;
   color: #ffffff;
-  line-height: 1.5;
+  line-height: 1.48;
 }
 
 .smart-answer-subline {
-  font-size: 0.8rem;
+  font-size: 0.92rem;
   color: #cbd5e1;
-  margin-top: 2px;
-  line-height: 1.5;
+  margin-top: 3px;
+  line-height: 1.48;
 }
 
 .smart-answer-pills {
@@ -3436,11 +3446,11 @@ async function refreshChat() {
   align-items: center;
   gap: 3px;
   max-width: 100%;
-  min-height: 28px;
-  padding: 4px 9px;
+  min-height: 30px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-family: "Kanit", sans-serif;
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   line-height: 1.4;
   text-align: left;
   font-weight: 700;

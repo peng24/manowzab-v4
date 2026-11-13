@@ -24,54 +24,63 @@
     @click="$emit('select', index)"
     :id="`stock-${index}`"
   >
-    <div class="stock-num">{{ index }}</div>
-    
-    <div v-if="isCancelled && !item.owner" class="stock-status cancelled-name">
-      ❌ {{ cancelledName }}
-    </div>
-    <div v-else :class="['stock-status', { empty: !item.owner, 'unsaved-owner': isUnsavedOwner(item.owner) }]">
-      <span>{{ nickname || item.owner || "ว่าง" }}</span>
-      <i
-        v-if="item.owner && item.backdated"
-        class="fa-solid fa-clock-rotate-left backdated-inline-icon"
-        :title="backdatedTooltip"
-      ></i>
+    <!-- Top Row: Item Number (Left) + Price & Queue (Right) — Zero Overlap -->
+    <div class="card-top-row">
+      <div class="stock-num">{{ index }}</div>
+
+      <div class="card-top-right">
+        <div
+          v-if="item.price && Number(item.price) > 0"
+          class="stock-price-pill"
+          :title="`ราคาสินค้า: ฿${Number(item.price).toLocaleString()} บาท (คลิกเพื่อแก้ไข)`"
+          @click.stop="$emit('select', index)"
+        >
+          ฿{{ Number(item.price).toLocaleString() }}
+        </div>
+        <div v-if="queueLength > 0" class="queue-badge" :title="`มีคิวสำรอง ${queueLength} คน`">
+          +{{ queueLength }}
+        </div>
+      </div>
     </div>
 
-    <div class="card-meta-row" v-if="item.owner || (item.price && Number(item.price) > 0)">
+    <!-- Center Body: High-Contrast Customer Name or Vacant / Cancelled -->
+    <div class="card-center-body">
+      <div v-if="isCancelled && !item.owner" class="stock-status cancelled-name">
+        <i class="fa-solid fa-xmark cancel-x-icon"></i> {{ cancelledName }}
+      </div>
+      <div v-else :class="['stock-status', { empty: !item.owner, 'unsaved-owner': isUnsavedOwner(item.owner) }]">
+        <span>{{ nickname || item.owner || "ว่าง" }}</span>
+        <i
+          v-if="item.owner && item.backdated"
+          class="fa-solid fa-clock-rotate-left backdated-inline-icon"
+          :title="backdatedTooltip"
+        ></i>
+      </div>
+    </div>
+
+    <!-- Bottom Micro-Meta Row (Subtle, Non-intrusive) -->
+    <div class="card-meta-row" v-if="item.owner">
       <div
-        v-if="item.owner && ownerCount >= 1"
+        v-if="ownerCount >= 1"
         class="owner-count-badge"
         :title="`${item.owner} จองทั้งหมด ${ownerCount} ชิ้น — คลิกเพื่อจัดการ`"
         @click.stop="$emit('show-owner', item.owner)"
-      >👗 {{ ownerCount }} ตัว</div>
+      >×{{ ownerCount }}</div>
 
       <div
-        v-if="item.owner && !hasAddress"
+        v-if="!hasAddress"
         class="no-addr-indicator"
         :title="`${item.owner} ยังไม่มีที่อยู่จัดส่งในระบบ`"
         @click.stop="$emit('show-owner', item.owner)"
       >
-        <i class="fa-solid fa-location-dot"></i> รอที่อยู่
-      </div>
-
-      <!-- 💰 Price Pill: Hidden when missing, prominent & clean when set -->
-      <div
-        v-if="item.price && Number(item.price) > 0"
-        class="stock-price-pill"
-        :title="`ราคาสินค้า: ฿${Number(item.price).toLocaleString()} บาท (คลิกเพื่อแก้ไข)`"
-        @click.stop="$emit('select', index)"
-      >
-        ฿{{ Number(item.price).toLocaleString() }}
+        <span class="no-addr-dot"></span>รอที่อยู่
       </div>
     </div>
 
-    <div v-if="queueLength > 0" class="queue-badge">
-      +{{ queueLength }}
-    </div>
-
-    <!-- 🌟 VIP Shimmer Beam (ลำแสงเพชรพาดผ่านตัวการ์ด) -->
+    <!-- 🌟 VIP Shimmer Beam (แสงทองวิ่งผ่านตอนจองใหม่) -->
     <div v-if="isNewOrder" class="new-order-shimmer"></div>
+    <!-- 🚨 Cancel Flash Sweep (แสงแดงแจ้งเตือนตอนยกเลิก) -->
+    <div v-if="isCancelled && !item.owner" class="cancel-flash-sweep"></div>
   </div>
 </template>
 
@@ -107,41 +116,42 @@ function isUnsavedOwner(name) {
 <style scoped>
 .stock-item {
   content-visibility: auto;
-  contain-intrinsic-size: 110px 85px;
-  aspect-ratio: 1.35;
-  background: rgba(13, 17, 28, 0.65);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px dashed rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-md, 12px);
+  contain-intrinsic-size: 132px 98px;
+  min-height: 98px;
+  background: rgba(17, 22, 34, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   cursor: pointer;
   position: relative;
-  padding: 8px 6px;
-  min-height: 85px;
+  padding: 8px 9px;
+  gap: 4px;
   z-index: 0;
   backface-visibility: hidden;
-  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+  transition:
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
 @media (hover: hover) {
   .stock-item:hover {
-    border-color: rgba(16, 185, 129, 0.45);
-    background: rgba(16, 185, 129, 0.06);
+    border-color: rgba(229, 184, 105, 0.4);
+    background: rgba(24, 31, 48, 0.92);
     will-change: transform;
     transform: translateY(-2px) translateZ(0);
     z-index: 10;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(16, 185, 129, 0.2);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
   }
 
   .stock-item.sold:hover {
-    background: linear-gradient(145deg, rgba(16, 185, 129, 0.28) 0%, rgba(5, 150, 105, 0.45) 100%);
-    border-color: #34d399;
-    box-shadow: 0 8px 28px rgba(16, 185, 129, 0.35), 0 0 0 1px rgba(52, 211, 153, 0.4);
+    background: linear-gradient(160deg, rgba(16, 185, 129, 0.20) 0%, rgba(11, 35, 30, 0.92) 100%);
+    border-color: rgba(52, 211, 153, 0.7);
+    box-shadow: 0 10px 26px rgba(16, 185, 129, 0.2);
   }
 }
 
@@ -151,41 +161,84 @@ function isUnsavedOwner(name) {
 }
 
 .stock-item.sold {
-  background: linear-gradient(145deg, rgba(16, 185, 129, 0.17) 0%, rgba(5, 150, 105, 0.30) 100%);
-  border: 1.5px solid rgba(16, 185, 129, 0.6);
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: linear-gradient(160deg, rgba(16, 185, 129, 0.14) 0%, rgba(12, 29, 27, 0.92) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(52, 211, 153, 0.12);
+}
+
+/* 🔎 Search / Jump Highlight */
+.stock-item.highlight {
+  border-color: #e5b869 !important;
+  box-shadow:
+    0 0 0 2px rgba(229, 184, 105, 0.5),
+    0 0 24px rgba(229, 184, 105, 0.35) !important;
+  animation: highlightFocusPulse 0.9s cubic-bezier(0.22, 1, 0.36, 1) 2;
+  z-index: 12;
+}
+
+@keyframes highlightFocusPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+/* Top Row: Number Left, Price & Queue Right */
+.card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-height: 22px;
+  z-index: 2;
+}
+
+.card-top-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .stock-num {
-  font-size: 1.1em;
+  font-size: 1.05em;
   font-weight: 800;
   font-family: var(--font-main, sans-serif);
-  color: #fbbf24;
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(251, 191, 36, 0.35);
+  font-variant-numeric: tabular-nums;
+  color: #e5b869;
+  background: rgba(11, 15, 23, 0.65);
+  border: 1px solid rgba(229, 184, 105, 0.32);
   padding: 1px 7px;
-  border-radius: var(--radius-sm, 6px);
-  position: absolute;
-  top: 5px;
-  left: 5px;
-  line-height: 1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  letter-spacing: 0.3px;
-  z-index: 1;
+  border-radius: 7px;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
 }
 
 .stock-item:not(.sold) .stock-num {
-  color: #64748b;
-  border-color: rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Center Body: Clear Seller-Readable Name */
+.card-center-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 30px;
+  z-index: 2;
 }
 
 .stock-status {
-  font-size: 1em;
-  color: #e2e8f0;
+  font-size: 1.04em;
+  color: #f1f5f9;
   font-weight: 600;
   text-align: center;
   width: 100%;
-  padding: 0 4px;
+  padding: 0 2px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -193,64 +246,57 @@ function isUnsavedOwner(name) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: normal;
-  line-height: 1.25;
-  margin-top: 8px;
-  position: relative;
-  z-index: 2;
+  line-height: 1.28;
+  word-break: break-word;
 }
 
 .stock-item.sold .stock-status {
-  color: #ffffff !important;
+  color: #ffffff;
   font-weight: 700;
-  text-shadow:
-    -1px -1px 0 #000000,
-     0px -1px 0 #000000,
-     1px -1px 0 #000000,
-    -1px  0px 0 #000000,
-     1px  0px 0 #000000,
-    -1px  1px 0 #000000,
-     0px  1px 0 #000000,
-     1px  1px 0 #000000,
-     0px  2px 4px rgba(0, 0, 0, 0.95);
-  letter-spacing: 0.2px;
-  position: relative;
-  z-index: 3;
-  margin-top: 4px;
+  font-size: 1.08em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  letter-spacing: 0.15px;
 }
 
 .stock-status.empty {
-  color: var(--status-empty-color, #64748b);
+  color: #64748b;
   font-weight: 400;
   font-size: 0.88em;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
 }
 
 .stock-status.unsaved-owner {
   color: #facc15 !important;
   font-weight: 700;
-  text-shadow: 0 0 10px rgba(250, 204, 21, 0.45);
 }
 
+/* ======================================================
+   ✨ BOOKING ANIMATION (CF Confirmed — Pop + Gold Sweep)
+   ====================================================== */
 .stock-item.sold.new-order {
-  animation: newOrderBlink 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  border-width: 2.5px !important;
+  animation:
+    orderPopEntry 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1,
+    newOrderLuxPulse 1.5s ease-in-out infinite;
+  border: 1.5px solid #e5b869 !important;
   z-index: 10 !important;
 }
 
 .stock-item.sold.new-order::after {
   content: "";
   position: absolute;
-  inset: -4px;
-  border-radius: calc(var(--radius-md, 12px) + 4px);
-  border: 1.5px solid #fbbf24;
+  inset: -3px;
+  border-radius: 17px;
+  border: 1.5px solid rgba(229, 184, 105, 0.75);
   pointer-events: none;
-  animation: newOrderRadar 1.8s ease-out infinite;
+  animation: newOrderRadar 1.6s ease-out infinite;
   z-index: -1;
 }
 
 .stock-item.sold.new-order .stock-num {
-  animation: newOrderNumBlink 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  z-index: 3;
+  color: #0b0f17 !important;
+  background: linear-gradient(135deg, #f3cf7a 0%, #d4a145 100%) !important;
+  border-color: #fef08a !important;
+  box-shadow: 0 0 10px rgba(229, 184, 105, 0.6);
 }
 
 .new-order-shimmer {
@@ -259,7 +305,7 @@ function isUnsavedOwner(name) {
   border-radius: inherit;
   overflow: hidden;
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
 }
 
 .new-order-shimmer::before {
@@ -267,218 +313,244 @@ function isUnsavedOwner(name) {
   position: absolute;
   top: -60%;
   left: -120%;
-  width: 60%;
+  width: 55%;
   height: 220%;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.1) 20%,
-    rgba(254, 240, 138, 0.55) 50%,
-    rgba(255, 255, 255, 0.4) 75%,
+    rgba(255, 255, 255, 0.08) 20%,
+    rgba(243, 207, 122, 0.45) 50%,
+    rgba(255, 255, 255, 0.3) 75%,
     transparent 100%
   );
   transform: rotate(25deg);
-  animation: vipShimmerSweep 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: vipShimmerSweep 1.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes orderPopEntry {
+  0% { transform: scale(0.9) translateZ(0); }
+  55% { transform: scale(1.06) translateZ(0); }
+  100% { transform: scale(1) translateZ(0); }
 }
 
 @keyframes vipShimmerSweep {
   0% { left: -120%; }
-  55%, 100% { left: 170%; }
+  60%, 100% { left: 170%; }
 }
 
-@keyframes newOrderBlink {
-  0%,
-  100% {
-    border-color: #fbbf24 !important;
-    background: linear-gradient(145deg, rgba(251, 191, 36, 0.42) 0%, rgba(245, 158, 11, 0.28) 100%) !important;
-    box-shadow:
-      0 0 0 3px rgba(251, 191, 36, 0.55),
-      0 0 30px rgba(251, 191, 36, 0.95),
-      0 0 55px rgba(245, 158, 11, 0.45),
-      inset 0 0 18px rgba(251, 191, 36, 0.4) !important;
-    transform: scale(1.04) translateZ(0);
-  }
-  50% {
-    border-color: #10b981 !important;
-    background: linear-gradient(145deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.34) 100%) !important;
-    box-shadow:
-      0 0 0 1px rgba(16, 185, 129, 0.4),
-      0 0 14px rgba(16, 185, 129, 0.35),
-      inset 0 0 8px rgba(16, 185, 129, 0.2) !important;
-    transform: scale(1.0) translateZ(0);
-  }
-}
-
-@keyframes newOrderNumBlink {
+@keyframes newOrderLuxPulse {
   0%, 100% {
-    color: #000000 !important;
-    background: #fbbf24 !important;
-    border-color: #fef08a !important;
-    box-shadow: 0 0 12px rgba(251, 191, 36, 0.95);
-    transform: scale(1.06);
+    border-color: #e5b869 !important;
+    background: linear-gradient(160deg, rgba(229, 184, 105, 0.24) 0%, rgba(16, 185, 129, 0.22) 100%) !important;
+    box-shadow:
+      0 0 0 2px rgba(229, 184, 105, 0.35),
+      0 6px 24px rgba(229, 184, 105, 0.35);
   }
   50% {
-    color: #fbbf24 !important;
-    background: rgba(0, 0, 0, 0.85) !important;
-    border-color: rgba(251, 191, 36, 0.35) !important;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-    transform: scale(1.0);
+    border-color: #34d399 !important;
+    background: linear-gradient(160deg, rgba(16, 185, 129, 0.2) 0%, rgba(12, 29, 27, 0.94) 100%) !important;
+    box-shadow:
+      0 0 0 1px rgba(52, 211, 153, 0.35),
+      0 4px 16px rgba(16, 185, 129, 0.22);
   }
 }
 
 @keyframes newOrderRadar {
-  0% { transform: scale(0.96); opacity: 0.9; }
-  70% { transform: scale(1.18); opacity: 0; }
-  100% { transform: scale(1.22); opacity: 0; }
+  0% { transform: scale(0.98); opacity: 0.85; }
+  75% { transform: scale(1.12); opacity: 0; }
+  100% { transform: scale(1.15); opacity: 0; }
 }
 
+/* Queue Badge (Neat Top-Right Pill) */
 .queue-badge {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  background: linear-gradient(135deg, #ff6d00 0%, #dd2c00 100%);
+  background: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
   color: #ffffff;
-  border-radius: 7px;
-  padding: 2px 7px;
-  min-width: 24px;
+  border-radius: 6px;
+  padding: 1px 6px;
+  min-width: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85em;
+  font-size: 0.78em;
   font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: 0.3px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
-  box-shadow: 0 2px 8px rgba(221, 44, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.3);
-  z-index: 20;
-  border: 1.5px solid #fde047;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  border: 1px solid rgba(254, 240, 138, 0.65);
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.45);
+  flex-shrink: 0;
 }
 
+/* Bottom Meta Row */
 .card-meta-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  margin-top: 3px;
+  gap: 5px;
   flex-wrap: wrap;
   z-index: 2;
+  min-height: 18px;
 }
 
 .owner-count-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.78em;
-  color: #34d399;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  padding: 2px 7px;
-  border-radius: 12px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  font-size: 0.72em;
+  font-variant-numeric: tabular-nums;
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  padding: 0.5px 6px;
+  border-radius: 999px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .owner-count-badge:hover {
-  background: rgba(16, 185, 129, 0.3);
-  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.28);
+  color: #ffffff;
   transform: translateY(-1px);
 }
 
 .no-addr-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 0.72em;
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.2);
-  border: 1px solid rgba(239, 68, 68, 0.45);
-  padding: 2px 6px;
-  border-radius: 10px;
-  font-weight: 700;
+  gap: 4px;
+  font-size: 0.7em;
+  color: #fda4af;
+  background: rgba(244, 63, 94, 0.14);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  padding: 0.5px 6px;
+  border-radius: 999px;
+  font-weight: 600;
   cursor: pointer;
-  letter-spacing: 0.2px;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.no-addr-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fb7185;
+  flex-shrink: 0;
 }
 
 .no-addr-indicator:hover {
-  background: rgba(239, 68, 68, 0.35);
-  border-color: #f87171;
+  background: rgba(244, 63, 94, 0.28);
   color: #ffffff;
-  transform: translateY(-1px);
 }
 
 .stock-price-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.76em;
-  color: #fde047;
-  background: rgba(120, 53, 15, 0.75);
-  border: 1px solid rgba(251, 191, 36, 0.6);
-  padding: 1.5px 7px;
-  border-radius: 10px;
+  font-size: 0.78em;
+  font-variant-numeric: tabular-nums;
+  color: #f3cf7a;
+  background: rgba(229, 184, 105, 0.13);
+  border: 1px solid rgba(229, 184, 105, 0.35);
+  padding: 1px 6px;
+  border-radius: 7px;
   font-weight: 700;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: all 0.2s ease;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .stock-price-pill:hover {
-  background: rgba(217, 119, 6, 0.95);
+  background: rgba(229, 184, 105, 0.28);
   color: #ffffff;
-  border-color: #fde047;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.5);
+  border-color: #f3cf7a;
 }
 
+/* ======================================================
+   🚨 CANCELLATION ANIMATION (Shake + Crimson Pulse)
+   ====================================================== */
 .stock-item.cancelled-blink {
-  animation: cancelBlink 1s ease-in-out infinite;
-  z-index: 3;
+  animation:
+    cancelShakeEntry 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1,
+    cancelPulseLux 1.15s ease-in-out infinite;
+  border: 1.5px solid rgba(244, 63, 94, 0.85) !important;
+  z-index: 8;
 }
 
-@keyframes cancelBlink {
+.cancel-flash-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cancel-flash-sweep::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(244, 63, 94, 0.28) 0%, transparent 72%);
+  animation: cancelFlashFade 1.15s ease-in-out infinite;
+}
+
+@keyframes cancelShakeEntry {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px) rotate(-0.8deg); }
+  40% { transform: translateX(4px) rotate(0.8deg); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+@keyframes cancelPulseLux {
   0%, 100% {
-    border-color: #ef4444;
-    box-shadow: 0 0 18px rgba(239, 68, 68, 0.6);
-    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(244, 63, 94, 0.9);
+    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.25), 0 6px 20px rgba(244, 63, 94, 0.35);
+    background: rgba(127, 29, 29, 0.32);
   }
   50% {
-    border-color: #7f1d1d;
-    box-shadow: 0 0 4px rgba(239, 68, 68, 0.15);
-    background: rgba(239, 68, 68, 0.06);
+    border-color: rgba(244, 63, 94, 0.38);
+    box-shadow: 0 0 6px rgba(244, 63, 94, 0.15);
+    background: rgba(69, 10, 10, 0.22);
   }
+}
+
+@keyframes cancelFlashFade {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.25; }
 }
 
 .cancelled-name {
-  color: #fca5a5 !important;
-  font-weight: 600;
-  font-size: 0.85em !important;
-  animation: cancelTextPulse 1s ease-in-out infinite;
+  color: #fecdd3 !important;
+  font-weight: 700;
+  font-size: 0.92em !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  animation: cancelTextPulse 1.15s ease-in-out infinite;
+}
+
+.cancel-x-icon {
+  color: #fb7185;
+  font-size: 0.95em;
 }
 
 @keyframes cancelTextPulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  50% { opacity: 0.65; }
 }
 
 .backdated-inline-icon {
   display: inline-block;
   color: #fb923c;
-  font-size: 0.8em;
-  margin-left: 5px;
+  font-size: 0.78em;
+  margin-left: 4px;
   vertical-align: -0.5px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
   transition: transform 0.2s ease, color 0.2s ease;
   cursor: help;
 }
 
 .backdated-inline-icon:hover {
-  color: #fbbf24;
-  transform: scale(1.2);
+  color: #f3cf7a;
+  transform: scale(1.15);
 }
 </style>

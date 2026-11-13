@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.4.25 — 2026-11-09** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.5.0 — 2026-11-13** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -259,6 +259,10 @@ description: Mandatory verification checklist after every code change
 | 16.8 | Original queue UX | `StockGrid.vue` | เปิด/แก้ไข/บันทึก/เลื่อนรายการตาม source v5.4.18; draft UI/dirty guard ของ v5.4.19 ถูกถอนตาม rollback และผลทดสอบเดิมเป็นประวัติเท่านั้น |
 | 16.9 | Original responsive layout | `App.vue`, `Header.vue`, `ChatPanel.vue`, `system.js` | คืน chat collapse และ layout เดิม; ไม่มี mobile workspace tabs/desktop resizer/workspace.css หรือ references ของฟีเจอร์ที่ถอน; ตรวจ browser และ PWA artifacts หลังเผยแพร่ |
 | 16.10 | Original appearance and order effect | `StockGrid.vue`, `ChatPanel.vue`, `StockItemCard.vue` | สี/แสง/ปุ่มเดิมตรง v5.4.18, Smart Answer เต็มกรอบและขอบดำยังอยู่, new-order timer เดิม 15000ms; เลข release เพิ่มต่อเนื่องเพื่อให้ client ตรวจพบ rollback update |
+| 16.11 | Quiet Luxury Full-Width Header & Mobile Pane Tabs (v5.5.0+) | `App.vue`, `Header.vue`, `style.css` | `<Header />` อยู่เหนือ `.app-layout` เต็มความกว้าง, แสดง `.mobile-pane-tabs` ที่ `<= 900px` สำหรับสลับหน้าจอสินค้า/แชท, `.version-badge` อ่านชัดเจน, และคง `100dvh` Lenis lock |
+| 16.12 | 3-Tier Stock Card & Booking/Cancel Animations (v5.5.0+) | `StockItemCard.vue`, `StockGrid.vue` | การ์ด 3 ระดับไม่ทับซ้อนกัน, แสดงแอนิเมชันจองใหม่/เลื่อนคิว (`newOrders` -> `newOrderLuxPulse` / `.new-order-shimmer`) และยกเลิก (`cancelShakeEntry` / `.cancel-flash-sweep`), `.stock-search-input` ไม่ตัดคำ และ `.quick-filter-select` มีลูกศรเดียวไม่ซ้อน |
+| 16.13 | Live Monitor Chat Readability & Non-Clipping Header (v5.5.0+) | `ChatPanel.vue`, `style.css` | ข้อความแชทใหญ่คมชัด (`1.18rem`, `#ffffff`), `.chat-panel` กว้าง `430px` (`min-width: 410px`), `.btn-collapse` แบบไอคอนไม่ทำให้หัวแชทล้นขอบขวา และ `#chat-viewport` ใช้ `scroll-behavior: auto` |
+| 16.14 | Quiet Luxury Shipping Manager Readability (v5.5.0+) | `ShippingManager.vue`, `style.css` | โมดอลกว้าง `1040px`, การ์ด KPI/แท็บ/ป้ายสถานะโทน Quiet Luxury, `.item-count-auto` ใช้ `white-space: nowrap` ไม่ตกบรรทัด, ปุ่มจัดการใช้ FontAwesome สม่ำเสมอ, และปุ่มลบคงเป็น non-destructive |
 
 ---
 
@@ -567,3 +571,18 @@ description: Mandatory verification checklist after every code change
   - `npm test` ผ่าน **840 tests ใน 32 ไฟล์**
   - `npm run build:gh` ผ่านครบ 4 หน้าและ PWA 65 precache entries
   - อัปเดตกฎโปรเจกต์ครบถ้วน (`AI_RULES.md`, `.agents/AGENTS.md`, `.agents/workflows/verify.md`)
+
+## 🎨 ผลตรวจ UX/UI ใหม่ (Quiet Luxury Obsidian & Champagne Gold) — v5.5.0 (2026-11-13)
+
+- **สิ่งที่ดำเนินการ**:
+  1. ปรับดีไซน์ภาพรวมเป็น **Quiet Luxury (Obsidian & Champagne Gold)** สำหรับแม่ค้าดูหน้าจอระหว่างไลฟ์สด พร้อมสำรองไฟล์ต้นฉบับไว้ใน `src/_backup_v5.4.34/` (ถูก ignore จาก Git ตาม `.gitignore`)
+  2. **Layout & Header (`App.vue`, `Header.vue`, `style.css`)**: ย้าย `<Header />` ขึ้นเต็มความกว้างเหนือ `.app-layout`, เพิ่มแถบสลับมุมมองมือถือ `.mobile-pane-tabs` (`<= 900px`), ลบอีโมจิซ้ำซ้อนข้าง FontAwesome, และเพิ่มความชัด `.version-badge` (`#94a3b8`)
+  3. **Stock Cards & Grid (`StockItemCard.vue`, `StockGrid.vue`)**: จัดโครงสร้างการ์ด 3 ระดับไม่ทับซ้อน, เพิ่มแอนิเมชันจอง/เลื่อนคิว (`newOrders` ➔ `orderPopEntry` / `newOrderLuxPulse` / `.new-order-shimmer`) และแอนิเมชันยกเลิก (`cancelShakeEntry` / `cancelPulseLux` / `.cancel-flash-sweep`), ขยาย `.stock-search-input` เป็น `150px` ไม่ให้ตัดคำ, และแก้ไข `.quick-filter-select` ให้เหลือลูกศรเดียวไม่ซ้อน
+  4. **Live Chat (`ChatPanel.vue`, `style.css`)**: ขยายตัวอักษรแชทสำหรับอ่านตอนไลฟ์ (`.chat-bubble` `1.18rem`, `#ffffff` 600/700, `.chat-meta` `0.98rem`), ขยาย `.chat-panel` เป็น `430px` (`min-width: 410px`), ใช้ `.btn-collapse` แบบไอคอนเพื่อไม่ให้หัวแชทล้นขอบขวา, และแก้ไข `#chat-viewport` เป็น `scroll-behavior: auto` ตามเกณฑ์ข้อ `13.3`
+  5. **Shipping Manager (`ShippingManager.vue`, `style.css`)**: ปรับความกว้าง `1040px`, การ์ด KPI/แท็บ Segmented Control/ป้ายสถานะโทน Quiet Luxury, `.item-count-auto` ใช้ `white-space: nowrap` ไม่ตกบรรทัด, ปุ่มจัดการ FontAwesome สม่ำเสมอ, และคง non-destructive removal (`removeFromShippingList`)
+- **ผลตรวจ Automated & Build (`v5.5.0`)**:
+  - `npm test` (`vitest run`): ผ่านครบ **32 ไฟล์ / 842 tests** (`5.35s`)
+  - `npm run build` (`vite build`): ผ่าน (`134 modules transformed`, `3.41s`, PWA `precache 66 entries`)
+  - `npm run build:gh` (`vite build --base=/manowzab-v4/`): ผ่านครบ 4 entry pages + PWA `66 entries` (`3.17s`)
+  - อัปเดตกฎโปรเจกต์ครบ 4 ไฟล์ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`), `.agents/workflows/verify.md` (`16.11`–`16.14`), และ `src/data/changelog.js` / `package.json` / `package-lock.json` (`v5.5.0`)
+  - **ขอบเขตที่ยังต้องสังเกตหน้างานจริง**: การแสดงผลบนมือถือ/อุปกรณ์จริงขณะไลฟ์สด YouTube, เสียง TTS ลำโพงจริง และเครื่องพิมพ์ความร้อน

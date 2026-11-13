@@ -6,26 +6,59 @@
     <!-- Protected Application Views -->
     <template v-else>
       <UpdatePrompt />
-      <div class="app-layout" :class="{ 'chat-collapsed': systemStore.isChatCollapsed }">
-        <div class="left-column">
-          <Header />
+      <Header />
 
-          <div v-if="systemStore.isAway" class="away-banner">
-            <div class="away-content">
-              <div class="away-icon">🌙</div>
-              <div class="away-text">
-                <div class="away-title">แอดมินพาลูกนอน</div>
-                <div class="away-subtitle">
-                  กรุณารอสักครู่ หรือส่งข้อความทักทายไว้ค่ะ
-                </div>
-              </div>
-              <span class="away-timer">{{ awayTimer }}</span>
-              <button class="away-btn" @click="closeAwayMode">
-                <i class="fa-solid fa-check"></i> ลูกหลับแล้ว
-              </button>
+      <div v-if="systemStore.isAway" class="away-banner">
+        <div class="away-content">
+          <div class="away-icon">🌙</div>
+          <div class="away-text">
+            <div class="away-title">แอดมินพาลูกนอน</div>
+            <div class="away-subtitle">
+              กรุณารอสักครู่ หรือส่งข้อความทักทายไว้ค่ะ
             </div>
           </div>
+          <span class="away-timer">{{ awayTimer }}</span>
+          <button class="away-btn" @click="closeAwayMode">
+            <i class="fa-solid fa-check"></i> ลูกหลับแล้ว
+          </button>
+        </div>
+      </div>
 
+      <!-- 📱 Mobile Monitor Switcher (<= 900px: Full-width readable Stock vs Live Chat) -->
+      <div class="mobile-pane-tabs" role="tablist" aria-label="สลับหน้าจอแสดงผล">
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="mobilePane === 'stock'"
+          class="mobile-pane-tab"
+          :class="{ active: mobilePane === 'stock' }"
+          @click="mobilePane = 'stock'"
+        >
+          <i class="fa-solid fa-table-cells"></i>
+          <span>สินค้า ({{ stockStore.soldCount }}/{{ stockStore.stockSize }})</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="mobilePane === 'chat'"
+          class="mobile-pane-tab"
+          :class="{ active: mobilePane === 'chat' }"
+          @click="mobilePane = 'chat'"
+        >
+          <i class="fa-solid fa-comments"></i>
+          <span>แชทสด</span>
+          <span v-if="systemStore.isConnected" class="mobile-live-dot" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <div
+        class="app-layout"
+        :class="{
+          'chat-collapsed': systemStore.isChatCollapsed,
+          'mobile-show-chat': mobilePane === 'chat',
+        }"
+      >
+        <div class="left-column">
           <div class="main-container">
             <StockGrid />
             <Dashboard v-if="showDashboard" @close="showDashboard = false" />
@@ -133,6 +166,7 @@ const { initAutoCleanup } = useAutoCleanup();
 usePullToRefresh();
 
 const showDashboard = ref(false);
+const mobilePane = ref("stock");
 const showHistory = ref(false);
 const showShippingManager = ref(false);
 const showPhoneticManager = ref(false);

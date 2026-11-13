@@ -3,15 +3,20 @@
     <div class="sm-content">
       <!-- Header -->
       <div class="sm-header">
-        <div class="sm-title">📦 รายการจัดส่ง</div>
-        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <div class="sm-title">
+          <span class="sm-title-icon"><i class="fa-solid fa-box-open"></i></span>
+          <span>รายการจัดส่ง</span>
+        </div>
+        <div class="sm-header-actions">
           <button class="btn btn-primary sm-head-btn" @click="showShippingLabels = true" title="พิมพ์ใบปะหน้าพัสดุ">
-            <i class="fa-solid fa-print"></i> 🖨️ ปริ้นใบปะหน้า
+            <i class="fa-solid fa-print"></i> ปริ้นใบปะหน้า
           </button>
           <button class="btn btn-dark sm-head-btn" @click="showAddressImport = true" title="นำเข้าที่อยู่จาก Apple Note หรือแชท">
-            <i class="fa-solid fa-file-import"></i> 📥 นำเข้าที่อยู่
+            <i class="fa-solid fa-file-import"></i> นำเข้าที่อยู่
           </button>
-          <button class="btn btn-dark" @click="$emit('close')">ปิด</button>
+          <button class="btn btn-dark sm-close-btn" @click="$emit('close')">
+            <i class="fa-solid fa-xmark"></i> ปิด
+          </button>
         </div>
       </div>
 
@@ -27,7 +32,7 @@
         </div>
         <div class="sm-stat pack-tonight" v-if="packTonightCount > 0">
           <span class="sm-stat-num">{{ packTonightCount }}</span>
-          <span class="sm-stat-label">📦 แพ็คคืนนี้</span>
+          <span class="sm-stat-label"><i class="fa-solid fa-moon"></i> แพ็คคืนนี้</span>
         </div>
         <div class="sm-stat warn">
           <span class="sm-stat-num">{{ soonCount }}</span>
@@ -37,7 +42,7 @@
           <span class="sm-stat-num">{{ unassignedCustomers.length }}</span>
           <span class="sm-stat-label">ฝากสินค้า</span>
         </div>
-        <div class="sm-stat">
+        <div class="sm-stat total-items">
           <span class="sm-stat-num">{{ totalItemCount }}</span>
           <span class="sm-stat-label">สินค้ารวม</span>
         </div>
@@ -46,7 +51,7 @@
       <!-- 🚚 Shipping Cycle Bar -->
       <div class="sm-cycle-bar">
         <div class="sm-cycle-info">
-          <span class="sm-cycle-icon">🚚</span>
+          <span class="sm-cycle-icon"><i class="fa-solid fa-truck-fast"></i></span>
           <span class="sm-cycle-title">รอบจัดส่งหลัก:</span>
           <span class="sm-cycle-pill">{{ currentCycleLabel }}</span>
         </div>
@@ -108,21 +113,21 @@
           :class="{ active: viewMode === 'requested' }" 
           @click="viewMode = 'requested'"
         >
-          📦 เฉพาะคนที่แจ้งส่ง ({{ shippingRequestedCustomers.length }})
+          <i class="fa-solid fa-truck"></i> เฉพาะคนที่แจ้งส่ง <span class="sm-tab-count">{{ shippingRequestedCustomers.length }}</span>
         </button>
         <button 
           class="sm-tab-btn" 
           :class="{ active: viewMode === 'unassigned' }" 
           @click="viewMode = 'unassigned'"
         >
-          🛋️ ฝากสินค้า / ยังไม่ระบุวันส่ง ({{ unassignedCustomers.length }})
+          <i class="fa-solid fa-box-archive"></i> ฝากสินค้า / ยังไม่ระบุวันส่ง <span class="sm-tab-count">{{ unassignedCustomers.length }}</span>
         </button>
         <button 
           class="sm-tab-btn" 
           :class="{ active: viewMode === 'all' }" 
           @click="viewMode = 'all'"
         >
-          🌐 ทั้งหมด ({{ activeCustomers.length }})
+          <i class="fa-solid fa-layer-group"></i> ทั้งหมด <span class="sm-tab-count">{{ activeCustomers.length }}</span>
         </button>
       </div>
 
@@ -227,7 +232,7 @@
                   @change="updateField(c.id, 'name', $event.target.value)"
                 />
                 <div class="lifetime-bookings" v-if="c.totalBookings > 0">
-                  ลูกค้าประจำ • เคยสั่งรวม {{ c.totalBookings }} ชิ้น
+                  <i class="fa-solid fa-crown"></i> ลูกค้าประจำ • เคยสั่งรวม {{ c.totalBookings }} ชิ้น
                 </div>
                 <div class="sm-addr-row">
                   <!-- 📚 Multi-address indicator badge when customer has > 1 address -->
@@ -305,7 +310,7 @@
               <td class="td-center">
                 <div class="date-cell">
                   <span v-if="c.deliveryDate" class="thai-date">{{ formatThaiDate(c.deliveryDate) }}</span>
-                  <span v-else class="no-date">ดด/วว/ปป</span>
+                  <span v-else class="no-date">ระบุวันส่ง</span>
                   <ThaiDatePicker :modelValue="c.deliveryDate" position="bottom-center" @update:modelValue="val => updateField(c.id, 'deliveryDate', val)" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
                     <input
                       type="text"
@@ -326,7 +331,7 @@
                     {{ getCountdown(c.deliveryDate).text }}
                   </span>
                   <span v-if="isPackTonight(c)" class="pack-badge">
-                    📦 แพ็คคืนนี้
+                    <i class="fa-solid fa-moon"></i> แพ็คคืนนี้
                   </span>
                 </div>
               </td>
@@ -335,7 +340,7 @@
                   type="text"
                   class="sm-edit-input sm-note"
                   :value="c.note || ''"
-                  placeholder="โน้ต..."
+                  placeholder="เพิ่มโน้ต..."
                   @change="updateField(c.id, 'note', $event.target.value)"
                 />
               </td>
@@ -347,25 +352,25 @@
                     @click="openPrintForCustomer(c)"
                     :title="c.labelPrinted ? 'พิมพ์แล้ว (คลิกเพื่อดู/พิมพ์ซ้ำเฉพาะคนนี้)' : 'พิมพ์ใบปะหน้าเฉพาะคนนี้'"
                   >
-                    🖨️
+                    <i class="fa-solid fa-print"></i>
                   </button>
                   <button
                     v-if="c.status !== 'done'"
                     class="action-btn done-btn"
                     @click="markDone(c)"
                     title="เสร็จแล้ว"
-                  >✅</button>
+                  ><i class="fa-solid fa-check"></i></button>
                   <button
                     v-else
                     class="action-btn undo-btn"
                     @click="undoDone(c)"
                     title="ยังไม่เสร็จ"
-                  >↩️</button>
+                  ><i class="fa-solid fa-rotate-left"></i></button>
                   <button
                     class="action-btn del-btn"
                     @click="deleteCustomer(c.id, c.name)"
                     title="นำออกจากรายการจัดส่ง (ย้ายไปฝากสินค้า)"
-                  >🗑️</button>
+                  ><i class="fa-regular fa-trash-can"></i></button>
                 </div>
               </td>
             </tr>
@@ -458,24 +463,24 @@
                   :class="{ 'is-printed': c.labelPrinted }"
                   @click="openPrintForCustomer(c)"
                   title="พิมพ์ใบปะหน้าเฉพาะคนนี้"
-                >🖨️ พิมพ์</button>
+                ><i class="fa-solid fa-print"></i> พิมพ์</button>
                 <button
                   v-if="c.status !== 'done'"
                   class="action-btn done-btn"
                   @click="markDone(c)"
                   title="เสร็จแล้ว"
-                >✅ เสร็จ</button>
+                ><i class="fa-solid fa-check"></i> เสร็จ</button>
                 <button
                   v-else
                   class="action-btn undo-btn"
                   @click="undoDone(c)"
                   title="ยังไม่เสร็จ"
-                >↩️ ย้อน</button>
+                ><i class="fa-solid fa-rotate-left"></i> ย้อน</button>
                 <button
                   class="action-btn del-btn"
                   @click="deleteCustomer(c.id, c.name)"
                   title="นำออกจากรายการจัดส่ง (ย้ายไปฝากสินค้า)"
-                >🗑️</button>
+                ><i class="fa-regular fa-trash-can"></i></button>
               </div>
             </div>
           </div>
@@ -1341,84 +1346,156 @@ function deleteCustomer(id, name) {
 
 <style scoped>
 .sm-content {
-  background: rgba(11, 15, 23, 0.94);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(11, 15, 23, 0.96);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
   border-radius: 20px;
-  border: 1px solid rgba(251, 191, 36, 0.22);
-  max-width: 95%;
-  width: 950px;
-  max-height: 90vh;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-width: 96%;
+  width: 1040px;
+  max-height: 92vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 20px;
-  box-shadow: 
-    0 32px 100px rgba(0, 0, 0, 0.8),
-    0 0 50px rgba(16, 185, 129, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  padding: 20px 24px;
+  box-shadow:
+    0 32px 96px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(243, 200, 117, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .sm-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.sm-title { font-size: 1.3em; font-weight: bold; color: #fbbf24; text-shadow: 0 0 12px rgba(251, 191, 36, 0.3); }
+.sm-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: 0.2px;
+}
+
+.sm-title-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(243, 200, 117, 0.12);
+  border: 1px solid rgba(243, 200, 117, 0.3);
+  color: #f3c875;
+  font-size: 0.95rem;
+}
+
+.sm-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sm-close-btn {
+  padding: 7px 14px;
+  font-size: 0.88em;
+  font-weight: 600;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
 /* Stats */
 .sm-stats {
   display: flex;
   gap: 10px;
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 14px 0 10px;
 }
 
 .sm-stat {
   flex: 1;
-  background: rgba(15, 21, 36, 0.8);
+  background: rgba(255, 255, 255, 0.025);
   border-radius: 12px;
   padding: 10px 12px;
   text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   transition: all 0.2s ease;
 }
 
 .sm-stat:hover {
-  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(243, 200, 117, 0.3);
   transform: translateY(-1px);
 }
 
-.sm-stat.urgent { border-color: #ef4444; background: rgba(239, 68, 68, 0.12); }
-.sm-stat.warn { border-color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
-.sm-stat.unassigned { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.12); }
-.sm-stat.unassigned .sm-stat-num { color: #a78bfa; }
-.sm-stat.pack-tonight {
-  border-color: #f97316;
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(234, 88, 12, 0.08));
-  animation: pack-glow 2.5s ease-in-out infinite;
-}
-.sm-stat.active {
-  box-shadow: 0 0 0 2px #10b981;
-  border-color: #10b981;
+.sm-stat.urgent {
+  border-color: rgba(239, 68, 68, 0.26);
+  background: rgba(239, 68, 68, 0.05);
 }
 
+.sm-stat.warn {
+  border-color: rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.045);
+}
+
+.sm-stat.unassigned {
+  border-color: rgba(167, 139, 250, 0.25);
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.sm-stat.unassigned .sm-stat-num {
+  color: #c4b5fd;
+}
+
+.sm-stat.pack-tonight {
+  border-color: rgba(251, 146, 60, 0.35);
+  background: rgba(249, 115, 22, 0.07);
+  animation: pack-glow 2.8s ease-in-out infinite;
+}
+
+.sm-stat.total-items .sm-stat-num {
+  color: #34d399;
+}
+
+.sm-stat.active {
+  border-color: rgba(243, 200, 117, 0.55);
+  background: rgba(243, 200, 117, 0.07);
+  box-shadow:
+    inset 0 2px 0 rgba(243, 200, 117, 0.85),
+    0 4px 16px rgba(243, 200, 117, 0.1);
+}
 
 .sm-stat-num {
   display: block;
-  font-size: 1.5em;
-  font-weight: 800;
-  color: #fff;
+  font-size: 1.55em;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #f8fafc;
   font-variant-numeric: tabular-nums;
 }
 
-.sm-stat.urgent .sm-stat-num { color: #ef4444; }
-.sm-stat.warn .sm-stat-num { color: #f59e0b; }
+.sm-stat.urgent .sm-stat-num { color: #f87171; }
+.sm-stat.warn .sm-stat-num { color: #fbbf24; }
 .sm-stat.pack-tonight .sm-stat-num { color: #fb923c; }
-.sm-stat-label { font-size: 0.7em; color: #888; margin-top: 2px; }
+
+.sm-stat-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.78em;
+  color: #94a3b8;
+  font-weight: 500;
+  margin-top: 3px;
+}
 
 /* 🚚 Shipping Cycle Bar */
 .sm-cycle-bar {
@@ -1426,11 +1503,11 @@ function deleteCustomer(id, name) {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   padding: 8px 14px;
-  margin: 10px 0 4px;
+  margin: 2px 0;
   flex-wrap: wrap;
 }
 
@@ -1441,7 +1518,8 @@ function deleteCustomer(id, name) {
 }
 
 .sm-cycle-icon {
-  font-size: 1.1em;
+  font-size: 1em;
+  color: #f3c875;
 }
 
 .sm-cycle-title {
@@ -1451,12 +1529,12 @@ function deleteCustomer(id, name) {
 }
 
 .sm-cycle-pill {
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  color: #60a5fa;
-  padding: 2px 10px;
-  border-radius: 20px;
-  font-size: 0.85em;
+  background: rgba(243, 200, 117, 0.12);
+  border: 1px solid rgba(243, 200, 117, 0.32);
+  color: #f3c875;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 0.88em;
   font-weight: 600;
 }
 
@@ -1467,61 +1545,116 @@ function deleteCustomer(id, name) {
 }
 
 .sm-cycle-label-inline {
-  font-size: 0.85em;
+  font-size: 0.86em;
   color: #94a3b8;
 }
 
 .sm-cycle-select {
-  background: #1e1e1e;
-  border: 1px solid #444;
-  border-radius: 6px;
-  color: #fff;
-  padding: 4px 10px;
+  background: #0f1520;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: #f8fafc;
+  padding: 5px 12px;
   font-family: "Kanit", sans-serif;
-  font-size: 0.85em;
+  font-size: 0.88em;
   cursor: pointer;
   outline: none;
   transition: all 0.2s ease;
 }
 
 .sm-cycle-select:hover, .sm-cycle-select:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: rgba(243, 200, 117, 0.55);
+  box-shadow: 0 0 0 2px rgba(243, 200, 117, 0.15);
 }
 
-/* Filter Tabs */
-.sm-filter-tabs {
+/* Add Form */
+.sm-add-form {
   display: flex;
   gap: 8px;
-  padding: 6px 0 10px;
+  padding: 10px 0 8px;
+  align-items: center;
+}
+
+.sm-input {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: #f8fafc;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.95em;
+  flex: 1;
+  transition: all 0.2s ease;
+}
+
+.sm-input::placeholder {
+  color: #64748b;
+}
+
+.sm-input:focus {
+  outline: none;
+  border-color: rgba(243, 200, 117, 0.55);
+  background: rgba(15, 21, 32, 0.9);
+  box-shadow: 0 0 0 2px rgba(243, 200, 117, 0.14);
+}
+
+.sm-date { max-width: 155px; flex: unset; text-align: center; }
+.sm-add-btn { padding: 9px 18px; font-size: 0.95em; border-radius: 10px; white-space: nowrap; }
+
+/* Filter Tabs (Segmented Luxury Track) */
+.sm-filter-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin: 2px 0 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
 }
 
 .sm-tab-btn {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   padding: 8px 12px;
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 8px;
-  color: #aaa;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #94a3b8;
   font-family: "Kanit", sans-serif;
-  font-size: 0.85em;
+  font-size: 0.9em;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
 }
 
+.sm-tab-count {
+  font-size: 0.85em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
 .sm-tab-btn:hover {
-  background: #282828;
-  color: #fff;
-  border-color: #555;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f8fafc;
 }
 
 .sm-tab-btn.active {
-  background: rgba(59, 130, 246, 0.18);
-  border-color: #3b82f6;
-  color: #60a5fa;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+  background: rgba(243, 200, 117, 0.13);
+  border-color: rgba(243, 200, 117, 0.35);
+  color: #fde68a;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+.sm-tab-btn.active .sm-tab-count {
+  background: rgba(243, 200, 117, 0.22);
+  color: #fde68a;
 }
 
 /* 🔍 Filter Subbar: Search & Sub-Filter Pills */
@@ -1529,8 +1662,8 @@ function deleteCustomer(id, name) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 4px 0 10px;
+  gap: 10px;
+  padding: 2px 0 10px;
   flex-wrap: wrap;
 }
 
@@ -1545,28 +1678,32 @@ function deleteCustomer(id, name) {
 .sm-search-icon {
   position: absolute;
   left: 12px;
-  font-size: 0.85em;
-  color: #94a3b8;
+  font-size: 0.88em;
+  color: #64748b;
   pointer-events: none;
 }
 
 .sm-search-input {
   width: 100%;
-  padding: 7px 32px 7px 34px;
-  background: #18181b;
-  border: 1px solid #3f3f46;
-  border-radius: 8px;
-  color: #fff;
+  padding: 8px 32px 8px 34px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #f8fafc;
   font-family: "Kanit", sans-serif;
-  font-size: 0.88em;
+  font-size: 0.92em;
   outline: none;
   transition: all 0.2s ease;
 }
 
+.sm-search-input::placeholder {
+  color: #64748b;
+}
+
 .sm-search-input:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
-  background: #09090b;
+  border-color: rgba(243, 200, 117, 0.5);
+  box-shadow: 0 0 0 2px rgba(243, 200, 117, 0.12);
+  background: rgba(15, 21, 32, 0.9);
 }
 
 .sm-search-clear {
@@ -1577,13 +1714,13 @@ function deleteCustomer(id, name) {
   color: #94a3b8;
   cursor: pointer;
   padding: 3px 6px;
-  font-size: 0.82em;
+  font-size: 0.85em;
   border-radius: 50%;
 }
 
 .sm-search-clear:hover {
   color: #f87171;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .sm-sub-pills {
@@ -1594,13 +1731,13 @@ function deleteCustomer(id, name) {
 }
 
 .sm-sub-pill {
-  padding: 5px 12px;
-  border-radius: 20px;
-  border: 1px solid #3f3f46;
-  background: #18181b;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
   color: #94a3b8;
   font-family: "Kanit", sans-serif;
-  font-size: 0.82em;
+  font-size: 0.85em;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
@@ -1610,101 +1747,142 @@ function deleteCustomer(id, name) {
 }
 
 .sm-sub-pill:hover {
-  background: #27272a;
-  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f8fafc;
 }
 
 .sm-sub-pill.active {
-  background: rgba(56, 189, 248, 0.18);
-  border-color: #38bdf8;
-  color: #38bdf8;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #7dd3fc;
 }
 
 .sm-sub-pill.pill-warn.active {
-  background: rgba(239, 68, 68, 0.18);
-  border-color: #f87171;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(248, 113, 113, 0.45);
   color: #fca5a5;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
 }
 
 .sm-sub-pill.pill-print.active {
-  background: rgba(245, 158, 11, 0.18);
-  border-color: #fbbf24;
-  color: #fde047;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(251, 191, 36, 0.45);
+  color: #fde68a;
 }
-
-/* Add Form */
-.sm-add-form { display: flex; gap: 10px; padding: 12px 0; align-items: center; }
-
-.sm-input {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background: #1e1e1e;
-  color: #fff;
-  font-family: "Kanit", sans-serif;
-  font-size: 0.95em;
-  flex: 1;
-}
-
-.sm-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
-.sm-date { max-width: 160px; flex: unset; }
-.sm-add-btn { padding: 8px 16px; font-size: 0.95em; white-space: nowrap; }
 
 /* Table */
-.sm-table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; }
+.sm-table-wrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(8, 11, 18, 0.45);
+}
 
-.sm-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+.sm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94em;
+}
 
 .sm-table th {
-  background: #252525;
-  color: #aaa;
-  padding: 10px 6px;
+  background: #131823;
+  color: #94a3b8;
+  padding: 10px 10px;
+  font-size: 0.85em;
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
   position: sticky;
   top: 0;
   z-index: 2;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.sm-table td { padding: 7px 6px; border-bottom: 1px solid #2a2a2a; vertical-align: middle; }
-.sm-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+.sm-table th:first-child,
+.sm-table th:nth-child(3),
+.sm-table th:nth-child(4),
+.sm-table th:nth-child(5),
+.sm-table th:last-child {
+  text-align: center;
+}
+
+.sm-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: middle;
+}
+
+.sm-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.sm-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .td-center { text-align: center; }
+
 .td-index {
-  font-size: 1.35em;
-  font-weight: 800;
-  color: #94a3b8;
+  width: 44px;
+  font-size: 1.15em;
+  font-weight: 700;
+  color: #64748b;
   font-variant-numeric: tabular-nums;
 }
 
-.row-urgent { background: rgba(239, 68, 68, 0.06) !important; }
-.row-pack-tonight { background: rgba(249, 115, 22, 0.06) !important; border-left: 3px solid #f97316; }
-.row-done { opacity: 0.45; }
+.row-urgent {
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.row-pack-tonight {
+  background: rgba(249, 115, 22, 0.05) !important;
+  box-shadow: inset 3px 0 0 #fb923c;
+}
+
+.row-done {
+  opacity: 0.45;
+}
 
 /* Auto Item Count */
 .item-count-auto {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 1.15em;
+  justify-content: center;
+  gap: 6px;
+  font-size: 1.18em;
   font-weight: 700;
-  color: #10b981;
+  color: #34d399;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.session-info-icon { font-size: 0.75em; color: #666; cursor: help; }
+.session-info-icon {
+  font-size: 0.72em;
+  color: #64748b;
+  cursor: help;
+}
+
+.session-info-icon:hover {
+  color: #cbd5e1;
+}
 
 /* Lifetime Bookings (ลูกค้าประจำ) */
 .lifetime-bookings {
-  font-size: 0.9em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.86em;
   font-weight: 600;
-  color: #c084fc;
-  margin-top: 3px;
+  color: #e5c17b;
+  margin-top: 2px;
   padding-left: 6px;
-  opacity: 0.95;
-  letter-spacing: 0.3px;
+  opacity: 0.92;
+  letter-spacing: 0.2px;
+}
+
+.lifetime-bookings i {
+  font-size: 0.85em;
 }
 
 /* Thai Date Cell */
@@ -1713,19 +1891,30 @@ function deleteCustomer(id, name) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 90px;
+  min-width: 100px;
+  padding: 4px 8px;
+  border-radius: 8px;
   gap: 6px;
   cursor: text;
+  transition: background 0.15s ease;
+}
+
+.date-cell:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .thai-date {
-  font-size: 1.05em;
+  font-size: 1.02em;
   font-weight: 600;
-  color: #e0e0e0;
+  color: #f1f5f9;
   white-space: nowrap;
 }
 
-.no-date { color: #555; font-size: 0.85em; }
+.no-date {
+  color: #64748b;
+  font-size: 0.88em;
+  white-space: nowrap;
+}
 
 .sm-date-input-text {
   position: absolute;
@@ -1740,15 +1929,15 @@ function deleteCustomer(id, name) {
   text-align: center;
   font-family: inherit;
   font-size: 0.95em;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: text;
   transition: all 0.2s;
 }
 
 .sm-date-input-text:focus {
   opacity: 1;
-  background: #1e1e1e;
-  border-color: #3b82f6;
+  background: #0f1520;
+  border-color: rgba(243, 200, 117, 0.55);
   outline: none;
   z-index: 10;
 }
@@ -1759,110 +1948,134 @@ function deleteCustomer(id, name) {
   border: 1px solid transparent;
   color: #fff;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-family: "Kanit", sans-serif;
   font-size: 0.95em;
   width: 100%;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 .sm-customer-name {
-  font-size: 1.45em;
-  font-weight: 800;
+  font-size: 1.32em;
+  font-weight: 700;
   color: #ffffff;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   line-height: 1.25;
+  padding: 2px 6px;
 }
 
-.sm-edit-input:hover { border-color: #555; }
-.sm-edit-input:focus { border-color: #3b82f6; outline: none; background: #1e1e1e; }
-.sm-note { max-width: 130px; font-size: 0.85em; color: #aaa; }
+.sm-edit-input:hover { border-color: rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.03); }
+.sm-edit-input:focus { border-color: rgba(243, 200, 117, 0.55); outline: none; background: #0f1520; }
+
+.sm-note {
+  max-width: 150px;
+  font-size: 0.9em;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px 10px;
+}
+
+.sm-note::placeholder {
+  color: #64748b;
+}
 
 /* Countdown Cell (stacked layout for badge + pack indicator) */
 .countdown-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 /* Countdown Badge */
 .countdown-badge {
   display: inline-block;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 0.8em;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 0.84em;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.cd-overdue { background: rgba(220, 38, 38, 0.2); color: #fca5a5; animation: pulse-urgent 1.5s infinite; }
-.cd-red { background: rgba(239, 68, 68, 0.2); color: #fca5a5; animation: pulse-urgent 2s infinite; }
-.cd-orange { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.cd-yellow { background: rgba(234, 179, 8, 0.12); color: #facc15; }
-.cd-green { background: rgba(16, 185, 129, 0.12); color: #6ee7b7; }
-.cd-gray { background: rgba(107, 114, 128, 0.12); color: #9ca3af; }
+.cd-overdue { background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; animation: pulse-urgent 1.8s infinite; }
+.cd-red { background: rgba(239, 68, 68, 0.16); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; animation: pulse-urgent 2.2s infinite; }
+.cd-orange { background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.3); color: #fcd34d; }
+.cd-yellow { background: rgba(234, 179, 8, 0.12); border: 1px solid rgba(234, 179, 8, 0.25); color: #fde047; }
+.cd-green { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); color: #6ee7b7; }
+.cd-gray { background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8; }
 
 /* Pack Tonight Badge */
 .pack-badge {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 0.7em;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.76em;
   font-weight: 700;
   color: #fdba74;
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.25), rgba(234, 88, 12, 0.15));
-  border: 1px solid rgba(249, 115, 22, 0.35);
+  background: rgba(249, 115, 22, 0.14);
+  border: 1px solid rgba(249, 115, 22, 0.3);
   white-space: nowrap;
-  animation: pack-pulse 2s ease-in-out infinite;
-  letter-spacing: 0.3px;
+  animation: pack-pulse 2.2s ease-in-out infinite;
 }
 
 @keyframes pulse-urgent {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
-  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.25); }
+  50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
 }
 
 @keyframes pack-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.25); }
-  50% { box-shadow: 0 0 8px 2px rgba(249, 115, 22, 0.15); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.2); }
+  50% { box-shadow: 0 0 8px 1px rgba(249, 115, 22, 0.14); }
 }
 
 @keyframes pack-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.2); }
-  50% { box-shadow: 0 0 12px 3px rgba(249, 115, 22, 0.1); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.15); }
+  50% { box-shadow: 0 0 12px 2px rgba(249, 115, 22, 0.08); }
 }
 
 /* Action Buttons */
-.action-btns { display: flex; gap: 6px; justify-content: center; align-items: center; }
+.action-btns {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+}
 
 .action-btn {
-  background: transparent;
-  border: none;
-  font-size: 1.1em;
+  width: 34px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  font-size: 0.92em;
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
-  transition: transform 0.15s, background 0.15s;
+  padding: 0;
+  border-radius: 9px;
+  transition: all 0.16s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
 }
 
-.action-btn:hover { transform: scale(1.15); background: rgba(255,255,255,0.08); }
+.action-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
 
 .action-btn.print-btn {
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  color: #60a5fa;
-  font-size: 0.9em;
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.25);
+  color: #7dd3fc;
 }
 
 .action-btn.print-btn:hover {
-  background: rgba(59, 130, 246, 0.25);
-  border-color: #3b82f6;
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
 }
 
 .action-btn.print-btn.is-printed {
@@ -1871,49 +2084,92 @@ function deleteCustomer(id, name) {
   color: #34d399;
 }
 
+.action-btn.done-btn {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.action-btn.done-btn:hover {
+  background: rgba(16, 185, 129, 0.24);
+  border-color: #10b981;
+  color: #6ee7b7;
+}
+
+.action-btn.undo-btn {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.action-btn.undo-btn:hover {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: #f59e0b;
+}
+
+.action-btn.del-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.09);
+  color: #94a3b8;
+}
+
+.action-btn.del-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+}
+
 /* Footer */
-.sm-footer { padding: 10px 0 0; border-top: 1px solid #2a2a2a; }
+.sm-footer {
+  padding: 12px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 8px;
+}
 
 .sm-toggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #888;
-  font-size: 0.85em;
+  color: #94a3b8;
+  font-size: 0.9em;
   cursor: pointer;
 }
 
-.sm-toggle input { accent-color: #3b82f6; }
+.sm-toggle input { accent-color: #f3c875; }
 
 /* Header Action Buttons */
 .sm-head-btn {
-  padding: 6px 12px;
-  font-size: 0.85em;
+  padding: 7px 14px;
+  font-size: 0.88em;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   white-space: nowrap;
 }
 
-/* Subtle Address Pill in Table & Card */
+/* Subtle Tonal Address & Meta Pills in Table & Card */
 .sm-addr-row, .sm-card-addr {
-  margin-top: 6px;
+  margin-top: 7px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-.sm-addr-mini-pill {
+.sm-addr-mini-pill,
+.sm-payment-pill,
+.sm-contact-pill,
+.sm-printed-pill,
+.sm-multi-addr-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.92em;
+  gap: 5px;
+  font-size: 0.86em;
   font-weight: 600;
   padding: 3px 10px;
-  border-radius: 14px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
@@ -1922,222 +2178,162 @@ function deleteCustomer(id, name) {
 
 .sm-addr-mini-pill.has {
   background: rgba(16, 185, 129, 0.1);
-  color: #34d399;
+  color: #6ee7b7;
   border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
 .sm-addr-mini-pill.has:hover {
-  background: rgba(16, 185, 129, 0.2);
-  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.45);
 }
 
 .sm-addr-mini-pill.none {
-  background: rgba(255, 255, 255, 0.04);
-  color: #a1a1aa;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.035);
+  color: #cbd5e1;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
 }
 
 .sm-addr-mini-pill.none:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 /* Payment Type Pill */
-.sm-payment-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.9em;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  user-select: none;
-  line-height: 1.4;
-}
-
 .sm-payment-pill.transfer {
-  background: rgba(59, 130, 246, 0.12);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.1);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.26);
 }
 
 .sm-payment-pill.transfer:hover {
-  background: rgba(59, 130, 246, 0.22);
-  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
 }
 
 .sm-payment-pill.cod {
-  background: rgba(245, 158, 11, 0.14);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  background: rgba(243, 200, 117, 0.12);
+  color: #fde68a;
+  border: 1px solid rgba(243, 200, 117, 0.3);
 }
 
 .sm-payment-pill.cod:hover {
-  background: rgba(245, 158, 11, 0.24);
-  border-color: #f59e0b;
+  background: rgba(243, 200, 117, 0.22);
+  border-color: rgba(243, 200, 117, 0.55);
 }
 
 .sm-payment-pill.unspecified {
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(148, 163, 184, 0.07);
   color: #94a3b8;
-  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border: 1px dashed rgba(148, 163, 184, 0.28);
 }
 
 .sm-payment-pill.unspecified:hover {
-  background: rgba(148, 163, 184, 0.16);
-  border-color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.14);
+  border-color: rgba(203, 213, 225, 0.5);
   color: #f1f5f9;
 }
 
 /* Contact Channel Pill */
-.sm-contact-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.9em;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  user-select: none;
-  line-height: 1.4;
-}
-
 .sm-contact-pill.line {
-  background: rgba(34, 197, 94, 0.12);
-  color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.1);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
 .sm-contact-pill.line:hover {
-  background: rgba(34, 197, 94, 0.22);
-  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.45);
 }
 
 .sm-contact-pill.lineoa {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.28);
 }
 
 .sm-contact-pill.lineoa:hover {
-  background: rgba(16, 185, 129, 0.25);
-  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.5);
 }
 
 .sm-contact-pill.phone {
-  background: rgba(59, 130, 246, 0.12);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.1);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.26);
 }
 
 .sm-contact-pill.phone:hover {
-  background: rgba(59, 130, 246, 0.22);
-  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
 }
 
 .sm-contact-pill.unspecified {
-  background: rgba(148, 163, 184, 0.1);
+  background: rgba(148, 163, 184, 0.07);
   color: #94a3b8;
-  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border: 1px dashed rgba(148, 163, 184, 0.28);
 }
 
 .sm-contact-pill.unspecified:hover {
-  background: rgba(148, 163, 184, 0.2);
-  border-color: #94a3b8;
+  background: rgba(148, 163, 184, 0.15);
+  border-color: rgba(203, 213, 225, 0.45);
   color: #e2e8f0;
 }
 
 /* Printed Status Pill */
-.sm-printed-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.92em;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  user-select: none;
-  line-height: 1.4;
-}
-
 .sm-printed-pill.printed {
-  background: rgba(16, 185, 129, 0.14);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.11);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.28);
 }
 
 .sm-printed-pill.printed:hover {
-  background: rgba(16, 185, 129, 0.24);
-  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
 }
 
 .sm-printed-pill.unprinted {
-  background: rgba(245, 158, 11, 0.1);
-  color: #fbbf24;
-  border: 1px dashed rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.09);
+  color: #fcd34d;
+  border: 1px dashed rgba(245, 158, 11, 0.3);
 }
 
 .sm-printed-pill.unprinted:hover {
-  background: rgba(245, 158, 11, 0.2);
-  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.55);
 }
 
 .sm-card-name {
   font-size: 1.35em;
-  font-weight: 800;
+  font-weight: 700;
   color: #ffffff;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 /* 📚 Multi-Address Indicator Pill */
 .sm-multi-addr-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.9em;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 14px;
-  cursor: pointer;
-  background: rgba(99, 102, 241, 0.16);
-  color: #818cf8;
-  border: 1px solid rgba(129, 140, 248, 0.45);
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.15);
-  transition: all 0.2s ease;
-  user-select: none;
-  line-height: 1.4;
+  background: rgba(139, 92, 246, 0.12);
+  color: #c4b5fd;
+  border: 1px solid rgba(167, 139, 250, 0.3);
   white-space: nowrap;
 }
 
 .sm-multi-addr-pill:hover {
-  background: rgba(99, 102, 241, 0.28);
-  border-color: #a5b4fc;
+  background: rgba(139, 92, 246, 0.22);
+  border-color: rgba(196, 181, 253, 0.55);
   color: #ffffff;
-  box-shadow: 0 0 14px rgba(99, 102, 241, 0.35);
-  transform: translateY(-1px);
 }
 
 .sm-multi-addr-pill .multi-count-num {
-  font-weight: 800;
-  color: #a5b4fc;
-}
-
-.sm-multi-addr-pill:hover .multi-count-num {
-  color: #c7d2fe;
+  font-weight: 700;
+  color: #ddd6fe;
 }
 
 .sm-multi-addr-pill .multi-count-action {
-  font-size: 0.88em;
-  color: #e0e7ff;
-  font-weight: 600;
-  opacity: 0.95;
+  font-size: 0.92em;
+  color: #ede9fe;
+  font-weight: 500;
+  opacity: 0.92;
 }
 
 .sm-card-addr-tags {
@@ -2145,6 +2341,13 @@ function deleteCustomer(id, name) {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+}
+
+.sm-mobile-cards .action-btn {
+  width: auto;
+  height: auto;
+  padding: 6px 12px;
+  font-size: 0.88em;
 }
 
 .multi-count {
@@ -2157,13 +2360,14 @@ function deleteCustomer(id, name) {
 @media (max-width: 768px) {
   .sm-content { padding: 14px; }
   .sm-stats { flex-wrap: wrap; gap: 8px; }
-  .sm-stat { min-width: calc(50% - 4px); }
+  .sm-stat { min-width: calc(33.33% - 6px); }
   .sm-add-form { flex-wrap: wrap; }
   .sm-input { min-width: 100%; }
   .sm-date { max-width: unset; min-width: 100%; }
-  .sm-table { font-size: 0.75em; }
+  .sm-filter-tabs { flex-wrap: wrap; }
+  .sm-table { font-size: 0.8em; }
   .sm-note { max-width: 100px; }
-  .sm-head-btn { font-size: 0.75em; padding: 4px 8px; }
+  .sm-head-btn, .sm-close-btn { font-size: 0.8em; padding: 6px 10px; }
 }
 
 /* Print Clean Setup */

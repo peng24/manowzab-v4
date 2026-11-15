@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.5.0 — 2026-11-13** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.5.1 — 2026-11-15** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -84,7 +84,7 @@ description: Mandatory verification checklist after every code change
 | 4.12 | Zero-Mute Admin Notes & TTS Fallback Guarantee | `src/composables/useChatProcessor.js`, `src/stores/chat.js`, `src/services/TextToSpeech.js` | แชทโน้ตแอดมิน (`admin-note`) และคำเฉพาะแอดมิน (`admin-stopword`) ต้องส่ง `ttsText: isVoiceChat ? "" : ttsMessage` ขึ้น Firebase เสมอ และ `chat.js` ต้องมี fallback ไปที่ `messageData.text` หาก `ttsText` ว่างเปล่า เพื่อรับประกันว่าจะไม่มีข้อความใดถูกตัดเสียงอ่านทิ้ง รวมถึงตัดชื่อซ้ำที่ท้ายข้อความใน TTS (`suffixRegex`) |
 | 4.13 | Free / approved Cloud preference | Header.vue, system.js, ttsStore.test.js | free build คง TH ฟรี/native และไม่มี Cloud keys; Cloud opt-in ย้าย native เป็น standard ครั้งเดียวตาม policy แล้วรักษาการเลือก native ภายหลัง; แต่ละเครื่องตั้งค่าอิสระ |
 | 4.14 | Cloud deadline / recovery | GoogleTtsAudio.js, TextToSpeech.js | Cloud opt-in: รอ fetch+body รวมทุกคีย์ไม่เกิน 2s; invalid key/network หมุนภายในงบเวลา; Billing/429 หยุดหมุนและพัก 60s/10s; ใช้ native ต่อคิว แล้ว retry อัตโนมัติ/ปุ่มสลับเสียง |
-| 4.15 | Thai Cardinal Number Pronunciation (`numberToThaiWords`) | `src/utils/thaiNumberWords.js`, `src/services/TextToSpeech.js`, `src/composables/useChatProcessor.js` | อ่านตัวเลขจองสินค้าเป็นจำนวนนับภาษาไทย เช่น "15" -> "สิบห้า" ไม่ใช่อ่านแยกทีละตัว "หนึ่งห้า" พร้อมแปลง CF, ตัวเลขทับลำดับ, และปกป้องเบอร์โทรศัพท์ (08x/09x)/เวลา (13:11) |
+| 4.15 | Thai Cardinal Number & Multi-Buy Prefix (`numberToThaiWords`, `formatMultiBuyTtsMessage`) | `src/utils/thaiNumberWords.js`, `src/services/TextToSpeech.js`, `src/composables/useChatProcessor.js` | อ่านตัวเลขจองสินค้าเป็นจำนวนนับภาษาไทย เช่น "15" -> "สิบห้า" ไม่ใช่อ่านแยกทีละตัว "หนึ่งห้า", และเมื่อจองหลายรายการพร้อมกัน (`multi-buy`) ต้องอ่านคำว่า "รายการที่" นำหน้าเลขรายการทุกรายการ (เช่น "12 15" -> "รายการที่ สิบสอง รายการที่ สิบห้า ... ทั้งหมด สอง รายการ") พร้อมแปลง CF, ตัวเลขทับลำดับ, และปกป้องเบอร์โทรศัพท์ (08x/09x)/เวลา (13:11) |
 | 4.16 | Zero TTS charges / Native lifecycle | nativeTts.test.js, ttsStore.test.js | free build ไม่มี Cloud endpoint/keys; direct speakOnline และ legacy settings ไม่ยิง HTTP; local Thai มาก่อน browser voice; delayed voices/error/end/reset ไม่ค้าง ไม่ซ้อน; browser บันทึก start/end แยกจากการฟังด้วยหู |
 | 4.17 | Prefetch / cache / FIFO | GoogleTtsAudio.js, useAudio.js, cloudTts.test.js | เตรียม current+next2 ไม่เล่นเสียง; dedup ข้อความ/voice และ copy buffer; queueAudio เล่นตามลำดับ ไม่มีเสียงซ้อน/ข้อความหล่น; muted/native ไม่ prefetch |
 | 4.18 | Reset / stale callbacks / two clients | cloudTts.test.js, audioQueuePrefetch.test.js | reset ระหว่าง fetch/decode/resume/SFX และ watchdog ต้องกัน callback เก่า; คิวใหม่ไม่ถูก finally เก่ารบกวน; ทดสอบสอง browser contexts แยกผลจากอุปกรณ์จริงและ live Google |
@@ -260,7 +260,7 @@ description: Mandatory verification checklist after every code change
 | 16.9 | Original responsive layout | `App.vue`, `Header.vue`, `ChatPanel.vue`, `system.js` | คืน chat collapse และ layout เดิม; ไม่มี mobile workspace tabs/desktop resizer/workspace.css หรือ references ของฟีเจอร์ที่ถอน; ตรวจ browser และ PWA artifacts หลังเผยแพร่ |
 | 16.10 | Original appearance and order effect | `StockGrid.vue`, `ChatPanel.vue`, `StockItemCard.vue` | สี/แสง/ปุ่มเดิมตรง v5.4.18, Smart Answer เต็มกรอบและขอบดำยังอยู่, new-order timer เดิม 15000ms; เลข release เพิ่มต่อเนื่องเพื่อให้ client ตรวจพบ rollback update |
 | 16.11 | Quiet Luxury Full-Width Header & Mobile Pane Tabs (v5.5.0+) | `App.vue`, `Header.vue`, `style.css` | `<Header />` อยู่เหนือ `.app-layout` เต็มความกว้าง, แสดง `.mobile-pane-tabs` ที่ `<= 900px` สำหรับสลับหน้าจอสินค้า/แชท, `.version-badge` อ่านชัดเจน, และคง `100dvh` Lenis lock |
-| 16.12 | 3-Tier Stock Card & Booking/Cancel Animations (v5.5.0+) | `StockItemCard.vue`, `StockGrid.vue` | การ์ด 3 ระดับไม่ทับซ้อนกัน, แสดงแอนิเมชันจองใหม่/เลื่อนคิว (`newOrders` -> `newOrderLuxPulse` / `.new-order-shimmer`) และยกเลิก (`cancelShakeEntry` / `.cancel-flash-sweep`), `.stock-search-input` ไม่ตัดคำ และ `.quick-filter-select` มีลูกศรเดียวไม่ซ้อน |
+| 16.12 | 3-Tier Stock Card, Zero Row Overlap & Animations (v5.5.0+) | `StockItemCard.vue`, `StockGrid.vue` | การ์ด 3 ระดับไม่ซ้อนทับแถวข้างล่าง (ห้ามมี `.stock-item` หรือ `aspect-ratio: 1.35` ซ้ำใน `StockGrid.vue`; ใช้ `grid-auto-rows: minmax(104px, auto); align-items: stretch;`), แสดงแอนิเมชันจองใหม่/เลื่อนคิว (`newOrders` -> `newOrderLuxPulse` / `.new-order-shimmer`) และยกเลิก (`cancelShakeEntry` / `.cancel-flash-sweep`), `.stock-search-input` ไม่ตัดคำ และ `.quick-filter-select` มีลูกศรเดียวไม่ซ้อน |
 | 16.13 | Live Monitor Chat Readability & Non-Clipping Header (v5.5.0+) | `ChatPanel.vue`, `style.css` | ข้อความแชทใหญ่คมชัด (`1.18rem`, `#ffffff`), `.chat-panel` กว้าง `430px` (`min-width: 410px`), `.btn-collapse` แบบไอคอนไม่ทำให้หัวแชทล้นขอบขวา และ `#chat-viewport` ใช้ `scroll-behavior: auto` |
 | 16.14 | Quiet Luxury Shipping Manager Readability (v5.5.0+) | `ShippingManager.vue`, `style.css` | โมดอลกว้าง `1040px`, การ์ด KPI/แท็บ/ป้ายสถานะโทน Quiet Luxury, `.item-count-auto` ใช้ `white-space: nowrap` ไม่ตกบรรทัด, ปุ่มจัดการใช้ FontAwesome สม่ำเสมอ, และปุ่มลบคงเป็น non-destructive |
 
@@ -586,3 +586,14 @@ description: Mandatory verification checklist after every code change
   - `npm run build:gh` (`vite build --base=/manowzab-v4/`): ผ่านครบ 4 entry pages + PWA `66 entries` (`3.17s`)
   - อัปเดตกฎโปรเจกต์ครบ 4 ไฟล์ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`), `.agents/workflows/verify.md` (`16.11`–`16.14`), และ `src/data/changelog.js` / `package.json` / `package-lock.json` (`v5.5.0`)
   - **ขอบเขตที่ยังต้องสังเกตหน้างานจริง**: การแสดงผลบนมือถือ/อุปกรณ์จริงขณะไลฟ์สด YouTube, เสียง TTS ลำโพงจริง และเครื่องพิมพ์ความร้อน
+
+## ✅ ผลตรวจการแก้ไข v5.5.1 (2026-11-15)
+
+- **สิ่งที่แก้ไข**:
+  1. ลบสไตล์ `.stock-item` และ `aspect-ratio: 1.35` ชุดเก่าที่ซ้ำซ้อนออกจาก `src/components/StockGrid.vue` เหลือเฉพาะกฎ `.stock-grid` (`grid-auto-rows: minmax(104px, auto); align-items: stretch;`) และกำหนด `aspect-ratio: auto; height: auto;` ใน `src/components/StockItemCard.vue` เพื่อแก้ปัญหาการ์ดแถวบนล้นลงมาซ้อนทับการ์ดแถวล่าง
+  2. เพิ่ม `formatMultiBuyTtsMessage()` ใน `src/utils/thaiNumberWords.js` และเชื่อมเข้า `src/composables/useChatProcessor.js` เพื่อให้การจองหลายรายการพร้อมกัน (`multi-buy`) อ่าน `"รายการที่ "` นำหน้าเลขรายการทุกรายการ (กัน `"รายการที่"` ซ้ำ) พร้อมคง `"ทั้งหมด ... รายการ"`
+  3. (ฝั่ง AI `live-product-capture-ai`) ปรับ `run_live_realtime.bat` และ `src/services/session_resolver.py` ให้ส่ง `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8` และดึง metadata ด้วย `yt-dlp -J` เพื่อให้แสดงชื่อไลฟ์ภาษาไทยและอีโมจิครบถ้วนบน Windows
+- **ผลตรวจ Automated**:
+  - `npm test` (`vitest run`): ผ่านครบ **32 ไฟล์ / 848 tests** (เพิ่ม 6 เคสใหม่ใน `thaiNumberWords.test.js` และ `chatProcessorLogRegression.test.js`)
+  - `main-*.css` ตรวจซ้ำ: ไม่มี `aspect-ratio: 1.35` และเหลือ `.stock-item` เฉพาะของ `StockItemCard.vue`
+  - **ขอบเขตที่ยังต้องตรวจหน้างาน**: การแสดงผลสดบนเบราว์เซอร์และการฟังเสียง TTS multi-buy ผ่านลำโพงจริงหลังรีเฟรชเป็น `v5.5.1`

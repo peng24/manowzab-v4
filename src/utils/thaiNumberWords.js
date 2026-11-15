@@ -7,6 +7,8 @@ const THAI_POSITIONS = ["", "สิบ", "ร้อย", "พัน", "หมื
 const LAUGHTER_REGEX = /5{3,}\+*/g;
 const SLASH_NUM_REGEX = /(\d+)\s*\/\s*(\d+)/g;
 const CF_PREFIX_REGEX = /(?:^|(?<=\s))(?:cf|CF)\s*(?=\d)/gi;
+const STANDALONE_CF_REGEX = /(?:^|(?<=\s))(?:cf|CF)(?=\s|$)/gi;
+const TRAILING_ITEM_PREFIX_REGEX = /รายการที่\s*$/;
 const PHONE_AND_NUM_REGEX = /(0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{3,4})|(?<![:\d])(\d+)(?![:\d])/g;
 
 /**
@@ -120,4 +122,45 @@ export function replaceNumbersWithThaiWords(text) {
   });
 
   return result;
+}
+
+/**
+ * Format spoken TTS text when booking multiple items at once ("12 15", "เอา 6 7 8", "CF 12 15 ค่ะ").
+ * Prepends "รายการที่ " before EVERY booked item number so TTS reads each item clearly instead of merging digits.
+ *
+ * Examples:
+ * - ("12 15", "12 15", [12, 15]) -> "รายการที่ สิบสอง รายการที่ สิบห้า ... ทั้งหมด สอง รายการ"
+ * - ("เอา 6 7", "6 7", [6, 7]) -> "เอา รายการที่ หก รายการที่ เจ็ด ... ทั้งหมด สอง รายการ"
+ *
+ * @param {string} normalizedMsg
+ * @param {string} numbersStr
+ * @param {number[]} itemIds
+ * @returns {string}
+ */
+export function formatMultiBuyTtsMessage(normalizedMsg, numbersStr, itemIds) {
+  const safeIds = Array.isArray(itemIds) ? itemIds : [];
+  if (safeIds.length <= 1) {
+    const baseText = replaceNumbersWithThaiWords(normalizedMsg);
+    return safeIds.length === 1
+      ? `${baseText} ... ทั้งหมด ${numberToThaiWords(1)} รายการ`
+      : baseText;
+  }
+
+  const itemsPhrase = safeIds.map((id) => `รายการที่ ${numberToThaiWords(id)}`).join(" ");
+  const text = String(normalizedMsg || "");
+  const numIdx = numbersStr ? text.indexOf(numbersStr) : -1;
+
+  let bodyText = itemsPhrase;
+  if (numIdx !== -1) {
+    const rawPrefix = text
+      .slice(0, numIdx)
+      .replace(TRAILING_ITEM_PREFIX_REGEX, "")
+      .replace(STANDALONE_CF_REGEX, "ซีเอฟ");
+    const rawSuffix = text.slice(numIdx + numbersStr.length);
+    const cleanPrefix = replaceNumbersWithThaiWords(rawPrefix).trim();
+    const cleanSuffix = replaceNumbersWithThaiWords(rawSuffix).trim();
+    bodyText = [cleanPrefix, itemsPhrase, cleanSuffix].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  }
+
+  return `${bodyText} ... ทั้งหมด ${numberToThaiWords(safeIds.length)} รายการ`;
 }

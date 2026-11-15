@@ -158,4 +158,14 @@ describe('actual chat processor log safety', () => {
     expect(state.stock.processOrder).not.toHaveBeenCalled();
     expect(chat).toMatchObject({ type: 'note', noteCategory: 'size-selection', proxyCustomerName: customerName });
   });
+
+  it.each([
+    ['12 15', false, 'รายการที่ สิบสอง รายการที่ สิบห้า ... ทั้งหมด สอง รายการ'],
+    ['เอา 6 7 8', false, 'เอา รายการที่ หก รายการที่ เจ็ด รายการที่ แปด ... ทั้งหมด สาม รายการ'],
+    ['พี่อ้อย 26 38 74', true, 'พี่อ้อย รายการที่ ยี่สิบหก รายการที่ สามสิบแปด รายการที่ เจ็ดสิบสี่ ... ทั้งหมด สาม รายการ'],
+    ['๑๒ ๑๕', false, 'รายการที่ สิบสอง รายการที่ สิบห้า ... ทั้งหมด สอง รายการ'],
+  ])('prepends รายการที่ before every item number in multi-buy TTS: %s', async (text, asAdmin, expectedTts) => {
+    const chat = await process(text, asAdmin);
+    expect(chat).toMatchObject({ type: 'buy', detectionMethod: 'multi-buy', ttsText: expectedTts });
+  });
 });

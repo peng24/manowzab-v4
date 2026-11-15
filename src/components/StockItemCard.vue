@@ -116,8 +116,11 @@ function isUnsavedOwner(name) {
 <style scoped>
 .stock-item {
   content-visibility: auto;
-  contain-intrinsic-size: 132px 98px;
-  min-height: 98px;
+  contain-intrinsic-size: auto 104px;
+  min-height: 104px;
+  height: auto;
+  aspect-ratio: auto;
+  box-sizing: border-box;
   background: rgba(17, 22, 34, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 14px;
@@ -552,5 +555,32 @@ function isUnsavedOwner(name) {
 .backdated-inline-icon:hover {
   color: #f3cf7a;
   transform: scale(1.15);
+}
+
+@media (max-width: 768px) {
+  .stock-item {
+    min-height: 92px;
+    padding: 6px 7px;
+    border-radius: 11px;
+    gap: 3px;
+  }
+
+  .stock-num {
+    font-size: 0.95em;
+    padding: 1px 6px;
+  }
+
+  .stock-price-pill {
+    font-size: 0.72em;
+    padding: 1px 5px;
+  }
+
+  .stock-status {
+    font-size: 0.95em;
+  }
+
+  .stock-item.sold .stock-status {
+    font-size: 0.98em;
+  }
 }
 </style>

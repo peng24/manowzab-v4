@@ -84,65 +84,68 @@
         </button>
       </div>
 
-      <!-- Free Thai voice test; Cloud toggle exists only in explicitly enabled builds. -->
-      <button
-        :class="['btn', 'btn-tts-mode', { 'is-cloud': systemStore.useOnlineTts }]"
-        @click="toggleTtsMode"
-        :aria-label="systemStore.googleCloudTtsEnabled ? 'สลับเสียงอ่าน' : 'ทดลองเสียงภาษาไทยฟรี'"
-        :title="
-          !systemStore.googleCloudTtsEnabled
-            ? 'เสียงภาษาไทยฟรี • กดทดลองฟัง (ไม่ใช้ Google Cloud)'
-            : systemStore.ttsVoiceMode === 'chirp3'
-            ? `Chirp 3: HD Aoede (th-TH-Chirp3-HD-Aoede) - Key #${systemStore.activeKeyIndex} • สำรอง: Standard-A`
-            : systemStore.ttsVoiceMode === 'achernar'
-            ? `Chirp 3: HD Achernar (th-TH-Chirp3-HD-Achernar) - Key #${systemStore.activeKeyIndex} • สำรอง: Standard-A`
-            : systemStore.ttsVoiceMode === 'standard'
-            ? `Google Cloud Standard (th-TH-Standard-A) - Key #${systemStore.activeKeyIndex} Active`
-            : 'เสียงในเครื่อง • กดเพื่อสลับเสียง'
-        "
-      >
-        <!-- Icon -->
-        <i
-          :class="[
-            systemStore.useOnlineTts
-              ? 'fa-solid fa-cloud'
-              : 'fa-solid fa-robot',
-          ]"
-        ></i>
-
-        <!-- Mode & Key Index Number -->
-        <span
-          v-if="systemStore.useOnlineTts"
-          class="tts-mode-code"
-        >
-          {{
-            (systemStore.ttsVoiceMode === 'achernar'
-              ? 'A'
+      <!-- Free Thai voice test; Cloud toggle + live quota capsule exist only in explicitly enabled builds. -->
+      <div class="tts-control-group">
+        <button
+          :class="['btn', 'btn-tts-mode', { 'is-cloud': systemStore.useOnlineTts, 'has-quota': systemStore.googleCloudTtsEnabled }]"
+          @click="toggleTtsMode"
+          :aria-label="systemStore.googleCloudTtsEnabled ? 'สลับเสียงอ่าน' : 'ทดลองเสียงภาษาไทยฟรี'"
+          :title="
+            !systemStore.googleCloudTtsEnabled
+              ? 'เสียงภาษาไทยฟรี • กดทดลองฟัง (ไม่ใช้ Google Cloud)'
               : systemStore.ttsVoiceMode === 'chirp3'
-                ? 'C'
-                : 'S') + systemStore.activeKeyIndex
-          }}
-        </span>
-        <span v-else-if="!systemStore.googleCloudTtsEnabled" style="margin-left: 2px">TH ฟรี</span>
-      </button>
+              ? `Chirp 3: HD Aoede (th-TH-Chirp3-HD-Aoede) - Key #${systemStore.activeKeyIndex} • สำรอง: Standard-A`
+              : systemStore.ttsVoiceMode === 'achernar'
+              ? `Chirp 3: HD Achernar (th-TH-Chirp3-HD-Achernar) - Key #${systemStore.activeKeyIndex} • สำรอง: Standard-A`
+              : systemStore.ttsVoiceMode === 'standard'
+              ? `Google Cloud Standard (th-TH-Standard-A) - Key #${systemStore.activeKeyIndex} Active`
+              : 'เสียงในเครื่อง • กดเพื่อสลับเสียง'
+          "
+        >
+          <!-- Icon -->
+          <i
+            :class="[
+              systemStore.useOnlineTts
+                ? 'fa-solid fa-cloud'
+                : 'fa-solid fa-robot',
+            ]"
+          ></i>
 
-      <!-- 📊 Live TTS Character Quota Pill (Only in Cloud-enabled builds) -->
-      <button
-        v-if="systemStore.googleCloudTtsEnabled"
-        type="button"
-        :class="['btn', 'btn-tts-quota', `level-${headerQuotaDisplay.level}`]"
-        @click="openTtsQuotaModal"
-        :title="headerQuotaTooltip"
-      >
-        <i class="fa-solid fa-gauge-high"></i>
-        <span class="tts-quota-label">{{ headerQuotaDisplay.label }}</span>
-        <span class="tts-quota-bar">
+          <!-- Mode & Key Index Number -->
           <span
-            class="tts-quota-bar-fill"
-            :style="{ width: `${Math.min(100, headerQuotaDisplay.percent)}%` }"
-          ></span>
-        </span>
-      </button>
+            v-if="systemStore.useOnlineTts"
+            class="tts-mode-code"
+          >
+            {{
+              (systemStore.ttsVoiceMode === 'achernar'
+                ? 'A'
+                : systemStore.ttsVoiceMode === 'chirp3'
+                  ? 'C'
+                  : 'S') + systemStore.activeKeyIndex
+            }}
+          </span>
+          <span v-else-if="!systemStore.googleCloudTtsEnabled" style="margin-left: 2px">TH ฟรี</span>
+        </button>
+
+        <!-- 📊 Live TTS Character Quota Pill (Only in Cloud-enabled builds) -->
+        <button
+          v-if="systemStore.googleCloudTtsEnabled"
+          type="button"
+          :class="['btn', 'btn-tts-quota', `level-${headerQuotaDisplay.level}`]"
+          @click="openTtsQuotaModal"
+          :title="headerQuotaTooltip"
+        >
+          <i class="fa-solid fa-gauge-high"></i>
+          <span class="tts-quota-chars">{{ headerQuotaDisplay.chars }}</span>
+          <span class="tts-quota-pct">{{ headerQuotaDisplay.pct }}%</span>
+          <span class="tts-quota-bar">
+            <span
+              class="tts-quota-bar-fill"
+              :style="{ width: `${Math.min(100, headerQuotaDisplay.percent)}%` }"
+            ></span>
+          </span>
+        </button>
+      </div>
 
       <!-- 💬 Live Chat Panel Toggle Button -->
       <button
@@ -398,10 +401,13 @@ const cleanupFns = [];
 const headerQuotaDisplay = computed(() => {
   const active = systemStore.activeQuotaStatus || systemStore.chirp3QuotaStatus;
   const pct = Math.round(active.percent);
+  const chars = formatCompactChars(active.used);
   return {
     level: active.level,
     percent: active.percent,
-    label: `${formatCompactChars(active.used)} (${pct}%)`,
+    chars,
+    pct,
+    label: `${chars} (${pct}%)`,
   };
 });
 
@@ -420,14 +426,16 @@ watch(
   () => systemStore.ttsAutoSwitchEvent,
   (evt) => {
     if (!evt) return;
-    const msg =
-      evt.reason === "chirp3_near_limit"
+    const isReset = evt.reason === "monthly_quota_reset";
+    const msg = isReset
+      ? "ขึ้นรอบเดือนใหม่แล้ว — รีเซ็ตโควตาและกลับมาใช้เสียงหลักอัตโนมัติแล้ว"
+      : evt.reason === "chirp3_near_limit"
         ? "โควตา Chirp 3: HD ใกล้เต็ม (90%) — สลับไป Standard-A อัตโนมัติแล้ว"
         : "โควตา Google Cloud ใกล้เต็ม (90%) — สลับไปใช้เสียงในเครื่องอัตโนมัติแล้ว";
     Swal.fire({
       toast: true,
       position: "top-end",
-      icon: "warning",
+      icon: isReset ? "success" : "warning",
       title: msg,
       showConfirmButton: false,
       timer: 4500,

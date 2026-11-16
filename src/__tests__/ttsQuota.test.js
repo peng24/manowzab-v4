@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import {
   getCurrentTtsQuotaMonth,
+  getNextTtsResetTimestamp,
+  getNextTtsResetLabel,
+  formatThaiQuotaMonth,
   getVoiceQuotaTier,
   normalizeUsageCounts,
   getTierStatus,
@@ -31,8 +34,22 @@ vi.mock("../composables/useFirebase", () => ({
 }));
 
 describe("TTS Quota Utilities", () => {
-  it("formats UTC month key, classifies voice tier, and resets on month rollover", () => {
-    expect(getCurrentTtsQuotaMonth(new Date("2026-11-16T10:00:00Z"))).toBe("2026-11");
+  it("formats US/Pacific month key across PST/PDT boundaries, computes reset timestamp, and resets on rollover", () => {
+    // 2026-12-01 14:59 Bangkok (UTC+7) == 2026-11-30 23:59 PST -> still 2026-11
+    expect(getCurrentTtsQuotaMonth(new Date("2026-12-01T14:59:00+07:00"))).toBe("2026-11");
+    // 2026-12-01 15:00 Bangkok (UTC+7) == 2026-12-01 00:00 PST -> resets to 2026-12
+    expect(getCurrentTtsQuotaMonth(new Date("2026-12-01T15:00:00+07:00"))).toBe("2026-12");
+    // 2026-07-01 13:59 Bangkok (UTC+7) == 2026-06-30 23:59 PDT -> still 2026-06
+    expect(getCurrentTtsQuotaMonth(new Date("2026-07-01T13:59:00+07:00"))).toBe("2026-06");
+    // 2026-07-01 14:00 Bangkok (UTC+7) == 2026-07-01 00:00 PDT -> resets to 2026-07
+    expect(getCurrentTtsQuotaMonth(new Date("2026-07-01T14:00:00+07:00"))).toBe("2026-07");
+
+    expect(getNextTtsResetTimestamp(new Date("2026-11-16T10:00:00+07:00"))).toBe(
+      new Date("2026-12-01T15:00:00+07:00").getTime()
+    );
+    expect(getNextTtsResetLabel(new Date("2026-11-16T10:00:00+07:00"))).toContain("15:00 น. (เวลาไทย)");
+    expect(formatThaiQuotaMonth("2026-11")).toContain("2569");
+
     expect(getVoiceQuotaTier("th-TH-Chirp3-HD-Achernar")).toBe("chirp3");
     expect(getVoiceQuotaTier("th-TH-Chirp3-HD-Aoede")).toBe("chirp3");
     expect(getVoiceQuotaTier("th-TH-Standard-A")).toBe("standard");
@@ -138,6 +155,32 @@ describe("System Store - TTS Quota Tracking & Auto-Switch", () => {
       month: currentMonth,
       chirp3: 1120,
       standard: 245,
+    });
+  });
+
+  it("auto-resets usage and restores original primary voice when the new Pacific Time month starts", async () => {
+    vi.stubEnv("VITE_ENABLE_GOOGLE_CLOUD_TTS", "true");
+    vi.setSystemTime(new Date("2026-11-30T10:00:00+07:00"));
+    const { useSystemStore } = await import("../stores/system");
+    const store = useSystemStore();
+    expect(store.ttsVoiceMode).toBe("achernar");
+
+    store.recordTtsUsage("th-TH-Chirp3-HD-Achernar", 900_000);
+    expect(store.ttsVoiceMode).toBe("standard");
+
+    // Still November in PT at Dec 1 14:59 Bangkok
+    expect(store.ensureCurrentQuotaMonth(new Date("2026-12-01T14:59:00+07:00"))).toBe(false);
+    expect(store.ttsVoiceMode).toBe("standard");
+    expect(store.ttsUsage.chirp3).toBe(900_000);
+
+    // At Dec 1 15:00 Bangkok (00:00 PT) -> resets to 0 and restores achernar
+    expect(store.ensureCurrentQuotaMonth(new Date("2026-12-01T15:00:00+07:00"))).toBe(true);
+    expect(store.ttsUsage).toMatchObject({ month: "2026-12", chirp3: 0, standard: 0 });
+    expect(store.ttsVoiceMode).toBe("achernar");
+    expect(store.ttsAutoSwitchEvent).toMatchObject({
+      fromMode: "standard",
+      toMode: "achernar",
+      reason: "monthly_quota_reset",
     });
   });
 });

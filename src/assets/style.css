@@ -686,8 +686,28 @@ body {
   50% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.8); }
 }
 
+.tts-control-group {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.tts-control-group .btn-tts-mode {
+  border: none;
+  border-radius: 0;
+  padding: 6px 10px;
+}
+
+.tts-control-group .btn-tts-mode.has-quota {
+  border-right: 1px solid rgba(148, 163, 184, 0.18);
+}
+
 .btn-tts-mode {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: #cbd5e1;
   padding: 6px 11px;
@@ -719,13 +739,14 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 10px 7px;
-  border-radius: 8px;
+  padding: 6px 10px 8px;
+  border: none;
+  border-radius: 0;
   font-size: 0.78em;
   font-weight: 700;
   font-family: var(--font-mono);
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.32);
+  font-variant-numeric: tabular-nums;
+  background: rgba(16, 185, 129, 0.1);
   color: #6ee7b7;
   overflow: hidden;
   white-space: nowrap;
@@ -733,18 +754,20 @@ body {
 
 .btn-tts-quota.level-warn {
   background: rgba(245, 158, 11, 0.14);
-  border-color: rgba(245, 158, 11, 0.4);
   color: #fcd34d;
 }
 
 .btn-tts-quota.level-danger {
-  background: rgba(239, 68, 68, 0.16);
-  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.18);
   color: #fca5a5;
 }
 
 .btn-tts-quota:hover:not(:disabled) {
-  filter: brightness(1.15);
+  filter: brightness(1.18);
+}
+
+.tts-quota-pct {
+  opacity: 0.88;
 }
 
 .tts-quota-bar {
@@ -752,7 +775,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 3px;
+  height: 2.5px;
   background: rgba(15, 23, 42, 0.7);
 }
 
@@ -764,8 +787,12 @@ body {
 }
 
 @media (max-width: 768px) {
-  .btn-tts-quota .tts-quota-label {
-    font-size: 0.92em;
+  .btn-tts-quota {
+    padding: 5px 8px 7px;
+    gap: 4px;
+  }
+  .btn-tts-quota .tts-quota-chars {
+    display: none;
   }
 }
 

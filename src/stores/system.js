@@ -49,6 +49,7 @@ export const useSystemStore = defineStore("system", () => {
         ? (ttsVoiceMode.value !== "native" ? ttsVoiceMode.value : "achernar")
         : "native";
       localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
+      try { localStorage.removeItem("manowzab_tts_auto_switched_from"); } catch { /* ignore */ }
     },
   });
   const CLOUD_VOICE_MAP = {
@@ -68,6 +69,7 @@ export const useSystemStore = defineStore("system", () => {
       ttsVoiceMode.value = validModes[(idx + 1) % validModes.length];
     }
     localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
+    try { localStorage.removeItem("manowzab_tts_auto_switched_from"); } catch { /* ignore */ }
     return ttsVoiceMode.value;
   }
 
@@ -236,6 +238,7 @@ export const useSystemStore = defineStore("system", () => {
   // ✅ Monthly TTS Character Quota Counter & Auto-Switch (Cloud-enabled builds only)
   const TTS_USAGE_STORAGE_KEY = "manowzab_tts_usage";
   const TTS_AUTO_SWITCH_KEY = "manowzab_tts_auto_switch";
+  const TTS_AUTO_SWITCHED_FROM_KEY = "manowzab_tts_auto_switched_from";
 
   function loadStoredTtsUsage() {
     if (!googleCloudTtsEnabled) return normalizeUsageCounts(null);
@@ -263,6 +266,8 @@ export const useSystemStore = defineStore("system", () => {
   const ttsAutoSwitchEvent = ref(null);
   const pendingUsageDelta = { month: getCurrentTtsQuotaMonth(), chirp3: 0, standard: 0 };
   let usageFlushTimer = null;
+  let activeUsageUnsub = null;
+  let activeUsageBoundMonth = null;
 
   const chirp3QuotaStatus = computed(() => getTierStatus("chirp3", ttsUsage.value.chirp3));
   const standardQuotaStatus = computed(() => getTierStatus("standard", ttsUsage.value.standard));
@@ -270,6 +275,83 @@ export const useSystemStore = defineStore("system", () => {
     if (!googleCloudTtsEnabled || ttsVoiceMode.value === "native") return null;
     return ttsVoiceMode.value === "standard" ? standardQuotaStatus.value : chirp3QuotaStatus.value;
   });
+
+  function bindUsageMonthListener(month) {
+    if (activeUsageUnsub) {
+      activeUsageUnsub();
+      activeUsageUnsub = null;
+    }
+    activeUsageBoundMonth = month;
+    const usageRef = dbRef(db, `settings/ttsUsage/${month}`);
+    activeUsageUnsub = onValue(usageRef, (snapshot) => {
+      const remote = normalizeUsageCounts(snapshot.val(), month);
+      const pendingC = pendingUsageDelta.month === month ? pendingUsageDelta.chirp3 : 0;
+      const pendingS = pendingUsageDelta.month === month ? pendingUsageDelta.standard : 0;
+      const merged = {
+        month,
+        chirp3: Math.max(remote.chirp3 + pendingC, ttsUsage.value.month === month ? ttsUsage.value.chirp3 : 0),
+        standard: Math.max(remote.standard + pendingS, ttsUsage.value.month === month ? ttsUsage.value.standard : 0),
+        updatedAt: Math.max(remote.updatedAt, ttsUsage.value.updatedAt || 0),
+      };
+      // Honor explicit reset/calibration when remote timestamp is newer than local
+      if (snapshot.exists() && remote.updatedAt >= (ttsUsage.value.updatedAt || 0) && pendingC === 0 && pendingS === 0) {
+        merged.chirp3 = remote.chirp3;
+        merged.standard = remote.standard;
+      }
+      ttsUsage.value = merged;
+      saveStoredTtsUsage(merged);
+      evaluateTtsQuotaAutoSwitch();
+    });
+  }
+
+  function ensureCurrentQuotaMonth(date = new Date()) {
+    if (!googleCloudTtsEnabled) return false;
+    const currentMonth = getCurrentTtsQuotaMonth(date);
+    if (ttsUsage.value.month === currentMonth) {
+      if (activeUsageUnsub && activeUsageBoundMonth !== currentMonth) {
+        bindUsageMonthListener(currentMonth);
+      }
+      return false;
+    }
+
+    const prevMonth = ttsUsage.value.month;
+    ttsUsage.value = normalizeUsageCounts(null, currentMonth);
+    saveStoredTtsUsage(ttsUsage.value);
+    pendingUsageDelta.month = currentMonth;
+    pendingUsageDelta.chirp3 = 0;
+    pendingUsageDelta.standard = 0;
+    if (usageFlushTimer) {
+      clearTimeout(usageFlushTimer);
+      usageFlushTimer = null;
+    }
+
+    // Restore original voice mode automatically if last month auto-switched due to quota
+    try {
+      const switchedFrom = localStorage.getItem(TTS_AUTO_SWITCHED_FROM_KEY);
+      if (switchedFrom && validModes.includes(switchedFrom) && switchedFrom !== "native") {
+        const fromMode = ttsVoiceMode.value;
+        ttsVoiceMode.value = switchedFrom;
+        localStorage.setItem("manowzab_tts_voice_mode", switchedFrom);
+        localStorage.removeItem(TTS_AUTO_SWITCHED_FROM_KEY);
+        if (fromMode !== switchedFrom) {
+          ttsAutoSwitchEvent.value = {
+            fromMode,
+            toMode: switchedFrom,
+            reason: "monthly_quota_reset",
+            timestamp: Date.now(),
+          };
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    if (activeUsageUnsub) {
+      bindUsageMonthListener(currentMonth);
+    }
+    logger.log(`🗓️ TTS Quota Month rolled over: ${prevMonth} -> ${currentMonth} (00:00 PT)`);
+    return true;
+  }
 
   function evaluateTtsQuotaAutoSwitch() {
     if (!googleCloudTtsEnabled || !ttsAutoSwitchEnabled.value) return null;
@@ -291,12 +373,15 @@ export const useSystemStore = defineStore("system", () => {
     }
 
     if (nextMode && nextMode !== current) {
-      ttsVoiceMode.value = nextMode;
       try {
+        if (!localStorage.getItem(TTS_AUTO_SWITCHED_FROM_KEY)) {
+          localStorage.setItem(TTS_AUTO_SWITCHED_FROM_KEY, current);
+        }
         localStorage.setItem("manowzab_tts_voice_mode", nextMode);
       } catch {
         /* ignore */
       }
+      ttsVoiceMode.value = nextMode;
       const evt = { fromMode: current, toMode: nextMode, reason, timestamp: Date.now() };
       ttsAutoSwitchEvent.value = evt;
       logger.warn(`⚠️ TTS Auto-Switch: ${current} -> ${nextMode} (${reason})`);
@@ -343,6 +428,7 @@ export const useSystemStore = defineStore("system", () => {
     const count = Math.max(0, Number(chars) || 0);
     if (count === 0) return;
 
+    ensureCurrentQuotaMonth();
     const currentMonth = getCurrentTtsQuotaMonth();
     const tier = getVoiceQuotaTier(voiceName);
     const current = normalizeUsageCounts(ttsUsage.value, currentMonth);
@@ -369,27 +455,20 @@ export const useSystemStore = defineStore("system", () => {
 
   function initTtsUsageListener() {
     if (!googleCloudTtsEnabled) return null;
+    ensureCurrentQuotaMonth();
     const currentMonth = getCurrentTtsQuotaMonth();
-    const usageRef = dbRef(db, `settings/ttsUsage/${currentMonth}`);
-    return onValue(usageRef, (snapshot) => {
-      const remote = normalizeUsageCounts(snapshot.val(), currentMonth);
-      const pendingC = pendingUsageDelta.month === currentMonth ? pendingUsageDelta.chirp3 : 0;
-      const pendingS = pendingUsageDelta.month === currentMonth ? pendingUsageDelta.standard : 0;
-      const merged = {
-        month: currentMonth,
-        chirp3: Math.max(remote.chirp3 + pendingC, ttsUsage.value.month === currentMonth ? ttsUsage.value.chirp3 : 0),
-        standard: Math.max(remote.standard + pendingS, ttsUsage.value.month === currentMonth ? ttsUsage.value.standard : 0),
-        updatedAt: Math.max(remote.updatedAt, ttsUsage.value.updatedAt || 0),
-      };
-      // Honor explicit reset/calibration when remote timestamp is newer than local
-      if (snapshot.exists() && remote.updatedAt >= (ttsUsage.value.updatedAt || 0) && pendingC === 0 && pendingS === 0) {
-        merged.chirp3 = remote.chirp3;
-        merged.standard = remote.standard;
+    bindUsageMonthListener(currentMonth);
+    const rolloverTimer = setInterval(() => {
+      ensureCurrentQuotaMonth();
+    }, 60000);
+    return () => {
+      clearInterval(rolloverTimer);
+      if (activeUsageUnsub) {
+        activeUsageUnsub();
+        activeUsageUnsub = null;
       }
-      ttsUsage.value = merged;
-      saveStoredTtsUsage(merged);
-      evaluateTtsQuotaAutoSwitch();
-    });
+      activeUsageBoundMonth = null;
+    };
   }
 
   async function setTtsUsageCalibration({ chirp3, standard }) {
@@ -479,6 +558,7 @@ export const useSystemStore = defineStore("system", () => {
     resetTtsUsageMonth,
     setTtsAutoSwitchEnabled,
     evaluateTtsQuotaAutoSwitch,
+    ensureCurrentQuotaMonth,
     shippingCycle, // ✅ Export
     initShippingCycleListener, // ✅ Export
     setShippingCycle, // ✅ Export

@@ -2016,6 +2016,14 @@ watch(
   background: var(--bg-panel);
   border-right: 1px solid rgba(251, 191, 36, 0.1);
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.stock-panel input,
+.stock-panel textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* ✅ Pull-to-Refresh Indicator */

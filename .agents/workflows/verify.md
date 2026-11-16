@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.6.3 — 2026-11-16** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.6.4 — 2026-11-16** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -266,6 +266,7 @@ description: Mandatory verification checklist after every code change
 | 16.12 | 3-Tier Stock Card, Zero Row Overlap & Animations (v5.5.0+) | `StockItemCard.vue`, `StockGrid.vue` | การ์ด 3 ระดับไม่ซ้อนทับแถวข้างล่าง (ห้ามมี `.stock-item` หรือ `aspect-ratio: 1.35` ซ้ำใน `StockGrid.vue`; ใช้ `grid-auto-rows: minmax(104px, auto); align-items: stretch;`), แสดงแอนิเมชันจองใหม่/เลื่อนคิว (`newOrders` -> `newOrderLuxPulse` / `.new-order-shimmer`) และยกเลิก (`cancelShakeEntry` / `.cancel-flash-sweep`), `.stock-search-input` ไม่ตัดคำ และ `.quick-filter-select` มีลูกศรเดียวไม่ซ้อน |
 | 16.13 | Live Monitor Chat Readability & Non-Clipping Header (v5.5.0+) | `ChatPanel.vue`, `style.css` | ข้อความแชทใหญ่คมชัด (`1.18rem`, `#ffffff`), `.chat-panel` กว้าง `430px` (`min-width: 410px`), `.btn-collapse` แบบไอคอนไม่ทำให้หัวแชทล้นขอบขวา และ `#chat-viewport` ใช้ `scroll-behavior: auto` |
 | 16.14 | Quiet Luxury Shipping Manager Readability (v5.5.0+) | `ShippingManager.vue`, `style.css` | โมดอลกว้าง `1040px`, การ์ด KPI/แท็บ/ป้ายสถานะโทน Quiet Luxury, `.item-count-auto` ใช้ `white-space: nowrap` ไม่ตกบรรทัด, ปุ่มจัดการใช้ FontAwesome สม่ำเสมอ, และปุ่มลบคงเป็น non-destructive |
+| 16.15 | High-Contrast Booked vs Vacant Stock Cards, Clear Price/Num & Drag-Select Guard (v5.6.3+) | `StockItemCard.vue`, `StockGrid.vue`, `HistoryModal.vue`, `style.css` | การ์ดสินค้าที่ **จองแล้ว** (`.stock-item.sold` สีเขียวมรกตสดคมชัด + ขอบทึบ `2px solid #34d399`) แยกชัดเจนจากรายการ **ว่าง** (`.stock-item:not(.sold)` พื้นมืดจมตัว + ขอบเส้นประ `1.5px dashed`), เลขรายการ (`.stock-num` `1.16em`) และป้ายราคา (`.stock-price-pill` `0.94em` สีทองคมชัด) อ่านง่ายทั้งการ์ดว่างและการ์ดจองแล้ว รวมถึงใน `HistoryModal.vue`, และลากเมาส์ผ่าน `.header`, `.stock-panel`, `.stock-item`, `.grid-item` ต้องไม่เกิดการลากคลุมสีฟ้า (`user-select: none`, โดย `input`/`textarea` ยังพิมพ์/คลุมได้ปกติ) |
 
 ---
 

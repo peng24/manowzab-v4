@@ -42,8 +42,8 @@
   --accent-purple: #8b5cf6;
 
   /* ── Status Colors ── */
-  --status-sold-bg: linear-gradient(145deg, rgba(16,185,129,0.18) 0%, rgba(5,150,105,0.32) 100%);
-  --status-sold-border: #10b981;
+  --status-sold-bg: linear-gradient(155deg, rgba(16, 185, 129, 0.68) 0%, rgba(5, 130, 92, 0.88) 55%, rgba(6, 78, 59, 0.98) 100%);
+  --status-sold-border: #34d399;
   --status-empty-color: #475569;
   --vacant-price: #475569;
 
@@ -135,6 +135,14 @@ body {
   position: relative;
   z-index: 100;
   width: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.header input,
+.header textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .header-controls {

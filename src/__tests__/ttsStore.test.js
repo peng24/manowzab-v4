@@ -44,7 +44,7 @@ describe("System Store - TTS Modes", () => {
     expect(store.googleApiKey).toBe("");
   });
 
-  it.each(["chirp3", "gemini", "standard", "neural2", "invalid"])("migrates saved %s to free native speech", async saved => {
+  it.each(["chirp3", "achernar", "gemini", "standard", "neural2", "invalid"])("migrates saved %s to free native speech", async saved => {
     localStorage.setItem("manowzab_tts_voice_mode", saved);
     const { useSystemStore } = await import("../stores/system");
     const store = useSystemStore();
@@ -88,6 +88,9 @@ describe("System Store - TTS Modes", () => {
     expect(store.googleVoiceName).toBe("th-TH-Chirp3-HD-Aoede");
     expect(store.googleCloudTtsEnabled).toBe(true);
     expect(store.googleApiKey).toBe("test-cloud-key-1,test-cloud-key-2");
+    expect(store.cycleTtsMode()).toBe("achernar");
+    expect(store.googleVoiceName).toBe("th-TH-Chirp3-HD-Achernar");
+    expect(store.useOnlineTts).toBe(true);
     expect(store.cycleTtsMode()).toBe("standard");
     expect(store.googleVoiceName).toBe("th-TH-Standard-A");
     expect(store.useOnlineTts).toBe(true);
@@ -105,6 +108,7 @@ describe("System Store - TTS Modes", () => {
     const first = useSystemStore();
     expect(first.ttsVoiceMode).toBe("chirp3");
     expect(localStorage.getItem("manowzab_tts_cloud_policy")).toBe("cloud-chirp3-2026-11-16");
+    first.cycleTtsMode(); // achernar
     first.cycleTtsMode(); // standard
     first.cycleTtsMode(); // native
     setActivePinia(createPinia());

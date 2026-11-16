@@ -113,12 +113,26 @@ describe("Cloud primary actual speech service", () => {
     sources[0].onended();
     await t1;
 
-    // Both Chirp3-HD (cooldown) and Standard-A fail -> falls back to Native speech
-    fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+    // Achernar mode works with th-TH-Chirp3-HD-Achernar and falls back to Standard-A on failure
+    state.ttsVoiceMode = "achernar";
+    state.googleVoiceName = "th-TH-Chirp3-HD-Achernar";
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ audioContent: btoa("ACH") }) });
     const t2 = service.speak("สมใจ", "20");
+    await flush();
+    expect(sources).toHaveLength(2);
+    expect(JSON.parse(fetchMock.mock.calls[3][1].body).voice.name).toBe("th-TH-Chirp3-HD-Achernar");
+    expect(JSON.parse(fetchMock.mock.calls[3][1].body).audioConfig).toEqual({ audioEncoding: "MP3" });
+    sources[1].onended();
+    await t2;
+
+    // Both Chirp3-HD (cooldown) and Standard-A fail -> falls back to Native speech
+    state.ttsVoiceMode = "chirp3";
+    state.googleVoiceName = "th-TH-Chirp3-HD-Aoede";
+    fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+    const t3 = service.speak("สมใจ", "21");
     await flush();
     expect(synth.speak).toHaveBeenCalledTimes(1);
     synth.speak.mock.calls[0][0].onend();
-    await t2;
+    await t3;
   });
 });

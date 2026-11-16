@@ -12,7 +12,7 @@
 - **State Management:** Pinia
 - **Backend:** Firebase Realtime Database
 - **CSS:** Custom vanilla CSS
-- **TTS:** Multi-tier Cloud TTS in approved opt-in builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`, native in free builds): **Chirp 3: HD** (`th-TH-Chirp3-HD-Aoede`, mode `C`, default) with automatic fallback to **Google Cloud Standard** (`th-TH-Standard-A`, mode `S`) and **Native TTS** (`🤖`), sharing a singleton Web Audio API `AudioContext` and LRU Audio Buffer Cache.
+- **TTS:** Multi-tier Cloud TTS in approved opt-in builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`, native in free builds): **Chirp 3: HD** (`th-TH-Chirp3-HD-Aoede` mode `C` default, and `th-TH-Chirp3-HD-Achernar` mode `A`) with automatic fallback to **Google Cloud Standard** (`th-TH-Standard-A`, mode `S`) and **Native TTS** (`🤖`), sharing a singleton Web Audio API `AudioContext` and LRU Audio Buffer Cache.
 
 ## 3. 🚨 CRITICAL RULES (DO NOT BREAK)
 
@@ -281,9 +281,9 @@ _Please acknowledge that you understand these rules. If I ask for a change, ensu
 
 ## Chirp 3: HD with Standard-A/Native Fallback (2026-11-16)
 
-- Approved Cloud builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`) support 3 TTS modes cycled in `Header.vue`: `chirp3` (`C#`, `th-TH-Chirp3-HD-Aoede`, default via `manowzab_tts_cloud_policy=cloud-chirp3-2026-11-16`), `standard` (`S#`, `th-TH-Standard-A`), and `native` (`🤖`). Free builds MUST keep migrating all Cloud modes to `native`, hide Cloud keys (`googleApiKey === ""`), and block all HTTP requests.
+- Approved Cloud builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`) support 4 TTS modes cycled in `Header.vue`: `chirp3` (`C#`, `th-TH-Chirp3-HD-Aoede`, default via `manowzab_tts_cloud_policy=cloud-chirp3-2026-11-16`), `achernar` (`A#`, `th-TH-Chirp3-HD-Achernar`), `standard` (`S#`, `th-TH-Standard-A`), and `native` (`🤖`). Free builds MUST keep migrating all Cloud modes to `native`, hide Cloud keys (`googleApiKey === ""`), and block all HTTP requests.
 - `GoogleTtsAudio.js` MUST omit `pitch` and `speakingRate` from `audioConfig` when `voice` contains `Chirp3-HD` (sending `{ audioEncoding: 'MP3' }` only, avoiding HTTP 400 `INVALID_ARGUMENT`), and isolate per-voice cooldowns (`voiceRetryAfter`) for non-billing errors so `Chirp3-HD` failures fall back immediately to `th-TH-Standard-A`.
-- Fallback chain in `TextToSpeech.js` (`prepareOnlineAudio`): `chirp3` ➔ `th-TH-Standard-A` ➔ `speakNative`; `standard` ➔ `speakNative`. Workbox `runtimeCaching` in `vite.config.js` MUST exclude `texttospeech.googleapis.com`.
+- Fallback chain in `TextToSpeech.js` (`prepareOnlineAudio`): `chirp3` / `achernar` ➔ `th-TH-Standard-A` ➔ `speakNative`; `standard` ➔ `speakNative`. Workbox `runtimeCaching` in `vite.config.js` MUST exclude `texttospeech.googleapis.com`.
 - `cleanShippingLabelAddress` (`getCustomerCleanAddress`) must strip duplicate leading recipient names, embedded phone numbers, and 5-digit postal codes from the address body when those fields are already rendered on dedicated lines.
 
 ## Quiet Luxury Live Monitor UI (v5.5.0+ — 2026-11-13)

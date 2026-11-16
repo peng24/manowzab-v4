@@ -26,7 +26,7 @@ export const useSystemStore = defineStore("system", () => {
 
   // Free builds use native speech; approved Cloud builds default to Chirp 3: HD (female friendly Aoede) once.
   const savedMode = localStorage.getItem("manowzab_tts_voice_mode");
-  const validModes = googleCloudTtsEnabled ? ["chirp3", "standard", "native"] : ["native"];
+  const validModes = googleCloudTtsEnabled ? ["chirp3", "achernar", "standard", "native"] : ["native"];
   const cloudPolicy = "cloud-chirp3-2026-11-16";
   const restoreCloud = googleCloudTtsEnabled && localStorage.getItem("manowzab_tts_cloud_policy") !== cloudPolicy;
   const defaultMode = googleCloudTtsEnabled ? "chirp3" : "native";
@@ -45,8 +45,13 @@ export const useSystemStore = defineStore("system", () => {
       localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     },
   });
+  const CLOUD_VOICE_MAP = {
+    chirp3: "th-TH-Chirp3-HD-Aoede",
+    achernar: "th-TH-Chirp3-HD-Achernar",
+    standard: "th-TH-Standard-A",
+  };
   const googleVoiceName = computed(() => {
-    return ttsVoiceMode.value === "standard" ? "th-TH-Standard-A" : "th-TH-Chirp3-HD-Aoede";
+    return CLOUD_VOICE_MAP[ttsVoiceMode.value] || "th-TH-Chirp3-HD-Aoede";
   });
 
   function cycleTtsMode() {

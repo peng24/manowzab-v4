@@ -93,7 +93,9 @@
           !systemStore.googleCloudTtsEnabled
             ? 'เสียงภาษาไทยฟรี • กดทดลองฟัง (ไม่ใช้ Google Cloud)'
             : systemStore.ttsVoiceMode === 'chirp3'
-            ? `Chirp 3: HD (th-TH-Chirp3-HD-Aoede) - Key #${systemStore.activeKeyIndex} • สำรอง: Standard-A`
+            ? `Chirp 3: HD Aoede (th-TH-Chirp3-HD-Aoede) - Key #${systemStore.activeKeyIndex} • สำรอง: Standard-A`
+            : systemStore.ttsVoiceMode === 'achernar'
+            ? `Chirp 3: HD Achernar (th-TH-Chirp3-HD-Achernar) - Key #${systemStore.activeKeyIndex} • สำรอง: Standard-A`
             : systemStore.ttsVoiceMode === 'standard'
             ? `Google Cloud Standard (th-TH-Standard-A) - Key #${systemStore.activeKeyIndex} Active`
             : 'เสียงในเครื่อง • กดเพื่อสลับเสียง'
@@ -113,7 +115,13 @@
           v-if="systemStore.useOnlineTts"
           class="tts-mode-code"
         >
-          {{ (systemStore.ttsVoiceMode === 'chirp3' ? 'C' : 'S') + systemStore.activeKeyIndex }}
+          {{
+            (systemStore.ttsVoiceMode === 'achernar'
+              ? 'A'
+              : systemStore.ttsVoiceMode === 'chirp3'
+                ? 'C'
+                : 'S') + systemStore.activeKeyIndex
+          }}
         </span>
         <span v-else-if="!systemStore.googleCloudTtsEnabled" style="margin-left: 2px">TH ฟรี</span>
       </button>
@@ -710,7 +718,8 @@ function toggleTtsMode() {
   const newMode = systemStore.cycleTtsMode();
   ttsService.retryGoogle();
   const modeLabelMap = {
-    chirp3: "Chirp 3 HD",
+    chirp3: "Chirp 3 Aoede",
+    achernar: "Chirp 3 Achernar",
     standard: "Google Standard",
     native: "Native TTS",
   };

@@ -231,7 +231,7 @@ When the user specifies **"อัพเลย"** (Deploy now), automatically exe
 
 ## Chirp 3: HD with Standard-A/Native Fallback (2026-11-16)
 
-- Approved Cloud builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`) support 3 TTS modes (`chirp3` default `th-TH-Chirp3-HD-Aoede`, `standard` `th-TH-Standard-A`, `native` `🤖`) with automatic fallback (`chirp3 -> standard -> native`); free builds stay strictly `native` with empty `googleApiKey`.
+- Approved Cloud builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`) support 4 TTS modes (`chirp3` default `th-TH-Chirp3-HD-Aoede`, `achernar` `th-TH-Chirp3-HD-Achernar`, `standard` `th-TH-Standard-A`, `native` `🤖`) with automatic fallback (`chirp3`/`achernar -> standard -> native`); free builds stay strictly `native` with empty `googleApiKey`.
 - `GoogleTtsAudio.js` omits `pitch` and `speakingRate` for `Chirp3-HD` voices and isolates per-voice cooldowns (`voiceRetryAfter`) so `Standard-A` fallback runs immediately.
 - Maintain high-legibility thermal font sizes calibrated 1:1 with on-screen preview (`receiver-name: 13.5pt / 700`, `receiver-addr: 11pt / 600` with adaptive long-address sizing, `receiver-zip: 14pt / 800`, `receiver-phone: 11pt / 700`, `sender-name: 10pt / 700`, `meta-payment-row: 9.5pt / 800`, `card-footer: 9pt / 600`) and support user-selectable font scaling (`preview` 100% default / `compact` 90% / `large` 120%) persisted in `localStorage('manowzab_label_font_scale')` so print output matches preview proportions.
 - `cleanShippingLabelAddress` (`getCustomerCleanAddress`) must strip duplicate leading recipient names, embedded phone numbers, and 5-digit postal codes from the address body when those fields are already rendered on dedicated lines.

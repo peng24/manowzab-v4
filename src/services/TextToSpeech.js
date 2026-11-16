@@ -236,24 +236,24 @@ export class TextToSpeech {
     if (!isGoogleCloudTtsEnabled() || !cleanText) return null;
     const store = useSystemStore();
     const mode = store.ttsVoiceMode || "standard";
+    const isChirpMode = mode === "chirp3" || mode === "achernar";
 
-    if (background) {
-      if (mode === "chirp3") {
-        if (Date.now() >= (this.googleAudio.voiceRetryAfter.get("th-TH-Chirp3-HD-Aoede") || 0)) {
-          return this.googleAudio.prepare(cleanText, true, "th-TH-Chirp3-HD-Aoede");
+    if (isChirpMode) {
+      const primaryVoice =
+        store.googleVoiceName ||
+        (mode === "achernar" ? "th-TH-Chirp3-HD-Achernar" : "th-TH-Chirp3-HD-Aoede");
+      if (background) {
+        if (Date.now() >= (this.googleAudio.voiceRetryAfter.get(primaryVoice) || 0)) {
+          return this.googleAudio.prepare(cleanText, true, primaryVoice);
         }
         return this.googleAudio.prepare(cleanText, true, "th-TH-Standard-A");
       }
-      return this.googleAudio.prepare(cleanText, true);
-    }
-
-    if (mode === "chirp3") {
-      const chirpBuffer = await this.googleAudio.prepare(cleanText, false, "th-TH-Chirp3-HD-Aoede");
+      const chirpBuffer = await this.googleAudio.prepare(cleanText, false, primaryVoice);
       if (chirpBuffer) return chirpBuffer;
       return this.googleAudio.prepare(cleanText, false, "th-TH-Standard-A");
     }
 
-    return this.googleAudio.prepare(cleanText, false);
+    return this.googleAudio.prepare(cleanText, background);
   }
 
   /**

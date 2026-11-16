@@ -17,7 +17,7 @@ This skill governs all development, bug fixing, architectural changes, and deplo
 The application is an event-driven, real-time live commerce dashboard built with:
 - **Frontend**: Vue 3 (Composition API, `<script setup>`), Vite 7, Pinia 3.
 - **Persistence & Real-Time Sync**: Firebase Realtime Database (RTDB v12).
-- **Audio Engine**: Multi-tier Cloud TTS in approved opt-in builds (`Chirp 3: HD` `th-TH-Chirp3-HD-Aoede` default, fallback `th-TH-Standard-A`, and Native `SpeechSynthesis`; native-only in free builds) + Web Audio SFX.
+- **Audio Engine**: Multi-tier Cloud TTS in approved opt-in builds (`Chirp 3: HD` `th-TH-Chirp3-HD-Achernar` default & `th-TH-Chirp3-HD-Aoede`, fallback `th-TH-Standard-A`, and Native `SpeechSynthesis`; native-only in free builds) + Web Audio SFX.
 - **Hardware Integration**: Direct thermal label printing via isolated hidden iframes (130x76mm / 76x130mm).
 
 ### Core Stores & Composables
@@ -244,5 +244,5 @@ When the user states **"อัพเลย"**:
 - Keep 3-tier non-overlapping `StockItemCard.vue` (no duplicate `.stock-item` / `aspect-ratio: 1.35` in `StockGrid.vue`; `.stock-grid` uses `grid-auto-rows: minmax(104px, auto); align-items: stretch;`) with booking (`orderPopEntry`, `newOrderLuxPulse`, `.new-order-shimmer`, also on queue promotion in `StockGrid.vue`) and cancellation (`cancelShakeEntry`, `cancelPulseLux`, `.cancel-flash-sweep`) animations, untruncated `.stock-search-input` (`150px`), single-chevron `.quick-filter-select`, and Quiet Luxury `ShippingManager.vue` (`1040px` modal, `white-space: nowrap` item counts, FontAwesome actions, non-destructive shipping removal).
 
 ## Chirp 3: HD with Standard-A/Native Fallback (2026-11-16)
-- Approved Cloud builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`) support 3 TTS modes (`chirp3` default `th-TH-Chirp3-HD-Aoede`, `standard` `th-TH-Standard-A`, `native` `🤖`) with automatic fallback (`chirp3 -> standard -> native`); free builds stay strictly `native` with empty `googleApiKey`.
+- Approved Cloud builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`) support 4 TTS modes (`achernar` default `th-TH-Chirp3-HD-Achernar`, `chirp3` `th-TH-Chirp3-HD-Aoede`, `standard` `th-TH-Standard-A`, `native` `🤖`) with automatic fallback (`achernar`/`chirp3 -> standard -> native`); free builds stay strictly `native` with empty `googleApiKey`.
 - `GoogleTtsAudio.js` omits `pitch` and `speakingRate` for `Chirp3-HD` voices and isolates per-voice cooldowns (`voiceRetryAfter`) so `Standard-A` fallback runs immediately.

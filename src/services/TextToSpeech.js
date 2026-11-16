@@ -54,6 +54,9 @@ export class TextToSpeech {
         const store = useSystemStore();
         if (store.activeKeyIndex !== index) { store.activeKeyIndex = index; store.updatePresenceTtsKey(); }
       },
+      onUsage: ({ voice, chars }) => {
+        useSystemStore().recordTtsUsage?.(voice, chars);
+      },
       warn: message => logger.warn(message),
     });
 
@@ -236,9 +239,16 @@ export class TextToSpeech {
     if (!isGoogleCloudTtsEnabled() || !cleanText) return null;
     const store = useSystemStore();
     const mode = store.ttsVoiceMode || "standard";
+    const autoSwitch = store.ttsAutoSwitchEnabled !== false;
+    const chirp3Near = autoSwitch && Boolean(store.chirp3QuotaStatus?.isNearLimit);
+    const standardNear = autoSwitch && Boolean(store.standardQuotaStatus?.isNearLimit);
     const isChirpMode = mode === "chirp3" || mode === "achernar";
 
     if (isChirpMode) {
+      if (chirp3Near) {
+        if (standardNear) return null;
+        return this.googleAudio.prepare(cleanText, background, "th-TH-Standard-A");
+      }
       const primaryVoice =
         store.googleVoiceName ||
         (mode === "achernar" ? "th-TH-Chirp3-HD-Achernar" : "th-TH-Chirp3-HD-Aoede");
@@ -246,13 +256,15 @@ export class TextToSpeech {
         if (Date.now() >= (this.googleAudio.voiceRetryAfter.get(primaryVoice) || 0)) {
           return this.googleAudio.prepare(cleanText, true, primaryVoice);
         }
-        return this.googleAudio.prepare(cleanText, true, "th-TH-Standard-A");
+        return standardNear ? null : this.googleAudio.prepare(cleanText, true, "th-TH-Standard-A");
       }
       const chirpBuffer = await this.googleAudio.prepare(cleanText, false, primaryVoice);
       if (chirpBuffer) return chirpBuffer;
+      if (standardNear) return null;
       return this.googleAudio.prepare(cleanText, false, "th-TH-Standard-A");
     }
 
+    if (standardNear) return null;
     return this.googleAudio.prepare(cleanText, background);
   }
 

@@ -5,6 +5,12 @@ import { db } from "../composables/useFirebase";
 import pkg from "../../package.json";
 import { logger } from "../utils/logger";
 import { isGoogleCloudTtsEnabled } from "../utils/ttsConfig";
+import {
+  getCurrentTtsQuotaMonth,
+  getVoiceQuotaTier,
+  normalizeUsageCounts,
+  getTierStatus,
+} from "../utils/ttsQuota";
 
 export const useSystemStore = defineStore("system", () => {
   // State
@@ -24,13 +30,13 @@ export const useSystemStore = defineStore("system", () => {
   // Free builds neither load Cloud keys nor allow saved preferences to enable them.
   const googleApiKey = ref(googleCloudTtsEnabled ? (import.meta.env.VITE_GOOGLE_API_KEYS || "") : "");
 
-  // Free builds use native speech; approved Cloud builds default to Chirp 3: HD (female friendly Aoede) once.
+  // Free builds use native speech; approved Cloud builds default to Chirp 3: HD Achernar once.
   const savedMode = localStorage.getItem("manowzab_tts_voice_mode");
-  const validModes = googleCloudTtsEnabled ? ["chirp3", "achernar", "standard", "native"] : ["native"];
-  const cloudPolicy = "cloud-chirp3-2026-11-16";
+  const validModes = googleCloudTtsEnabled ? ["achernar", "chirp3", "standard", "native"] : ["native"];
+  const cloudPolicy = "cloud-achernar-2026-11-16";
   const restoreCloud = googleCloudTtsEnabled && localStorage.getItem("manowzab_tts_cloud_policy") !== cloudPolicy;
-  const defaultMode = googleCloudTtsEnabled ? "chirp3" : "native";
-  const ttsVoiceMode = ref(restoreCloud ? "chirp3" : validModes.includes(savedMode) ? savedMode : defaultMode);
+  const defaultMode = googleCloudTtsEnabled ? "achernar" : "native";
+  const ttsVoiceMode = ref(restoreCloud ? "achernar" : validModes.includes(savedMode) ? savedMode : defaultMode);
   if (restoreCloud) localStorage.setItem("manowzab_tts_cloud_policy", cloudPolicy);
   if (savedMode !== ttsVoiceMode.value) {
     localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
@@ -40,18 +46,18 @@ export const useSystemStore = defineStore("system", () => {
     get: () => googleCloudTtsEnabled && ttsVoiceMode.value !== "native",
     set: (val) => {
       ttsVoiceMode.value = val && googleCloudTtsEnabled
-        ? (ttsVoiceMode.value !== "native" ? ttsVoiceMode.value : "chirp3")
+        ? (ttsVoiceMode.value !== "native" ? ttsVoiceMode.value : "achernar")
         : "native";
       localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     },
   });
   const CLOUD_VOICE_MAP = {
-    chirp3: "th-TH-Chirp3-HD-Aoede",
     achernar: "th-TH-Chirp3-HD-Achernar",
+    chirp3: "th-TH-Chirp3-HD-Aoede",
     standard: "th-TH-Standard-A",
   };
   const googleVoiceName = computed(() => {
-    return CLOUD_VOICE_MAP[ttsVoiceMode.value] || "th-TH-Chirp3-HD-Aoede";
+    return CLOUD_VOICE_MAP[ttsVoiceMode.value] || "th-TH-Chirp3-HD-Achernar";
   });
 
   function cycleTtsMode() {
@@ -227,6 +233,207 @@ export const useSystemStore = defineStore("system", () => {
     logger.success(`🚚 Shipping Cycle saved to Firebase: ${val}`);
   }
 
+  // ✅ Monthly TTS Character Quota Counter & Auto-Switch (Cloud-enabled builds only)
+  const TTS_USAGE_STORAGE_KEY = "manowzab_tts_usage";
+  const TTS_AUTO_SWITCH_KEY = "manowzab_tts_auto_switch";
+
+  function loadStoredTtsUsage() {
+    if (!googleCloudTtsEnabled) return normalizeUsageCounts(null);
+    try {
+      const raw = localStorage.getItem(TTS_USAGE_STORAGE_KEY);
+      return normalizeUsageCounts(raw ? JSON.parse(raw) : null);
+    } catch {
+      return normalizeUsageCounts(null);
+    }
+  }
+
+  function saveStoredTtsUsage(usage) {
+    if (!googleCloudTtsEnabled) return;
+    try {
+      localStorage.setItem(TTS_USAGE_STORAGE_KEY, JSON.stringify(usage));
+    } catch {
+      /* ignore storage quota errors */
+    }
+  }
+
+  const ttsUsage = ref(loadStoredTtsUsage());
+  const ttsAutoSwitchEnabled = ref(
+    googleCloudTtsEnabled ? localStorage.getItem(TTS_AUTO_SWITCH_KEY) !== "false" : false
+  );
+  const ttsAutoSwitchEvent = ref(null);
+  const pendingUsageDelta = { month: getCurrentTtsQuotaMonth(), chirp3: 0, standard: 0 };
+  let usageFlushTimer = null;
+
+  const chirp3QuotaStatus = computed(() => getTierStatus("chirp3", ttsUsage.value.chirp3));
+  const standardQuotaStatus = computed(() => getTierStatus("standard", ttsUsage.value.standard));
+  const activeQuotaStatus = computed(() => {
+    if (!googleCloudTtsEnabled || ttsVoiceMode.value === "native") return null;
+    return ttsVoiceMode.value === "standard" ? standardQuotaStatus.value : chirp3QuotaStatus.value;
+  });
+
+  function evaluateTtsQuotaAutoSwitch() {
+    if (!googleCloudTtsEnabled || !ttsAutoSwitchEnabled.value) return null;
+    const current = ttsVoiceMode.value;
+    let nextMode = null;
+    let reason = "";
+
+    if ((current === "achernar" || current === "chirp3") && chirp3QuotaStatus.value.isNearLimit) {
+      if (!standardQuotaStatus.value.isNearLimit) {
+        nextMode = "standard";
+        reason = "chirp3_near_limit";
+      } else {
+        nextMode = "native";
+        reason = "all_cloud_near_limit";
+      }
+    } else if (current === "standard" && standardQuotaStatus.value.isNearLimit) {
+      nextMode = "native";
+      reason = "standard_near_limit";
+    }
+
+    if (nextMode && nextMode !== current) {
+      ttsVoiceMode.value = nextMode;
+      try {
+        localStorage.setItem("manowzab_tts_voice_mode", nextMode);
+      } catch {
+        /* ignore */
+      }
+      const evt = { fromMode: current, toMode: nextMode, reason, timestamp: Date.now() };
+      ttsAutoSwitchEvent.value = evt;
+      logger.warn(`⚠️ TTS Auto-Switch: ${current} -> ${nextMode} (${reason})`);
+      return evt;
+    }
+    return null;
+  }
+
+  async function flushTtsUsage() {
+    if (!googleCloudTtsEnabled) return;
+    if (usageFlushTimer) {
+      clearTimeout(usageFlushTimer);
+      usageFlushTimer = null;
+    }
+    const deltaChirp3 = pendingUsageDelta.chirp3;
+    const deltaStandard = pendingUsageDelta.standard;
+    const month = pendingUsageDelta.month;
+    if (deltaChirp3 <= 0 && deltaStandard <= 0) return;
+
+    pendingUsageDelta.chirp3 = 0;
+    pendingUsageDelta.standard = 0;
+    try {
+      await runTransaction(dbRef(db, `settings/ttsUsage/${month}`), (current) => {
+        const base = normalizeUsageCounts(current, month);
+        return {
+          month,
+          chirp3: base.chirp3 + deltaChirp3,
+          standard: base.standard + deltaStandard,
+          updatedAt: Date.now(),
+        };
+      });
+    } catch (e) {
+      // Restore delta if offline/failed so it will retry on next flush
+      if (pendingUsageDelta.month === month) {
+        pendingUsageDelta.chirp3 += deltaChirp3;
+        pendingUsageDelta.standard += deltaStandard;
+      }
+      logger.warn("Failed to sync TTS usage to Firebase:", e);
+    }
+  }
+
+  function recordTtsUsage(voiceName, chars) {
+    if (!googleCloudTtsEnabled) return;
+    const count = Math.max(0, Number(chars) || 0);
+    if (count === 0) return;
+
+    const currentMonth = getCurrentTtsQuotaMonth();
+    const tier = getVoiceQuotaTier(voiceName);
+    const current = normalizeUsageCounts(ttsUsage.value, currentMonth);
+    current[tier] += count;
+    current.updatedAt = Date.now();
+    ttsUsage.value = current;
+    saveStoredTtsUsage(current);
+
+    if (pendingUsageDelta.month !== currentMonth) {
+      pendingUsageDelta.month = currentMonth;
+      pendingUsageDelta.chirp3 = 0;
+      pendingUsageDelta.standard = 0;
+    }
+    pendingUsageDelta[tier] += count;
+
+    evaluateTtsQuotaAutoSwitch();
+
+    if (!usageFlushTimer) {
+      usageFlushTimer = setTimeout(() => {
+        flushTtsUsage();
+      }, 5000);
+    }
+  }
+
+  function initTtsUsageListener() {
+    if (!googleCloudTtsEnabled) return null;
+    const currentMonth = getCurrentTtsQuotaMonth();
+    const usageRef = dbRef(db, `settings/ttsUsage/${currentMonth}`);
+    return onValue(usageRef, (snapshot) => {
+      const remote = normalizeUsageCounts(snapshot.val(), currentMonth);
+      const pendingC = pendingUsageDelta.month === currentMonth ? pendingUsageDelta.chirp3 : 0;
+      const pendingS = pendingUsageDelta.month === currentMonth ? pendingUsageDelta.standard : 0;
+      const merged = {
+        month: currentMonth,
+        chirp3: Math.max(remote.chirp3 + pendingC, ttsUsage.value.month === currentMonth ? ttsUsage.value.chirp3 : 0),
+        standard: Math.max(remote.standard + pendingS, ttsUsage.value.month === currentMonth ? ttsUsage.value.standard : 0),
+        updatedAt: Math.max(remote.updatedAt, ttsUsage.value.updatedAt || 0),
+      };
+      // Honor explicit reset/calibration when remote timestamp is newer than local
+      if (snapshot.exists() && remote.updatedAt >= (ttsUsage.value.updatedAt || 0) && pendingC === 0 && pendingS === 0) {
+        merged.chirp3 = remote.chirp3;
+        merged.standard = remote.standard;
+      }
+      ttsUsage.value = merged;
+      saveStoredTtsUsage(merged);
+      evaluateTtsQuotaAutoSwitch();
+    });
+  }
+
+  async function setTtsUsageCalibration({ chirp3, standard }) {
+    if (!googleCloudTtsEnabled) return;
+    const currentMonth = getCurrentTtsQuotaMonth();
+    pendingUsageDelta.month = currentMonth;
+    pendingUsageDelta.chirp3 = 0;
+    pendingUsageDelta.standard = 0;
+    if (usageFlushTimer) {
+      clearTimeout(usageFlushTimer);
+      usageFlushTimer = null;
+    }
+    const next = {
+      month: currentMonth,
+      chirp3: Math.max(0, Math.round(Number(chirp3) || 0)),
+      standard: Math.max(0, Math.round(Number(standard) || 0)),
+      updatedAt: Date.now(),
+    };
+    ttsUsage.value = next;
+    saveStoredTtsUsage(next);
+    evaluateTtsQuotaAutoSwitch();
+    try {
+      await update(dbRef(db), { [`settings/ttsUsage/${currentMonth}`]: next });
+    } catch (e) {
+      logger.warn("Failed to save TTS usage calibration:", e);
+    }
+  }
+
+  async function resetTtsUsageMonth() {
+    await setTtsUsageCalibration({ chirp3: 0, standard: 0 });
+  }
+
+  function setTtsAutoSwitchEnabled(enabled) {
+    ttsAutoSwitchEnabled.value = Boolean(enabled) && googleCloudTtsEnabled;
+    try {
+      localStorage.setItem(TTS_AUTO_SWITCH_KEY, ttsAutoSwitchEnabled.value ? "true" : "false");
+    } catch {
+      /* ignore */
+    }
+    if (ttsAutoSwitchEnabled.value) {
+      evaluateTtsQuotaAutoSwitch();
+    }
+  }
+
   return {
     isConnected,
     currentVideoId,
@@ -259,6 +466,19 @@ export const useSystemStore = defineStore("system", () => {
     googleVoiceName, // ✅ Export
     cycleTtsMode, // ✅ Export
     activeKeyIndex, // ✅ Export
+    ttsUsage,
+    ttsAutoSwitchEnabled,
+    ttsAutoSwitchEvent,
+    chirp3QuotaStatus,
+    standardQuotaStatus,
+    activeQuotaStatus,
+    recordTtsUsage,
+    flushTtsUsage,
+    initTtsUsageListener,
+    setTtsUsageCalibration,
+    resetTtsUsageMonth,
+    setTtsAutoSwitchEnabled,
+    evaluateTtsQuotaAutoSwitch,
     shippingCycle, // ✅ Export
     initShippingCycleListener, // ✅ Export
     setShippingCycle, // ✅ Export

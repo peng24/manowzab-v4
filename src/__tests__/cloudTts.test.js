@@ -20,6 +20,7 @@ describe("Cloud primary actual speech service", () => {
     vi.useFakeTimers(); vi.stubEnv("VITE_ENABLE_GOOGLE_CLOUD_TTS", "true");
     state.useOnlineTts = true; state.ttsVoiceMode = "standard"; state.activeKeyIndex = 1;
     state.googleVoiceName = "th-TH-Standard-A";
+    state.chirp3QuotaStatus = undefined; state.standardQuotaStatus = undefined; state.ttsAutoSwitchEnabled = true;
     sources = [];
     context = { state: "running", destination: {}, resume: vi.fn().mockResolvedValue(),
       decodeAudioData: vi.fn().mockResolvedValue({ duration: 1 }),
@@ -134,5 +135,30 @@ describe("Cloud primary actual speech service", () => {
     expect(synth.speak).toHaveBeenCalledTimes(1);
     synth.speak.mock.calls[0][0].onend();
     await t3;
+  });
+
+  it("routes straight to Standard-A when Chirp 3: HD quota is near limit, and to Native when both are near limit", async () => {
+    state.ttsVoiceMode = "achernar";
+    state.googleVoiceName = "th-TH-Chirp3-HD-Achernar";
+    state.ttsAutoSwitchEnabled = true;
+    state.chirp3QuotaStatus = { isNearLimit: true };
+    state.standardQuotaStatus = { isNearLimit: false };
+
+    const t1 = service.speak("สมใจ", "10");
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).voice.name).toBe("th-TH-Standard-A");
+    sources[0].onended();
+    await t1;
+
+    // Both tiers near limit -> skip Cloud HTTP and use Native directly
+    state.standardQuotaStatus = { isNearLimit: true };
+    fetchMock.mockClear();
+    const t2 = service.speak("สมใจ", "11");
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(synth.speak).toHaveBeenCalledTimes(1);
+    synth.speak.mock.calls[0][0].onend();
+    await t2;
   });
 });

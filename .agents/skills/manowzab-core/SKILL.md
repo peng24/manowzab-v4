@@ -246,3 +246,4 @@ When the user states **"อัพเลย"**:
 ## Chirp 3: HD with Standard-A/Native Fallback (2026-11-16)
 - Approved Cloud builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`) support 4 TTS modes (`achernar` default `th-TH-Chirp3-HD-Achernar`, `chirp3` `th-TH-Chirp3-HD-Aoede`, `standard` `th-TH-Standard-A`, `native` `🤖`) with automatic fallback (`achernar`/`chirp3 -> standard -> native`); free builds stay strictly `native` with empty `googleApiKey`.
 - `GoogleTtsAudio.js` omits `pitch` and `speakingRate` for `Chirp3-HD` voices and isolates per-voice cooldowns (`voiceRetryAfter`) so `Standard-A` fallback runs immediately.
+- Monthly TTS character quota tracking (`ttsQuota.js`, `system.js`, `TtsQuotaModal.vue`): counts real HTTP synthesis calls only (excluding cache hits), syncs via `settings/ttsUsage/{YYYY-MM}` (`runTransaction`), shows a live Header quota pill, and auto-switches at 90% (`Chirp3-HD -> Standard-A -> Native`), remaining inert in free builds.

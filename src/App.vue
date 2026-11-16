@@ -243,6 +243,9 @@ function startAppListeners() {
   const unsubBlacklist = blacklistStore.initBlacklistListener(); // ✅ Init Shared Blacklist Store
   if (unsubBlacklist) cleanupFns.push(unsubBlacklist);
 
+  const unsubTtsUsage = systemStore.initTtsUsageListener(); // ✅ Init Shared Monthly TTS Quota Sync
+  if (unsubTtsUsage) cleanupFns.push(unsubTtsUsage);
+
 
   // ✅ Reset Connection State (Ensure YouTube starts disconnected)
   systemStore.isConnected = false;

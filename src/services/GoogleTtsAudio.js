@@ -2,8 +2,8 @@ import { isGoogleCloudTtsEnabled } from "../utils/ttsConfig";
 
 // Preparing an audio file never plays sound or advances either playback queue.
 export class GoogleTtsAudio {
-  constructor({ getConfig, getCached, setCached, onKeySuccess = () => {}, warn = () => {} }) {
-    Object.assign(this, { getConfig, getCached, setCached, onKeySuccess, warn });
+  constructor({ getConfig, getCached, setCached, onKeySuccess = () => {}, onUsage = () => {}, warn = () => {} }) {
+    Object.assign(this, { getConfig, getCached, setCached, onKeySuccess, onUsage, warn });
     this.pending = new Map();
     this.controllers = new Set();
     this.generation = 0;
@@ -108,6 +108,7 @@ export class GoogleTtsAudio {
         this.retryAfter = 0;
         this.voiceRetryAfter.delete(config.voice);
         this.lastError = null;
+        try { this.onUsage({ voice: config.voice, chars: text.length }); } catch { /* usage tracking must not block playback */ }
         try { this.onKeySuccess(index + 1); } catch { /* presence must not block playback */ }
         return buffer;
       } catch (error) {

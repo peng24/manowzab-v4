@@ -141,4 +141,22 @@ describe("Google audio preparation (no playback)", () => {
     const stdBody = JSON.parse(fetchMock.mock.calls[2][1].body);
     expect(stdBody.audioConfig).toEqual({ audioEncoding: "MP3", speakingRate: 1, pitch: 0 });
   });
+
+  it("reports sent character count via onUsage only on real network success, not on cache hits", async () => {
+    const onUsage = vi.fn();
+    const trackedLoader = new GoogleTtsAudio({
+      getConfig: () => config,
+      getCached: key => cache.get(key),
+      setCached: (key, buffer) => cache.set(key, buffer),
+      onUsage,
+      warn,
+    });
+    expect(await trackedLoader.prepare("ทดสอบหกคำ", false, "th-TH-Chirp3-HD-Achernar")).toBeInstanceOf(ArrayBuffer);
+    expect(onUsage).toHaveBeenCalledTimes(1);
+    expect(onUsage).toHaveBeenCalledWith({ voice: "th-TH-Chirp3-HD-Achernar", chars: 9 });
+
+    // Cached repeat must not trigger onUsage again
+    expect(await trackedLoader.prepare("ทดสอบหกคำ", false, "th-TH-Chirp3-HD-Achernar")).toBeInstanceOf(ArrayBuffer);
+    expect(onUsage).toHaveBeenCalledTimes(1);
+  });
 });

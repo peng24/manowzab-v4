@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.6.1 — 2026-11-16** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.6.2 — 2026-11-16** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -90,6 +90,7 @@ description: Mandatory verification checklist after every code change
 | 4.17 | Prefetch / cache / FIFO | GoogleTtsAudio.js, useAudio.js, cloudTts.test.js | เตรียม current+next2 ไม่เล่นเสียง; dedup ข้อความ/voice และ copy buffer; queueAudio เล่นตามลำดับ ไม่มีเสียงซ้อน/ข้อความหล่น; muted/native ไม่ prefetch |
 | 4.18 | Reset / stale callbacks / two clients | cloudTts.test.js, audioQueuePrefetch.test.js | reset ระหว่าง fetch/decode/resume/SFX และ watchdog ต้องกัน callback เก่า; คิวใหม่ไม่ถูก finally เก่ารบกวน; ทดสอบสอง browser contexts แยกผลจากอุปกรณ์จริงและ live Google |
 | 4.19 | Chirp 3: HD & Standard-A/Native Fallback | `GoogleTtsAudio.js`, `TextToSpeech.js`, `system.js`, `Header.vue`, `cloudTts.test.js`, `googleTtsAudio.test.js`, `ttsStore.test.js` | โหมด `achernar` (`th-TH-Chirp3-HD-Achernar` ค่าเริ่มต้น) และ `chirp3` (`th-TH-Chirp3-HD-Aoede`) ไม่ส่ง `pitch`/`speakingRate` ใน `audioConfig` และสลับสำรองอัตโนมัติ `Chirp3-HD -> Standard-A -> Native` โดย free build ยังคงเป็น `native` และไม่ยิง HTTP |
+| 4.20 | TTS Character Quota Counter & 90% Auto-Switch | `src/utils/ttsQuota.js`, `system.js`, `GoogleTtsAudio.js`, `TextToSpeech.js`, `Header.vue`, `TtsQuotaModal.vue`, `ttsQuota.test.js` | นับตัวอักษรเฉพาะคำขอที่ยิง API สำเร็จจริง (ไม่นับ cache hit), ซิงค์ข้ามเครื่องผ่าน `settings/ttsUsage/{YYYY-MM}`, แสดงป้าย % บน Header และหน้าต่าง `TtsQuotaModal` พร้อมปรับ/รีเซ็ตเลขได้, และสลับอัตโนมัติเมื่อถึง 90% (`Chirp3 900k -> Standard-A`, `Standard 3.6M -> Native`) โดย free build ไม่นับ/ไม่แตะ Firebase |
 
 
 ---

@@ -126,6 +126,24 @@
         <span v-else-if="!systemStore.googleCloudTtsEnabled" style="margin-left: 2px">TH ฟรี</span>
       </button>
 
+      <!-- 📊 Live TTS Character Quota Pill (Only in Cloud-enabled builds) -->
+      <button
+        v-if="systemStore.googleCloudTtsEnabled"
+        type="button"
+        :class="['btn', 'btn-tts-quota', `level-${headerQuotaDisplay.level}`]"
+        @click="openTtsQuotaModal"
+        :title="headerQuotaTooltip"
+      >
+        <i class="fa-solid fa-gauge-high"></i>
+        <span class="tts-quota-label">{{ headerQuotaDisplay.label }}</span>
+        <span class="tts-quota-bar">
+          <span
+            class="tts-quota-bar-fill"
+            :style="{ width: `${Math.min(100, headerQuotaDisplay.percent)}%` }"
+          ></span>
+        </span>
+      </button>
+
       <!-- 💬 Live Chat Panel Toggle Button -->
       <button
         type="button"
@@ -186,6 +204,14 @@
               <a @click="testVoice" class="menu-voice">
                 <i class="fa-solid fa-volume-high"></i>
                 <span>ทดสอบเสียง</span>
+              </a>
+              <a
+                v-if="systemStore.googleCloudTtsEnabled"
+                @click="openTtsQuotaModal"
+                class="menu-tts-quota"
+              >
+                <i class="fa-solid fa-gauge-high" style="color: #38bdf8;"></i>
+                <span>โควตาตัวอักษร TTS ({{ headerQuotaDisplay.label }})</span>
               </a>
               <a @click="toggleAwayMode" class="menu-away" :class="{ active: systemStore.isAway }">
                 <i class="fa-solid fa-moon"></i>
@@ -272,6 +298,9 @@
 
       <!-- ✅ Blacklist Modal -->
       <BlacklistModal ref="blacklistModalRef" />
+
+      <!-- ✅ TTS Quota Modal -->
+      <TtsQuotaModal v-if="systemStore.googleCloudTtsEnabled" ref="ttsQuotaModalRef" />
     </div>
 
     <div class="header-info">
@@ -309,10 +338,12 @@ const ChangelogModal = defineAsyncComponent(() => import("./ChangelogModal.vue")
 const LiveSummaryModal = defineAsyncComponent(() => import("./LiveSummaryModal.vue"));
 const ShortcutsModal = defineAsyncComponent(() => import("./ShortcutsModal.vue"));
 const BlacklistModal = defineAsyncComponent(() => import("./BlacklistModal.vue"));
+const TtsQuotaModal = defineAsyncComponent(() => import("./TtsQuotaModal.vue"));
 import { useAuthStore } from "../stores/auth";
 import { announceShippingCustomers } from "../utils/deliverySync";
 import { CONSTANTS } from "../config/constants";
 import { formatShippingCycleLabel } from "../utils/chatParserUtils";
+import { formatCompactChars } from "../utils/ttsQuota";
 
 // Logger Configuration (คงเดิม)
 const DEBUG_MODE = false;
@@ -361,7 +392,48 @@ const changelogModalRef = ref(null); // ✅ Changelog Modal Ref
 const liveSummaryModalRef = ref(null); // ✅ Live Summary Modal Ref
 const shortcutsModalRef = ref(null); // ✅ Shortcuts Modal Ref
 const blacklistModalRef = ref(null); // ✅ Blacklist Modal Ref
+const ttsQuotaModalRef = ref(null); // ✅ TTS Quota Modal Ref
 const cleanupFns = [];
+
+const headerQuotaDisplay = computed(() => {
+  const active = systemStore.activeQuotaStatus || systemStore.chirp3QuotaStatus;
+  const pct = Math.round(active.percent);
+  return {
+    level: active.level,
+    percent: active.percent,
+    label: `${formatCompactChars(active.used)} (${pct}%)`,
+  };
+});
+
+const headerQuotaTooltip = computed(() => {
+  const c = systemStore.chirp3QuotaStatus;
+  const s = systemStore.standardQuotaStatus;
+  return `Chirp 3: HD: ${c.used.toLocaleString()} / ${c.monthlyLimit.toLocaleString()} (${c.percent}%)\nStandard-A: ${s.used.toLocaleString()} / ${s.monthlyLimit.toLocaleString()} (${s.percent}%)\nคลิกเพื่อดูรายละเอียดและตั้งค่าสลับอัตโนมัติ`;
+});
+
+function openTtsQuotaModal() {
+  if (ttsQuotaModalRef.value) ttsQuotaModalRef.value.open();
+  showDropdown.value = false;
+}
+
+watch(
+  () => systemStore.ttsAutoSwitchEvent,
+  (evt) => {
+    if (!evt) return;
+    const msg =
+      evt.reason === "chirp3_near_limit"
+        ? "โควตา Chirp 3: HD ใกล้เต็ม (90%) — สลับไป Standard-A อัตโนมัติแล้ว"
+        : "โควตา Google Cloud ใกล้เต็ม (90%) — สลับไปใช้เสียงในเครื่องอัตโนมัติแล้ว";
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "warning",
+      title: msg,
+      showConfirmButton: false,
+      timer: 4500,
+    });
+  }
+);
 
 function openShortcuts() {
   if (shortcutsModalRef.value) shortcutsModalRef.value.open();

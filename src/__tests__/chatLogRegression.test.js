@@ -173,4 +173,61 @@ describe('reviewed chat log regressions — 2026-10-31', () => {
     expect(extractCustomerSelfName('บุญทรัพย์')).toBe('บุญทรัพย์');
     expect(parseIntentDetails('บุญทรัพย์')).toMatchObject({ type: 'SELF_INTRO', customerName: 'บุญทรัพย์' });
   });
+
+  // Reviewed Nov 8 – Nov 15, 2026 CSV logs (174 rows anonymized)
+  it.each([
+    'สวสดีคะ', 'สว้สดีคะ', 'ดูผอมจ่ะ', 'รอดูลูกไม้', 'ไว้ไปญี่ปุ่น//',
+    'ใช่หล่ออยู่', 'ให้ลูก', 'จำผิดเบอร์ค่ะ', 'ผิดตัวแน่เลย',
+  ])('does not learn Nov 8 – Nov 15 conversational phrases as customer names: %s', text => {
+    expect(extractCustomerSelfName(text)).toBeNull();
+    expect(extractAdminCustomerName(text)).toBeNull();
+  });
+
+  it('keeps genuine short self-intro ตาลค่ะ from Nov 10 log', () => {
+    expect(extractCustomerSelfName('ตาลค่ะ')).toBe('ตาล');
+    expect(parseIntentDetails('ตาลค่ะ')).toMatchObject({ type: 'SELF_INTRO', customerName: 'ตาล' });
+  });
+
+  it('prevents ดู inside เอ็นดู / ดูซีจีน from triggering TRY_ITEM', () => {
+    expect(parseIntentDetails('โอ้จยยเอ็นดู64อิอิ').type).toBe('UNKNOWN');
+    expect(parseIntentDetails('ใช่คนเดียวกันพี่ก็ดูซีจีนคนนี้แสดงอยู่').type).toBe('UNKNOWN');
+  });
+
+  it('blocks ไม่เหมาะกับ+number as NEGATION, never booking stock', () => {
+    expect(parseIntentDetails('พี่มดไม่เหมาะกับ21')).toMatchObject({ type: 'NEGATION', method: 'negation-guard' });
+    expect(extractAdminCustomerName('พี่มดไม่เหมาะกับ21')).toBeNull();
+  });
+
+  it('parses รายการXX and 64 ค่ะฝฝฝฝฝ cleanly without fake customer names (รายการ/ค่ะฝฝฝฝฝ)', () => {
+    expect(parseIntentDetails('รายการ50')).toEqual({ type: 'SINGLE_BUY', itemId: 50, method: 'explicit-keyword' });
+    expect(parseIntentDetails('64 ค่ะฝฝฝฝฝ:text-green-game-over::text-green-game-over:')).toEqual({
+      type: 'SINGLE_BUY',
+      itemId: 64,
+      method: 'polite-number',
+    });
+    expect(extractAdminCustomerName('อ๋อๆๆ22')).toBeNull();
+    expect(extractAdminCustomerName('ได้ๆ23')).toBeNull();
+  });
+
+  it('handles พี่ได้ไห๊มคะ 46น้องนาว as QUESTION and ฝากไวัก่อนนะคะ as hold without fake name', () => {
+    expect(parseIntentDetails('พี่ได้ไห๊มคะ 46น้องนาว').type).toBe('QUESTION');
+    expect(parseIntentDetails('ฝากไวัก่อนนะคะ')).toEqual({
+      type: 'SHIPPING',
+      customerName: null,
+      method: 'hold-keyword',
+    });
+  });
+
+  it('handles admin trailing ด้วย (พี่กวาง 19 ด้วย) and color note (พี่พัช เขียวขี้ม้า)', () => {
+    expect(parseIntentDetails('พี่กวาง 19 ด้วย')).toMatchObject({
+      type: 'SINGLE_BUY',
+      itemId: 19,
+      customerName: 'พี่กวาง',
+    });
+    expect(parseIntentDetails('พี่พัช เขียวขี้ม้า')).toMatchObject({
+      type: 'ADMIN_NOTE',
+      noteCategory: 'size-selection',
+      customerName: 'พี่พัช',
+    });
+  });
 });

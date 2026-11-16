@@ -8,6 +8,7 @@ export class GoogleTtsAudio {
     this.controllers = new Set();
     this.generation = 0;
     this.retryAfter = 0;
+    this.voiceRetryAfter = new Map();
     this.lastError = null;
     this.totalTimeoutMs = 2000;
     this.keyTimeoutMs = 1500;
@@ -23,21 +24,25 @@ export class GoogleTtsAudio {
   retry() {
     this.cancel();
     this.retryAfter = 0;
+    this.voiceRetryAfter.clear();
     this.lastError = null;
   }
 
-  async prepare(text, background = false) {
+  async prepare(text, background = false, voiceOverride = null) {
     if (!isGoogleCloudTtsEnabled()) return null;
     const config = this.getConfig();
     if (!config.enabled || !text || !config.keys.length) return null;
-    const key = `google:${config.voice}:${text}`;
+    const voice = voiceOverride || config.voice;
+    const key = `google:${voice}:${text}`;
     const cached = this.getCached(key);
     if (cached) return cached;
     let job = this.pending.get(key);
     if (!job) {
-      if (Date.now() < this.retryAfter || (background && this.pending.size >= 3)) return null;
+      const voiceCooldown = this.voiceRetryAfter.get(voice) || 0;
+      const now = Date.now();
+      if (now < this.retryAfter || now < voiceCooldown || (background && this.pending.size >= 3)) return null;
       const generation = this.generation;
-      job = Promise.resolve().then(() => this.fetchAudio(text, config, key, generation));
+      job = Promise.resolve().then(() => this.fetchAudio(text, { ...config, voice }, key, generation));
       this.pending.set(key, job);
       const cleanup = () => { if (this.pending.get(key) === job) this.pending.delete(key); };
       job.then(cleanup, cleanup);
@@ -59,11 +64,15 @@ export class GoogleTtsAudio {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await Promise.race([aborted, (async () => {
+        const isChirp3 = typeof voice === 'string' && voice.includes('Chirp3-HD');
+        const audioConfig = isChirp3
+          ? { audioEncoding: 'MP3' }
+          : { audioEncoding: 'MP3', speakingRate: 1, pitch: 0 };
         const response = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key },
           body: JSON.stringify({ input: { text }, voice: { languageCode: 'th-TH', name: voice },
-            audioConfig: { audioEncoding: 'MP3', speakingRate: 1, pitch: 0 } }),
+            audioConfig }),
           signal: controller.signal,
         });
         const data = await response.json();
@@ -97,6 +106,7 @@ export class GoogleTtsAudio {
         if (generation !== this.generation) return null;
         this.setCached(cacheKey, buffer);
         this.retryAfter = 0;
+        this.voiceRetryAfter.delete(config.voice);
         this.lastError = null;
         try { this.onKeySuccess(index + 1); } catch { /* presence must not block playback */ }
         return buffer;
@@ -109,7 +119,15 @@ export class GoogleTtsAudio {
       }
     }
     this.lastError = failure?.reason || (failure?.name === 'AbortError' ? 'TIMEOUT' : 'REQUEST_FAILED');
-    this.retryAfter = Date.now() + (failure?.reason === 'BILLING_DISABLED' ? 60000 : 10000);
+    const isAccountWideLimit = failure?.reason === 'BILLING_DISABLED' || failure?.status === 429;
+    if (isAccountWideLimit) {
+      this.retryAfter = Date.now() + (failure?.reason === 'BILLING_DISABLED' ? 60000 : 10000);
+    } else if (config.voice && config.voice !== 'th-TH-Standard-A') {
+      // Voice-specific failure (e.g. Chirp3-HD unavailable/timeout): cool down this voice so Standard-A fallback runs immediately.
+      this.voiceRetryAfter.set(config.voice, Date.now() + 30000);
+    } else {
+      this.retryAfter = Date.now() + 10000;
+    }
     return null;
   }
 }

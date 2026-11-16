@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TextToSpeech } from "../services/TextToSpeech";
 
-const state = vi.hoisted(() => ({ useOnlineTts: true, googleApiKey: "key-a,key-b", googleVoiceName: "th-TH-Standard-A", activeKeyIndex: 1, updatePresenceTtsKey: vi.fn() }));
+const state = vi.hoisted(() => ({
+  useOnlineTts: true,
+  ttsVoiceMode: "standard",
+  googleApiKey: "key-a,key-b",
+  googleVoiceName: "th-TH-Standard-A",
+  activeKeyIndex: 1,
+  updatePresenceTtsKey: vi.fn(),
+}));
 vi.mock("../stores/system", () => ({ useSystemStore: () => state }));
 vi.mock("../utils/logger", () => ({ logger: new Proxy({}, { get: () => vi.fn() }) }));
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
@@ -11,7 +18,8 @@ describe("Cloud primary actual speech service", () => {
   let service, synth, sources, context, fetchMock;
   beforeEach(() => {
     vi.useFakeTimers(); vi.stubEnv("VITE_ENABLE_GOOGLE_CLOUD_TTS", "true");
-    state.useOnlineTts = true; state.activeKeyIndex = 1;
+    state.useOnlineTts = true; state.ttsVoiceMode = "standard"; state.activeKeyIndex = 1;
+    state.googleVoiceName = "th-TH-Standard-A";
     sources = [];
     context = { state: "running", destination: {}, resume: vi.fn().mockResolvedValue(),
       decodeAudioData: vi.fn().mockResolvedValue({ duration: 1 }),
@@ -87,5 +95,30 @@ describe("Cloud primary actual speech service", () => {
     delayed.resolve({ duration: 1 }); await flush();
     expect(sources).toHaveLength(1); expect(service.isSpeaking).toBe(true);
     sources[0].onended(); await Promise.all([old, next]);
+  });
+
+  it("falls back cleanly from Chirp 3: HD to Standard-A, and to Native if Standard-A also fails", async () => {
+    state.ttsVoiceMode = "chirp3";
+    state.googleVoiceName = "th-TH-Chirp3-HD-Aoede";
+    // Chirp3-HD fails on both keys -> falls back to Standard-A and succeeds
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: { details: [{ reason: "INVALID_ARGUMENT" }] } }) })
+      .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: { details: [{ reason: "INVALID_ARGUMENT" }] } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ audioContent: btoa("STD") }) });
+    const t1 = service.speak("มะระ", "15");
+    await flush();
+    expect(sources).toHaveLength(1);
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body).voice.name).toBe("th-TH-Standard-A");
+    expect(synth.speak).not.toHaveBeenCalled();
+    sources[0].onended();
+    await t1;
+
+    // Both Chirp3-HD (cooldown) and Standard-A fail -> falls back to Native speech
+    fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+    const t2 = service.speak("สมใจ", "20");
+    await flush();
+    expect(synth.speak).toHaveBeenCalledTimes(1);
+    synth.speak.mock.calls[0][0].onend();
+    await t2;
   });
 });

@@ -53,6 +53,9 @@ These instructions help customize interactions with the Gemini agent for this sp
    - ใน `StockGrid.vue` (และ `HistoryModal.vue`) เปลี่ยนตำแหน่งข้อความเดิม ("🔥 ไฟเริ่มติดแล้ว!") เป็นป้ายยอดขายรวม `.total-sales-badge` (`ยอด: ฿...`) สีทองเรืองแสง
    - คำนวณจาก `useStockStore.totalSales` โดยรวมเฉพาะสินค้าที่ขายแล้ว (`item.owner` มีค่า) และมีราคาที่ถูกต้อง (`item.price > 0`) สินค้าที่ว่างอยู่ไม่ถูกนำมาคำนวณ
    - รองรับตัวเลขอัปเดตแบบแอนิเมชันลื่นไหล (`animateValue`), Pulse Effect (`isPulsingSales`), Tooltip สรุปจำนวนชิ้น, และ Responsive ซ่อนคำว่า `ยอด:` บนมือถือ (`<= 768px`) เพื่อความกะทัดรัด
+9. **การป้องกัน False Positives จาก Whisper Thai ASR (`live-product-capture-ai`):**
+   - ต้องรองรับเลขหลักสิบที่มีช่องว่างและคำเพี้ยน Whisper (`แปด สิบ` ➔ `80`, `สิบเจ็บ` ➔ `17`, `สีสิบเอ็ด` ➔ `41`, `สี่สิบห้าแปนส` ➔ `45 80`, `สาม สอง 80` ➔ `32 80`), รหัส-ราคาขีด/จุด (`24-80`, `25-80`, `29-60`, `3.6 80 บาท`, `80 บาท นะฮะ 42 บาท`, `26 ตัวนี้ ไป 60 บาท`), กัน `สิบสาม สิบสาม` / `ออก 4 4 4 6` / `652` / `ได้ 48 50 ประมาณนี้`, ใช้ `ตัว(?!นี้)`, และตัด `post_text` หลัง `code_end_idx`
+   - ต้องกรองช่วงราคานำรายการ/ค่าส่ง (`"ตั้งแต่ 20 ไป จะถึง 100"`, `"กรณีโอนเงิน 40"`, `"เก็บไปทาง 50"`, `"บกเพิ่ม"`), ใช้ `(?!\d)` แทน `\b` ใน Measurement, ตรวจ `parsed_raw.is_new_product_signal` จาก chunk ปัจจุบัน, ผูกราคา `pre_text` หน้า `รายการที่ X` เข้าตัวก่อนหน้า (`ราคา 60 บาท รายการที่ 20 บาท`), ไม่ข้ามขอบเขต `สุดท้าย/ต่อไป`, และกันไม่ให้คำพูดนอกลำดับเขียนทับราคาที่ล็อกไว้แล้ว
 
 - **Stability First**: This is a production Vue 3 application used for Live Commerce. Never break existing features, especially the real-time Firebase sync, stock booking queues, and the audio/TTS queue.
 - **Read the Rules**: Always review [AI_RULES.md](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/AI_RULES.md) before implementing logic changes.
@@ -85,7 +88,7 @@ Manowzab Command Center (currently v5.3.2+) coordinates live sales stream manage
 ### 4. Audio & Text-to-Speech (TTS)
 - **Unified Audio Queue**: Managed in [useAudio.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/composables/useAudio.js). All audio events (SFX + TTS) must go through `queueAudio(sfxType, author, message)`. **Do not call TTS services directly** to prevent overlapping.
 - **Synthesized SFX**: Sound effects (`'success'`, `'error'`, `'cancel'`) are generated dynamically on-the-fly using the shared singleton Web Audio API `AudioContext` (`ttsService.getAudioContext()`).
-- **TTS Engine**: [TextToSpeech.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/services/TextToSpeech.js) handles 2 TTS modes: `S` (Google Cloud Standard `th-TH-Standard-A` as primary default) and `🤖` (Native offline SpeechSynthesis as fallback/toggle). Includes multi-tier auto-fallback, LRU buffer cache, and `ensureAudioContextReady()` to recover from browser idle suspension.
+- **TTS Engine**: [TextToSpeech.js](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/services/TextToSpeech.js) handles 3 TTS modes in approved Cloud builds (`C` Chirp 3: HD `th-TH-Chirp3-HD-Aoede` default, `S` Google Cloud Standard `th-TH-Standard-A`, and `🤖` Native offline SpeechSynthesis). Includes automatic multi-tier fallback (`Chirp3-HD -> Standard-A -> Native`), LRU buffer cache, and `ensureAudioContextReady()` to recover from browser idle suspension.
 
 ### 5. Shipping & Lifetime Bookings
 - **Shipping Manager**: [ShippingManager.vue](file:///c:/Users/PR-Notebook-new/Desktop/manowzab-v4/src/components/ShippingManager.vue) manages delivery customers, relative dates, countdowns, and order status updates (`Pending` / `Done`) backed by centralized `useCustomerStore`.
@@ -155,7 +158,8 @@ We have adapted and installed developer-agent workflows from `9arm-skills` into 
 - Keep numeric captures complete when rejecting quantity/price/measurement suffixes. Never infer item IDs from body measurements or unnumbered contextual chat. Keep conversational fragments out of nickname learning.
 - Preserve every message and settle every Promise in the first poll batch of a new video. Capture videoId when enqueueing and skip stale queued work before processing; never clear the active batch inside processSingleMessage.
 - Regex changes require the reviewed anonymized 307-row corpus, boundary tests, and actual useChatProcessor side-effect tests. Expected labels must be reviewed independently of the changed parser. Keep raw logs/identifiers outside tracked fixtures; archive analyzed files only after hash checks, with no overwrite on filename collisions.
-- See docs/chat-regex-review-2026-10-31.md and /verify 2.11–2.15. Passing this corpus is regression evidence, not a claim of 100% accuracy on new chat.
+- Guard `tryRegex` against substring false matches (`เอ็นดู`, `ดูซี`), treat `ไม่เหมาะกับ`/`ผิดเบอร์`/`ไว้ไปญี่ปุ่น`/`ให้ลูก`/`ฝากไวัก่อน`/`จ่ะ`/`ฝฝฝ` cleanly out of self-name learning, support `ไห๊ม` ownership queries, and strip leading polite particles in `sanitizeAdminCustomerName` (`/verify` 2.16–2.18).
+- See docs/chat-regex-review-2026-10-31.md and /verify 2.11–2.18. Passing this corpus is regression evidence, not a claim of 100% accuracy on new chat.
 
 ## Thai TTS Policy (2026-11-02, latest user approval)
 
@@ -194,6 +198,11 @@ We have adapted and installed developer-agent workflows from `9arm-skills` into 
 - Never include `'TH Sarabun New'` in the `font-family` stack of `ShippingLabelModal.vue` (`handlePrint` or preview CSS): on Windows machines with `TH Sarabun New` installed, any race in Google Font (`Sarabun`) loading inside the print iframe causes the browser to fall back to `TH Sarabun New`, which renders Thai glyphs ~35% smaller and thinner at the same `pt` size. Use `'Sarabun', 'Kanit', 'Leelawadee UI', 'Tahoma', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`.
 - Give the print iframe real off-screen dimensions (`width: pageWidth; height: pageHeight; left: -9999px; visibility: hidden;`) rather than `0x0`, and await both the stylesheet `<link id="label-font-link">` load event and `document.fonts.ready` (bounded by an 800ms timeout guard) before invoking `print()`.
 - Use valid W3C `@page { size: <width> <height>; margin: 0mm; }` syntax (never combine two explicit `<length>` values with the `landscape` keyword such as `size: 130mm 76mm landscape;`, which browsers reject as invalid CSS Paged Media syntax).
+
+## Chirp 3: HD with Standard-A/Native Fallback (2026-11-16)
+
+- Approved Cloud builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`) support 3 TTS modes (`chirp3` default `th-TH-Chirp3-HD-Aoede`, `standard` `th-TH-Standard-A`, `native` `🤖`) with automatic fallback (`chirp3 -> standard -> native`); free builds stay strictly `native` with empty `googleApiKey`.
+- `GoogleTtsAudio.js` omits `pitch` and `speakingRate` for `Chirp3-HD` voices and isolates per-voice cooldowns (`voiceRetryAfter`) so `Standard-A` fallback runs immediately.
 - Maintain high-legibility thermal font sizes calibrated 1:1 with on-screen preview (`receiver-name: 13.5pt / 700`, `receiver-addr: 11pt / 600` with adaptive long-address sizing, `receiver-zip: 14pt / 800`, `receiver-phone: 11pt / 700`, `sender-name: 10pt / 700`, `meta-payment-row: 9.5pt / 800`, `card-footer: 9pt / 600`) and support user-selectable font scaling (`preview` 100% default / `compact` 90% / `large` 120%) persisted in `localStorage('manowzab_label_font_scale')` so print output matches preview proportions.
 - `cleanShippingLabelAddress` (`getCustomerCleanAddress`) must strip duplicate leading recipient names, embedded phone numbers, and 5-digit postal codes from the address body when those fields are already rendered on dedicated lines.
 

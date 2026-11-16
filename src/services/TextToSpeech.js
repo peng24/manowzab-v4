@@ -232,15 +232,39 @@ export class TextToSpeech {
     return new Blob([bytes], { type });
   }
 
+  async prepareOnlineAudio(cleanText, background = false) {
+    if (!isGoogleCloudTtsEnabled() || !cleanText) return null;
+    const store = useSystemStore();
+    const mode = store.ttsVoiceMode || "standard";
+
+    if (background) {
+      if (mode === "chirp3") {
+        if (Date.now() >= (this.googleAudio.voiceRetryAfter.get("th-TH-Chirp3-HD-Aoede") || 0)) {
+          return this.googleAudio.prepare(cleanText, true, "th-TH-Chirp3-HD-Aoede");
+        }
+        return this.googleAudio.prepare(cleanText, true, "th-TH-Standard-A");
+      }
+      return this.googleAudio.prepare(cleanText, true);
+    }
+
+    if (mode === "chirp3") {
+      const chirpBuffer = await this.googleAudio.prepare(cleanText, false, "th-TH-Chirp3-HD-Aoede");
+      if (chirpBuffer) return chirpBuffer;
+      return this.googleAudio.prepare(cleanText, false, "th-TH-Standard-A");
+    }
+
+    return this.googleAudio.prepare(cleanText, false);
+  }
+
   /**
-   * Speak using Google Cloud TTS API with key rotation
+   * Speak using Google Cloud TTS API (Chirp 3: HD with Standard-A & Native fallback)
    */
   async speakOnline(text) {
     if (!isGoogleCloudTtsEnabled()) { this.speakNative(text); return; }
     const generation = this.playbackGeneration;
     let source;
     try {
-      const buffer = await this.googleAudio.prepare(this.sanitize(text).substring(0, 500));
+      const buffer = await this.prepareOnlineAudio(this.sanitize(text).substring(0, 500), false);
       if (generation !== this.playbackGeneration) return;
       if (!buffer) { this.consecutiveGoogleFailures++; this.speakNative(text); return; }
       if (!await this.ensureAudioContextReady()) throw new Error("AudioContext unavailable");
@@ -282,10 +306,12 @@ export class TextToSpeech {
   prefetchSpeech(author, message) {
     const text = this.formatSpeechText(author, message);
     if (!text) return Promise.resolve(null);
-    return this.googleAudio.prepare(this.sanitize(text).substring(0, 500), true);
+    return this.prepareOnlineAudio(this.sanitize(text).substring(0, 500), true);
   }
 
-  retryGoogle() { this.googleAudio.retry(); }
+  retryGoogle() {
+    this.googleAudio.retry();
+  }
 
   /**
    * Speak using native browser TTS

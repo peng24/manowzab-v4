@@ -24,36 +24,43 @@ export const useSystemStore = defineStore("system", () => {
   // Free builds neither load Cloud keys nor allow saved preferences to enable them.
   const googleApiKey = ref(googleCloudTtsEnabled ? (import.meta.env.VITE_GOOGLE_API_KEYS || "") : "");
 
-  // Free builds use native speech; approved Cloud builds restore Standard once.
+  // Free builds use native speech; approved Cloud builds default to Chirp 3: HD (female friendly Aoede) once.
   const savedMode = localStorage.getItem("manowzab_tts_voice_mode");
-  const validModes = googleCloudTtsEnabled ? ["standard", "native"] : ["native"];
-  const cloudPolicy = "cloud-primary-2026-11-02";
+  const validModes = googleCloudTtsEnabled ? ["chirp3", "standard", "native"] : ["native"];
+  const cloudPolicy = "cloud-chirp3-2026-11-16";
   const restoreCloud = googleCloudTtsEnabled && localStorage.getItem("manowzab_tts_cloud_policy") !== cloudPolicy;
-  const defaultMode = googleCloudTtsEnabled ? "standard" : "native";
-  const ttsVoiceMode = ref(restoreCloud ? "standard" : validModes.includes(savedMode) ? savedMode : defaultMode);
+  const defaultMode = googleCloudTtsEnabled ? "chirp3" : "native";
+  const ttsVoiceMode = ref(restoreCloud ? "chirp3" : validModes.includes(savedMode) ? savedMode : defaultMode);
   if (restoreCloud) localStorage.setItem("manowzab_tts_cloud_policy", cloudPolicy);
   if (savedMode !== ttsVoiceMode.value) {
     localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
   }
 
   const useOnlineTts = computed({
-    get: () => googleCloudTtsEnabled && ttsVoiceMode.value === "standard",
+    get: () => googleCloudTtsEnabled && ttsVoiceMode.value !== "native",
     set: (val) => {
-      ttsVoiceMode.value = val && googleCloudTtsEnabled ? "standard" : "native";
+      ttsVoiceMode.value = val && googleCloudTtsEnabled
+        ? (ttsVoiceMode.value !== "native" ? ttsVoiceMode.value : "chirp3")
+        : "native";
       localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     },
   });
   const googleVoiceName = computed(() => {
-    return "th-TH-Standard-A";
+    return ttsVoiceMode.value === "standard" ? "th-TH-Standard-A" : "th-TH-Chirp3-HD-Aoede";
   });
 
   function cycleTtsMode() {
-    ttsVoiceMode.value = googleCloudTtsEnabled && ttsVoiceMode.value !== "standard" ? "standard" : "native";
+    if (!googleCloudTtsEnabled) {
+      ttsVoiceMode.value = "native";
+    } else {
+      const idx = validModes.indexOf(ttsVoiceMode.value);
+      ttsVoiceMode.value = validModes[(idx + 1) % validModes.length];
+    }
     localStorage.setItem("manowzab_tts_voice_mode", ttsVoiceMode.value);
     return ttsVoiceMode.value;
   }
 
-  const activeKeyIndex = ref(1); // ✅ Track which API key is currently active
+  const activeKeyIndex = ref(1); // ✅ Track which Google Cloud API key is currently active
   const shippingCycle = ref("today"); // ✅ รอบจัดส่งเริ่มต้น ('today' | 'tomorrow' | 'พฤหัส' etc. | 'YYYY-MM-DD')
 
   // ✅ Live Chat Panel Collapsible State (Saved to localStorage)

@@ -86,12 +86,14 @@
 
       <!-- Free Thai voice test; Cloud toggle exists only in explicitly enabled builds. -->
       <button
-        :class="['btn', 'btn-tts-mode', { 'is-cloud': systemStore.ttsVoiceMode === 'standard' }]"
+        :class="['btn', 'btn-tts-mode', { 'is-cloud': systemStore.useOnlineTts }]"
         @click="toggleTtsMode"
         :aria-label="systemStore.googleCloudTtsEnabled ? 'สลับเสียงอ่าน' : 'ทดลองเสียงภาษาไทยฟรี'"
         :title="
           !systemStore.googleCloudTtsEnabled
             ? 'เสียงภาษาไทยฟรี • กดทดลองฟัง (ไม่ใช้ Google Cloud)'
+            : systemStore.ttsVoiceMode === 'chirp3'
+            ? `Chirp 3: HD (th-TH-Chirp3-HD-Aoede) - Key #${systemStore.activeKeyIndex} • สำรอง: Standard-A`
             : systemStore.ttsVoiceMode === 'standard'
             ? `Google Cloud Standard (th-TH-Standard-A) - Key #${systemStore.activeKeyIndex} Active`
             : 'เสียงในเครื่อง • กดเพื่อสลับเสียง'
@@ -111,7 +113,7 @@
           v-if="systemStore.useOnlineTts"
           class="tts-mode-code"
         >
-          {{ 'S' + systemStore.activeKeyIndex }}
+          {{ (systemStore.ttsVoiceMode === 'chirp3' ? 'C' : 'S') + systemStore.activeKeyIndex }}
         </span>
         <span v-else-if="!systemStore.googleCloudTtsEnabled" style="margin-left: 2px">TH ฟรี</span>
       </button>
@@ -707,7 +709,12 @@ function toggleTtsMode() {
   }
   const newMode = systemStore.cycleTtsMode();
   ttsService.retryGoogle();
-  const modeName = newMode === "standard" ? "Google Standard" : "Native TTS";
+  const modeLabelMap = {
+    chirp3: "Chirp 3 HD",
+    standard: "Google Standard",
+    native: "Native TTS",
+  };
+  const modeName = modeLabelMap[newMode] || "Native TTS";
 
   logger.log("🔊 Switched to:", modeName);
   queueAudio(null, "", `เปลี่ยนเป็น ${modeName}`);

@@ -126,4 +126,19 @@ describe("Google audio preparation (no playback)", () => {
     expect(await loader.request("ทดสอบ", config.voice, "key-a", 100)).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("omits pitch and speakingRate for Chirp3-HD voices and isolates voice-level cooldowns from Standard-A", async () => {
+    fetchMock
+      .mockResolvedValueOnce(error(400, "INVALID_ARGUMENT"))
+      .mockResolvedValueOnce(error(400, "INVALID_ARGUMENT"))
+      .mockResolvedValueOnce(ok());
+    expect(await loader.prepare("สวัสดี", false, "th-TH-Chirp3-HD-Aoede")).toBeNull();
+    const chirpBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(chirpBody.voice.name).toBe("th-TH-Chirp3-HD-Aoede");
+    expect(chirpBody.audioConfig).toEqual({ audioEncoding: "MP3" });
+    // Standard-A fallback still executes immediately without waiting for Chirp3-HD cooldown
+    expect(await loader.prepare("สวัสดี", false, "th-TH-Standard-A")).toBeInstanceOf(ArrayBuffer);
+    const stdBody = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(stdBody.audioConfig).toEqual({ audioEncoding: "MP3", speakingRate: 1, pitch: 0 });
+  });
 });

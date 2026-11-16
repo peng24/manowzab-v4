@@ -17,7 +17,7 @@ This skill governs all development, bug fixing, architectural changes, and deplo
 The application is an event-driven, real-time live commerce dashboard built with:
 - **Frontend**: Vue 3 (Composition API, `<script setup>`), Vite 7, Pinia 3.
 - **Persistence & Real-Time Sync**: Firebase Realtime Database (RTDB v12).
-- **Audio Engine**: Google Cloud Standard in approved opt-in builds (native in free builds) + Web Audio SFX; Google Cloud Text-to-Speech (`th-TH-Standard-A`) + Native `SpeechSynthesis` Fallback.
+- **Audio Engine**: Multi-tier Cloud TTS in approved opt-in builds (`Chirp 3: HD` `th-TH-Chirp3-HD-Aoede` default, fallback `th-TH-Standard-A`, and Native `SpeechSynthesis`; native-only in free builds) + Web Audio SFX.
 - **Hardware Integration**: Direct thermal label printing via isolated hidden iframes (130x76mm / 76x130mm).
 
 ### Core Stores & Composables
@@ -87,6 +87,9 @@ For detailed Firebase schema definitions and database paths, refer to [architect
    - ใน `StockGrid.vue` (และ `HistoryModal.vue`) เปลี่ยนตำแหน่งข้อความเดิม ("🔥 ไฟเริ่มติดแล้ว!") เป็นป้ายยอดขายรวม `.total-sales-badge` (`ยอด: ฿...`) สีทองเรืองแสง
    - คำนวณจาก `useStockStore.totalSales` โดยรวมเฉพาะสินค้าที่ขายแล้ว (`item.owner` มีค่า) และมีราคาที่ถูกต้อง (`item.price > 0`) สินค้าที่ว่างอยู่ไม่ถูกนำมาคำนวณ
    - รองรับตัวเลขอัปเดตแบบแอนิเมชันลื่นไหล (`animateValue`), Pulse Effect (`isPulsingSales`), Tooltip สรุปจำนวนชิ้น, และ Responsive ซ่อนคำว่า `ยอด:` บนมือถือ (`<= 768px`) เพื่อความกะทัดรัด
+9. **การป้องกัน False Positives จาก Whisper Thai ASR (`live-product-capture-ai`):**
+   - ต้องรองรับเลขหลักสิบที่มีช่องว่างและคำเพี้ยน Whisper (`แปด สิบ` ➔ `80`, `สิบเจ็บ` ➔ `17`, `สีสิบเอ็ด` ➔ `41`, `สี่สิบห้าแปนส` ➔ `45 80`, `สาม สอง 80` ➔ `32 80`), รหัส-ราคาขีด/จุด (`24-80`, `25-80`, `29-60`, `3.6 80 บาท`, `80 บาท นะฮะ 42 บาท`, `26 ตัวนี้ ไป 60 บาท`), กัน `สิบสาม สิบสาม` / `ออก 4 4 4 6` / `652` / `ได้ 48 50 ประมาณนี้`, ใช้ `ตัว(?!นี้)`, และตัด `post_text` หลัง `code_end_idx`
+   - ต้องกรองช่วงราคานำรายการ/ค่าส่ง (`"ตั้งแต่ 20 ไป จะถึง 100"`, `"กรณีโอนเงิน 40"`, `"เก็บไปทาง 50"`, `"บกเพิ่ม"`), ใช้ `(?!\d)` แทน `\b` ใน Measurement, ตรวจ `parsed_raw.is_new_product_signal` จาก chunk ปัจจุบัน, ผูกราคา `pre_text` หน้า `รายการที่ X` เข้าตัวก่อนหน้า (`ราคา 60 บาท รายการที่ 20 บาท`), ไม่ข้ามขอบเขต `สุดท้าย/ต่อไป`, และกันไม่ให้คำพูดนอกลำดับเขียนทับราคาที่ล็อกไว้แล้ว
 
 
 Whenever touching code in this repository, you **MUST** uphold these non-negotiable rules:
@@ -193,7 +196,8 @@ When the user states **"อัพเลย"**:
 - Keep numeric captures complete when rejecting quantity/price/measurement suffixes. Never infer item IDs from body measurements or unnumbered contextual chat. Keep conversational fragments out of nickname learning.
 - Preserve every message and settle every Promise in the first poll batch of a new video. Capture videoId when enqueueing and skip stale queued work before processing; never clear the active batch inside processSingleMessage.
 - Regex changes require the reviewed anonymized 307-row corpus, boundary tests, and actual useChatProcessor side-effect tests. Expected labels must be reviewed independently of the changed parser. Keep raw logs/identifiers outside tracked fixtures; archive analyzed files only after hash checks, with no overwrite on filename collisions.
-- See docs/chat-regex-review-2026-10-31.md and /verify 2.11–2.15. Passing this corpus is regression evidence, not a claim of 100% accuracy on new chat.
+- Guard `tryRegex` against substring false matches (`เอ็นดู`, `ดูซี`), treat `ไม่เหมาะกับ`/`ผิดเบอร์`/`ไว้ไปญี่ปุ่น`/`ให้ลูก`/`ฝากไวัก่อน`/`จ่ะ`/`ฝฝฝ` cleanly out of self-name learning, support `ไห๊ม` ownership queries, and strip leading polite particles in `sanitizeAdminCustomerName` (`/verify` 2.16–2.18).
+- See docs/chat-regex-review-2026-10-31.md and /verify 2.11–2.18. Passing this corpus is regression evidence, not a claim of 100% accuracy on new chat.
 
 ## Thai TTS Policy (2026-11-02, latest user approval)
 
@@ -238,3 +242,7 @@ When the user states **"อัพเลย"**:
 ## Quiet Luxury Live Monitor UI (v5.5.0+ — 2026-11-13)
 - Render `<Header />` full-width above `.app-layout` (`App.vue`), with `.mobile-pane-tabs` (`<= 900px`) for single-pane mobile switching, `430px` desktop `.chat-panel` with `1.18rem` crisp white chat typography, icon-only `.btn-collapse` to prevent header clipping, and `scroll-behavior: auto` on `#chat-viewport`.
 - Keep 3-tier non-overlapping `StockItemCard.vue` (no duplicate `.stock-item` / `aspect-ratio: 1.35` in `StockGrid.vue`; `.stock-grid` uses `grid-auto-rows: minmax(104px, auto); align-items: stretch;`) with booking (`orderPopEntry`, `newOrderLuxPulse`, `.new-order-shimmer`, also on queue promotion in `StockGrid.vue`) and cancellation (`cancelShakeEntry`, `cancelPulseLux`, `.cancel-flash-sweep`) animations, untruncated `.stock-search-input` (`150px`), single-chevron `.quick-filter-select`, and Quiet Luxury `ShippingManager.vue` (`1040px` modal, `white-space: nowrap` item counts, FontAwesome actions, non-destructive shipping removal).
+
+## Chirp 3: HD with Standard-A/Native Fallback (2026-11-16)
+- Approved Cloud builds (`VITE_ENABLE_GOOGLE_CLOUD_TTS=true`) support 3 TTS modes (`chirp3` default `th-TH-Chirp3-HD-Aoede`, `standard` `th-TH-Standard-A`, `native` `🤖`) with automatic fallback (`chirp3 -> standard -> native`); free builds stay strictly `native` with empty `googleApiKey`.
+- `GoogleTtsAudio.js` omits `pitch` and `speakingRate` for `Chirp3-HD` voices and isolates per-voice cooldowns (`voiceRetryAfter`) so `Standard-A` fallback runs immediately.

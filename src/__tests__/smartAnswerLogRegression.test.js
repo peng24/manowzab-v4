@@ -39,4 +39,10 @@ describe('Smart Answer — reviewed log questions', () => {
     expect(isSmartQuestionText('ของพี่กี่ตัวเเล้วส่งเลย')).toBe(true);
     expect(resolveSmartAnswer(chat('ของพี่กี่ตัวเเล้วส่งเลย'), context)).toMatchObject({ category: 'orders' });
   });
+  it('extracts item 46 from พี่ได้ไห๊มคะ 46น้องนาว without false-matching ได้ค่ะ 43', () => {
+    expect(isSmartQuestionText('พี่ได้ไห๊มคะ 46น้องนาว')).toBe(true);
+    expect(extractQueriedItemId('พี่ได้ไห๊มคะ 46น้องนาว')).toBe(46);
+    expect(isSmartQuestionText('ได้ค่ะ 43')).toBe(false);
+    expect(extractQueriedItemId('ได้ค่ะ 43')).toBeNull();
+  });
 });

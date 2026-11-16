@@ -168,4 +168,31 @@ describe('actual chat processor log safety', () => {
     const chat = await process(text, asAdmin);
     expect(chat).toMatchObject({ type: 'buy', detectionMethod: 'multi-buy', ttsText: expectedTts });
   });
+
+  it.each([
+    'พี่มดไม่เหมาะกับ21',
+    'โอ้จยยเอ็นดู64อิอิ',
+    'พี่ได้ไห๊มคะ 46น้องนาว',
+    'ได้ๆ23',
+    'อ๋อๆๆ22',
+  ])('does not falsely book stock on Nov 8 – Nov 15 negation/question/chat noise: %s', async text => {
+    await process(text);
+    expect(state.stock.processOrder).not.toHaveBeenCalled();
+  });
+
+  it('books พี่กวาง 19 ด้วย for proxy customer พี่กวาง without leaking ด้วย', async () => {
+    const chat = await process('พี่กวาง 19 ด้วย', true);
+    expect(state.stock.processOrder).toHaveBeenCalledTimes(1);
+    expect(state.stock.processOrder.mock.calls[0][0]).toBe(19);
+    expect(state.stock.processOrder.mock.calls[0][1]).toBe('พี่กวาง');
+    expect(chat.proxyCustomerName).toBe('พี่กวาง');
+  });
+
+  it('records พี่พัช เขียวขี้ม้า as admin note without writing conversational nicknames', async () => {
+    state.nick.hasNickname.mockReturnValue(false);
+    const chat = await process('พี่พัช เขียวขี้ม้า', true);
+    expect(chat).toMatchObject({ type: 'note', proxyCustomerName: 'พี่พัช' });
+    await process('จำผิดเบอร์ค่ะ');
+    expect(state.update.mock.calls.some(([ref]) => ref.path.startsWith('nicknames/'))).toBe(false);
+  });
 });

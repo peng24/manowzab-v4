@@ -339,7 +339,7 @@
                 @click="editNickname(chat)"
                 title="คลิกเพื่อแก้ไขข้อมูลลูกค้า (ชื่อเล่น, ที่อยู่, ช่องทางติดต่อ)"
               >
-                <span class="chat-name-dot" :style="{ backgroundColor: chat.color || '#94a3b8' }"></span>
+                <span class="chat-name-dot" :style="{ backgroundColor: getCustomerRowColor(chat) || chat.color || '#94a3b8' }"></span>
                 <span class="chat-name-text">{{ chat.displayName }}</span>
               </span>
 
@@ -1032,39 +1032,116 @@ async function confirmToggleBan(chat) {
 }
 
 // 🎨 Helper: Generate calm Quiet Luxury tint and subtle left accent from customer signature color
-function getChatRowStyle(chat) {
-  if (!chat) return {};
-  // Priority actions use dedicated class themes (buy, shipping, cancel, admin)
-  if (chat.type === "buy" || chat.type === "shipping" || chat.type === "cancel" || chat.type === "note" || chat.isAdmin) {
-    return {};
+function applyColorAlpha(colorStr, alpha) {
+  if (!colorStr || typeof colorStr !== "string") return `rgba(148, 163, 184, ${alpha})`;
+  const c = colorStr.trim();
+  const hslMatch = c.match(/^hsla?\(\s*([\d.]+)\s*,\s*([\d.]+%)\s*,\s*([\d.]+%)/i);
+  if (hslMatch) {
+    return `hsla(${hslMatch[1]}, ${hslMatch[2]}, ${hslMatch[3]}, ${alpha})`;
   }
-
-  const rawColor = chat.color;
-  if (!rawColor) return {};
-
-  let tint06 = "rgba(148, 163, 184, 0.06)";
-  let tint16 = "rgba(148, 163, 184, 0.16)";
-
-  if (rawColor.startsWith("hsl")) {
-    tint06 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.06)");
-    tint16 = rawColor.replace("hsl(", "hsla(").replace(")", ", 0.18)");
-  } else if (rawColor.startsWith("#")) {
-    const hex = rawColor.replace("#", "");
+  const rgbMatch = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgbMatch) {
+    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${alpha})`;
+  }
+  if (c.startsWith("#")) {
+    const hex = c.slice(1);
     if (hex.length === 6) {
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
       const b = parseInt(hex.substring(4, 6), 16);
-      tint06 = `rgba(${r}, ${g}, ${b}, 0.06)`;
-      tint16 = `rgba(${r}, ${g}, ${b}, 0.18)`;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
   }
+  return `rgba(148, 163, 184, ${alpha})`;
+}
 
+// 🌈 Memoized 360-degree FNV-1a personal row color cache (prevents adjacent-customer color collisions)
+const CUSTOMER_ROW_COLOR_CACHE = new Map();
+
+function getCustomerRowColor(chat) {
+  if (!chat) return null;
+  const key = String(chat.realName || chat.displayName || chat.authorName || chat.uid || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, "");
+  if (!key) return chat.color || null;
+
+  if (CUSTOMER_ROW_COLOR_CACHE.has(key)) {
+    return CUSTOMER_ROW_COLOR_CACHE.get(key);
+  }
+
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const mixed = Math.imul(h, 2654435761) >>> 0;
+  const hue = mixed % 360;
+  const color = `hsl(${hue}, 76%, 64%)`;
+
+  if (CUSTOMER_ROW_COLOR_CACHE.size >= 500) {
+    const oldest = CUSTOMER_ROW_COLOR_CACHE.keys().next().value;
+    CUSTOMER_ROW_COLOR_CACHE.delete(oldest);
+  }
+  CUSTOMER_ROW_COLOR_CACHE.set(key, color);
+  return color;
+}
+
+function getChatRowStyle(chat) {
+  if (!chat) return {};
+  if (isBannedUser(chat)) return {};
+
+  // Hybrid design:
+  // - Admin cards keep Champagne Gold background with intent-colored left accent stripe
+  // - Customer cards use each customer's personal 360-degree background tint so speakers stay distinct
+  //   while priority intents (buy/shipping/cancel) stand out via crisp colored border + 4.5px left stripe + badge
+  // - Cancellations also keep a crimson danger wash so they are never missed
+  if (chat.isAdmin) {
+    const adminStripe =
+      chat.type === "buy" ? "#10b981" :
+      chat.type === "cancel" ? "#f43f5e" :
+      chat.type === "shipping" ? "#a855f7" :
+      "#e5b869";
+    return {
+      borderLeft: `4.5px solid ${adminStripe}`,
+    };
+  }
+
+  const rawColor = getCustomerRowColor(chat) || chat.color;
+  if (!rawColor) return {};
+
+  const tintStart = applyColorAlpha(rawColor, 0.24);
+  const tintEnd = applyColorAlpha(rawColor, 0.09);
+
+  if (chat.type === "buy") {
+    return {
+      borderColor: "rgba(52, 211, 153, 0.58)",
+      borderLeft: "4.5px solid #10b981",
+      background: `linear-gradient(135deg, ${tintStart} 0%, ${tintEnd} 60%, rgba(13, 18, 28, 0.9) 100%)`,
+    };
+  }
+
+  if (chat.type === "shipping") {
+    return {
+      borderColor: "rgba(192, 132, 252, 0.58)",
+      borderLeft: "4.5px solid #a855f7",
+      background: `linear-gradient(135deg, ${tintStart} 0%, ${tintEnd} 60%, rgba(13, 18, 28, 0.9) 100%)`,
+    };
+  }
+
+  if (chat.type === "cancel") {
+    return {
+      borderColor: "rgba(251, 113, 133, 0.68)",
+      borderLeft: "4.5px solid #f43f5e",
+      background: `linear-gradient(135deg, rgba(244, 63, 94, 0.22) 0%, ${tintEnd} 60%, rgba(24, 13, 18, 0.92) 100%)`,
+    };
+  }
+
+  const tintBorder = applyColorAlpha(rawColor, 0.40);
   return {
-    borderLeft: `3px solid ${rawColor}`,
-    borderColor: "rgba(255, 255, 255, 0.06)",
-    background: `linear-gradient(135deg, ${tint06} 0%, rgba(13, 18, 28, 0.85) 100%)`,
-    "--bubble-bg": "rgba(18, 24, 38, 0.84)",
-    "--bubble-border": tint16,
+    borderColor: tintBorder,
+    borderLeft: `3.5px solid ${rawColor}`,
+    background: `linear-gradient(135deg, ${tintStart} 0%, ${tintEnd} 60%, rgba(13, 18, 28, 0.9) 100%)`,
   };
 }
 
@@ -1713,6 +1790,8 @@ async function refreshChat() {
   gap: 6px;
   min-height: 44px;
   box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 
@@ -1907,7 +1986,7 @@ async function refreshChat() {
 #chat-viewport {
   flex: 1;
   overflow-y: auto;
-  padding: 15px 5px; /* ✅ Reduced side padding */
+  padding: 10px 8px;
   padding-bottom: calc(
     20px + env(safe-area-inset-bottom)
   ); /* ✅ Safe Area for Mobile */
@@ -1916,80 +1995,80 @@ async function refreshChat() {
 #chat-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 8px;
 }
 
 .chat-row {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 9px 11px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  background: rgba(18, 24, 38, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   transition: background-color 0.2s ease, border-color 0.2s ease;
   position: relative;
 }
 
 .chat-row:hover {
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(24, 32, 50, 0.78);
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* 🛒 Quiet Luxury Emerald (Buy / CF) */
+/* 🛒 Hybrid Emerald (Buy / CF) */
 .chat-row.buy {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(15, 23, 30, 0.85) 100%) !important;
-  border: 1px solid rgba(16, 185, 129, 0.38) !important;
-  border-left: 3.5px solid #10b981 !important;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22) !important;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(12, 22, 24, 0.88) 100%);
+  border: 1px solid rgba(52, 211, 153, 0.55);
+  border-left: 4.5px solid #10b981;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
 }
 
 .chat-row.buy .chat-bubble {
-  background: rgba(16, 185, 129, 0.10);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: transparent;
+  border: none;
   color: #f8fafc;
   font-weight: 600;
 }
 
-/* ❌ Quiet Luxury Rose (Cancel) */
+/* ❌ Hybrid Rose Danger (Cancel) */
 .chat-row.cancel {
-  background: linear-gradient(135deg, rgba(244, 63, 94, 0.14) 0%, rgba(28, 17, 24, 0.85) 100%) !important;
-  border: 1px solid rgba(244, 63, 94, 0.42) !important;
-  border-left: 3.5px solid #f43f5e !important;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22) !important;
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.22) 0%, rgba(26, 15, 22, 0.9) 100%);
+  border: 1px solid rgba(251, 113, 133, 0.65);
+  border-left: 4.5px solid #f43f5e;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.24);
 }
 
 .chat-row.cancel .chat-bubble {
-  background: rgba(244, 63, 94, 0.10);
-  border: 1px solid rgba(244, 63, 94, 0.25);
+  background: transparent;
+  border: none;
   color: #f8fafc;
 }
 
-/* 📦 Shipping Message */
+/* 📦 Hybrid Violet (Shipping) */
 .chat-row.shipping {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(21, 18, 34, 0.85) 100%) !important;
-  border: 1px solid rgba(168, 85, 247, 0.35) !important;
-  border-left: 3.5px solid #a855f7 !important;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2) !important;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(20, 16, 32, 0.88) 100%);
+  border: 1px solid rgba(192, 132, 252, 0.55);
+  border-left: 4.5px solid #a855f7;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
 }
 
 .chat-row.shipping .chat-bubble {
-  background: rgba(168, 85, 247, 0.10);
-  border: 1px solid rgba(168, 85, 247, 0.24);
+  background: transparent;
+  border: none;
   color: #f8fafc;
 }
 
 /* 👑 Admin / Proxy Message */
 .chat-row.admin {
-  background: linear-gradient(135deg, rgba(229, 184, 105, 0.12) 0%, rgba(24, 21, 18, 0.85) 100%) !important;
-  border: 1px solid rgba(229, 184, 105, 0.35) !important;
-  border-left: 3.5px solid #e5b869 !important;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2) !important;
+  background: linear-gradient(135deg, rgba(229, 184, 105, 0.16) 0%, rgba(24, 20, 16, 0.9) 100%);
+  border: 1px solid rgba(229, 184, 105, 0.45);
+  border-left: 4.5px solid #e5b869;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
 }
 
 .chat-row.admin .chat-bubble {
-  background: rgba(229, 184, 105, 0.09);
-  border: 1px solid rgba(229, 184, 105, 0.24);
+  background: transparent;
+  border: none;
   color: #f8fafc;
 }
 
@@ -2036,8 +2115,10 @@ async function refreshChat() {
   flex-direction: column;
   align-items: center;
   flex-shrink: 0;
-  width: 48px;
-  gap: 4px;
+  width: 44px;
+  gap: 5px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .status-badge-under {
@@ -2045,14 +2126,14 @@ async function refreshChat() {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  padding: 2.5px 6px;
-  border-radius: 8px;
+  padding: 2px 6px;
+  border-radius: 6px;
   font-size: 0.68em;
   font-weight: 800;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   line-height: 1.2;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.1px;
 }
 
 .status-badge-under.badge-spam {
@@ -2138,15 +2219,17 @@ async function refreshChat() {
   align-items: center;
   flex-wrap: nowrap;
   gap: 5px;
-  margin-bottom: 6px;
-  font-size: 0.98rem;
+  margin-bottom: 3px;
+  font-size: 0.96rem;
   min-width: 0;
   width: 100%;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .chat-time {
-  color: #94a3b8;
-  font-size: 0.85em;
+  color: #64748b;
+  font-size: 0.8em;
   font-family: monospace;
   font-weight: 600;
   flex-shrink: 0;
@@ -2158,13 +2241,13 @@ async function refreshChat() {
   gap: 6px;
   font-size: 0.98em;
   font-weight: 700;
-  color: #f8fafc;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  padding: 2px 10px 2px 8px;
-  border-radius: 999px;
+  color: #f1f5f9;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 1px 6px 1px 0;
+  border-radius: 6px;
   cursor: pointer;
-  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, padding 0.18s ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2187,9 +2270,10 @@ async function refreshChat() {
 }
 
 .chat-name:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(229, 184, 105, 0.45);
-  transform: translateY(-0.5px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(229, 184, 105, 0.38);
+  padding-left: 6px;
+  color: #ffffff;
 }
 
 .real-name {
@@ -2209,19 +2293,19 @@ async function refreshChat() {
 }
 
 .chat-bubble {
-  background-color: var(--bubble-bg, rgba(20, 26, 40, 0.78));
-  border: 1px solid var(--bubble-border, rgba(255, 255, 255, 0.09));
+  background: transparent;
+  border: none;
   color: #ffffff;
-  padding: 11px 14px;
-  border-radius: 6px 14px 14px 14px;
+  padding: 2px 0 0 0;
+  border-radius: 0;
   font-size: 1.18rem;
-  line-height: 1.48;
+  line-height: 1.44;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
+  box-shadow: none;
 }
 
 .chat-text {
@@ -2232,6 +2316,8 @@ async function refreshChat() {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   letter-spacing: 0.15px;
   word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .chat-row.buy .chat-text,
@@ -2254,21 +2340,21 @@ async function refreshChat() {
 }
 
 .badge-buy {
-  background: rgba(16, 185, 129, 0.16);
+  background: rgba(16, 185, 129, 0.26);
   color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  border: 1px solid rgba(52, 211, 153, 0.72);
 }
 
 .badge-cancel {
-  background: rgba(244, 63, 94, 0.16);
-  color: #fda4af;
-  border: 1px solid rgba(244, 63, 94, 0.42);
+  background: rgba(244, 63, 94, 0.28);
+  color: #fecdd3;
+  border: 1px solid rgba(251, 113, 133, 0.78);
 }
 
 .badge-shipping {
-  background: rgba(168, 85, 247, 0.16);
-  color: #d8b4fe;
-  border: 1px solid rgba(168, 85, 247, 0.4);
+  background: rgba(168, 85, 247, 0.26);
+  color: #e9d5ff;
+  border: 1px solid rgba(192, 132, 252, 0.72);
 }
 
 
@@ -2300,7 +2386,7 @@ async function refreshChat() {
 }
 
 .chat-row.admin .chat-bubble {
-  border: 1px solid #f59e0b; /* Gold border for Admin */
+  border: none;
 }
 
 .force-process-btn {
@@ -2711,18 +2797,25 @@ async function refreshChat() {
   justify-content: center;
   width: 20px;
   height: 20px;
+  margin-left: auto;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 5px;
   color: #64748b;
-  font-size: 0.74em;
+  font-size: 0.72em;
+  opacity: 0.42;
   cursor: pointer;
   transition: all 0.2s ease;
   padding: 0;
   flex-shrink: 0;
 }
 
+.chat-row:hover .btn-author-filter {
+  opacity: 0.9;
+}
+
 .btn-author-filter:hover {
+  opacity: 1;
   color: #f59e0b;
   background: rgba(245, 158, 11, 0.15);
   border-color: rgba(245, 158, 11, 0.35);
@@ -2730,6 +2823,7 @@ async function refreshChat() {
 }
 
 .btn-author-filter.is-active {
+  opacity: 1;
   color: #0f172a;
   background: #f59e0b;
   border-color: #f59e0b;
@@ -3283,16 +3377,17 @@ async function refreshChat() {
 /* Keep the answer below both avatar and message, inside the shared row frame. */
 .chat-row.has-smart-answer {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 10px;
-  padding: 12px;
-  border-radius: 14px;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px 10px;
+  padding: 10px 11px;
+  border-radius: 12px;
 }
 
 .chat-row.has-smart-answer:not(.admin):not(.shipping) {
-  background: linear-gradient(135deg, #292235, #1b1b2b) !important;
-  border: 1px solid rgba(192, 132, 252, 0.38) !important;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18) !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(22, 22, 38, 0.9) 100%);
+  border: 1px solid rgba(192, 132, 252, 0.38);
+  border-left: 3.5px solid #a855f7;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 
 .has-smart-answer .chat-bubble {
@@ -3300,11 +3395,11 @@ async function refreshChat() {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 6px;
-  background: rgba(139, 92, 246, 0.08);
-  border: 1px solid rgba(192, 132, 252, 0.18);
+  background: transparent;
+  border: none;
   box-shadow: none;
   backdrop-filter: none;
-  padding: 10px 12px;
+  padding: 2px 0 0 0;
 }
 
 .has-smart-answer .chat-name {
@@ -3362,12 +3457,14 @@ async function refreshChat() {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-radius: 10px;
   background: linear-gradient(135deg, #193342, #141d2d);
   border: 1px solid rgba(56, 189, 248, 0.25);
   border-left: 3px solid #38bdf8;
   overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .smart-answer-card.tone-emerald {

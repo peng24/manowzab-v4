@@ -2324,25 +2324,30 @@ async function openCleanupModal() {
 }
 
 .grid-item.sold {
-    background: linear-gradient(145deg, rgba(220, 38, 38, 0.5) 0%, rgba(153, 27, 27, 0.78) 60%, rgba(127, 29, 29, 0.92) 100%);
-    border: 2px solid #f87171;
-    box-shadow: 0 5px 16px rgba(220, 38, 38, 0.34), inset 0 1px 0 rgba(254, 202, 202, 0.25);
+    background: linear-gradient(155deg, rgba(185, 28, 28, 0.42) 0%, rgba(127, 29, 29, 0.62) 55%, rgba(69, 10, 10, 0.88) 100%);
+    border: 1.5px solid rgba(248, 113, 113, 0.65);
+    box-shadow: 0 4px 14px rgba(153, 27, 27, 0.25), inset 0 1px 0 rgba(254, 202, 202, 0.16);
 }
 
 .item-num {
     position: absolute;
     top: 4px;
-    left: 4px;
-    font-size: 1.15em;
+    left: 6px;
+    font-size: 1.18em;
     font-weight: 800;
     font-family: var(--font-main);
-    color: #ffffff;
-    background: rgba(0, 0, 0, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.32);
-    padding: 2px 7px;
-    border-radius: 7px;
-    line-height: 1;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    color: #fef08a;
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+    line-height: 1.1;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+    box-shadow: none;
+}
+
+.grid-item.empty .item-num {
+    color: #cbd5e1;
 }
 
 .item-status {
@@ -2367,13 +2372,14 @@ async function openCleanupModal() {
 }
 
 .stock-price {
-  font-size: 0.9em;
-  color: #fef08a;
-  background: rgba(20, 18, 6, 0.78);
-  border: 1px solid rgba(250, 204, 21, 0.65);
-  padding: 1px 7px;
-  border-radius: 7px;
+  font-size: 0.95em;
+  color: #fde047;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
   font-weight: 800;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
   margin-top: 3px;
 }
 

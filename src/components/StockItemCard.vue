@@ -159,9 +159,9 @@ function isUnsavedOwner(name) {
   }
 
   .stock-item.sold:hover {
-    background: linear-gradient(155deg, rgba(16, 185, 129, 0.82) 0%, rgba(5, 150, 105, 0.94) 55%, rgba(6, 95, 70, 1) 100%);
-    border-color: #6ee7b7;
-    box-shadow: 0 10px 26px rgba(16, 185, 129, 0.42), inset 0 1px 0 rgba(209, 250, 229, 0.45);
+    background: linear-gradient(155deg, rgba(220, 38, 38, 0.52) 0%, rgba(153, 27, 27, 0.74) 55%, rgba(92, 16, 16, 0.94) 100%);
+    border-color: #fca5a5;
+    box-shadow: 0 8px 22px rgba(185, 28, 28, 0.34), inset 0 1px 0 rgba(254, 202, 202, 0.28);
   }
 }
 
@@ -171,9 +171,9 @@ function isUnsavedOwner(name) {
 }
 
 .stock-item.sold {
-  background: linear-gradient(155deg, rgba(16, 185, 129, 0.68) 0%, rgba(5, 130, 92, 0.88) 55%, rgba(6, 78, 59, 0.98) 100%);
-  border: 2px solid #34d399;
-  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.32), inset 0 1px 0 rgba(167, 243, 208, 0.38);
+  background: linear-gradient(155deg, rgba(185, 28, 28, 0.42) 0%, rgba(127, 29, 29, 0.62) 55%, rgba(69, 10, 10, 0.88) 100%);
+  border: 1.5px solid rgba(248, 113, 113, 0.65);
+  box-shadow: 0 4px 14px rgba(153, 27, 27, 0.25), inset 0 1px 0 rgba(254, 202, 202, 0.16);
 }
 
 /* 🔎 Search / Jump Highlight */
@@ -211,26 +211,27 @@ function isUnsavedOwner(name) {
 }
 
 .stock-num {
-  font-size: 1.16em;
+  font-size: 1.2em;
   font-weight: 800;
   font-family: var(--font-main, sans-serif);
   font-variant-numeric: tabular-nums;
   color: #fef08a;
-  background: rgba(3, 30, 26, 0.9);
-  border: 1.5px solid #facc15;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  padding: 1.5px 8px;
-  border-radius: 8px;
-  line-height: 1.2;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+  padding: 0 2px;
+  border-radius: 0;
+  line-height: 1.15;
   letter-spacing: 0.25px;
   flex-shrink: 0;
 }
 
 .stock-item:not(.sold) .stock-num {
-  color: #e2e8f0;
-  background: rgba(30, 41, 59, 0.88);
-  border: 1px solid rgba(148, 163, 184, 0.36);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  color: #cbd5e1;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 /* Center Body: Clear Seller-Readable Name */
@@ -353,17 +354,17 @@ function isUnsavedOwner(name) {
 @keyframes newOrderLuxPulse {
   0%, 100% {
     border-color: #e5b869 !important;
-    background: linear-gradient(155deg, rgba(229, 184, 105, 0.48) 0%, rgba(16, 185, 129, 0.72) 52%, rgba(6, 78, 59, 0.96) 100%) !important;
+    background: linear-gradient(155deg, rgba(229, 184, 105, 0.38) 0%, rgba(185, 28, 28, 0.5) 55%, rgba(69, 10, 10, 0.9) 100%) !important;
     box-shadow:
-      0 0 0 2px rgba(229, 184, 105, 0.45),
-      0 6px 24px rgba(229, 184, 105, 0.38);
+      0 0 0 2px rgba(229, 184, 105, 0.42),
+      0 6px 22px rgba(229, 184, 105, 0.34);
   }
   50% {
-    border-color: #6ee7b7 !important;
-    background: linear-gradient(155deg, rgba(16, 185, 129, 0.72) 0%, rgba(5, 130, 92, 0.9) 55%, rgba(6, 78, 59, 0.98) 100%) !important;
+    border-color: #fca5a5 !important;
+    background: linear-gradient(155deg, rgba(185, 28, 28, 0.54) 0%, rgba(127, 29, 29, 0.7) 55%, rgba(69, 10, 10, 0.92) 100%) !important;
     box-shadow:
-      0 0 0 1px rgba(110, 231, 183, 0.45),
-      0 6px 20px rgba(16, 185, 129, 0.36);
+      0 0 0 1px rgba(252, 165, 165, 0.4),
+      0 6px 18px rgba(185, 28, 28, 0.3);
   }
 }
 
@@ -456,60 +457,59 @@ function isUnsavedOwner(name) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.94em;
+  font-size: 1em;
   font-variant-numeric: tabular-nums;
-  color: #fef08a;
-  background: rgba(180, 118, 14, 0.34);
-  border: 1.5px solid rgba(251, 191, 36, 0.78);
-  padding: 1.5px 7px;
-  border-radius: 8px;
+  color: #fbbf24;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0 2px;
+  border-radius: 0;
   font-weight: 800;
   letter-spacing: 0.2px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, transform 0.2s ease;
   white-space: nowrap;
 }
 
 .stock-price-pill:hover {
-  background: rgba(217, 119, 6, 0.52);
+  background: transparent;
   color: #ffffff;
-  border-color: #fef08a;
+  transform: scale(1.06);
 }
 
-/* High-contrast badge backing on vivid emerald sold cards */
+/* Clean high-contrast text on deep crimson sold cards (no dark background box for num/price) */
 .stock-item.sold .stock-price-pill {
-  color: #fef08a;
-  background: rgba(20, 18, 6, 0.8);
-  border-color: #facc15;
+  color: #fde047;
+  background: transparent;
+  border: none;
 }
 
 .stock-item.sold .stock-price-pill:hover {
-  background: rgba(36, 32, 8, 0.95);
+  background: transparent;
   color: #ffffff;
-  border-color: #fef08a;
 }
 
 .stock-item.sold .owner-count-badge {
-  color: #a7f3d0;
-  background: rgba(4, 38, 34, 0.82);
-  border-color: rgba(110, 231, 183, 0.55);
+  color: #fecaca;
+  background: rgba(20, 8, 8, 0.45);
+  border-color: rgba(254, 202, 202, 0.38);
 }
 
 .stock-item.sold .owner-count-badge:hover {
-  background: rgba(6, 56, 48, 0.95);
+  background: rgba(69, 10, 10, 0.85);
   color: #ffffff;
 }
 
 .stock-item.sold .no-addr-indicator {
   color: #fecdd3;
-  background: rgba(76, 5, 25, 0.88);
-  border-color: rgba(251, 113, 133, 0.7);
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(251, 113, 133, 0.68);
 }
 
 .stock-item.sold .no-addr-indicator:hover {
-  background: rgba(136, 19, 55, 0.95);
+  background: rgba(30, 41, 59, 0.95);
   color: #ffffff;
 }
 
@@ -612,13 +612,13 @@ function isUnsavedOwner(name) {
   }
 
   .stock-num {
-    font-size: 1.04em;
-    padding: 1px 6px;
+    font-size: 1.08em;
+    padding: 0 1px;
   }
 
   .stock-price-pill {
-    font-size: 0.86em;
-    padding: 1px 6px;
+    font-size: 0.9em;
+    padding: 0 1px;
   }
 
   .stock-status {

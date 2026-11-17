@@ -1,7 +1,7 @@
 import { ref, onUnmounted } from "vue";
 import { useSystemStore } from "../stores/system";
 import { useChatStore } from "../stores/chat";
-import { ref as dbRef, set } from "firebase/database";
+import { ref as dbRef, set, get, update } from "firebase/database";
 import { db } from "./useFirebase";
 import { YouTubeLiveChat } from "../services/YouTubeLiveChat";
 import { useAudio } from "./useAudio";
@@ -135,12 +135,40 @@ export function useYouTube() {
       systemStore.liveTitle = item.snippet.title;
       logger.youtube("Video title:", item.snippet.title);
 
-      // Save History to Firebase
+      // Save History metadata non-destructively to Firebase (preserve totals & original timestamp)
       if (videoId && videoId !== "demo") {
-        set(dbRef(db, `history/${videoId}`), {
-          title: item.snippet.title,
-          timestamp: Date.now(),
-        }).catch((error) => logger.error("Error saving history:", error));
+        const liveTitle = (item.snippet?.title || "").trim();
+        const actualStartMs = item.liveStreamingDetails?.actualStartTime
+          ? new Date(item.liveStreamingDetails.actualStartTime).getTime()
+          : NaN;
+        const publishedMs = item.snippet?.publishedAt
+          ? new Date(item.snippet.publishedAt).getTime()
+          : NaN;
+        const fallbackTimestamp = Number.isFinite(actualStartMs) && actualStartMs > 0
+          ? actualStartMs
+          : (Number.isFinite(publishedMs) && publishedMs > 0 ? publishedMs : Date.now());
+
+        const historyRef = dbRef(db, `history/${videoId}`);
+        get(historyRef)
+          .then((snap) => {
+            const existing = snap.exists() ? snap.val() : null;
+            const payload = {
+              title: liveTitle || existing?.title || videoId,
+              lastUpdated: Date.now(),
+            };
+            if (!existing || !existing.timestamp) {
+              payload.timestamp = fallbackTimestamp;
+            }
+            return update(historyRef, payload);
+          })
+          .catch((error) => {
+            logger.warn("Error reading history before update, falling back:", error);
+            return update(historyRef, {
+              title: liveTitle || videoId,
+              lastUpdated: Date.now(),
+            });
+          })
+          .catch((error) => logger.error("Error saving history:", error));
 
         // Save active video title and finished status to Firebase system node
         set(dbRef(db, "system/activeVideoTitle"), item.snippet.title).catch(

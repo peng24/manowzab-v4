@@ -122,11 +122,22 @@ export const useStockStore = defineStore("stock", () => {
             lastHistorySales = calculatedSales;
             lastHistoryItems = totalItems;
             const historyRef = dbRef(db, `history/${videoId}`);
-            update(historyRef, {
+            const historyPayload = {
               totalSales: calculatedSales,
               totalItems: totalItems,
               lastUpdated: Date.now(),
-            }).catch((err) => console.error("History Sync Error:", err));
+            };
+            const activeTitle = typeof systemStore.liveTitle === "string"
+              ? systemStore.liveTitle.trim()
+              : "";
+            if (
+              systemStore.currentVideoId === videoId &&
+              activeTitle &&
+              activeTitle !== "รอกระแสข้อมูล..."
+            ) {
+              historyPayload.title = activeTitle;
+            }
+            update(historyRef, historyPayload).catch((err) => console.error("History Sync Error:", err));
           }, HISTORY_WRITE_DELAY);
         }
       }

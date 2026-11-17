@@ -33,19 +33,38 @@
             </div>
           </div>
           
+          <div class="sidebar-search-bar">
+            <i class="fa-solid fa-magnifying-glass sidebar-search-icon"></i>
+            <input
+              v-model="sidebarSearchQuery"
+              type="text"
+              class="sidebar-search-input"
+              placeholder="ค้นหาชื่อไลฟ์ / วันที่ / ID..."
+            />
+            <button
+              v-if="sidebarSearchQuery"
+              type="button"
+              class="sidebar-search-clear"
+              @click="sidebarSearchQuery = ''"
+              title="ล้างค้นหา"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
           <div v-if="history.isLoading.value" class="text-center p-10 text-muted">
             <i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...
           </div>
 
           <div v-else class="sidebar-list">
              <div 
-               v-for="item in history.historyList.value" 
+               v-for="item in filteredHistoryList" 
                :key="item.videoId"
                class="sidebar-item"
                :class="{ active: selectedId === item.videoId }"
                @click="selectLive(item)"
              >
-               <div class="item-title">{{ item.title || "ไม่มีชื่อ" }}</div>
+               <div class="item-title" :title="item.title || item.videoId">{{ item.title || "ไม่มีชื่อไลฟ์" }}</div>
                <div class="item-date">
                  <i class="fa-regular fa-calendar"></i> {{ formatDate(item.timestamp) }}
                </div>
@@ -54,8 +73,8 @@
                </div>
              </div>
              
-             <div v-if="history.historyList.value.length === 0" class="text-center p-10 text-muted">
-                ไม่พบข้อมูลประวัติ
+             <div v-if="filteredHistoryList.length === 0" class="text-center p-10 text-muted">
+                {{ sidebarSearchQuery ? 'ไม่พบชื่อไลฟ์ที่ค้นหา' : 'ไม่พบข้อมูลประวัติ' }}
              </div>
           </div>
         </div>
@@ -70,6 +89,61 @@
           <div v-else class="content-wrapper">
              <!-- Stats Bar (Styled like StockGrid header) -->
              <div class="stats-bar-header">
+                <div class="history-live-title-bar">
+                  <div v-if="!isEditingTitle" class="history-live-title-left">
+                    <span class="history-live-dot" title="ชื่อไลฟ์ย้อนหลัง">
+                      <i class="fa-solid fa-tower-broadcast"></i>
+                    </span>
+                    <span class="history-live-title-text" :title="selectedItem.title || selectedItem.videoId">
+                      {{ selectedItem.title || "ไม่มีชื่อไลฟ์" }}
+                    </span>
+                  </div>
+                  <div v-else class="history-live-title-edit">
+                    <input
+                      ref="editTitleInputRef"
+                      v-model="editingTitleText"
+                      type="text"
+                      class="history-title-edit-input"
+                      placeholder="ระบุชื่อไลฟ์..."
+                      @keyup.enter="saveEditedTitle"
+                      @keyup.esc="cancelEditTitle"
+                    />
+                    <button type="button" class="btn-title-save" @click="saveEditedTitle" title="บันทึกชื่อไลฟ์">
+                      <i class="fa-solid fa-check"></i> บันทึก
+                    </button>
+                    <button type="button" class="btn-title-cancel" @click="cancelEditTitle" title="ยกเลิก">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+
+                  <div class="history-live-title-meta">
+                    <span v-if="selectedItem.timestamp" class="history-title-date">
+                      <i class="fa-regular fa-calendar"></i> {{ formatDate(selectedItem.timestamp) }}
+                    </span>
+                    <span class="history-title-vid" :title="'YouTube Video ID: ' + selectedItem.videoId">
+                      {{ selectedItem.videoId }}
+                    </span>
+                    <button
+                      v-if="!isEditingTitle"
+                      type="button"
+                      class="btn-title-icon"
+                      @click="startEditTitle"
+                      title="แก้ไขชื่อไลฟ์"
+                    >
+                      <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-title-icon"
+                      :disabled="isFetchingTitle"
+                      @click="refreshTitleFromYouTube(selectedItem.videoId, false)"
+                      title="ดึงชื่อไลฟ์จาก YouTube และบันทึกลงประวัติ"
+                    >
+                      <i class="fa-solid" :class="isFetchingTitle ? 'fa-spinner fa-spin' : 'fa-rotate'"></i>
+                    </button>
+                  </div>
+                </div>
+
                 <div v-if="isDetailsLoading" class="flex items-center justify-center p-4 w-full text-muted">
                     <i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังโหลดข้อมูล...
                 </div>
@@ -140,7 +214,7 @@
                     v-model="searchQuery" 
                     type="text" 
                     class="search-input" 
-                    placeholder="ค้นหาชื่อลูกค้า, รหัสสินค้า..."
+                    :placeholder="viewMode === 'chat' ? 'ค้นหาชื่อลูกค้า, ข้อความแชท...' : 'ค้นหาชื่อลูกค้า, รหัสสินค้า...'"
                   >
                 </div>
                 
@@ -148,18 +222,27 @@
                     <button 
                         class="btn btn-sm" 
                         :class="viewMode === 'list' ? 'btn-primary' : 'btn-outline'"
-                        @click="viewMode = 'list'"
-                        title="List View"
+                        @click="setViewMode('list')"
+                        title="มุมมองรายการ (List View)"
                     >
-                        <i class="fa-solid fa-list"></i>
+                        <i class="fa-solid fa-list"></i> รายการ
                     </button>
                     <button 
                         class="btn btn-sm" 
                         :class="viewMode === 'grid' ? 'btn-primary' : 'btn-outline'"
-                        @click="viewMode = 'grid'"
-                        title="Grid View"
+                        @click="setViewMode('grid')"
+                        title="มุมมองตาราง (Grid View)"
                     >
-                        <i class="fa-solid fa-th"></i>
+                        <i class="fa-solid fa-th"></i> ตาราง
+                    </button>
+                    <button 
+                        class="btn btn-sm btn-chat-mode" 
+                        :class="viewMode === 'chat' ? 'btn-primary' : 'btn-outline'"
+                        @click="setViewMode('chat')"
+                        title="ดูประวัติแชทย้อนหลัง (เหมือนตอนไลฟ์สด)"
+                    >
+                        <i class="fa-solid fa-comments"></i> แชท
+                        <span v-if="loadedChatVideoId === selectedId && historyChats.length > 0" class="chat-mode-count">{{ historyChats.length }}</span>
                     </button>
                     <button 
                         v-if="viewMode === 'grid'"
@@ -222,7 +305,7 @@
              </div>
              
              <!-- Grid View (Styled like StockGrid) -->
-             <div v-else class="grid-container" :class="{ 'fullscreen-grid': isFullscreen }">
+             <div v-else-if="viewMode === 'grid'" class="grid-container" :class="{ 'fullscreen-grid': isFullscreen }">
                 <div v-if="isFullscreen" class="fullscreen-header">
                      <h2>รายการขาย {{ selectedItem.title }}</h2>
                      <button class="btn btn-danger" @click="isFullscreen = false">
@@ -267,6 +350,216 @@
                         </div>
                     </div>
                 </div>
+             </div>
+
+             <!-- Historical Chat View (Identical Hybrid Live Chat UI) -->
+             <div v-else-if="viewMode === 'chat'" class="history-chat-container">
+               <div class="history-chat-toolbar">
+                 <div class="history-chat-tabs">
+                   <button
+                     type="button"
+                     class="chat-tab"
+                     :class="{ active: chatIntentTab === 'all' }"
+                     @click="chatIntentTab = 'all'"
+                   >
+                     ทั้งหมด <span class="hchat-tab-count">{{ historyChatTabCounts.all }}</span>
+                   </button>
+                   <button
+                     type="button"
+                     class="chat-tab tab-cf"
+                     :class="{ active: chatIntentTab === 'buy' }"
+                     @click="chatIntentTab = 'buy'"
+                   >
+                     จอง (CF) <span v-if="historyChatTabCounts.buy > 0" class="hchat-tab-count">{{ historyChatTabCounts.buy }}</span>
+                   </button>
+                   <button
+                     type="button"
+                     class="chat-tab tab-shipping"
+                     :class="{ active: chatIntentTab === 'shipping' }"
+                     @click="chatIntentTab = 'shipping'"
+                   >
+                     ส่ง <span v-if="historyChatTabCounts.shipping > 0" class="hchat-tab-count">{{ historyChatTabCounts.shipping }}</span>
+                   </button>
+                   <button
+                     type="button"
+                     class="chat-tab tab-cancel"
+                     :class="{ active: chatIntentTab === 'cancel' }"
+                     @click="chatIntentTab = 'cancel'"
+                   >
+                     ยกเลิก <span v-if="historyChatTabCounts.cancel > 0" class="hchat-tab-count">{{ historyChatTabCounts.cancel }}</span>
+                   </button>
+                   <button
+                     type="button"
+                     class="chat-tab tab-question"
+                     :class="{ active: chatIntentTab === 'question' }"
+                     @click="chatIntentTab = 'question'"
+                   >
+                     คำถาม <span v-if="historyChatTabCounts.question > 0" class="hchat-tab-count">{{ historyChatTabCounts.question }}</span>
+                   </button>
+                   <button
+                     type="button"
+                     class="chat-tab tab-admin"
+                     :class="{ active: chatIntentTab === 'admin' }"
+                     @click="chatIntentTab = 'admin'"
+                   >
+                     แอดมิน <span v-if="historyChatTabCounts.admin > 0" class="hchat-tab-count">{{ historyChatTabCounts.admin }}</span>
+                   </button>
+                 </div>
+
+                 <div class="history-chat-tools">
+                   <span v-if="chatAuthorFilter" class="hchat-author-chip">
+                     <i class="fa-solid fa-filter"></i> {{ chatAuthorFilter }}
+                     <button type="button" class="hchat-chip-clear" @click="chatAuthorFilter = ''" title="ล้างตัวกรองชื่อ">
+                       <i class="fa-solid fa-xmark"></i>
+                     </button>
+                   </span>
+                   <button type="button" class="btn btn-sm btn-outline" @click="scrollHistoryChat('top')" title="เลื่อนไปข้อความแรก">
+                     <i class="fa-solid fa-angles-up"></i>
+                   </button>
+                   <button type="button" class="btn btn-sm btn-outline" @click="scrollHistoryChat('bottom')" title="เลื่อนไปข้อความล่าสุด">
+                     <i class="fa-solid fa-angles-down"></i>
+                   </button>
+                   <button
+                     type="button"
+                     class="btn btn-sm btn-success"
+                     @click="exportHistoryChatCSV"
+                     :disabled="filteredHistoryChats.length === 0"
+                     title="ดาวน์โหลดประวัติแชทเป็นไฟล์ CSV"
+                   >
+                     <i class="fa-solid fa-file-csv"></i> แชท CSV
+                   </button>
+                 </div>
+               </div>
+
+               <div id="history-chat-viewport" ref="historyChatViewport" data-lenis-prevent>
+                 <div v-if="isChatLoading" class="history-chat-empty">
+                   <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5em; color: #38bdf8;"></i>
+                   <span>กำลังโหลดประวัติแชท...</span>
+                 </div>
+
+                 <div v-else-if="filteredHistoryChats.length === 0" class="history-chat-empty">
+                   <i class="fa-regular fa-comment-dots" style="font-size: 1.8em; color: #64748b;"></i>
+                   <span>{{ historyChats.length === 0 ? 'ยังไม่มีข้อมูลประวัติแชทสำหรับไลฟ์นี้' : 'ไม่พบข้อความแชทที่ตรงกับเงื่อนไข' }}</span>
+                 </div>
+
+                 <div v-else class="history-chat-list">
+                   <div
+                     v-for="chat in filteredHistoryChats"
+                     :key="chat.id"
+                     :class="['chat-row', chat.isAdmin ? 'admin' : '', chat.type, isHistoryChatBanned(chat) ? 'banned' : '']"
+                     :style="getHistoryChatRowStyle(chat)"
+                   >
+                     <div class="avatar-col">
+                       <div class="avatar-container">
+                         <img
+                           v-if="chat.avatar"
+                           :src="chat.avatar"
+                           class="avatar"
+                           loading="lazy"
+                           decoding="async"
+                           @error="(e) => (e.target.style.display = 'none')"
+                         />
+                         <div
+                           class="avatar-fallback"
+                           :style="{ backgroundColor: getCustomerRowColor(chat) || chat.color || '#38bdf8' }"
+                         >
+                           {{ (chat.displayName || chat.authorName || '?')[0] }}
+                         </div>
+                       </div>
+
+                       <span v-if="isHistoryChatBanned(chat)" class="status-badge-under badge-banned">
+                         🚫 แบน
+                       </span>
+                       <span
+                         v-else-if="getIntentBadge(chat.type)"
+                         class="status-badge-under"
+                         :class="getIntentBadge(chat.type).class"
+                       >
+                         {{ getIntentBadge(chat.type).icon }} {{ getIntentBadge(chat.type).label }}
+                       </span>
+                     </div>
+
+                     <div class="chat-bubble-container">
+                       <div class="chat-meta">
+                         <span class="chat-time">{{ formatChatClockTime(chat.timestamp) }}</span>
+                         <span
+                           class="chat-name"
+                           @click="toggleHistoryAuthorFilter(chat)"
+                           title="คลิกเพื่อกรองดูเฉพาะแชทของคนนี้"
+                         >
+                           <span class="chat-name-dot" :style="{ backgroundColor: getCustomerRowColor(chat) || chat.color || '#94a3b8' }"></span>
+                           <span class="chat-name-text">{{ chat.displayName || chat.authorName || 'ลูกค้า' }}</span>
+                         </span>
+
+                         <div
+                           v-if="getHistoryCustomerMeta(chat)?.hasAddress || getHistoryCustomerMeta(chat)?.contactChannel || getHistoryCustomerMeta(chat)?.paymentType"
+                           class="cust-meta-cluster"
+                         >
+                           <span
+                             v-if="getHistoryCustomerMeta(chat)?.hasAddress"
+                             class="cust-mini-badge addr"
+                             title="มีที่อยู่จัดส่งแล้ว"
+                           >
+                             <i class="fa-solid fa-location-dot"></i>
+                           </span>
+                           <span
+                             v-if="getHistoryCustomerMeta(chat)?.contactChannel"
+                             class="cust-mini-badge channel"
+                             :class="getHistoryCustomerMeta(chat).contactChannel"
+                             :title="`ช่องทางติดต่อ: ${getChannelLabel(getHistoryCustomerMeta(chat).contactChannel)}`"
+                           >
+                             <i :class="getChannelIcon(getHistoryCustomerMeta(chat).contactChannel)"></i>
+                             <span class="mini-txt">{{ getChannelShortText(getHistoryCustomerMeta(chat).contactChannel) }}</span>
+                           </span>
+                           <span
+                             v-if="getHistoryCustomerMeta(chat)?.paymentType"
+                             class="cust-mini-badge pay"
+                             :class="getHistoryCustomerMeta(chat).paymentType"
+                             :title="getHistoryCustomerMeta(chat).paymentType === 'cod' ? 'COD (เก็บปลายทาง)' : 'โอนเงิน'"
+                           >
+                             <i :class="getHistoryCustomerMeta(chat).paymentType === 'cod' ? 'fa-solid fa-box' : 'fa-solid fa-money-bill-transfer'"></i>
+                             <span class="mini-txt">{{ getHistoryCustomerMeta(chat).paymentType === 'cod' ? 'COD' : 'โอน' }}</span>
+                           </span>
+                         </div>
+
+                         <button
+                           type="button"
+                           class="btn-author-filter"
+                           :class="{ 'is-active': isHistoryAuthorFiltered(chat) }"
+                           @click.stop="toggleHistoryAuthorFilter(chat)"
+                           :title="isHistoryAuthorFiltered(chat) ? 'ยกเลิกกรองคนนี้' : 'กรองดูเฉพาะคนนี้'"
+                         >
+                           <i class="fa-solid fa-filter"></i>
+                         </button>
+                       </div>
+
+                       <div class="chat-bubble">
+                         <div class="chat-text">
+                           <template v-if="resolveStoredProxyName(chat)">
+                             <span v-html="renderAdminProxyHtml(chat, resolveStoredProxyName(chat))"></span>
+                           </template>
+                           <template v-else-if="resolveChatRuns(chat)">
+                             <template v-for="(run, idx) in resolveChatRuns(chat)" :key="idx">
+                               <span v-if="run.text">{{ run.text }}</span>
+                               <img
+                                 v-else-if="run.emoji && run.emoji.image"
+                                 :src="run.emoji.image.thumbnails?.[0]?.url || run.emoji.image.url"
+                                 :alt="run.emoji.emojiId || 'emoji'"
+                                 class="emoji-image"
+                                 loading="lazy"
+                                 decoding="async"
+                               />
+                             </template>
+                           </template>
+                           <template v-else>
+                             {{ chat.text }}
+                           </template>
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
              </div>
           </div>
         </div>
@@ -419,20 +712,64 @@ import { normalizeCustomerName, isProxyUid, syncDeliveryCustomerForOwner } from 
 import { formatBackdatedDetail, formatNormalBookingTime, getBookingTooltip } from "../utils/timeFormatUtils";
 import { useSystemStore } from "../stores/system";
 import { useStockStore } from "../stores/stock";
+import { useCustomerStore } from "../stores/customer";
+import { useBlacklistStore } from "../stores/blacklist";
+import {
+  formatChatClockTime,
+  getCustomerRowColor,
+  getChatRowStyle as buildHybridChatRowStyle,
+  getIntentBadge,
+  getChannelLabel,
+  getChannelShortText,
+  getChannelIcon,
+  renderAdminProxyHtml,
+  resolveChatRuns,
+  resolveStoredProxyName,
+} from "../utils/chatDisplayUtils";
 import Swal from "sweetalert2";
 
 const emit = defineEmits(["close"]);
 const history = useHistory();
 const systemStore = useSystemStore();
 const stockStore = useStockStore();
+const customerStore = useCustomerStore();
+const blacklistStore = useBlacklistStore();
 const baseUrl = import.meta.env.BASE_URL || "/";
 
 const selectedId = ref(null);
 const selectedItem = ref(null);
 const searchQuery = ref("");
-const viewMode = ref("list"); // 'list' | 'grid'
+const sidebarSearchQuery = ref("");
+const viewMode = ref("list"); // 'list' | 'grid' | 'chat'
 const isFullscreen = ref(false);
 const isDetailsLoading = ref(false);
+
+// Historical Live Title Edit / Refresh State
+const isEditingTitle = ref(false);
+const editingTitleText = ref("");
+const editTitleInputRef = ref(null);
+const isFetchingTitle = ref(false);
+const autoResolvedTitleIds = new Set();
+
+const filteredHistoryList = computed(() => {
+  const list = history.historyList.value || [];
+  const q = sidebarSearchQuery.value.trim().toLowerCase();
+  if (!q) return list;
+  return list.filter((item) => {
+    const title = (item.title || "").toLowerCase();
+    const vid = (item.videoId || "").toLowerCase();
+    const dateStr = item.timestamp ? formatDate(item.timestamp).toLowerCase() : "";
+    return title.includes(q) || vid.includes(q) || dateStr.includes(q);
+  });
+});
+
+// Historical Chat State
+const historyChats = ref([]);
+const loadedChatVideoId = ref(null);
+const isChatLoading = ref(false);
+const chatIntentTab = ref("all");
+const chatAuthorFilter = ref("");
+const historyChatViewport = ref(null);
 
 // Scoped Customer Total Purchases State
 const deliveryCustomers = ref([]);
@@ -471,6 +808,7 @@ function cleanupSessionListeners() {
 
 onMounted(() => {
   history.fetchHistoryList();
+  customerStore.initCustomerSync();
 
   // Listen to delivery customers for badge counts + past summaries
   const unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
@@ -488,6 +826,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   cleanupSessionListeners();
+  customerStore.stopCustomerSync();
   pageListeners.forEach(unsub => {
     if (typeof unsub === "function") unsub();
   });
@@ -511,9 +850,31 @@ onUnmounted(() => {
 async function selectLive(item) {
   cleanupSessionListeners();
 
+  isEditingTitle.value = false;
+  editingTitleText.value = "";
   selectedId.value = item.videoId;
   selectedItem.value = { ...item, orders: {}, stockSize: 70 };
   searchQuery.value = ""; // Reset search
+  historyChats.value = [];
+  loadedChatVideoId.value = null;
+  chatIntentTab.value = "all";
+  chatAuthorFilter.value = "";
+
+  // Auto-resolve missing or placeholder live title cleanly
+  const currentTitle = (item.title || "").trim();
+  const isMissingTitle = !currentTitle || currentTitle === "ไม่มีชื่อ" || currentTitle === "ไม่มีชื่อไลฟ์" || currentTitle === item.videoId;
+  if (isMissingTitle) {
+    const activeTitle = typeof systemStore.liveTitle === "string" ? systemStore.liveTitle.trim() : "";
+    if (item.videoId === systemStore.currentVideoId && activeTitle && activeTitle !== "รอกระแสข้อมูล...") {
+      selectedItem.value.title = activeTitle;
+      if (typeof history.updateHistoryTitle === "function") {
+        history.updateHistoryTitle(item.videoId, activeTitle).catch(() => {});
+      }
+    } else if (!autoResolvedTitleIds.has(item.videoId)) {
+      autoResolvedTitleIds.add(item.videoId);
+      refreshTitleFromYouTube(item.videoId, true);
+    }
+  }
 
   isDetailsLoading.value = true;
   // Fetch details initially
@@ -521,6 +882,10 @@ async function selectLive(item) {
   selectedItem.value.orders = orders;
   selectedItem.value.stockSize = stockSize;
   isDetailsLoading.value = false;
+
+  if (viewMode.value === "chat") {
+    loadChatsForSelected();
+  }
 
   // Real-time stock sync
   const stockRef = dbRef(db, `stock/${item.videoId}`);
@@ -541,6 +906,240 @@ async function selectLive(item) {
     }
   });
   sessionListeners.push(unsubSize);
+}
+
+async function startEditTitle() {
+  if (!selectedItem.value) return;
+  editingTitleText.value = selectedItem.value.title || "";
+  isEditingTitle.value = true;
+  await nextTick();
+  editTitleInputRef.value?.focus();
+  editTitleInputRef.value?.select?.();
+}
+
+function cancelEditTitle() {
+  isEditingTitle.value = false;
+  editingTitleText.value = "";
+}
+
+async function saveEditedTitle() {
+  const vid = selectedId.value;
+  const cleanTitle = editingTitleText.value.trim();
+  if (!vid || !cleanTitle) {
+    cancelEditTitle();
+    return;
+  }
+  try {
+    if (typeof history.updateHistoryTitle === "function") {
+      await history.updateHistoryTitle(vid, cleanTitle);
+    }
+    if (selectedItem.value && selectedId.value === vid) {
+      selectedItem.value.title = cleanTitle;
+    }
+    if (systemStore.currentVideoId === vid) {
+      systemStore.liveTitle = cleanTitle;
+      await set(dbRef(db, "system/activeVideoTitle"), cleanTitle);
+    }
+    isEditingTitle.value = false;
+    Swal.fire({
+      icon: "success",
+      title: "บันทึกชื่อไลฟ์เรียบร้อย",
+      timer: 1300,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    console.error("Save title error:", err);
+    Swal.fire("ผิดพลาด", "ไม่สามารถบันทึกชื่อไลฟ์ได้", "error");
+  }
+}
+
+async function refreshTitleFromYouTube(vid, silent = false) {
+  if (!vid || typeof history.syncMissingHistoryTitle !== "function") return;
+  isFetchingTitle.value = true;
+  try {
+    const resolved = await history.syncMissingHistoryTitle(vid);
+    if (resolved && resolved.title) {
+      if (selectedItem.value && selectedId.value === vid) {
+        selectedItem.value.title = resolved.title;
+        if (!selectedItem.value.timestamp && resolved.timestamp) {
+          selectedItem.value.timestamp = resolved.timestamp;
+        }
+      }
+      if (systemStore.currentVideoId === vid) {
+        systemStore.liveTitle = resolved.title;
+        await set(dbRef(db, "system/activeVideoTitle"), resolved.title);
+      }
+      if (!silent) {
+        Swal.fire({
+          icon: "success",
+          title: "ดึงชื่อไลฟ์จาก YouTube สำเร็จ",
+          text: resolved.title,
+          timer: 1800,
+          toast: true,
+          position: "top-end",
+          showConfirmButton: false,
+        });
+      }
+    } else if (!silent) {
+      Swal.fire({
+        icon: "info",
+        title: "ไม่พบข้อมูลชื่อไลฟ์บน YouTube",
+        text: "สามารถกดปุ่มดินสอเพื่อตั้งชื่อด้วยตนเองได้ครับ",
+        timer: 2000,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+      });
+    }
+  } catch (err) {
+    if (!silent) {
+      Swal.fire("ผิดพลาด", "ไม่สามารถดึงชื่อจาก YouTube ได้", "error");
+    }
+  } finally {
+    isFetchingTitle.value = false;
+  }
+}
+
+// ======================================================
+// 💬 Historical Chat Replay Logic (Read-Only, Hybrid UI)
+// ======================================================
+async function setViewMode(mode) {
+  viewMode.value = mode;
+  if (mode !== "grid") {
+    isFullscreen.value = false;
+  }
+  if (mode === "chat" && selectedId.value) {
+    await loadChatsForSelected();
+  }
+}
+
+async function loadChatsForSelected() {
+  const vid = selectedId.value;
+  if (!vid) return;
+  if (loadedChatVideoId.value === vid) {
+    nextTick(() => scrollHistoryChat("bottom"));
+    return;
+  }
+  isChatLoading.value = true;
+  try {
+    const chats = await history.fetchHistoryChats(vid);
+    if (selectedId.value === vid) {
+      historyChats.value = chats;
+      loadedChatVideoId.value = vid;
+      await nextTick();
+      scrollHistoryChat("bottom");
+    }
+  } finally {
+    if (selectedId.value === vid) {
+      isChatLoading.value = false;
+    }
+  }
+}
+
+function isHistoryChatBanned(chat) {
+  if (!chat) return false;
+  if (chat.isBanned || chat.type === "banned") return true;
+  return blacklistStore.isBanned(chat.uid, chat.realName || chat.displayName || chat.authorName);
+}
+
+function getHistoryChatRowStyle(chat) {
+  return buildHybridChatRowStyle(chat, isHistoryChatBanned(chat));
+}
+
+function getHistoryCustomerMeta(chat) {
+  if (!chat || chat.isAdmin) return null;
+  const name = chat.displayName || chat.realName || chat.authorName;
+  const realName = chat.realName || chat.authorName || name;
+  return customerStore.getCustomerMetaByName(name, chat.uid, realName);
+}
+
+function isHistoryAuthorFiltered(chat) {
+  if (!chatAuthorFilter.value || !chat) return false;
+  const target = normalizeCustomerName(chatAuthorFilter.value);
+  const name = normalizeCustomerName(chat.displayName || chat.realName || chat.authorName || "");
+  return Boolean(target && name && target === name);
+}
+
+function toggleHistoryAuthorFilter(chat) {
+  const name = (chat?.displayName || chat?.authorName || "").trim();
+  if (!name) return;
+  if (isHistoryAuthorFiltered(chat)) {
+    chatAuthorFilter.value = "";
+  } else {
+    chatAuthorFilter.value = name;
+  }
+}
+
+function scrollHistoryChat(position = "bottom") {
+  const el = historyChatViewport.value;
+  if (!el) return;
+  el.scrollTop = position === "top" ? 0 : el.scrollHeight;
+}
+
+const historyChatTabCounts = computed(() => {
+  const counts = { all: 0, buy: 0, shipping: 0, cancel: 0, question: 0, admin: 0 };
+  for (const m of historyChats.value) {
+    counts.all++;
+    if (m.type === "buy") counts.buy++;
+    else if (m.type === "shipping") counts.shipping++;
+    else if (m.type === "cancel") counts.cancel++;
+    else if (m.type === "question") counts.question++;
+    if (m.isAdmin) counts.admin++;
+  }
+  return counts;
+});
+
+const filteredHistoryChats = computed(() => {
+  let list = historyChats.value;
+  if (chatIntentTab.value === "admin") {
+    list = list.filter((m) => m.isAdmin);
+  } else if (chatIntentTab.value !== "all") {
+    list = list.filter((m) => m.type === chatIntentTab.value);
+  }
+
+  if (chatAuthorFilter.value) {
+    const target = normalizeCustomerName(chatAuthorFilter.value);
+    list = list.filter((m) => {
+      const name = normalizeCustomerName(m.displayName || m.realName || m.authorName || "");
+      const proxy = normalizeCustomerName(m.proxyCustomerName || "");
+      return name === target || proxy === target;
+    });
+  }
+
+  const q = searchQuery.value.trim().toLowerCase();
+  if (q) {
+    list = list.filter((m) => {
+      const name = (m.displayName || m.realName || m.authorName || "").toLowerCase();
+      const text = (m.text || "").toLowerCase();
+      const proxy = (m.proxyCustomerName || "").toLowerCase();
+      return name.includes(q) || text.includes(q) || proxy.includes(q);
+    });
+  }
+
+  return list;
+});
+
+function exportHistoryChatCSV() {
+  if (filteredHistoryChats.value.length === 0) return;
+  let csv = "\uFEFFTime,Author,Type,Message\n";
+  for (const chat of filteredHistoryChats.value) {
+    const t = formatChatClockTime(chat.timestamp);
+    const author = String(chat.displayName || chat.authorName || "").replace(/"/g, '""');
+    const type = String(chat.type || "general").replace(/"/g, '""');
+    const text = String(chat.text || "").replace(/"/g, '""').replace(/\r?\n/g, " ");
+    csv += `"${t}","${author}","${type}","${text}"\n`;
+  }
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `chat_history_${selectedId.value || "session"}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 async function openOnMainBoard() {
@@ -708,17 +1307,26 @@ const percentColorClass = computed(() => {
 
 // 💰 Historical Session Sales Revenue
 const historyTotalSales = computed(() => {
-  if (selectedItem.value && selectedItem.value.totalSales !== undefined && selectedItem.value.totalSales > 0) {
+  const orders = selectedItem.value?.orders;
+  let sum = 0;
+  if (orders && typeof orders === "object") {
+    Object.values(orders).forEach((item) => {
+      if (item && item.owner && item.price) {
+        const p = parseInt(item.price, 10);
+        if (!isNaN(p) && p > 0) sum += p;
+      }
+    });
+  }
+  if (sum > 0) return sum;
+  if (
+    selectedItem.value &&
+    selectedItem.value.totalSales !== undefined &&
+    selectedItem.value.totalSales > 0 &&
+    (isDetailsLoading.value || soldCount.value > 0)
+  ) {
     return selectedItem.value.totalSales;
   }
-  let sum = 0;
-  Object.values(allOrders.value || {}).forEach((item) => {
-    if (item && item.owner && item.price) {
-      const p = parseInt(item.price, 10);
-      if (!isNaN(p) && p > 0) sum += p;
-    }
-  });
-  return sum;
+  return 0;
 });
 
 const animatedHistoryTotalSales = ref(historyTotalSales.value);
@@ -1078,6 +1686,9 @@ async function updateDeliveryAndHistoryTotals(videoId) {
     // Sales history remains a single multi-path write.
     if (Object.keys(multiPathUpdates).length > 0) {
       await update(dbRef(db), multiPathUpdates);
+    }
+    if (selectedItem.value && selectedId.value === videoId) {
+      selectedItem.value.totalSales = totalSales;
     }
   } catch (err) {
     console.error("Error in updateDeliveryAndHistoryTotals:", err);
@@ -1838,6 +2449,56 @@ async function openCleanupModal() {
   justify-content: space-between;
 }
 
+.sidebar-search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.sidebar-search-icon {
+  position: absolute;
+  left: 19px;
+  color: #64748b;
+  font-size: 0.78em;
+  pointer-events: none;
+}
+
+.sidebar-search-input {
+  width: 100%;
+  padding: 6px 26px 6px 28px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  color: #f8fafc;
+  font-size: 0.82em;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sidebar-search-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+}
+
+.sidebar-search-clear {
+  position: absolute;
+  right: 16px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 2px 4px;
+}
+
+.sidebar-search-clear:hover {
+  color: #ffffff;
+}
+
 .sidebar-list {
   flex: 1;
   overflow-y: auto;
@@ -1868,10 +2529,14 @@ async function openCleanupModal() {
 .item-title {
   color: #f1f5f9;
   font-weight: 600;
-  margin-bottom: 4px;
-  white-space: nowrap; 
-  overflow: hidden; 
-  text-overflow: ellipsis; 
+  font-size: 0.92em;
+  line-height: 1.35;
+  margin-bottom: 5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 .item-date { color: #94a3b8; font-size: 0.85em; }
 .item-meta {
@@ -1922,6 +2587,148 @@ async function openCleanupModal() {
   background: #1e293b;
   border-bottom: 1px solid #334155;
   min-height: 48px;
+}
+
+.history-live-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  margin-bottom: 9px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.55) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.history-live-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.history-live-dot {
+  color: #fbbf24;
+  font-size: 0.88em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.history-live-title-text {
+  color: #f8fafc;
+  font-size: 0.96em;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.history-live-title-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.history-title-edit-input {
+  flex: 1;
+  min-width: 140px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: #0f172a;
+  border: 1px solid #38bdf8;
+  color: #ffffff;
+  font-size: 0.92em;
+  font-weight: 600;
+  outline: none;
+}
+
+.btn-title-save {
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  font-size: 0.8em;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-title-save:hover {
+  background: rgba(16, 185, 129, 0.35);
+  color: #ffffff;
+}
+
+.btn-title-cancel {
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.7);
+  color: #cbd5e1;
+  font-size: 0.8em;
+  cursor: pointer;
+}
+
+.history-live-title-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.history-title-date {
+  color: #94a3b8;
+  font-size: 0.78em;
+  font-weight: 600;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.history-title-vid {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75em;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  padding: 2px 7px;
+  border-radius: 6px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.btn-title-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(30, 41, 59, 0.85);
+  color: #cbd5e1;
+  font-size: 0.78em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-title-icon:hover:not(:disabled) {
+  border-color: #fbbf24;
+  color: #fde047;
+  background: rgba(251, 191, 36, 0.14);
+}
+
+.btn-title-icon:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .header-main-row {
@@ -2530,5 +3337,496 @@ async function openCleanupModal() {
 }
 .gap-10 {
   gap: 10px;
+}
+
+/* ========================================================
+   💬 Historical Chat Replay Styles (Matches Live Hybrid UI)
+   ======================================================== */
+.btn-chat-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chat-mode-count {
+  background: rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+  font-size: 0.78em;
+  font-weight: 700;
+  padding: 0 6px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.history-chat-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0b0f17;
+  overflow: hidden;
+}
+
+.history-chat-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(13, 18, 28, 0.96);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.history-chat-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.history-chat-tabs .chat-tab {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #94a3b8;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.18s ease;
+}
+
+.history-chat-tabs .chat-tab:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.history-chat-tabs .chat-tab.active {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.history-chat-tabs .chat-tab.tab-cf.active {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+}
+
+.history-chat-tabs .chat-tab.tab-shipping.active {
+  background: rgba(168, 85, 247, 0.16);
+  border-color: rgba(168, 85, 247, 0.45);
+  color: #d8b4fe;
+}
+
+.history-chat-tabs .chat-tab.tab-cancel.active {
+  background: rgba(244, 63, 94, 0.16);
+  border-color: rgba(244, 63, 94, 0.45);
+  color: #fda4af;
+}
+
+.history-chat-tabs .chat-tab.tab-question.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #38bdf8;
+}
+
+.history-chat-tabs .chat-tab.tab-admin.active {
+  background: rgba(229, 184, 105, 0.16);
+  border-color: rgba(229, 184, 105, 0.45);
+  color: #f3cf7a;
+}
+
+.hchat-tab-count {
+  font-size: 0.8em;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-chat-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hchat-author-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fcd34d;
+  font-size: 0.8em;
+  font-weight: 700;
+}
+
+.hchat-chip-clear {
+  background: transparent;
+  border: none;
+  color: #fcd34d;
+  cursor: pointer;
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+}
+
+#history-chat-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px 24px;
+}
+
+#history-chat-viewport::-webkit-scrollbar {
+  width: 7px;
+}
+#history-chat-viewport::-webkit-scrollbar-track {
+  background: #0b0f17;
+}
+#history-chat-viewport::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+.history-chat-empty {
+  height: 100%;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #94a3b8;
+  font-size: 1rem;
+}
+
+.history-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.history-chat-list .chat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(18, 24, 38, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.history-chat-list .chat-row.buy {
+  border-color: rgba(52, 211, 153, 0.55);
+  border-left: 4.5px solid #10b981;
+}
+
+.history-chat-list .chat-row.shipping {
+  border-color: rgba(192, 132, 252, 0.55);
+  border-left: 4.5px solid #a855f7;
+}
+
+.history-chat-list .chat-row.cancel {
+  border-color: rgba(251, 113, 133, 0.65);
+  border-left: 4.5px solid #f43f5e;
+}
+
+.history-chat-list .chat-row.admin {
+  background: linear-gradient(135deg, rgba(229, 184, 105, 0.16) 0%, rgba(24, 20, 16, 0.9) 100%);
+  border: 1px solid rgba(229, 184, 105, 0.45);
+  border-left: 4.5px solid #e5b869;
+}
+
+.history-chat-list .chat-row.banned {
+  opacity: 0.48;
+  border-left: 4px solid #ef4444;
+  filter: grayscale(35%);
+}
+
+.history-chat-list .avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  gap: 5px;
+  user-select: none;
+}
+
+.history-chat-list .avatar-container {
+  position: relative;
+  width: 38px;
+  height: 38px;
+}
+
+.history-chat-list .avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  object-fit: cover;
+}
+
+.history-chat-list .avatar-fallback {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0b0f17;
+  font-weight: 800;
+  font-size: 1.05em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.history-chat-list .avatar-container img:not([style*="display: none"]) ~ .avatar-fallback {
+  display: none;
+}
+
+.history-chat-list .status-badge-under {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.68em;
+  font-weight: 800;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.history-chat-list .badge-buy {
+  background: rgba(16, 185, 129, 0.26);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.72);
+}
+
+.history-chat-list .badge-cancel {
+  background: rgba(244, 63, 94, 0.28);
+  color: #fecdd3;
+  border: 1px solid rgba(251, 113, 133, 0.78);
+}
+
+.history-chat-list .badge-shipping {
+  background: rgba(168, 85, 247, 0.26);
+  color: #e9d5ff;
+  border: 1px solid rgba(192, 132, 252, 0.72);
+}
+
+.history-chat-list .badge-question {
+  background: rgba(56, 189, 248, 0.18);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+}
+
+.history-chat-list .badge-note {
+  background: rgba(229, 184, 105, 0.18);
+  color: #f3cf7a;
+  border: 1px solid rgba(229, 184, 105, 0.45);
+}
+
+.history-chat-list .badge-banned {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: #ffffff;
+}
+
+.history-chat-list .chat-bubble-container {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-chat-list .chat-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  font-size: 0.92rem;
+  min-width: 0;
+  user-select: none;
+}
+
+.history-chat-list .chat-time {
+  color: #94a3b8;
+  font-size: 0.82em;
+  font-family: monospace;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.history-chat-list .chat-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #f8fafc;
+  cursor: pointer;
+  padding: 1px 6px 1px 0;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.history-chat-list .chat-name:hover {
+  background: rgba(255, 255, 255, 0.08);
+  padding-left: 6px;
+}
+
+.history-chat-list .chat-name-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.history-chat-list .chat-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-chat-list .cust-meta-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.history-chat-list .cust-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  font-size: 0.7em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.history-chat-list .cust-mini-badge.addr {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+}
+
+.history-chat-list .cust-mini-badge.channel.line,
+.history-chat-list .cust-mini-badge.channel.lineoa {
+  background: rgba(6, 199, 85, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(6, 199, 85, 0.45);
+}
+
+.history-chat-list .cust-mini-badge.channel.phone {
+  background: rgba(2, 132, 199, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(2, 132, 199, 0.45);
+}
+
+.history-chat-list .cust-mini-badge.pay.transfer {
+  background: rgba(147, 51, 234, 0.22);
+  color: #c084fc;
+  border: 1px solid rgba(147, 51, 234, 0.55);
+}
+
+.history-chat-list .cust-mini-badge.pay.cod {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+.history-chat-list .btn-author-filter {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.74em;
+  opacity: 0.45;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.history-chat-list .chat-row:hover .btn-author-filter,
+.history-chat-list .btn-author-filter.is-active {
+  opacity: 1;
+}
+
+.history-chat-list .btn-author-filter.is-active {
+  background: #f59e0b;
+  color: #0f172a;
+}
+
+.history-chat-list .chat-bubble {
+  background: transparent;
+  border: none;
+  padding: 2px 0 0;
+  font-size: 1.14rem;
+  line-height: 1.44;
+  color: #ffffff;
+}
+
+.history-chat-list .chat-text {
+  color: #ffffff;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.history-chat-list .emoji-image {
+  height: 1.4em;
+  width: auto;
+  vertical-align: -0.22em;
+  display: inline-block;
+  margin: 0 2px;
+}
+
+.history-chat-list :deep(.chat-highlight-name) {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 800;
+  padding: 2px 9px;
+  margin: 0 3px;
+  border-radius: 999px;
+  font-size: 0.96em;
+  vertical-align: middle;
+  background: linear-gradient(135deg, #bae6fd 0%, #60a5fa 100%);
+  border: 1.5px solid #0284c7;
+  color: #082f49;
+}
+
+.history-chat-list :deep(.chat-highlight-name .name-icon) {
+  font-size: 0.82em;
+  margin-right: 4px;
 }
 </style>

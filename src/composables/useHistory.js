@@ -1,6 +1,9 @@
 import { ref } from "vue";
 import { ref as dbRef, get, remove, child, update } from "firebase/database";
 import { db } from "./useFirebase";
+import { isPriceAnnouncementMessage } from "../stores/chat";
+import { useNicknameStore } from "../stores/nickname";
+import { resolveStoredProxyName } from "../utils/chatDisplayUtils";
 
 export function useHistory() {
     const historyList = ref([]);
@@ -67,6 +70,63 @@ export function useHistory() {
     }
 
     /**
+     * Fetch Historical Chat Messages for a specific Live (from chats/{videoId})
+     * Filters out silent AI price announcements and sorts chronologically.
+     * @param {string} videoId
+     * @returns {Promise<Array>} Sorted chat message array
+     */
+    async function fetchHistoryChats(videoId) {
+        if (!videoId) return [];
+
+        try {
+            const snap = await get(dbRef(db, `chats/${videoId}`));
+            if (!snap.exists()) return [];
+
+            const raw = snap.val() || {};
+            let nicknameStore = null;
+            try {
+                nicknameStore = useNicknameStore();
+            } catch (e) {
+                nicknameStore = null;
+            }
+
+            const list = [];
+            Object.entries(raw).forEach(([fbKey, msg]) => {
+                if (!msg || typeof msg !== "object") return;
+                if (isPriceAnnouncementMessage(msg)) return;
+
+                const entry = {
+                    id: msg.id || fbKey,
+                    ...msg,
+                };
+
+                if (nicknameStore) {
+                    const resolved = nicknameStore.getNickname(
+                        entry.uid,
+                        entry.realName || entry.authorName || entry.displayName
+                    );
+                    if (resolved) {
+                        entry.displayName = resolved;
+                    }
+                }
+
+                const cleanedProxy = resolveStoredProxyName(entry);
+                if (cleanedProxy) {
+                    entry.proxyCustomerName = cleanedProxy;
+                }
+
+                list.push(entry);
+            });
+
+            list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            return list;
+        } catch (error) {
+            console.error("❌ Fetch History Chats Error:", error);
+            return [];
+        }
+    }
+
+    /**
      * Update History Item (Edit/Clear)
      * @param {string} videoId 
      * @param {string|number} itemId 
@@ -101,6 +161,104 @@ export function useHistory() {
             console.error("❌ Update Item Error:", error);
             throw error;
         }
+    }
+
+    /**
+     * Update and persist the live stream title for a historical session.
+     * @param {string} videoId
+     * @param {string} newTitle
+     * @returns {Promise<string|null>}
+     */
+    async function updateHistoryTitle(videoId, newTitle) {
+        const cleanTitle = typeof newTitle === "string" ? newTitle.trim() : "";
+        if (!videoId || !cleanTitle) return null;
+
+        await update(dbRef(db, `history/${videoId}`), {
+            title: cleanTitle,
+            lastUpdated: Date.now(),
+        });
+
+        const existing = historyList.value.find((item) => item.videoId === videoId);
+        if (existing) {
+            existing.title = cleanTitle;
+        }
+        return cleanTitle;
+    }
+
+    /**
+     * Fetch official live stream title and start timestamp from YouTube Data API v3.
+     * @param {string} videoId
+     * @returns {Promise<{title: string, timestamp: number|null}|null>}
+     */
+    async function fetchYouTubeVideoTitle(videoId) {
+        if (!videoId || videoId === "demo") return null;
+        const rawKeys = import.meta.env.VITE_YOUTUBE_API_KEYS || "";
+        const apiKeys = rawKeys.split(",").map((k) => k.trim()).filter(Boolean);
+        if (apiKeys.length === 0 || typeof fetch !== "function") return null;
+
+        for (const key of apiKeys) {
+            try {
+                const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${encodeURIComponent(videoId)}&key=${encodeURIComponent(key)}`;
+                const res = await fetch(url);
+                if (!res.ok) continue;
+                const data = await res.json();
+                const item = data?.items?.[0];
+                const ytTitle = (item?.snippet?.title || "").trim();
+                if (!ytTitle) return null;
+
+                const actualStartMs = item?.liveStreamingDetails?.actualStartTime
+                    ? new Date(item.liveStreamingDetails.actualStartTime).getTime()
+                    : NaN;
+                const publishedMs = item?.snippet?.publishedAt
+                    ? new Date(item.snippet.publishedAt).getTime()
+                    : NaN;
+                const resolvedTs =
+                    Number.isFinite(actualStartMs) && actualStartMs > 0
+                        ? actualStartMs
+                        : (Number.isFinite(publishedMs) && publishedMs > 0 ? publishedMs : null);
+
+                return { title: ytTitle, timestamp: resolvedTs };
+            } catch (err) {
+                continue;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Fetch title from YouTube and persist into history/{videoId} non-destructively.
+     * Preserves existing timestamp and totals.
+     * @param {string} videoId
+     * @returns {Promise<{title: string, timestamp: number|null}|null>}
+     */
+    async function syncMissingHistoryTitle(videoId) {
+        const meta = await fetchYouTubeVideoTitle(videoId);
+        if (!meta || !meta.title) return null;
+
+        const historyRef = dbRef(db, `history/${videoId}`);
+        const snap = await get(historyRef);
+        const existing = snap.exists() ? snap.val() : null;
+
+        const payload = {
+            title: meta.title,
+            lastUpdated: Date.now(),
+        };
+        if ((!existing || !existing.timestamp) && meta.timestamp) {
+            payload.timestamp = meta.timestamp;
+        }
+        await update(historyRef, payload);
+
+        const target = historyList.value.find((item) => item.videoId === videoId);
+        if (target) {
+            target.title = meta.title;
+            if (!target.timestamp && payload.timestamp) {
+                target.timestamp = payload.timestamp;
+            }
+        }
+        return {
+            title: meta.title,
+            timestamp: target?.timestamp || payload.timestamp || null,
+        };
     }
 
     /**
@@ -260,7 +418,11 @@ export function useHistory() {
         isLoading,
         fetchHistoryList,
         fetchHistoryDetails,
+        fetchHistoryChats,
         updateHistoryItem,
+        updateHistoryTitle,
+        fetchYouTubeVideoTitle,
+        syncMissingHistoryTitle,
         deleteHistory,
         getCleanupPreview, // ✅ Export
         deleteMultipleHistory, // ✅ Export

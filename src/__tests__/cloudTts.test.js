@@ -36,7 +36,7 @@ describe("Cloud primary actual speech service", () => {
   it("prefetches formatted speech without playing and consumes it once in FIFO order", async () => {
     await service.prefetchSpeech("สมใจ", "15");
     expect(sources).toHaveLength(0); expect(synth.speak).not.toHaveBeenCalled();
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).input.text).toBe("สมใจ ... สิบห้า");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).input.text).toBe("สมใจ, สิบห้า");
     const first = service.speak("สมใจ", "15"), second = service.speak("มะระ", "จอง 26");
     await flush(); expect(sources).toHaveLength(1); expect(fetchMock).toHaveBeenCalledTimes(1);
     sources[0].onended(); await flush();

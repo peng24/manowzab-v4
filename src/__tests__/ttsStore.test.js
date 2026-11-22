@@ -125,38 +125,49 @@ describe("System Store - TTS Modes", () => {
 
     await ttsService.speak("มะระ", "มะระ 39 เมื่อวาน");
     expect(pushSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "มะระ ... สามสิบเก้า เมื่อวาน" })
+      expect.objectContaining({ text: "มะระ, สามสิบเก้า เมื่อวาน" })
     );
 
     await ttsService.speak("มะระ", "ของมะระ 39 เมื่อวาน");
     expect(pushSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "มะระ ... สามสิบเก้า เมื่อวาน" })
+      expect.objectContaining({ text: "มะระ, สามสิบเก้า เมื่อวาน" })
     );
 
     await ttsService.speak("นิรชา", "พี่เอาใบที่120");
     expect(pushSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "นิรชา ... พี่เอาใบที่หนึ่งร้อยยี่สิบ" })
+      expect.objectContaining({ text: "นิรชา, พี่เอาใบที่หนึ่งร้อยยี่สิบ" })
     );
 
     await ttsService.speak("เดย์", "เสื้อสีแดง ราคาเท่าไหร่ เดย์");
     expect(pushSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "เดย์ ... เสื้อสีแดง ราคาเท่าไหร่" })
+      expect.objectContaining({ text: "เดย์, เสื้อสีแดง ราคาเท่าไหร่" })
     );
 
     // ✅ Test booking number 15 pronounced as "สิบห้า" instead of "หนึ่งห้า"
     await ttsService.speak("สมใจ", "15");
     expect(pushSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "สมใจ ... สิบห้า" })
+      expect.objectContaining({ text: "สมใจ, สิบห้า" })
     );
 
     await ttsService.speak("สมใจ", "15 ค่ะ");
     expect(pushSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "สมใจ ... สิบห้า ค่ะ" })
+      expect.objectContaining({ text: "สมใจ, สิบห้า ค่ะ" })
     );
 
     await ttsService.speak("สมใจ", "cf 15");
     expect(pushSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "สมใจ ... ซีเอฟ สิบห้า" })
+      expect.objectContaining({ text: "สมใจ, ซีเอฟ สิบห้า" })
+    );
+
+    // ✅ Prevent Chirp 3: HD from reading "จุด" after customer names or ellipses in chat
+    await ttsService.speak("คุณสมใจ.", "15...");
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "คุณสมใจ, สิบห้า" })
+    );
+
+    await ttsService.speak("คุณสมชาย...", "รอดูไลฟ์พรุ่งนี้ก่อน...ส่งทีเดียว");
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "คุณสมชาย, รอดูไลฟ์พรุ่งนี้ก่อน, ส่งทีเดียว" })
     );
   });
 });

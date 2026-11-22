@@ -142,7 +142,7 @@ export function formatMultiBuyTtsMessage(normalizedMsg, numbersStr, itemIds) {
   if (safeIds.length <= 1) {
     const baseText = replaceNumbersWithThaiWords(normalizedMsg);
     return safeIds.length === 1
-      ? `${baseText} ... ทั้งหมด ${numberToThaiWords(1)} รายการ`
+      ? `${baseText}, ทั้งหมด ${numberToThaiWords(1)} รายการ`
       : baseText;
   }
 
@@ -162,5 +162,5 @@ export function formatMultiBuyTtsMessage(normalizedMsg, numbersStr, itemIds) {
     bodyText = [cleanPrefix, itemsPhrase, cleanSuffix].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
   }
 
-  return `${bodyText} ... ทั้งหมด ${numberToThaiWords(safeIds.length)} รายการ`;
+  return `${bodyText}, ทั้งหมด ${numberToThaiWords(safeIds.length)} รายการ`;
 }

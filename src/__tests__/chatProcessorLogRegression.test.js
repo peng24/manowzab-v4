@@ -160,10 +160,10 @@ describe('actual chat processor log safety', () => {
   });
 
   it.each([
-    ['12 15', false, 'รายการที่ สิบสอง รายการที่ สิบห้า ... ทั้งหมด สอง รายการ'],
-    ['เอา 6 7 8', false, 'เอา รายการที่ หก รายการที่ เจ็ด รายการที่ แปด ... ทั้งหมด สาม รายการ'],
-    ['พี่อ้อย 26 38 74', true, 'พี่อ้อย รายการที่ ยี่สิบหก รายการที่ สามสิบแปด รายการที่ เจ็ดสิบสี่ ... ทั้งหมด สาม รายการ'],
-    ['๑๒ ๑๕', false, 'รายการที่ สิบสอง รายการที่ สิบห้า ... ทั้งหมด สอง รายการ'],
+    ['12 15', false, 'รายการที่ สิบสอง รายการที่ สิบห้า, ทั้งหมด สอง รายการ'],
+    ['เอา 6 7 8', false, 'เอา รายการที่ หก รายการที่ เจ็ด รายการที่ แปด, ทั้งหมด สาม รายการ'],
+    ['พี่อ้อย 26 38 74', true, 'พี่อ้อย รายการที่ ยี่สิบหก รายการที่ สามสิบแปด รายการที่ เจ็ดสิบสี่, ทั้งหมด สาม รายการ'],
+    ['๑๒ ๑๕', false, 'รายการที่ สิบสอง รายการที่ สิบห้า, ทั้งหมด สอง รายการ'],
   ])('prepends รายการที่ before every item number in multi-buy TTS: %s', async (text, asAdmin, expectedTts) => {
     const chat = await process(text, asAdmin);
     expect(chat).toMatchObject({ type: 'buy', detectionMethod: 'multi-buy', ttsText: expectedTts });
@@ -194,5 +194,35 @@ describe('actual chat processor log safety', () => {
     expect(chat).toMatchObject({ type: 'note', proxyCustomerName: 'พี่พัช' });
     await process('จำผิดเบอร์ค่ะ');
     expect(state.update.mock.calls.some(([ref]) => ref.path.startsWith('nicknames/'))).toBe(false);
+  });
+
+  it('does not cancel #12 on จะยกให้พี่สาว, does not learn ดู as nickname, and treats นาว13สีอาไร as question', async () => {
+    state.nick.hasNickname.mockReturnValue(false);
+    await process('พี่รับค่ะ 12');
+    expect(state.stock.processOrder).toHaveBeenCalledTimes(1);
+    expect(state.stock.processOrder.mock.calls[0][0]).toBe(12);
+
+    await process('ไม่เป็นไรค่ะ ถ้าพี่ใส่ไม่ได้ จะยกให้พี่สาว');
+    expect(state.stock.processCancel).not.toHaveBeenCalled();
+
+    await process('ดู');
+    expect(state.update.mock.calls.some(([ref]) => ref.path.startsWith('nicknames/'))).toBe(false);
+
+    const qChat = await process('นาว13สีอาไร');
+    expect(state.stock.processOrder).toHaveBeenCalledTimes(1);
+    expect(qChat.type).toBe('question');
+  });
+
+  it('handles Nov 21 hold (รอดูไลฟ์พรุ่งนี้ก่อน...ส่งทีเดียว) without setting deliveryDate, and blocks รับทราบค่าา nickname', async () => {
+    state.nick.hasNickname.mockReturnValue(false);
+    await process('รับทราบค่าา');
+    expect(state.update.mock.calls.some(([ref]) => ref.path.startsWith('nicknames/'))).toBe(false);
+
+    await process('ของพี่รอดูไลฟ์พรุ่งนี้ก่อนนะคะเผื่อต้องการเพิ่มจะได้ส่งทีเดียว');
+    expect(state.update.mock.calls.some(([ref]) => ref.path.startsWith('delivery_customers/'))).toBe(false);
+
+    await process('พี่รับค่ะ ที่2');
+    expect(state.stock.processOrder).toHaveBeenCalledTimes(1);
+    expect(state.stock.processOrder.mock.calls[0][0]).toBe(2);
   });
 });

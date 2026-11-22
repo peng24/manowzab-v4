@@ -45,4 +45,13 @@ describe('Smart Answer — reviewed log questions', () => {
     expect(isSmartQuestionText('ได้ค่ะ 43')).toBe(false);
     expect(extractQueriedItemId('ได้ค่ะ 43')).toBeNull();
   });
+  it('extracts item 13 from colloquial สีอาไร query (นาว13สีอาไร)', () => {
+    expect(isSmartQuestionText('นาว13สีอาไร')).toBe(true);
+    expect(extractQueriedItemId('นาว13สีอาไร')).toBe(13);
+    expect(resolveSmartAnswer(chat('นาว13สีอาไร'), {
+      currentVideoId: 'test-live',
+      stockData: { 13: { price: 80, size: 'อก 48 ยาว 28' } },
+      addressBook: {},
+    })).toMatchObject({ category: 'item', itemId: 13 });
+  });
 });

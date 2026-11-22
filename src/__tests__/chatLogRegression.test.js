@@ -230,4 +230,77 @@ describe('reviewed chat log regressions — 2026-10-31', () => {
       customerName: 'พี่พัช',
     });
   });
+
+  // Reviewed Nov 16, 2026 CSV log (66 rows anonymized)
+  it('guards conditional/family gifting (จะยกให้พี่สาว) from cancelling orders while keeping ยกให้พี่เค้า', () => {
+    expect(parseIntentDetails('ไม่เป็นไรค่ะ ถ้าพี่ใส่ไม่ได้ จะยกให้พี่สาว').type).toBe('UNKNOWN');
+    expect(parseIntentDetails('ยกให้พี่เค้า').type).toBe('CANCEL_LATEST');
+  });
+
+  it('prevents bare ดู from being learned as a self-name while disambiguating ดูเหมือน / รอดู / ให้ดู from TRY_ITEM', () => {
+    expect(extractCustomerSelfName('ดู')).toBeNull();
+    expect(parseIntentDetails('ดู').type).toBe('TRY_ITEM');
+    expect(parseIntentDetails('นาวลองใส่20ให้ดูหน่อย')).toMatchObject({ type: 'TRY_ITEM', itemId: 20 });
+    expect(parseIntentDetails('ปกติน้องนาวใส่ไซร์อะไรเหรอค่ะ พี่หุ่นไกล้เคียงกับน้องนาว แต่ดูเหมือนว่าพี่มีหน้าท้องใหญ่กว่า😊').type).toBe('QUESTION');
+    expect(parseIntentDetails('พรุ่งนี้จะมีลูกไม่ให้ดูหรือเปล่าคะ').type).toBe('QUESTION');
+    expect(parseIntentDetails('พรุ่งนี้จะรอดู/////ไม่ต้องรีดก็ได้///').type).toBe('UNKNOWN');
+  });
+
+  it('handles Nov 16 colloquial questions (สีอาไร, อีกไม่ค่ะ, ซักยังนาว) without false-matching เเก้ใหม่เด้อเสียง', () => {
+    expect(parseIntentDetails('เเก้ใหม่เด้อเสียง').type).toBe('UNKNOWN');
+    expect(parseIntentDetails('ซักยังนาว').type).toBe('QUESTION');
+    expect(parseIntentDetails('นาว13สีอาไร').type).toBe('QUESTION');
+    expect(parseIntentDetails('พรุ่งนี้ไลฟ์อีกไม่ค่ะ').type).toBe('QUESTION');
+  });
+
+  // Reviewed Nov 21, 2026 CSV log (72 rows anonymized)
+  it('parses พี่รับค่ะ ที่2 / ที่6 as explicit SINGLE_BUY without fake admin proxy name', () => {
+    expect(parseIntentDetails('พี่รับค่ะ ที่2')).toEqual({ type: 'SINGLE_BUY', itemId: 2, method: 'explicit-keyword' });
+    expect(parseIntentDetails('พี่รับค่ะ ที่6')).toEqual({ type: 'SINGLE_BUY', itemId: 6, method: 'explicit-keyword' });
+    expect(extractAdminCustomerName('พี่รับค่ะ ที่2')).toBeNull();
+  });
+
+  it('blocks รับทราบค่าา and ใส่ด้วยค่ะ สีดำ from nickname/admin-note extraction', () => {
+    expect(extractCustomerSelfName('รับทราบค่าา')).toBeNull();
+    expect(parseIntentDetails('รับทราบค่าา').type).toBe('UNKNOWN');
+    expect(extractAdminCustomerName('ใส่ด้วยค่ะ สีดำ')).toBeNull();
+    expect(parseIntentDetails('ใส่ด้วยค่ะ สีดำ').type).toBe('UNKNOWN');
+  });
+
+  it('treats รอดูไลฟ์พรุ่งนี้ก่อน...จะได้ส่งทีเดียว as HOLD, ขายไม่ค่ะ as QUESTION, and มะระ สั่งเสื้อสีขาว 2 ตัว as ADMIN_NOTE', () => {
+    expect(parseIntentDetails('ของพี่รอดูไลฟ์พรุ่งนี้ก่อนนะคะเผื่อต้องการเพิ่มจะได้ส่งทีเดียว')).toEqual({
+      type: 'SHIPPING',
+      customerName: null,
+      method: 'hold-keyword',
+    });
+    expect(parseIntentDetails('ปกตินาวเอากางเกงมาขายไม่ค่ะ').type).toBe('QUESTION');
+    expect(parseIntentDetails('มะระ สั่งเสื้อสีขาว 2 ตัว')).toMatchObject({
+      type: 'ADMIN_NOTE',
+      noteCategory: 'size-selection',
+      customerName: 'มะระ',
+    });
+  });
+
+  // Audited all 23 archived CSV logs (1,324 rows anonymized)
+  it.each([
+    'ไม่ใช้แม่', 'หราาาา', 'น้ำตกที่ไหน', 'จะคอยตาม', 'ใบ่หายไป',
+  ])('does not learn archived CSV conversational phrases as self-names: %s', text => {
+    expect(extractCustomerSelfName(text)).toBeNull();
+  });
+
+  it('prevents fake customerName on โอเค41ค่ะ, ใช่ค่ะ พี่รับ 42 ค่ะ, โอนแล้วอ่านด้วยจ้า, and พี่ฝากไว้ก่อนจะเอฟต่อ', () => {
+    expect(parseIntentDetails('โอเค41ค่ะ')).toEqual({ type: 'SINGLE_BUY', itemId: 41, method: 'explicit-keyword' });
+    expect(parseIntentDetails('ใช่ค่ะ พี่รับ 42 ค่ะ')).toEqual({ type: 'SINGLE_BUY', itemId: 42, method: 'explicit-keyword' });
+    expect(parseIntentDetails('โอนแล้วอ่านด้วยจ้า')).toEqual({ type: 'SHIPPING', customerName: null, method: 'shipping-keyword' });
+    expect(parseIntentDetails('พี่ฝากไว้ก่อนจะเอฟต่อ')).toEqual({ type: 'SHIPPING', customerName: null, method: 'hold-keyword' });
+  });
+
+  it('treats นาวไม่เอาตัวหลุดมาขายเลยเหรอ and ที่ตัวละ20อกเท่าไรค่ะ as QUESTION, and blocks casual ดูนาน/ดูทุกวัน/ดูใหม่/ดูวันนี้ from TRY_ITEM', () => {
+    expect(parseIntentDetails('นาวไม่เอาตัวหลุดมาขายเลยเหรอ').type).toBe('QUESTION');
+    expect(parseIntentDetails('ที่ตัวละ20อกเท่าไรค่ะ').type).toBe('QUESTION');
+    expect(parseIntentDetails('ไม่ได้ดูนานเลยคะ').type).toBe('UNKNOWN');
+    expect(parseIntentDetails('จ้าแม่ดูทุกวัน').type).toBe('UNKNOWN');
+    expect(parseIntentDetails('ใช่อยากดูวันนี้').type).toBe('UNKNOWN');
+    expect(parseIntentDetails('หาไซใหญ่ๆมาลงให้หน่อยค่ะไว้จะดูใหม่นะคะขอบคุณค่ะป้ามีอายุขมีแขนสามส่วน').type).toBe('UNKNOWN');
+  });
 });

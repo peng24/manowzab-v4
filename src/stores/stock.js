@@ -330,12 +330,17 @@ export const useStockStore = defineStore("stock", () => {
             };
             return committedItem;
           } else {
-            // No one in queue: preserve price if set, otherwise delete the item
+            // No one in queue: preserve AI-synced price and details if set, otherwise delete the item
             const preservedPrice = Number(currentData.price);
-            if (!isNaN(preservedPrice) && preservedPrice > 0) {
-              committedItem = {
-                price: preservedPrice,
-              };
+            const hasPrice = !isNaN(preservedPrice) && preservedPrice > 0;
+            const preservedDetails =
+              typeof currentData.details === "string" && currentData.details.trim()
+                ? currentData.details.trim()
+                : "";
+            if (hasPrice || preservedDetails) {
+              committedItem = {};
+              if (hasPrice) committedItem.price = preservedPrice;
+              if (preservedDetails) committedItem.details = preservedDetails;
               return committedItem;
             }
             committedItem = null;

@@ -141,22 +141,22 @@ describe("thaiNumberWords (Thai Number Pronunciation for TTS)", () => {
   describe("formatMultiBuyTtsMessage() (Multi-Buy รายการที่ Prefix)", () => {
     it("reads รายการที่ before every booked item number", () => {
       expect(formatMultiBuyTtsMessage("12 15", "12 15", [12, 15])).toBe(
-        "รายการที่ สิบสอง รายการที่ สิบห้า, ทั้งหมด สอง รายการ",
+        "รายการที่ สิบสอง รายการที่ สิบห้า ทั้งหมด สอง รายการ",
       );
       expect(formatMultiBuyTtsMessage("เอา 6 7 8", "6 7 8", [6, 7, 8])).toBe(
-        "เอา รายการที่ หก รายการที่ เจ็ด รายการที่ แปด, ทั้งหมด สาม รายการ",
+        "เอา รายการที่ หก รายการที่ เจ็ด รายการที่ แปด ทั้งหมด สาม รายการ",
       );
     });
 
     it("preserves CF/suffixes and avoids duplicate รายการที่", () => {
       expect(formatMultiBuyTtsMessage("CF 12 15 ค่ะ", "12 15", [12, 15])).toBe(
-        "ซีเอฟ รายการที่ สิบสอง รายการที่ สิบห้า ค่ะ, ทั้งหมด สอง รายการ",
+        "ซีเอฟ รายการที่ สิบสอง รายการที่ สิบห้า ค่ะ ทั้งหมด สอง รายการ",
       );
       expect(formatMultiBuyTtsMessage("รายการที่ 12 15", "12 15", [12, 15])).toBe(
-        "รายการที่ สิบสอง รายการที่ สิบห้า, ทั้งหมด สอง รายการ",
+        "รายการที่ สิบสอง รายการที่ สิบห้า ทั้งหมด สอง รายการ",
       );
       expect(formatMultiBuyTtsMessage("3 4 วาศินา", "3 4", [3, 4])).toBe(
-        "รายการที่ สาม รายการที่ สี่ วาศินา, ทั้งหมด สอง รายการ",
+        "รายการที่ สาม รายการที่ สี่ วาศินา ทั้งหมด สอง รายการ",
       );
     });
   });

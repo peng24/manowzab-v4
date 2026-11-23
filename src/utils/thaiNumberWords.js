@@ -129,8 +129,8 @@ export function replaceNumbersWithThaiWords(text) {
  * Prepends "รายการที่ " before EVERY booked item number so TTS reads each item clearly instead of merging digits.
  *
  * Examples:
- * - ("12 15", "12 15", [12, 15]) -> "รายการที่ สิบสอง รายการที่ สิบห้า ... ทั้งหมด สอง รายการ"
- * - ("เอา 6 7", "6 7", [6, 7]) -> "เอา รายการที่ หก รายการที่ เจ็ด ... ทั้งหมด สอง รายการ"
+ * - ("12 15", "12 15", [12, 15]) -> "รายการที่ สิบสอง รายการที่ สิบห้า ทั้งหมด สอง รายการ"
+ * - ("เอา 6 7", "6 7", [6, 7]) -> "เอา รายการที่ หก รายการที่ เจ็ด ทั้งหมด สอง รายการ"
  *
  * @param {string} normalizedMsg
  * @param {string} numbersStr
@@ -142,7 +142,7 @@ export function formatMultiBuyTtsMessage(normalizedMsg, numbersStr, itemIds) {
   if (safeIds.length <= 1) {
     const baseText = replaceNumbersWithThaiWords(normalizedMsg);
     return safeIds.length === 1
-      ? `${baseText}, ทั้งหมด ${numberToThaiWords(1)} รายการ`
+      ? `${baseText} ทั้งหมด ${numberToThaiWords(1)} รายการ`
       : baseText;
   }
 
@@ -162,5 +162,5 @@ export function formatMultiBuyTtsMessage(normalizedMsg, numbersStr, itemIds) {
     bodyText = [cleanPrefix, itemsPhrase, cleanSuffix].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
   }
 
-  return `${bodyText}, ทั้งหมด ${numberToThaiWords(safeIds.length)} รายการ`;
+  return `${bodyText} ทั้งหมด ${numberToThaiWords(safeIds.length)} รายการ`;
 }

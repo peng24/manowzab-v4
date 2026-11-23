@@ -10,10 +10,8 @@ import { GoogleTtsAudio } from "./GoogleTtsAudio";
 const TTS_EMOJI_REGEX = /[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE00-\uFE0F\u200D\u20E3]/gu;
 const SPECIAL_CHARS_REGEX = /[#*~_]/g;
 const ELLIPSIS_REGEX = /(?:\.{2,}|…+)/g;
-const STANDALONE_DOT_REGEX = /\s+\.\s+/g;
-const TRAILING_DOTS_REGEX = /[.…]+$/;
-const MULTI_COMMA_REGEX = /\s*,\s*(?:,\s*)+/g;
-const EDGE_COMMA_REGEX = /^[\s,]+|[\s,]+$/g;
+const NON_DECIMAL_DOT_REGEX = /(?<!\d)\.|(?<=\d)\.(?!\d)|[．。·•]/g;
+const DECIMAL_NUM_REGEX = /(\d+)\.(\d+)/g;
 const JONG_FIX_REGEX = /จอง/g;
 const MULTI_SPACE_REGEX = /\s+/g;
 
@@ -203,10 +201,12 @@ export class TextToSpeech {
     // Remove specific special chars that might annoy TTS (optional)
     cleanText = cleanText.replace(SPECIAL_CHARS_REGEX, "");
 
-    // ✅ Replace ellipses ("...", "…") and stray standalone dots with a comma pause so Chirp 3: HD never reads "จุด"
+    // ✅ Replace ellipses ("...", "…") and non-decimal stray dots (".", "รับค่ะ.", "25. ค่ะ", "A.B") with clean Thai space
+    // so Chirp 3: HD never reads "จุด" AND never receives Western commas (", ") that distort Thai intonation.
     cleanText = cleanText
-      .replace(ELLIPSIS_REGEX, ", ")
-      .replace(STANDALONE_DOT_REGEX, ", ");
+      .replace(ELLIPSIS_REGEX, " ")
+      .replace(NON_DECIMAL_DOT_REGEX, " ")
+      .replace(DECIMAL_NUM_REGEX, "$1จุด$2");
 
     // ✅ แก้ไขปัญหาการอ่านออกเสียงเพี้ยน (เช่น คำว่า "จอง" อ่านเป็น "จอ ออ งอ" โดยเปลี่ยนเป็น "จอร์ง" เพื่อให้ออกเสียง "จอง" ได้ถูกต้อง)
     cleanText = cleanText.replace(JONG_FIX_REGEX, "จอร์ง");
@@ -214,12 +214,8 @@ export class TextToSpeech {
     // ✅ แก้ไขปัญหาการอ่านตัวเลข (เช่น 15 ให้อ่านเป็น "สิบห้า" ไม่ใช่ "หนึ่งห้า")
     cleanText = replaceNumbersWithThaiWords(cleanText);
 
-    // Clean up redundant commas & double spaces
-    cleanText = cleanText
-      .replace(MULTI_COMMA_REGEX, ", ")
-      .replace(EDGE_COMMA_REGEX, "")
-      .replace(MULTI_SPACE_REGEX, " ")
-      .trim();
+    // Clean up double spaces
+    cleanText = cleanText.replace(MULTI_SPACE_REGEX, " ").trim();
 
     // Limit length (prevent too long speech)
     if (cleanText.length > 500) {
@@ -520,12 +516,12 @@ export class TextToSpeech {
 
     if (!sanitized) return "";
 
-    // Strip trailing dots/ellipses from author name so Chirp 3: HD never reads "จุด" after customer name
+    // Strip ellipses and non-decimal dots from author name so Chirp 3: HD never reads "จุด"
     const cleanAuthor = author
       ? author
           .trim()
           .replace(ELLIPSIS_REGEX, " ")
-          .replace(TRAILING_DOTS_REGEX, "")
+          .replace(NON_DECIMAL_DOT_REGEX, " ")
           .replace(MULTI_SPACE_REGEX, " ")
           .trim()
       : "";
@@ -534,7 +530,7 @@ export class TextToSpeech {
     let messageBody = sanitized;
     if (cleanAuthor && messageBody) {
       // If message starts with author name (e.g. "มะระ 39 เมื่อวาน" or "ของมะระ 39 เมื่อวาน" with author "มะระ"),
-      // strip author prefix so TTS doesn't repeat "มะระ, มะระ 39 เมื่อวาน"
+      // strip author prefix so TTS doesn't repeat "มะระ มะระ 39 เมื่อวาน"
       const escaped = cleanAuthor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const prefixRegex = new RegExp(`^(?:ของ(?:พี่|น้อง|แม่|ป้า)?\\s*)?${escaped}\\s*`, "i");
       if (prefixRegex.test(messageBody)) {
@@ -545,7 +541,7 @@ export class TextToSpeech {
       }
 
       // If message ends with author name (e.g. "เสื้อสีแดง ราคาเท่าไหร่ เดย์" with author "เดย์"),
-      // strip author suffix so TTS doesn't repeat "เดย์, เสื้อสีแดง ราคาเท่าไหร่ เดย์"
+      // strip author suffix so TTS doesn't repeat "เดย์ เสื้อสีแดง ราคาเท่าไหร่ เดย์"
       const suffixRegex = new RegExp(`\\s+(?:ของ(?:พี่|น้อง|แม่|ป้า)?\\s*)?${escaped}$`, "i");
       if (suffixRegex.test(messageBody)) {
         const stripped = messageBody.replace(suffixRegex, "").trim();
@@ -555,7 +551,7 @@ export class TextToSpeech {
       }
     }
 
-    return cleanAuthor ? `${cleanAuthor}, ${messageBody}` : messageBody;
+    return cleanAuthor ? `${cleanAuthor} ${messageBody}` : messageBody;
   }
 
   speak(author, message) {

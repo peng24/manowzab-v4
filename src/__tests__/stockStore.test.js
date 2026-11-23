@@ -214,6 +214,21 @@ describe("Stock Store", () => {
       expect(honorificRes.previousOwner).toBe("พี่มะระ");
       expect(honorificRes.previousUid).toBe("proxy-123");
       expect(txResultHonorific).toEqual({ price: 200 });
+
+      // Preserve AI-synced price AND details when sole owner cancels
+      let txResultAiDetails;
+      runTransaction.mockImplementationOnce(async (_ref, updateFn) => {
+        txResultAiDetails = updateFn({
+          owner: "ณิชา",
+          uid: "UC_NICHA",
+          price: 80,
+          details: "อก 44 ยาว 25 สีขาว",
+          queue: [],
+        });
+        return { committed: true };
+      });
+      await stockStore.processCancel(15, "UC_NICHA", "ณิชา");
+      expect(txResultAiDetails).toEqual({ price: 80, details: "อก 44 ยาว 25 สีขาว" });
     });
 
     it("preserves previousUid and nextUid when promoting next person in queue", async () => {

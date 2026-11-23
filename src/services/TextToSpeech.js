@@ -36,6 +36,7 @@ export class TextToSpeech {
       this.audioCtx = null;
     }
     this.currentSource = null; // ✅ Track active AudioBufferSource
+    this.currentFilterNode = null; // ✅ Track active BiquadFilterNode for emotion EQ tone
     this.currentGainNode = null; // ✅ Track active GainNode for emotion volume modulation
     this.lastPreparedVoice = null; // ✅ Track which Cloud voice actually produced the last foreground buffer
     this.stuckTimer = null; // ✅ Safety timer to detect stuck state
@@ -311,6 +312,7 @@ export class TextToSpeech {
     if (!isGoogleCloudTtsEnabled()) { this.speakNative(text, { emotion }); return; }
     const generation = this.playbackGeneration;
     let source;
+    let filterNode = null;
     let gainNode = null;
     try {
       this.lastPreparedVoice = null;
@@ -325,7 +327,7 @@ export class TextToSpeech {
       this.currentSource = source;
       source.buffer = decoded;
 
-      // Apply subtle Web Audio prosody for Chirp 3: HD (which does not accept pitch/speakingRate in API audioConfig).
+      // Apply Web Audio prosody + tonal EQ for Chirp 3: HD (which does not accept pitch/speakingRate in API audioConfig).
       // Standard-A already applies native pitch/speakingRate in GoogleTtsAudio.request().
       const isChirp3Voice = typeof this.lastPreparedVoice === "string" && this.lastPreparedVoice.includes("Chirp3-HD");
       const profile = getTtsEmotionProfile(emotion);
@@ -333,17 +335,30 @@ export class TextToSpeech {
         if (source.playbackRate && typeof source.playbackRate.value === "number") {
           source.playbackRate.value = profile.playbackRate;
         }
+        let lastNode = source;
+        if (profile.filterType && typeof this.audioCtx.createBiquadFilter === "function") {
+          filterNode = this.audioCtx.createBiquadFilter();
+          filterNode.type = profile.filterType;
+          if (filterNode.frequency && typeof filterNode.frequency.value === "number") {
+            filterNode.frequency.value = profile.filterFreq;
+          }
+          if (filterNode.gain && typeof filterNode.gain.value === "number") {
+            filterNode.gain.value = profile.filterGainDb;
+          }
+          this.currentFilterNode = filterNode;
+          lastNode.connect(filterNode);
+          lastNode = filterNode;
+        }
         if (profile.gain !== 1 && typeof this.audioCtx.createGain === "function") {
           gainNode = this.audioCtx.createGain();
           if (gainNode.gain && typeof gainNode.gain.value === "number") {
             gainNode.gain.value = profile.gain;
           }
           this.currentGainNode = gainNode;
-          source.connect(gainNode);
-          gainNode.connect(this.audioCtx.destination);
-        } else {
-          source.connect(this.audioCtx.destination);
+          lastNode.connect(gainNode);
+          lastNode = gainNode;
         }
+        lastNode.connect(this.audioCtx.destination);
       } else {
         source.connect(this.audioCtx.destination);
       }
@@ -353,6 +368,10 @@ export class TextToSpeech {
         if (ended) return;
         ended = true;
         try { source.disconnect(); } catch { /* already disconnected */ }
+        if (filterNode) {
+          try { filterNode.disconnect(); } catch { /* already disconnected */ }
+          if (this.currentFilterNode === filterNode) this.currentFilterNode = null;
+        }
         if (gainNode) {
           try { gainNode.disconnect(); } catch { /* already disconnected */ }
           if (this.currentGainNode === gainNode) this.currentGainNode = null;
@@ -373,6 +392,10 @@ export class TextToSpeech {
         try { source.stop(); } catch { /* not started */ }
         try { source.disconnect(); } catch { /* already disconnected */ }
         if (this.currentSource === source) this.currentSource = null;
+      }
+      if (filterNode) {
+        try { filterNode.disconnect(); } catch { /* already disconnected */ }
+        if (this.currentFilterNode === filterNode) this.currentFilterNode = null;
       }
       if (gainNode) {
         try { gainNode.disconnect(); } catch { /* already disconnected */ }
@@ -500,6 +523,10 @@ export class TextToSpeech {
             this.currentSource.disconnect();
           } catch(e) {}
           this.currentSource = null;
+        }
+        if (this.currentFilterNode) {
+          try { this.currentFilterNode.disconnect(); } catch (e) {}
+          this.currentFilterNode = null;
         }
         if (this.currentGainNode) {
           try { this.currentGainNode.disconnect(); } catch (e) {}
@@ -658,6 +685,10 @@ export class TextToSpeech {
         // Ignore — source may already be stopped
       }
       this.currentSource = null;
+    }
+    if (this.currentFilterNode) {
+      try { this.currentFilterNode.disconnect(); } catch (e) { /* already disconnected */ }
+      this.currentFilterNode = null;
     }
     if (this.currentGainNode) {
       try { this.currentGainNode.disconnect(); } catch (e) { /* already disconnected */ }

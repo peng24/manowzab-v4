@@ -8,34 +8,43 @@
 
 export const TTS_EMOTION_PROFILES = Object.freeze({
   happy: Object.freeze({
-    // Subtle upbeat lift (+3.5% rate/pitch via Web Audio for Chirp 3: HD)
-    playbackRate: 1.035,
-    gain: 1.04,
+    // Distinct yet natural cheerful tone (+9% rate/pitch + bright highshelf EQ for Chirp 3: HD)
+    playbackRate: 1.09,
+    gain: 1.08,
+    filterType: "highshelf",
+    filterFreq: 2600,
+    filterGainDb: 4.5,
     // Google Cloud Standard-A native API parameters
-    standardSpeakingRate: 1.05,
-    standardPitch: 1.5,
+    standardSpeakingRate: 1.1,
+    standardPitch: 3.0,
     // Native SpeechSynthesis parameters
-    nativeRate: 1.05,
-    nativePitch: 1.12,
+    nativeRate: 1.1,
+    nativePitch: 1.22,
   }),
   neutral: Object.freeze({
     playbackRate: 1.0,
     gain: 1.0,
+    filterType: null,
+    filterFreq: 0,
+    filterGainDb: 0,
     standardSpeakingRate: 1.0,
     standardPitch: 0,
     nativeRate: 1.0,
     nativePitch: 1.0,
   }),
   sad: Object.freeze({
-    // Subtle downcast drop (-5.5% rate/pitch + slightly softer via Web Audio for Chirp 3: HD)
-    playbackRate: 0.945,
-    gain: 0.92,
+    // Distinct yet natural downcast tone (-12% rate/pitch + softer + warm/dark highshelf cut for Chirp 3: HD)
+    playbackRate: 0.88,
+    gain: 0.86,
+    filterType: "highshelf",
+    filterFreq: 2000,
+    filterGainDb: -6.0,
     // Google Cloud Standard-A native API parameters
-    standardSpeakingRate: 0.92,
-    standardPitch: -2.0,
+    standardSpeakingRate: 0.87,
+    standardPitch: -3.5,
     // Native SpeechSynthesis parameters
-    nativeRate: 0.92,
-    nativePitch: 0.88,
+    nativeRate: 0.88,
+    nativePitch: 0.78,
   }),
 });
 

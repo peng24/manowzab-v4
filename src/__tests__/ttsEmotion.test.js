@@ -43,23 +43,30 @@ describe("Subtle TTS Emotion Mapping & Playback", () => {
     expect(applyEmotionTextCue("คุณสมใจ, ยกเลิก สิบห้า", "sad")).toBe("คุณสมใจ, ยกเลิก สิบห้า");
   });
 
-  it("keeps acoustic shifts subtle (not exaggerated)", () => {
+  it("keeps acoustic shifts clearly audible yet natural (not exaggerated)", () => {
     const happy = getTtsEmotionProfile("happy");
     const neutral = getTtsEmotionProfile("neutral");
     const sad = getTtsEmotionProfile("sad");
 
-    expect(happy.playbackRate).toBeGreaterThan(1.0);
-    expect(happy.playbackRate).toBeLessThanOrEqual(1.06);
-    expect(sad.playbackRate).toBeLessThan(1.0);
-    expect(sad.playbackRate).toBeGreaterThanOrEqual(0.92);
+    expect(happy.playbackRate).toBeGreaterThanOrEqual(1.07);
+    expect(happy.playbackRate).toBeLessThanOrEqual(1.12);
+    expect(happy.filterType).toBe("highshelf");
+    expect(happy.filterGainDb).toBeGreaterThan(0);
+
+    expect(sad.playbackRate).toBeLessThanOrEqual(0.9);
+    expect(sad.playbackRate).toBeGreaterThanOrEqual(0.85);
+    expect(sad.filterType).toBe("highshelf");
+    expect(sad.filterGainDb).toBeLessThan(0);
+
     expect(neutral.playbackRate).toBe(1.0);
+    expect(neutral.filterType).toBeNull();
     expect(neutral.standardPitch).toBe(0);
     expect(happy.standardPitch).toBeGreaterThan(0);
     expect(sad.standardPitch).toBeLessThan(0);
   });
 
   describe("Engine integration (Chirp 3: HD, Standard-A, Native)", () => {
-    let service, synth, sources, gains, context, fetchMock;
+    let service, synth, sources, filters, gains, context, fetchMock;
 
     beforeEach(() => {
       vi.stubEnv("VITE_ENABLE_GOOGLE_CLOUD_TTS", "true");
@@ -67,12 +74,18 @@ describe("Subtle TTS Emotion Mapping & Playback", () => {
       state.ttsVoiceMode = "achernar";
       state.googleVoiceName = "th-TH-Chirp3-HD-Achernar";
       sources = [];
+      filters = [];
       gains = [];
       context = {
         state: "running",
         destination: {},
         resume: vi.fn().mockResolvedValue(),
         decodeAudioData: vi.fn().mockResolvedValue({ duration: 1 }),
+        createBiquadFilter: vi.fn(() => {
+          const f = { type: "", frequency: { value: 0 }, gain: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() };
+          filters.push(f);
+          return f;
+        }),
         createGain: vi.fn(() => {
           const g = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
           gains.push(g);
@@ -115,13 +128,15 @@ describe("Subtle TTS Emotion Mapping & Playback", () => {
       vi.restoreAllMocks();
     });
 
-    it("applies subtle Web Audio prosody & '!' cue on Chirp 3: HD without sending pitch/speakingRate to API", async () => {
+    it("applies Web Audio prosody, EQ filter & '!' cue on Chirp 3: HD without sending pitch/speakingRate to API", async () => {
       const p1 = service.speak("คุณสมใจ", "15", { emotion: "happy" });
       await flush();
       const body1 = JSON.parse(fetchMock.mock.calls[0][1].body);
       expect(body1.input.text).toBe("คุณสมใจ, สิบห้า!");
       expect(body1.audioConfig).toEqual({ audioEncoding: "MP3" });
       expect(sources[0].playbackRate.value).toBe(getTtsEmotionProfile("happy").playbackRate);
+      expect(filters[0].type).toBe("highshelf");
+      expect(filters[0].gain.value).toBe(getTtsEmotionProfile("happy").filterGainDb);
       expect(gains[0].gain.value).toBe(getTtsEmotionProfile("happy").gain);
       sources[0].onended();
       await p1;
@@ -132,6 +147,8 @@ describe("Subtle TTS Emotion Mapping & Playback", () => {
       expect(body2.input.text).toBe("คุณสมใจ, ยกเลิก สิบห้า");
       expect(body2.audioConfig).toEqual({ audioEncoding: "MP3" });
       expect(sources[1].playbackRate.value).toBe(getTtsEmotionProfile("sad").playbackRate);
+      expect(filters[1].type).toBe("highshelf");
+      expect(filters[1].gain.value).toBe(getTtsEmotionProfile("sad").filterGainDb);
       expect(gains[1].gain.value).toBe(getTtsEmotionProfile("sad").gain);
       sources[1].onended();
       await p2;
@@ -139,6 +156,7 @@ describe("Subtle TTS Emotion Mapping & Playback", () => {
       const p3 = service.speak("คุณสมใจ", "สีอะไรคะ", { emotion: "neutral" });
       await flush();
       expect(sources[2].playbackRate.value).toBe(1);
+      expect(filters).toHaveLength(2);
       expect(gains).toHaveLength(2); // neutral connects directly to destination
       sources[2].onended();
       await p3;

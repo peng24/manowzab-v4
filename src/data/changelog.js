@@ -17,6 +17,15 @@
 
 export const changelog = [
   {
+    version: '5.7.5',
+    date: '2026-11-23',
+    changes: {
+      improved: [
+        'ปรับจูนอารมณ์เสียง TTS ให้แยกความต่างชัดเจนขึ้นแต่ยังเป็นธรรมชาติ (ไม่เพิ่มคำพูดและใช้โควต้าฟรี Chirp 3: HD เหมือนเดิม) — เพิ่ม Web Audio EQ (`BiquadFilterNode` `highshelf` +4.5 dB / -6.0 dB), ปรับ `playbackRate` (`1.09` จองดีใจ / `0.88` ยกเลิกเศร้า) และปรับทำนอง SFX จองขาขึ้น (`C6 → G6`) กับ SFX ยกเลิกขาลง (`E5 → C5 → Bb4`) (`ttsEmotion.js`, `TextToSpeech.js`, `useAudio.js`)',
+      ],
+    },
+  },
+  {
     version: '5.7.4',
     date: '2026-11-23',
     changes: {

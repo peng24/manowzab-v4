@@ -17,6 +17,15 @@
 
 export const changelog = [
   {
+    version: '5.7.6',
+    date: '2026-11-23',
+    changes: {
+      removed: [
+        'ถอดระบบปรับอารมณ์เสียง TTS (`ttsEmotion.js`, Web Audio `playbackRate`/EQ/SFX ดัดแปลง) ออกและคืนค่าเสียงอ่าน TTS + เสียง SFX + ปุ่มทดสอบเสียงกลับเป็นแบบปรกติเดิมทุกประการ (คงการแก้ไขตัดจุดไข่ปลา `...` ➔ `, ` เพื่อไม่ให้ Chirp 3: HD อ่านคำว่า "จุด" ไว้ครบถ้วน)',
+      ],
+    },
+  },
+  {
     version: '5.7.5',
     date: '2026-11-23',
     changes: {

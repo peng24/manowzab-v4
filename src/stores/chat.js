@@ -9,7 +9,6 @@ import { useSystemStore } from "./system";
 import { useBlacklistStore } from "./blacklist";
 import { archiveChatEntries, getAllChatEntries, clearChatEntries } from "../utils/chatIdb";
 import { extractAdminCustomerName } from "../utils/chatParserUtils";
-import { resolveTtsEmotion } from "../utils/ttsEmotion";
 
 export function isPriceAnnouncementMessage(m) {
   if (!m) return false;
@@ -316,8 +315,7 @@ export const useChatStore = defineStore("chat", () => {
             ? messageData.ttsText
             : (messageData.text || "");
 
-          const emotion = resolveTtsEmotion(messageData);
-          queueAudio(messageData.sfxType, messageData.phoneticName, textToRead, { emotion });
+          queueAudio(messageData.sfxType, messageData.phoneticName, textToRead);
         }
       }
     });

@@ -681,10 +681,7 @@ function downloadCSV() {
 }
 
 function testVoice() {
-  // ทดสอบเทียบเสียงทั้ง 3 อารมณ์: จอง (ดีใจ) -> ถาม/คุยทั่วไป (ปรกติ) -> ยกเลิก (เศร้า)
-  queueAudio("success", "คุณสมใจ", "รับ สิบห้า ค่ะ", { emotion: "happy", delayAfter: 500 });
-  queueAudio(null, "คุณสมใจ", "ตัวนี้อกเท่าไหร่คะ", { emotion: "neutral", delayAfter: 500 });
-  queueAudio("cancel", "คุณสมใจ", "ขอยกเลิก สิบห้า ค่ะ", { emotion: "sad" });
+  queueAudio(null, "", "ทดสอบเสียง หนึ่ง สอง สาม สี่ ห้า");
   showDropdown.value = false;
 }
 

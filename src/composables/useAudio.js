@@ -150,29 +150,28 @@ export function useAudio() {
 
 
         if (type === "success") {
-          // 🎵 Cheerful 2-note ascending bright chime (C6 -> G6) to set happy booking mood
+          // Soft Bright Chime
           const osc1 = ctx.createOscillator();
           const gain1 = ctx.createGain();
           osc1.type = "sine";
-          osc1.frequency.setValueAtTime(1046.5, now); // C6
-          gain1.gain.setValueAtTime(0.038, now);
-          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+          osc1.frequency.setValueAtTime(1200, now);
+          gain1.gain.setValueAtTime(0.03, now); // Very soft
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
           osc1.connect(gain1);
           gain1.connect(ctx.destination);
           osc1.start(now);
-          osc1.stop(now + 0.24);
+          osc1.stop(now + 0.4);
 
           const osc2 = ctx.createOscillator();
           const gain2 = ctx.createGain();
           osc2.type = "sine";
-          osc2.frequency.setValueAtTime(1568, now + 0.07); // G6 (bright ascending fifth)
-          gain2.gain.setValueAtTime(0.001, now);
-          gain2.gain.setValueAtTime(0.042, now + 0.07);
-          gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+          osc2.frequency.setValueAtTime(1600, now);
+          gain2.gain.setValueAtTime(0.02, now); // Very soft
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
           osc2.connect(gain2);
           gain2.connect(ctx.destination);
-          osc2.start(now + 0.07);
-          osc2.stop(now + 0.36);
+          osc2.start(now);
+          osc2.stop(now + 0.3);
 
           // ✅ Track both osc+gain pairs for complete cleanup
           activeAudioNodes.push({ osc: osc1, gain: gain1 }, { osc: osc2, gain: gain2 });
@@ -193,33 +192,21 @@ export function useAudio() {
           // ✅ Track osc+gain pair for complete cleanup
           activeAudioNodes.push({ osc, gain });
         } else if (type === "cancel") {
-          // 🎵 Gentle 2-note descending melancholic sigh (E5 -> C5 drooping to Bb4) to set sad cancel mood
-          const osc1 = ctx.createOscillator();
-          const gain1 = ctx.createGain();
-          osc1.type = "sine";
-          osc1.frequency.setValueAtTime(659.25, now); // E5
-          gain1.gain.setValueAtTime(0.04, now);
-          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
-          osc1.connect(gain1);
-          gain1.connect(ctx.destination);
-          osc1.start(now);
-          osc1.stop(now + 0.16);
+          // Soft Pop
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine"; // Changed from sawtooth
+          osc.frequency.setValueAtTime(600, now);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.15); // Drop frequency for pop effect
+          gain.gain.setValueAtTime(0.04, now); // Very soft
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15); // Short duration
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.15);
 
-          const osc2 = ctx.createOscillator();
-          const gain2 = ctx.createGain();
-          osc2.type = "sine";
-          osc2.frequency.setValueAtTime(523.25, now + 0.11); // C5 -> gentle droop to Bb4
-          osc2.frequency.exponentialRampToValueAtTime(466.16, now + 0.34);
-          gain2.gain.setValueAtTime(0.001, now);
-          gain2.gain.setValueAtTime(0.042, now + 0.11);
-          gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-          osc2.connect(gain2);
-          gain2.connect(ctx.destination);
-          osc2.start(now + 0.11);
-          osc2.stop(now + 0.35);
-
-          // ✅ Track both osc+gain pairs for complete cleanup
-          activeAudioNodes.push({ osc: osc1, gain: gain1 }, { osc: osc2, gain: gain2 });
+          // ✅ Track osc+gain pair for complete cleanup
+          activeAudioNodes.push({ osc, gain });
 
         } else if (type === "bell") {
           // 🔔 Crisp Silver Bell / Service Chime (เสียงกระดิ่งใสๆ กริ๊งๆ สำหรับลูกค้าใหม่)
@@ -408,7 +395,7 @@ export function useAudio() {
     for (const task of audioQueue.slice(0, 2)) {
       if (!task.message || task.prefetchStarted) continue;
       task.prefetchStarted = true;
-      ttsService.prefetchSpeech(task.author, task.message, { emotion: task.emotion }).catch(() => {});
+      ttsService.prefetchSpeech(task.author, task.message).catch(() => {});
     }
   }
 
@@ -429,7 +416,7 @@ export function useAudio() {
 
       // 2. Play TTS and wait for it to finish (with safety timeout)
       if (task.message) {
-        const ttsPromise = ttsService.speak(task.author, task.message, { emotion: task.emotion });
+        const ttsPromise = ttsService.speak(task.author, task.message);
         if (ttsPromise instanceof Promise) {
           // ✅ Race against safety timeout to prevent permanent queue stall
           await Promise.race([
@@ -459,8 +446,7 @@ export function useAudio() {
   function queueAudio(sfxType, author, message, options = {}) {
     if (!systemStore.isSoundOn) return;
     const delayAfter = typeof options === "number" ? options : options?.delayAfter || 0;
-    const emotion = typeof options === "object" && options?.emotion ? options.emotion : "neutral";
-    audioQueue.push({ sfxType, author, message, delayAfter, emotion });
+    audioQueue.push({ sfxType, author, message, delayAfter });
     prefetchNextAudio();
     processAudioQueue();
   }

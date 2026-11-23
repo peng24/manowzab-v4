@@ -1804,7 +1804,7 @@ async function saveQueueChanges(preventClose = false) {
   if (oldOwnerName && !newOwnerName) {
     // Case 1: Cancel (Deleted)
     playSfx();
-    queueAudio(null, "", `ยกเลิกรายการที่ ${num} ค่ะ`, { emotion: "sad" });
+    queueAudio(null, "", `ยกเลิกรายการที่ ${num} ค่ะ`);
   } else if (oldOwnerName && newOwnerName && oldOwnerName !== newOwnerName) {
     // Case 2: Name Changed
     playSfx();

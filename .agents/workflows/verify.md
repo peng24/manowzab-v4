@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.7.2 (Chat & AI v1.5.0 Chrome Live Caption Verified) — 2026-11-23** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.7.2 (Chat & AI v1.4.3 Verified) — 2026-11-22** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -64,7 +64,6 @@ description: Mandatory verification checklist after every code change
 | 3.10 | Queue Modal Price Editor & Quick Pills | src/components/StockGrid.vue | สามารถกรอกแก้ไขราคา editingPrice พร้อมปุ่มลัดราคา 50.-, 60.-, 80.-, 100.-, 120.-, 150.- และปุ่มล้างราคา บันทึกแล้วอัปเดตสต็อกและคำนวณ totalPrice ของลูกค้าอัตโนมัติ |
 | 3.11 | Historical Live Session & Replay Price Sync | `src/components/HistoryModal.vue` | ในประวัติย้อนหลัง แสดงป้ายราคา .stock-price สำหรับทั้งสินค้าที่จองแล้วและยังว่างอยู่ (item.price > 0), พร้อมปุ่ม 'เปิดที่หน้าหลัก' (openOnMainBoard) สำหรับสลับ session activeVideo ไปหน้ากระดานหลักทันที |
 | 3.12 | Spoken Permutation & Intervening Customer Name Price Detection | `live-product-capture-ai` (`product_parser.py`, `live_stream_detector.py`) | รองรับการพูดสลับลำดับทั้ง 6 รูปแบบของแม่ค้า (เช่น เบอร์+ชื่อ+ราคา, ราคา+เบอร์, ชื่อ+เบอร์+ราคา) พร้อมกรอง False Positive ป้องกันค่าส่ง/จำนวนตัว ไม่ให้ทับเบอร์สินค้า |
-| 3.13 | Google Chrome Live Caption Mode & Sequential/Recap Guard (`v1.5.0`) | `live-product-capture-ai` (`chrome_caption_reader.py`, `product_parser.py`, `live_stream_detector.py`, `run_live_launcher.py`, `test_chrome_caption_reader.py`) | อ่านซับสดภาษาไทยจาก Chrome Live Caption ผ่าน Windows UIA โดยไม่โหลด Whisper/GPU (`transcriber is None`), เลือกอ่านเฉพาะโหนดหลักที่มองเห็นเพียงโหนดเดียว (`select_primary_caption_node`), กรองข้อความระบบ Chrome (`Live Caption is visible...`/`not available right now`/`คำบรรยายสด`), ตัด `\ufffd` และรวมช่องว่างพยางค์ไทย (`compact_thai_spacing`), ใช้ `CaptionStreamStabilizer` แบบ Backward-Stepping Committed-Tail Anchor กันรีเพลย์เมื่อ Google ASR แก้คำย้อนหลัง, แยก `อก 3840`/`อก 4446`, กัน `21 22 หรือ 60 บาท` และ `เอา 8 ตัวนี้ 80`, ใช้ Phase-Aware Sequential (`max_item_seen + 5` + `current_item_measurements`) vs Recap (`<= max_item_seen` แบบไม่เรียง), แสดงสเปก `📏 สเปก:` และซิงค์ราคาเงียบเข้า Firebase ตามกฎเหล็ก |
 
 ---
 
@@ -93,7 +92,6 @@ description: Mandatory verification checklist after every code change
 | 4.19 | Chirp 3: HD & Standard-A/Native Fallback | `GoogleTtsAudio.js`, `TextToSpeech.js`, `system.js`, `Header.vue`, `cloudTts.test.js`, `googleTtsAudio.test.js`, `ttsStore.test.js` | โหมด `achernar` (`th-TH-Chirp3-HD-Achernar` ค่าเริ่มต้น) และ `chirp3` (`th-TH-Chirp3-HD-Aoede`) ไม่ส่ง `pitch`/`speakingRate` ใน `audioConfig` และสลับสำรองอัตโนมัติ `Chirp3-HD -> Standard-A -> Native` โดย free build ยังคงเป็น `native` และไม่ยิง HTTP |
 | 4.20 | TTS Character Quota Counter & 90% Auto-Switch | `src/utils/ttsQuota.js`, `system.js`, `GoogleTtsAudio.js`, `TextToSpeech.js`, `Header.vue`, `TtsQuotaModal.vue`, `ttsQuota.test.js` | นับตัวอักษรเฉพาะคำขอที่ยิง API สำเร็จจริง (ไม่นับ cache hit), ซิงค์ข้ามเครื่องผ่าน `settings/ttsUsage/{YYYY-MM}`, รีเซ็ตอัตโนมัติวันที่ 1 เวลา 00:00 PT (`America/Los_Angeles`) พร้อมแสดงเดือน/เวลารีเซ็ตเป็นภาษาไทย (`14:00/15:00 น. (เวลาไทย)`) และคืนเสียงหลักที่ถูกสลับออก, แสดงป้าย % บน Header และหน้าต่าง `TtsQuotaModal`, และสลับอัตโนมัติเมื่อถึง 90% (`Chirp3 900k -> Standard-A`, `Standard 3.6M -> Native`) โดย free build ไม่นับ/ไม่แตะ Firebase |
 | 4.21 | No Ellipsis/Dot Verbalization (`จุด`) on Chirp 3: HD | `src/services/TextToSpeech.js`, `src/utils/thaiNumberWords.js`, `cloudTts.test.js`, `ttsStore.test.js`, `thaiNumberWords.test.js` | `formatSpeechText()` ใช้ตัวคั่น `", "` แทน `" ... "` และตัดจุดท้ายชื่อลูกค้า (`TRAILING_DOTS_REGEX`), `formatMultiBuyTtsMessage()` ใช้ `", ทั้งหมด ... รายการ"`, และ `sanitize()` แปลงจุดไข่ปลา (`...`/`…`) กับจุดเดี่ยวลอยๆ เป็น `", "` เพื่อไม่ให้ Chirp 3: HD อ่านคำว่า `"จุด"` ต่อท้ายชื่อลูกค้าหรือกลางแชท |
-| 4.22 | Subtle Intent-Based TTS Emotion | `src/utils/ttsEmotion.js`, `chat.js`, `useAudio.js`, `TextToSpeech.js`, `GoogleTtsAudio.js`, `StockGrid.vue`, `Header.vue`, `ttsEmotion.test.js` | จอง (`buy`) ใช้เสียงดีใจชัดเจนแบบธรรมชาติ, ถาม/คุยทั่วไปใช้เสียงปรกติ (`neutral`), ยกเลิก (`cancel`) ใช้เสียงเศร้าชัดเจนแบบธรรมชาติ และปุ่ม "ทดสอบเสียง" (`Header.vue`) เล่นเทียบทั้ง 3 อารมณ์ต่อเนื่องกัน; โหมด Chirp 3: HD ใช้ `!` + Web Audio `playbackRate`/`BiquadFilterNode` (`highshelf` EQ)/`GainNode` + ทำนอง SFX ขาขึ้น/ขาลง โดยไม่ส่ง `pitch`/`speakingRate` ใน `audioConfig`, โหมด Standard-A ส่ง `speakingRate`/`pitch` โดยไม่เบิ้ล Web Audio, โหมด Native ปรับ `rate`/`pitch` |
 
 
 ---

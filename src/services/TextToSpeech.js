@@ -5,7 +5,6 @@ import { replaceNumbersWithThaiWords } from "../utils/thaiNumberWords";
 import { isGoogleCloudTtsEnabled } from "../utils/ttsConfig";
 import { selectThaiVoice } from "../utils/nativeVoiceUtils";
 import { GoogleTtsAudio } from "./GoogleTtsAudio";
-import { applyEmotionTextCue, getTtsEmotionProfile, normalizeTtsEmotion } from "../utils/ttsEmotion";
 
 // Module-scoped compiled regexes to prevent recreation in TTS sanitize loop
 const TTS_EMOJI_REGEX = /[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE00-\uFE0F\u200D\u20E3]/gu;
@@ -36,9 +35,6 @@ export class TextToSpeech {
       this.audioCtx = null;
     }
     this.currentSource = null; // ✅ Track active AudioBufferSource
-    this.currentFilterNode = null; // ✅ Track active BiquadFilterNode for emotion EQ tone
-    this.currentGainNode = null; // ✅ Track active GainNode for emotion volume modulation
-    this.lastPreparedVoice = null; // ✅ Track which Cloud voice actually produced the last foreground buffer
     this.stuckTimer = null; // ✅ Safety timer to detect stuck state
     this.STUCK_TIMEOUT = 30000; // ✅ 30 seconds max per utterance
     this.consecutiveGoogleFailures = 0; // ✅ Track consecutive Google TTS failures
@@ -253,7 +249,7 @@ export class TextToSpeech {
     return new Blob([bytes], { type });
   }
 
-  async prepareOnlineAudio(cleanText, background = false, emotion = "neutral") {
+  async prepareOnlineAudio(cleanText, background = false) {
     if (!isGoogleCloudTtsEnabled() || !cleanText) return null;
     const store = useSystemStore();
     const mode = store.ttsVoiceMode || "standard";
@@ -261,64 +257,42 @@ export class TextToSpeech {
     const chirp3Near = autoSwitch && Boolean(store.chirp3QuotaStatus?.isNearLimit);
     const standardNear = autoSwitch && Boolean(store.standardQuotaStatus?.isNearLimit);
     const isChirpMode = mode === "chirp3" || mode === "achernar";
-    const normalizedEmotion = normalizeTtsEmotion(emotion);
-
-    const recordVoice = (voice, buffer) => {
-      if (!background && buffer) this.lastPreparedVoice = voice;
-      return buffer;
-    };
 
     if (isChirpMode) {
       if (chirp3Near) {
         if (standardNear) return null;
-        return recordVoice(
-          "th-TH-Standard-A",
-          await this.googleAudio.prepare(cleanText, background, "th-TH-Standard-A", normalizedEmotion),
-        );
+        return this.googleAudio.prepare(cleanText, background, "th-TH-Standard-A");
       }
       const primaryVoice =
         store.googleVoiceName ||
         (mode === "achernar" ? "th-TH-Chirp3-HD-Achernar" : "th-TH-Chirp3-HD-Aoede");
       if (background) {
         if (Date.now() >= (this.googleAudio.voiceRetryAfter.get(primaryVoice) || 0)) {
-          return this.googleAudio.prepare(cleanText, true, primaryVoice, normalizedEmotion);
+          return this.googleAudio.prepare(cleanText, true, primaryVoice);
         }
-        return standardNear
-          ? null
-          : this.googleAudio.prepare(cleanText, true, "th-TH-Standard-A", normalizedEmotion);
+        return standardNear ? null : this.googleAudio.prepare(cleanText, true, "th-TH-Standard-A");
       }
-      const chirpBuffer = await this.googleAudio.prepare(cleanText, false, primaryVoice, normalizedEmotion);
-      if (chirpBuffer) return recordVoice(primaryVoice, chirpBuffer);
+      const chirpBuffer = await this.googleAudio.prepare(cleanText, false, primaryVoice);
+      if (chirpBuffer) return chirpBuffer;
       if (standardNear) return null;
-      return recordVoice(
-        "th-TH-Standard-A",
-        await this.googleAudio.prepare(cleanText, false, "th-TH-Standard-A", normalizedEmotion),
-      );
+      return this.googleAudio.prepare(cleanText, false, "th-TH-Standard-A");
     }
 
     if (standardNear) return null;
-    const stdVoice = store.googleVoiceName || "th-TH-Standard-A";
-    return recordVoice(
-      stdVoice,
-      await this.googleAudio.prepare(cleanText, background, null, normalizedEmotion),
-    );
+    return this.googleAudio.prepare(cleanText, background);
   }
 
   /**
    * Speak using Google Cloud TTS API (Chirp 3: HD with Standard-A & Native fallback)
    */
-  async speakOnline(text, options = {}) {
-    const emotion = normalizeTtsEmotion(options?.emotion);
-    if (!isGoogleCloudTtsEnabled()) { this.speakNative(text, { emotion }); return; }
+  async speakOnline(text) {
+    if (!isGoogleCloudTtsEnabled()) { this.speakNative(text); return; }
     const generation = this.playbackGeneration;
     let source;
-    let filterNode = null;
-    let gainNode = null;
     try {
-      this.lastPreparedVoice = null;
-      const buffer = await this.prepareOnlineAudio(this.sanitize(text).substring(0, 500), false, emotion);
+      const buffer = await this.prepareOnlineAudio(this.sanitize(text).substring(0, 500), false);
       if (generation !== this.playbackGeneration) return;
-      if (!buffer) { this.consecutiveGoogleFailures++; this.speakNative(text, { emotion }); return; }
+      if (!buffer) { this.consecutiveGoogleFailures++; this.speakNative(text); return; }
       if (!await this.ensureAudioContextReady()) throw new Error("AudioContext unavailable");
       if (generation !== this.playbackGeneration) return;
       const decoded = await this.audioCtx.decodeAudioData(buffer);
@@ -326,56 +300,12 @@ export class TextToSpeech {
       source = this.audioCtx.createBufferSource();
       this.currentSource = source;
       source.buffer = decoded;
-
-      // Apply Web Audio prosody + tonal EQ for Chirp 3: HD (which does not accept pitch/speakingRate in API audioConfig).
-      // Standard-A already applies native pitch/speakingRate in GoogleTtsAudio.request().
-      const isChirp3Voice = typeof this.lastPreparedVoice === "string" && this.lastPreparedVoice.includes("Chirp3-HD");
-      const profile = getTtsEmotionProfile(emotion);
-      if (isChirp3Voice && emotion !== "neutral") {
-        if (source.playbackRate && typeof source.playbackRate.value === "number") {
-          source.playbackRate.value = profile.playbackRate;
-        }
-        let lastNode = source;
-        if (profile.filterType && typeof this.audioCtx.createBiquadFilter === "function") {
-          filterNode = this.audioCtx.createBiquadFilter();
-          filterNode.type = profile.filterType;
-          if (filterNode.frequency && typeof filterNode.frequency.value === "number") {
-            filterNode.frequency.value = profile.filterFreq;
-          }
-          if (filterNode.gain && typeof filterNode.gain.value === "number") {
-            filterNode.gain.value = profile.filterGainDb;
-          }
-          this.currentFilterNode = filterNode;
-          lastNode.connect(filterNode);
-          lastNode = filterNode;
-        }
-        if (profile.gain !== 1 && typeof this.audioCtx.createGain === "function") {
-          gainNode = this.audioCtx.createGain();
-          if (gainNode.gain && typeof gainNode.gain.value === "number") {
-            gainNode.gain.value = profile.gain;
-          }
-          this.currentGainNode = gainNode;
-          lastNode.connect(gainNode);
-          lastNode = gainNode;
-        }
-        lastNode.connect(this.audioCtx.destination);
-      } else {
-        source.connect(this.audioCtx.destination);
-      }
-
+      source.connect(this.audioCtx.destination);
       let ended = false;
       source.onended = () => {
         if (ended) return;
         ended = true;
         try { source.disconnect(); } catch { /* already disconnected */ }
-        if (filterNode) {
-          try { filterNode.disconnect(); } catch { /* already disconnected */ }
-          if (this.currentFilterNode === filterNode) this.currentFilterNode = null;
-        }
-        if (gainNode) {
-          try { gainNode.disconnect(); } catch { /* already disconnected */ }
-          if (this.currentGainNode === gainNode) this.currentGainNode = null;
-        }
         if (generation !== this.playbackGeneration) return;
         this.clearStuckTimer();
         const complete = this._currentOnComplete;
@@ -393,25 +323,16 @@ export class TextToSpeech {
         try { source.disconnect(); } catch { /* already disconnected */ }
         if (this.currentSource === source) this.currentSource = null;
       }
-      if (filterNode) {
-        try { filterNode.disconnect(); } catch { /* already disconnected */ }
-        if (this.currentFilterNode === filterNode) this.currentFilterNode = null;
-      }
-      if (gainNode) {
-        try { gainNode.disconnect(); } catch { /* already disconnected */ }
-        if (this.currentGainNode === gainNode) this.currentGainNode = null;
-      }
       if (generation !== this.playbackGeneration) return;
       logger.warn("Google audio playback unavailable; using native speech");
-      this.speakNative(text, { emotion });
+      this.speakNative(text);
     }
   }
 
-  prefetchSpeech(author, message, options = {}) {
-    const emotion = normalizeTtsEmotion(options?.emotion);
-    const text = this.formatSpeechText(author, message, { emotion });
+  prefetchSpeech(author, message) {
+    const text = this.formatSpeechText(author, message);
     if (!text) return Promise.resolve(null);
-    return this.prepareOnlineAudio(this.sanitize(text).substring(0, 500), true, emotion);
+    return this.prepareOnlineAudio(this.sanitize(text).substring(0, 500), true);
   }
 
   retryGoogle() {
@@ -421,17 +342,15 @@ export class TextToSpeech {
   /**
    * Speak using native browser TTS
    */
-  speakNative(text, options = {}) {
+  speakNative(text) {
     const generation = this.playbackGeneration;
     try {
       const voice = this.getBestVoice();
-      const profile = getTtsEmotionProfile(options?.emotion);
 
       const utterance = new SpeechSynthesisUtterance(this.sanitize(text));
       utterance.lang = "th-TH";
       utterance.volume = 1.0;
-      utterance.rate = profile.nativeRate;
-      utterance.pitch = profile.nativePitch;
+      utterance.rate = 1.0;
 
       if (voice) {
         utterance.voice = voice;
@@ -524,14 +443,6 @@ export class TextToSpeech {
           } catch(e) {}
           this.currentSource = null;
         }
-        if (this.currentFilterNode) {
-          try { this.currentFilterNode.disconnect(); } catch (e) {}
-          this.currentFilterNode = null;
-        }
-        if (this.currentGainNode) {
-          try { this.currentGainNode.disconnect(); } catch (e) {}
-          this.currentGainNode = null;
-        }
         window.speechSynthesis.cancel();
 
         // ✅ Resolve pending Promise before moving on (prevents outer queue deadlock)
@@ -571,7 +482,6 @@ export class TextToSpeech {
     this.isSpeaking = true;
     const item = this.queue.shift();
     const text = typeof item === "string" ? item : item.text;
-    const emotion = typeof item === "object" ? normalizeTtsEmotion(item.emotion) : "neutral";
     this._currentOnComplete = typeof item === "object" ? item.onComplete : null;
 
     const generation = this.playbackGeneration;
@@ -589,9 +499,9 @@ export class TextToSpeech {
       isGoogleCloudTtsEnabled() && systemStore.useOnlineTts &&
       systemStore.googleApiKey
     ) {
-      this.speakOnline(text, { emotion });
+      this.speakOnline(text);
     } else {
-      this.speakNative(text, { emotion });
+      this.speakNative(text);
     }
   }
 
@@ -599,7 +509,7 @@ export class TextToSpeech {
    * Add message to queue and return a Promise that resolves when speech finishes.
    * @returns {Promise<void>}
    */
-  formatSpeechText(author, message, options = {}) {
+  formatSpeechText(author, message) {
     let sanitized = this.sanitize(message);
 
     // ✅ If message had content but got sanitized to empty (e.g. emoji-only),
@@ -645,18 +555,16 @@ export class TextToSpeech {
       }
     }
 
-    const combined = cleanAuthor ? `${cleanAuthor}, ${messageBody}` : messageBody;
-    return applyEmotionTextCue(combined, options?.emotion);
+    return cleanAuthor ? `${cleanAuthor}, ${messageBody}` : messageBody;
   }
 
-  speak(author, message, options = {}) {
-    const emotion = normalizeTtsEmotion(options?.emotion);
-    const textToSpeak = this.formatSpeechText(author, message, { emotion });
+  speak(author, message) {
+    const textToSpeak = this.formatSpeechText(author, message);
     if (!textToSpeak) return Promise.resolve();
 
     return new Promise((resolve) => {
       // Add to queue with a completion callback
-      this.queue.push({ text: textToSpeak, emotion, onComplete: resolve });
+      this.queue.push({ text: textToSpeak, onComplete: resolve });
 
       // Process queue
       this.processQueue();
@@ -685,14 +593,6 @@ export class TextToSpeech {
         // Ignore — source may already be stopped
       }
       this.currentSource = null;
-    }
-    if (this.currentFilterNode) {
-      try { this.currentFilterNode.disconnect(); } catch (e) { /* already disconnected */ }
-      this.currentFilterNode = null;
-    }
-    if (this.currentGainNode) {
-      try { this.currentGainNode.disconnect(); } catch (e) { /* already disconnected */ }
-      this.currentGainNode = null;
     }
 
     // Stop native speech synthesis

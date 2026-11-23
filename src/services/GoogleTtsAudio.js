@@ -1,4 +1,5 @@
 import { isGoogleCloudTtsEnabled } from "../utils/ttsConfig";
+import { getTtsEmotionProfile, normalizeTtsEmotion } from "../utils/ttsEmotion";
 
 // Preparing an audio file never plays sound or advances either playback queue.
 export class GoogleTtsAudio {
@@ -28,12 +29,16 @@ export class GoogleTtsAudio {
     this.lastError = null;
   }
 
-  async prepare(text, background = false, voiceOverride = null) {
+  async prepare(text, background = false, voiceOverride = null, emotion = "neutral") {
     if (!isGoogleCloudTtsEnabled()) return null;
     const config = this.getConfig();
     if (!config.enabled || !text || !config.keys.length) return null;
     const voice = voiceOverride || config.voice;
-    const key = `google:${voice}:${text}`;
+    const normalizedEmotion = normalizeTtsEmotion(emotion);
+    const isChirp3 = typeof voice === 'string' && voice.includes('Chirp3-HD');
+    const key = !isChirp3 && normalizedEmotion !== 'neutral'
+      ? `google:${voice}:${normalizedEmotion}:${text}`
+      : `google:${voice}:${text}`;
     const cached = this.getCached(key);
     if (cached) return cached;
     let job = this.pending.get(key);
@@ -42,7 +47,7 @@ export class GoogleTtsAudio {
       const now = Date.now();
       if (now < this.retryAfter || now < voiceCooldown || (background && this.pending.size >= 3)) return null;
       const generation = this.generation;
-      job = Promise.resolve().then(() => this.fetchAudio(text, { ...config, voice }, key, generation));
+      job = Promise.resolve().then(() => this.fetchAudio(text, { ...config, voice, emotion: normalizedEmotion }, key, generation));
       this.pending.set(key, job);
       const cleanup = () => { if (this.pending.get(key) === job) this.pending.delete(key); };
       job.then(cleanup, cleanup);
@@ -52,7 +57,7 @@ export class GoogleTtsAudio {
     return buffer?.slice(0) || null;
   }
 
-  async request(text, voice, key, timeoutMs) {
+  async request(text, voice, key, timeoutMs, emotion = "neutral") {
     // Keep the network implementation out of explicitly free builds as well.
     if (!isGoogleCloudTtsEnabled()) return null;
     const controller = new AbortController();
@@ -65,9 +70,10 @@ export class GoogleTtsAudio {
     try {
       return await Promise.race([aborted, (async () => {
         const isChirp3 = typeof voice === 'string' && voice.includes('Chirp3-HD');
+        const profile = getTtsEmotionProfile(emotion);
         const audioConfig = isChirp3
           ? { audioEncoding: 'MP3' }
-          : { audioEncoding: 'MP3', speakingRate: 1, pitch: 0 };
+          : { audioEncoding: 'MP3', speakingRate: profile.standardSpeakingRate, pitch: profile.standardPitch };
         const response = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key },
@@ -102,7 +108,7 @@ export class GoogleTtsAudio {
       if (remaining <= 0) break;
       const index = (start + offset) % config.keys.length;
       try {
-        const buffer = await this.request(text, config.voice, config.keys[index], Math.min(remaining, this.keyTimeoutMs));
+        const buffer = await this.request(text, config.voice, config.keys[index], Math.min(remaining, this.keyTimeoutMs), config.emotion);
         if (generation !== this.generation) return null;
         this.setCached(cacheKey, buffer);
         this.retryAfter = 0;

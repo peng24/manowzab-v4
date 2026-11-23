@@ -17,6 +17,15 @@
 
 export const changelog = [
   {
+    version: '5.7.3',
+    date: '2026-11-23',
+    changes: {
+      added: [
+        'เพิ่มระบบ **แสดงอารมณ์เสียง TTS แบบพอดีๆ** ตามประเภทแชท (`src/utils/ttsEmotion.js`, `chat.js`, `useAudio.js`, `TextToSpeech.js`, `GoogleTtsAudio.js`, `StockGrid.vue`) — แชท **จอง** (`buy`) อ่านด้วยโทนเสียงดีใจสดใสขึ้นเล็กน้อย, **ถาม/พูดคุยทั่วไป** อ่านด้วยเสียงปรกติ, และ **ยกเลิก** (`cancel`) อ่านด้วยโทนเสียงเศร้าช้าลงนุ่มลงเล็กน้อย รองรับครบทั้ง Chirp 3: HD (Web Audio prosody + `!` cue โดยไม่ส่ง `pitch`/`speakingRate` ใน API), Standard-A และ Native TTS พร้อมชุดทดสอบ 913 เทสต์',
+      ],
+    },
+  },
+  {
     version: '5.7.2',
     date: '2026-11-22',
     changes: {

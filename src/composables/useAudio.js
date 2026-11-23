@@ -395,7 +395,7 @@ export function useAudio() {
     for (const task of audioQueue.slice(0, 2)) {
       if (!task.message || task.prefetchStarted) continue;
       task.prefetchStarted = true;
-      ttsService.prefetchSpeech(task.author, task.message).catch(() => {});
+      ttsService.prefetchSpeech(task.author, task.message, { emotion: task.emotion }).catch(() => {});
     }
   }
 
@@ -416,7 +416,7 @@ export function useAudio() {
 
       // 2. Play TTS and wait for it to finish (with safety timeout)
       if (task.message) {
-        const ttsPromise = ttsService.speak(task.author, task.message);
+        const ttsPromise = ttsService.speak(task.author, task.message, { emotion: task.emotion });
         if (ttsPromise instanceof Promise) {
           // ✅ Race against safety timeout to prevent permanent queue stall
           await Promise.race([
@@ -446,7 +446,8 @@ export function useAudio() {
   function queueAudio(sfxType, author, message, options = {}) {
     if (!systemStore.isSoundOn) return;
     const delayAfter = typeof options === "number" ? options : options?.delayAfter || 0;
-    audioQueue.push({ sfxType, author, message, delayAfter });
+    const emotion = typeof options === "object" && options?.emotion ? options.emotion : "neutral";
+    audioQueue.push({ sfxType, author, message, delayAfter, emotion });
     prefetchNextAudio();
     processAudioQueue();
   }

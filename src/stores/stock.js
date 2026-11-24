@@ -22,6 +22,9 @@ export const useStockStore = defineStore("stock", () => {
   /** @type {import('vue').Ref<Object>} Dictionary of stock items */
   const stockData = ref({});
 
+  /** @type {import('vue').Ref<string>} Video ID whose stock snapshot has loaded from Firebase */
+  const loadedVideoId = ref("");
+
   /** @type {import('vue').Ref<number>} Total number of stock items */
   const stockSize = ref(parseInt(localStorage.getItem("lastStockSize")) || 50);
 
@@ -59,8 +62,10 @@ export const useStockStore = defineStore("stock", () => {
       currentUnsubscribe = null;
     }
 
-    // ✅ Reset milestones when connecting to a new session
+    // ✅ Reset milestones & stale stock immediately when connecting to a new session
     milestones.value = { fifty: false, eighty: false, hundred: false };
+    loadedVideoId.value = "";
+    stockData.value = {};
 
     const stockRef = dbRef(db, `stock/${videoId}`);
 
@@ -73,12 +78,14 @@ export const useStockStore = defineStore("stock", () => {
     const unsubStock = onValue(stockRef, (snapshot) => {
       const val = snapshot.val() || {};
       stockData.value = val;
+      loadedVideoId.value = videoId;
 
       if (videoId && videoId !== "demo") {
         let calculatedSales = 0;
         let totalItems = 0;
 
         Object.values(val).forEach((item) => {
+          if (!item) return;
           if (item.owner && item.price) {
             const p = parseInt(item.price, 10);
             calculatedSales += isNaN(p) ? 0 : p;
@@ -183,7 +190,11 @@ export const useStockStore = defineStore("stock", () => {
     method = "manual",
     isBackdated = false,
   ) {
-    const itemRef = dbRef(db, `stock/${systemStore.currentVideoId}/${num}`);
+    const videoId = systemStore.currentVideoId;
+    if (!videoId) {
+      return { success: false, action: "error", error: "No active videoId" };
+    }
+    const itemRef = dbRef(db, `stock/${videoId}/${num}`);
 
     try {
       let action = "unknown";
@@ -213,9 +224,7 @@ export const useStockStore = defineStore("stock", () => {
           currentData.source = method;
           if (price) currentData.price = price;
           if (!currentData.queue) currentData.queue = [];
-          if (markBackdated) {
-            currentData.backdated = true;
-          }
+          currentData.backdated = markBackdated;
           committedItem = { ...currentData };
           return currentData;
         } else {
@@ -244,12 +253,16 @@ export const useStockStore = defineStore("stock", () => {
 
       // ✅ Auto-sync customer to delivery_customers with post-transaction snapshot
       if (action === "claimed") {
-        const nextStockSnapshot = { ...stockData.value };
-        if (committedItem) {
-          nextStockSnapshot[num] = committedItem;
+        let syncSnapshot = null;
+        if (systemStore.currentVideoId === videoId) {
+          const nextStockSnapshot = { ...stockData.value };
+          if (committedItem) {
+            nextStockSnapshot[num] = committedItem;
+          }
+          stockData.value = nextStockSnapshot;
+          syncSnapshot = nextStockSnapshot;
         }
-        stockData.value = nextStockSnapshot;
-        syncDeliveryCustomerForOwner(owner, uid, systemStore.currentVideoId, nextStockSnapshot).catch((e) =>
+        syncDeliveryCustomerForOwner(owner, uid, videoId, syncSnapshot).catch((e) =>
           console.warn("Auto sync delivery error:", e)
         );
       }
@@ -282,7 +295,19 @@ export const useStockStore = defineStore("stock", () => {
    * @returns {Promise<{previousOwner: string|null, previousUid: string|null, nextOwner: string|null, nextUid: string|null, cancelledFromQueue: boolean}|null>} Info about the cancellation for TTS.
    */
   async function processCancel(num, uid = null, ownerName = null) {
-    const itemRef = dbRef(db, `stock/${systemStore.currentVideoId}/${num}`);
+    const videoId = systemStore.currentVideoId;
+    if (!videoId) {
+      return {
+        success: false,
+        previousOwner: null,
+        previousUid: null,
+        nextOwner: null,
+        nextUid: null,
+        cancelledFromQueue: false,
+        error: "No active videoId",
+      };
+    }
+    const itemRef = dbRef(db, `stock/${videoId}/${num}`);
     let previousOwner = null;
     let previousUid = null;
     let nextOwner = null;
@@ -366,22 +391,26 @@ export const useStockStore = defineStore("stock", () => {
       });
 
       // ✅ Update post-transaction stock snapshot and auto-sync delivery_customers
-      const nextStockSnapshot = { ...stockData.value };
-      if (committedItem === null) {
-        delete nextStockSnapshot[num];
-      } else if (committedItem !== undefined) {
-        nextStockSnapshot[num] = committedItem;
-      }
-      if (committedItem !== undefined) {
-        stockData.value = nextStockSnapshot;
+      let syncSnapshot = null;
+      if (systemStore.currentVideoId === videoId) {
+        const nextStockSnapshot = { ...stockData.value };
+        if (committedItem === null) {
+          delete nextStockSnapshot[num];
+        } else if (committedItem !== undefined) {
+          nextStockSnapshot[num] = committedItem;
+        }
+        if (committedItem !== undefined) {
+          stockData.value = nextStockSnapshot;
+        }
+        syncSnapshot = nextStockSnapshot;
       }
 
       if (previousOwner) {
         syncDeliveryCustomerForOwner(
           previousOwner,
           previousUid || uid,
-          systemStore.currentVideoId,
-          nextStockSnapshot,
+          videoId,
+          syncSnapshot,
         ).catch((e) =>
           console.warn("Auto sync delivery error on cancel:", e)
         );
@@ -390,8 +419,8 @@ export const useStockStore = defineStore("stock", () => {
         syncDeliveryCustomerForOwner(
           nextOwner,
           nextUid,
-          systemStore.currentVideoId,
-          nextStockSnapshot,
+          videoId,
+          syncSnapshot,
         ).catch((e) =>
           console.warn("Auto sync delivery error on promote:", e)
         );
@@ -441,7 +470,8 @@ export const useStockStore = defineStore("stock", () => {
     let mostRecentId = null;
     let maxTime = -2; // Start lower than missing (-1) or 0
 
-    Object.entries(stockData.value).forEach(([id, item]) => {
+    Object.entries(stockData.value || {}).forEach(([id, item]) => {
+      if (!item) return;
       const num = parseInt(id);
       if (isNaN(num)) return;
 
@@ -506,8 +536,10 @@ export const useStockStore = defineStore("stock", () => {
    */
   async function clearAllStock() {
     const videoId = systemStore.currentVideoId;
+    if (!videoId) return;
+
     const uniqueOwnersMap = new Map();
-    Object.values(stockData.value).forEach((item) => {
+    Object.values(stockData.value || {}).forEach((item) => {
       if (item?.owner) {
         const key = String(item.owner).trim().toLowerCase();
         if (key && (!uniqueOwnersMap.has(key) || (!uniqueOwnersMap.get(key).uid && item.uid))) {
@@ -521,13 +553,11 @@ export const useStockStore = defineStore("stock", () => {
 
     await remove(dbRef(db, `stock/${videoId}`));
 
-    if (videoId) {
-      const emptySnapshot = {};
-      for (const { owner, uid } of uniqueOwnersMap.values()) {
-        syncDeliveryCustomerForOwner(owner, uid, videoId, emptySnapshot).catch((e) =>
-          console.warn("Auto sync delivery error on clear all stock:", e)
-        );
-      }
+    const emptySnapshot = {};
+    for (const { owner, uid } of uniqueOwnersMap.values()) {
+      syncDeliveryCustomerForOwner(owner, uid, videoId, emptySnapshot).catch((e) =>
+        console.warn("Auto sync delivery error on clear all stock:", e)
+      );
     }
   }
 
@@ -585,7 +615,8 @@ export const useStockStore = defineStore("stock", () => {
    * @param {boolean} [isAuto=false] - Whether this update was triggered by the auto voice detector
    */
   async function updateItemData(num, newData, isAuto = false) {
-    if (!systemStore.currentVideoId) return;
+    const videoId = systemStore.currentVideoId;
+    if (!videoId) return;
 
     const oldOwner = stockData.value[num]?.owner;
     const oldUid = stockData.value[num]?.uid;
@@ -597,22 +628,26 @@ export const useStockStore = defineStore("stock", () => {
 
     // 1. Update Stock Item
     await update(
-      dbRef(db, `stock/${systemStore.currentVideoId}/${num}`),
+      dbRef(db, `stock/${videoId}/${num}`),
       newData,
     );
 
-    const mergedItem = { ...(stockData.value[num] || {}), ...(newData || {}) };
-    const nextStockSnapshot = { ...stockData.value, [num]: mergedItem };
-    stockData.value = nextStockSnapshot;
+    let syncSnapshot = null;
+    if (systemStore.currentVideoId === videoId) {
+      const mergedItem = { ...(stockData.value[num] || {}), ...(newData || {}) };
+      const nextStockSnapshot = { ...stockData.value, [num]: mergedItem };
+      stockData.value = nextStockSnapshot;
+      syncSnapshot = nextStockSnapshot;
+    }
 
     // 2. Auto-sync delivery_customers for previous owner and new owner
     if (oldOwner) {
-      syncDeliveryCustomerForOwner(oldOwner, oldUid, systemStore.currentVideoId, nextStockSnapshot).catch((e) =>
+      syncDeliveryCustomerForOwner(oldOwner, oldUid, videoId, syncSnapshot).catch((e) =>
         console.warn("Auto sync delivery error on item edit:", e)
       );
     }
     if (newData && newData.owner && newData.owner !== oldOwner) {
-      syncDeliveryCustomerForOwner(newData.owner, newData.uid, systemStore.currentVideoId, nextStockSnapshot).catch((e) =>
+      syncDeliveryCustomerForOwner(newData.owner, newData.uid, videoId, syncSnapshot).catch((e) =>
         console.warn("Auto sync delivery error on item edit:", e)
       );
     }
@@ -621,12 +656,14 @@ export const useStockStore = defineStore("stock", () => {
   function stopStockSync() {
     currentUnsubscribe?.();
     currentUnsubscribe = null;
+    loadedVideoId.value = "";
     stockData.value = {};
   }
 
   return {
     stopStockSync,
     stockData,
+    loadedVideoId,
     stockSize,
     totalSales,
     milestones,

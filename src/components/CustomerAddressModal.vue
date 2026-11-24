@@ -512,10 +512,10 @@ async function saveForm() {
   }
   updates[`address_book/${normKey.value}/addresses`] = currentList;
   updates[`address_book/${normKey.value}/name`] = cleanName;
-  if (formData.value.paymentType) {
-    updates[`address_book/${normKey.value}/paymentType`] = formData.value.paymentType;
+  if (formData.value.paymentType !== undefined) {
+    updates[`address_book/${normKey.value}/paymentType`] = formData.value.paymentType || "";
     if (props.addressBook && props.addressBook[normKey.value]) {
-      props.addressBook[normKey.value].paymentType = formData.value.paymentType;
+      props.addressBook[normKey.value].paymentType = formData.value.paymentType || "";
     }
   }
   if (formData.value.contactChannel !== undefined) {

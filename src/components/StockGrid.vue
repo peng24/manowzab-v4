@@ -799,7 +799,9 @@ function easeOutQuart(t) {
 function animateValue(fromVal, toVal, duration, onUpdate, onDone) {
   const startTime = performance.now();
   let frame = null;
+  let cancelled = false;
   function step(now) {
+    if (cancelled) return;
     const elapsed = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
     const easedProgress = easeOutQuart(progress);
@@ -808,15 +810,30 @@ function animateValue(fromVal, toVal, duration, onUpdate, onDone) {
     if (progress < 1) {
       frame = requestAnimationFrame(step);
     } else {
+      frame = null;
       if (onDone) onDone();
     }
   }
   frame = requestAnimationFrame(step);
-  return frame;
+  return {
+    cancel() {
+      cancelled = true;
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+        frame = null;
+      }
+    },
+  };
+}
+
+function cancelAnimHandle(handle) {
+  if (!handle) return;
+  if (typeof handle.cancel === "function") handle.cancel();
+  else cancelAnimationFrame(handle);
 }
 
 watch(soldCount, (newVal, oldVal) => {
-  if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
+  cancelAnimHandle(soldAnimFrame);
   const from = oldVal ?? 0;
   soldAnimFrame = animateValue(from, newVal, 500, (v) => {
     animatedSoldCount.value = v;
@@ -824,7 +841,7 @@ watch(soldCount, (newVal, oldVal) => {
 }, { immediate: true });
 
 watch(soldPercentage, (newVal, oldVal) => {
-  if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
+  cancelAnimHandle(pctAnimFrame);
   const from = oldVal ?? 0;
   // Trigger pulse effect without forcing synchronous layout reflow
   isPulsingPercent.value = true;
@@ -873,7 +890,7 @@ const isPulsingSales = ref(false);
 let pulsingSalesTimer = null;
 
 watch(totalSales, (newVal, oldVal) => {
-  if (salesAnimFrame) cancelAnimationFrame(salesAnimFrame);
+  cancelAnimHandle(salesAnimFrame);
   const from = oldVal ?? 0;
   isPulsingSales.value = true;
   if (pulsingSalesTimer) clearTimeout(pulsingSalesTimer);
@@ -887,9 +904,9 @@ watch(totalSales, (newVal, oldVal) => {
 }, { immediate: true });
 
 onUnmounted(() => {
-  if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
-  if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
-  if (salesAnimFrame) cancelAnimationFrame(salesAnimFrame);
+  cancelAnimHandle(soldAnimFrame);
+  cancelAnimHandle(pctAnimFrame);
+  cancelAnimHandle(salesAnimFrame);
   if (pulsingSalesTimer) clearTimeout(pulsingSalesTimer);
   // ✅ Cleanup cancelled & new item timers
   Object.values(cancelledTimers).forEach(t => clearTimeout(t));
@@ -1189,11 +1206,16 @@ async function showOwnerItems(ownerName) {
     });
   }
 
+  // ✅ Phase 4.1: Clean up any previously open owner modal BEFORE opening the new one
+  if (cleanupOwnerModal) {
+    cleanupOwnerModal();
+    cleanupOwnerModal = null;
+  }
+
   activeOwnerName.value = ownerName;
   pastItems.value = [];
 
-  // ✅ Phase 4.1: Reference สำหรับ cleanup listener & observer
-  cleanupOwnerModal = null;
+  let localCleanup = null;
 
   // เปิด Swal ขึ้นมาพร้อมหน้าตา Loading หรือข้อมูลเริ่มต้นทันที
   Swal.fire({
@@ -1207,8 +1229,8 @@ async function showOwnerItems(ownerName) {
     showCloseButton: true,
     width: 420,
     willClose: () => {
-      // ✅ Phase 4.1: Clean up observer & event listener explicitly on close
-      if (cleanupOwnerModal) cleanupOwnerModal();
+      // ✅ Phase 4.1: Clean up ONLY this modal's observer & event listener
+      if (localCleanup) localCleanup();
     },
     didOpen: () => {
 
@@ -1329,9 +1351,15 @@ async function showOwnerItems(ownerName) {
       const swalEl = Swal.getPopup();
       let observerTimeout = null;
 
-      cleanupOwnerModal = () => {
+      let observer = null;
+      let cleaned = false;
+      localCleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
         document.removeEventListener('remove-owner-item', handler);
-        activeOwnerName.value = null;
+        if (activeOwnerName.value === ownerName) {
+          activeOwnerName.value = null;
+        }
         if (observer) {
           observer.disconnect();
           observer = null;
@@ -1340,19 +1368,22 @@ async function showOwnerItems(ownerName) {
           clearTimeout(observerTimeout);
           observerTimeout = null;
         }
-        cleanupOwnerModal = null;
+        if (cleanupOwnerModal === localCleanup) {
+          cleanupOwnerModal = null;
+        }
       };
+      cleanupOwnerModal = localCleanup;
 
-      let observer = new MutationObserver(() => {
+      observer = new MutationObserver(() => {
         if (!document.contains(swalEl)) {
-          if (cleanupOwnerModal) cleanupOwnerModal();
+          localCleanup();
         }
       });
       observer.observe(document.body, { childList: true, subtree: true });
 
       // ✅ Phase 4.1: Safety timeout fallback (300,000ms = 5 mins) ป้องกัน observer ค้างใน Memory
       observerTimeout = setTimeout(() => {
-        if (cleanupOwnerModal) cleanupOwnerModal();
+        localCleanup();
       }, 300000);
 
     },
@@ -1390,6 +1421,7 @@ async function showOwnerItems(ownerName) {
       });
 
       await Promise.all(promises);
+      if (activeOwnerName.value !== ownerName) return;
       pastItems.value = fetchedPastItems;
       updateOwnerItemsModal();
     } catch (e) {
@@ -1640,7 +1672,15 @@ function dragStart(index) {
   draggingIndex = index;
 }
 function drop(index) {
+  if (draggingIndex === null || draggingIndex === index || draggingIndex < 0 || draggingIndex >= tempQueue.value.length) {
+    draggingIndex = null;
+    return;
+  }
   const itemToMove = tempQueue.value[draggingIndex];
+  if (!itemToMove) {
+    draggingIndex = null;
+    return;
+  }
   tempQueue.value.splice(draggingIndex, 1);
   tempQueue.value.splice(index, 0, itemToMove);
   draggingIndex = null;
@@ -1828,6 +1868,7 @@ async function saveQueueChanges(preventClose = false) {
       queue: null,
       time: null,
       source: null,
+      backdated: null,
     });
   }
 
@@ -1969,17 +2010,18 @@ async function refreshStock() {
   }
 }
 
-// ✅ Task 2: Real-time modal reactivity — auto-populate tempQueue on background CF
+// ✅ Task 2: Real-time modal reactivity — auto-populate tempQueue ONLY when a brand-new background CF arrives on THIS item
 watch(
-  () => stockStore.stockData,
-  (newVal) => {
+  () => (editingId.value ? stockStore.stockData?.[editingId.value]?.owner : null),
+  (newOwner, oldOwner) => {
     if (!showModal.value || !editingId.value) return;
+    // Only act on a genuine transition from vacant -> claimed (never restore an owner the admin intentionally removed)
+    if (!newOwner || oldOwner) return;
 
-    // Only act when the modal currently has NO owner (tempQueue empty)
     const hasLocalOwner = tempQueue.value.length > 0 && tempQueue.value[0].owner;
     if (hasLocalOwner) return;
 
-    const incomingItem = newVal[editingId.value];
+    const incomingItem = stockStore.stockData?.[editingId.value];
     if (!incomingItem || !incomingItem.owner) return;
 
     // A customer CF'd in the background while the modal was open — populate tempQueue
@@ -2003,7 +2045,6 @@ watch(
     // 🔊 Notify admin with SFX
     playSfx();
   },
-  { deep: true },
 );
 </script>
 

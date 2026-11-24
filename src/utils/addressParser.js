@@ -5,7 +5,7 @@ const MULTI_SPACE_REGEX = /\s+/g;
 const NON_DIGIT_REGEX = /\D/g;
 const PHONE_REGEX = /(?<!\d)(?:(?:\+66\s*|0)[689]\d[-. ]?\d{3,4}[-. ]?\d{3,4}|(?:\+66\s*|0)[2-57]\d?[-. ]?\d{3}[-. ]?\d{3,4}|\b0[689]\d{8}\b|\b0[2-7]\d{7,8}\b)(?!\d)/;
 const PHONE_LABEL_CLEAN_REGEX = /(?:^|\s)(?:เบอร์(?:\s*โทร)?|โทร(?:\.)?|Tel(?:\.)?|Phone(?:\.)?)[:\s-]*/gi;
-const ZIP_REGEX = /\b[1-9]\d{4}\b(?!\/|\d)/;
+const ZIP_REGEX = /(?<![\/\d])[1-9]\d{4}\b(?!\/|\d)/g;
 const LEADING_LIST_NUM_REGEX = /^\s*\d+[\.\)\-]\s*/;
 const ADDRESS_MARKER_REGEX = /^(?:\d+[\d\/\-\.]*|\b\d+\b(?=\s*(?:หมู่|ม\.|ซอย|ซ\.|ถนน|ถ\.|\/))|หมู่|ม\.|บ้านเลขที่|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|แขวง|เขต|กทม|ถ\.|ถนน|ซ\.|ซอย)/i;
 const ADDRESS_PREFIX_LABEL_REGEX = /^(?:ที่อยู่|ที่อยู่จัดส่ง|ส่งที่|Address)[:\s-]*/i;
@@ -82,11 +82,11 @@ export function extractPhone(text) {
 export function extractPostalCode(text) {
   if (!text) return { postalCode: '', cleanedText: '' };
 
-  // 5-digit postal code (Thai postal codes are 10000 - 96000), not followed by fraction / or digits
-  const match = text.match(ZIP_REGEX);
+  // 5-digit postal code (Thai postal codes are 10000 - 96000), preferring the trailing match
+  const matches = text.match(ZIP_REGEX);
 
-  if (match) {
-    return { postalCode: match[0], cleanedText: text };
+  if (matches && matches.length > 0) {
+    return { postalCode: matches[matches.length - 1], cleanedText: text };
   }
   return { postalCode: '', cleanedText: text };
 }
@@ -263,20 +263,38 @@ export function parseMultipleAddresses(fullText) {
 
     if (phoneIndices.length > 1) {
       const reconstructedBlocks = [];
-      let currentStartIndex = 0;
+      // Detect whether phone numbers appear at the END of each block (e.g. Name / Address / Phone)
+      const phoneAtEnd =
+        phoneIndices[0] >= 2 &&
+        (phoneIndices[0] + 1 < lines.length &&
+          !ADDRESS_MARKER_REGEX.test(lines[phoneIndices[0] + 1].replace(ADDRESS_PREFIX_LABEL_REGEX, '').trim()));
 
-      for (let i = 0; i < phoneIndices.length; i++) {
-        const phoneIdx = phoneIndices[i];
-        // Name is likely the line right before phone, or starting from previous end
-        const blockStart = (i === 0) ? 0 : Math.max(currentStartIndex, phoneIdx - 1);
-        const nextPhoneIdx = phoneIndices[i + 1];
-        const blockEnd = (nextPhoneIdx !== undefined) ? Math.max(blockStart + 1, nextPhoneIdx - 1) : lines.length;
-
-        const blockLines = lines.slice(blockStart, blockEnd);
-        if (blockLines.length > 0) {
-          reconstructedBlocks.push(blockLines.join('\n'));
+      if (phoneAtEnd) {
+        let startIdx = 0;
+        for (let i = 0; i < phoneIndices.length; i++) {
+          const endIdx = i === phoneIndices.length - 1 ? lines.length : phoneIndices[i] + 1;
+          const blockLines = lines.slice(startIdx, endIdx);
+          if (blockLines.length > 0) {
+            reconstructedBlocks.push(blockLines.join('\n'));
+          }
+          startIdx = endIdx;
         }
-        currentStartIndex = blockEnd;
+      } else {
+        let currentStartIndex = 0;
+
+        for (let i = 0; i < phoneIndices.length; i++) {
+          const phoneIdx = phoneIndices[i];
+          // Name is likely the line right before phone, or starting from previous end
+          const blockStart = (i === 0) ? 0 : Math.max(currentStartIndex, phoneIdx - 1);
+          const nextPhoneIdx = phoneIndices[i + 1];
+          const blockEnd = (nextPhoneIdx !== undefined) ? Math.max(blockStart + 1, nextPhoneIdx - 1) : lines.length;
+
+          const blockLines = lines.slice(blockStart, blockEnd);
+          if (blockLines.length > 0) {
+            reconstructedBlocks.push(blockLines.join('\n'));
+          }
+          currentStartIndex = blockEnd;
+        }
       }
 
       if (reconstructedBlocks.length > 1) {

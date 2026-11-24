@@ -44,12 +44,17 @@ let _liveAddressBook = null;
 let _deliveryCustomersCache = null;
 let _cacheTimestamp = 0;
 const CACHE_TTL = 3000;
+// 🛡️ Coalesce concurrent proxy UID creations for the same normalized name
+const _pendingProxyUids = new Map();
+const PENDING_PROXY_UID_TTL_MS = 15000;
 
 export function setLiveDeliveryCustomersCache(data) {
   _liveDeliveryCustomers = data || null;
   if (data) {
     _deliveryCustomersCache = data;
     _cacheTimestamp = Date.now();
+  } else {
+    _pendingProxyUids.clear();
   }
 }
 
@@ -100,9 +105,15 @@ export async function resolveDeliveryUid(uid, name) {
       );
     });
 
-    if (activeKey) return activeKey;
+    if (activeKey) {
+      if (normName) _pendingProxyUids.delete(normName);
+      return activeKey;
+    }
     const completedKey = Object.keys(data).find(key => data[key] && normalizeCustomerName(data[key].name) === normName);
-    if (completedKey) return completedKey;
+    if (completedKey) {
+      if (normName) _pendingProxyUids.delete(normName);
+      return completedKey;
+    }
   } catch (e) {
     logger.warn("resolveDeliveryUid name search error:", e);
   }
@@ -112,13 +123,25 @@ export async function resolveDeliveryUid(uid, name) {
     return uid;
   }
 
+  // Coalesce concurrent bookings/shipping commands for the same new proxy customer
+  const now = Date.now();
+  if (normName) {
+    const existingPending = _pendingProxyUids.get(normName);
+    if (existingPending && now - existingPending.ts < PENDING_PROXY_UID_TTL_MS) {
+      return existingPending.key;
+    }
+  }
+
   // Otherwise, create a clean unique key for proxy user
-  return (
+  const newKey =
     "customer-" +
-    Date.now() +
+    now +
     "-" +
-    Math.random().toString(36).substring(2, 5)
-  );
+    Math.random().toString(36).substring(2, 5);
+  if (normName) {
+    _pendingProxyUids.set(normName, { key: newKey, ts: now });
+  }
+  return newKey;
 }
 
 /**

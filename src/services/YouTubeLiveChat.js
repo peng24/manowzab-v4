@@ -4,11 +4,13 @@ import { parseYouTubeEmotesToRuns, hasYouTubeEmotes } from "../data/youtubeEmote
 export class YouTubeLiveChat {
   constructor(apiKeys, initialKeyIndex = 0) {
     this.apiKeys = Array.isArray(apiKeys) ? apiKeys : [apiKeys];
-    this.currentKeyIndex = initialKeyIndex % this.apiKeys.length;
+    const safeInitial = Number.isFinite(initialKeyIndex) && initialKeyIndex >= 0 ? initialKeyIndex : 0;
+    this.currentKeyIndex = this.apiKeys.length > 0 ? safeInitial % this.apiKeys.length : 0;
     this.liveChatId = null;
     this.nextPageToken = null;
     this.pollingInterval = 5000;
     this.isPolling = false;
+    this.pollGeneration = 0;
     this.seenIds = new Set();
     this.timeoutId = null;
     this.onMessage = null; // Callback function
@@ -90,14 +92,20 @@ export class YouTubeLiveChat {
   async startPolling(videoId, callback) {
     if (this.isPolling) return;
 
+    const gen = ++this.pollGeneration;
+    this.nextPageToken = null;
+    this.retryCount = 0;
+    this.wasInErrorState = false;
+
     try {
       if (!this.liveChatId) {
         await this.fetchLiveChatId(videoId);
       }
+      if (gen !== this.pollGeneration) return;
 
       this.isPolling = true;
       this.onMessage = callback;
-      this.loadChat();
+      this.loadChat(0, gen);
     } catch (error) {
       logger.error("Failed to start polling:", error);
       if (this.onError) this.onError(error);
@@ -106,7 +114,12 @@ export class YouTubeLiveChat {
   }
 
   stopPolling() {
+    this.pollGeneration++;
     this.isPolling = false;
+    this.liveChatId = null;
+    this.nextPageToken = null;
+    this.retryCount = 0;
+    this.wasInErrorState = false;
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
@@ -116,8 +129,8 @@ export class YouTubeLiveChat {
   /**
    * Main Polling Loop (Renamed to loadChat as per requirements)
    */
-  async loadChat(_rotationAttempts = 0) {
-    if (!this.isPolling || !this.liveChatId) return;
+  async loadChat(_rotationAttempts = 0, _gen = this.pollGeneration) {
+    if (!this.isPolling || !this.liveChatId || _gen !== this.pollGeneration) return;
 
     const url = new URL(
       "https://www.googleapis.com/youtube/v3/liveChat/messages",
@@ -134,6 +147,7 @@ export class YouTubeLiveChat {
     try {
       const response = await fetch(url.toString());
       const data = await response.json();
+      if (!this.isPolling || _gen !== this.pollGeneration) return;
 
       if (data.error) {
         logger.error(
@@ -152,7 +166,7 @@ export class YouTubeLiveChat {
         if (shouldRotate && _rotationAttempts < this.apiKeys.length - 1) {
           this.rotateKey();
           // Retry immediately with new key
-          this.loadChat(_rotationAttempts + 1);
+          this.loadChat(_rotationAttempts + 1, _gen);
           return;
         } else if (!shouldRotate) {
           logger.warn(
@@ -182,7 +196,9 @@ export class YouTubeLiveChat {
         logger.warn(
           `Retry ${this.retryCount}/${this.maxRetries} in ${(backoffDelay / 1000).toFixed(0)}s...`,
         );
-        this.timeoutId = setTimeout(() => this.loadChat(), backoffDelay);
+        if (this.isPolling && _gen === this.pollGeneration) {
+          this.timeoutId = setTimeout(() => this.loadChat(0, _gen), backoffDelay);
+        }
         return;
       }
 
@@ -269,14 +285,16 @@ export class YouTubeLiveChat {
         this.baseRetryDelay * Math.pow(2, this.retryCount - 1),
         this.maxRetryDelay,
       );
-      this.timeoutId = setTimeout(() => this.loadChat(), backoffDelay);
+      if (this.isPolling && _gen === this.pollGeneration) {
+        this.timeoutId = setTimeout(() => this.loadChat(0, _gen), backoffDelay);
+      }
       return;
     }
 
     // Schedule next poll
-    if (this.isPolling) {
+    if (this.isPolling && _gen === this.pollGeneration) {
       this.timeoutId = setTimeout(
-        () => this.loadChat(),
+        () => this.loadChat(0, _gen),
         Math.max(this.pollingInterval, 1000),
       );
     }

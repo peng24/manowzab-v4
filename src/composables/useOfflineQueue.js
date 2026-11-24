@@ -6,6 +6,7 @@ const isOnline = ref(navigator.onLine);
 const pendingQueue = ref(loadQueue());
 let sequenceCounter = 0;
 let isFlushing = false;
+let defaultProcessor = null;
 
 function loadQueue() {
   try {
@@ -25,11 +26,21 @@ function saveQueue(queue) {
   }
 }
 
-export function useOfflineQueue() {
+export function useOfflineQueue(processorFn = null) {
+  if (typeof processorFn === "function") {
+    defaultProcessor = processorFn;
+  }
+
+  function setProcessor(fn) {
+    defaultProcessor = typeof fn === "function" ? fn : null;
+  }
+
   function handleOnline() {
     isOnline.value = true;
     logger.log("🌐 Connection restored (Online). Processing offline queue...");
-    flushQueue();
+    if (defaultProcessor) {
+      flushQueue(defaultProcessor);
+    }
   }
 
   function handleOffline() {
@@ -66,8 +77,8 @@ export function useOfflineQueue() {
     pendingQueue.value.push(actionItem);
     saveQueue(pendingQueue.value);
 
-    if (isOnline.value) {
-      flushQueue();
+    if (isOnline.value && defaultProcessor) {
+      flushQueue(defaultProcessor);
     }
   }
 
@@ -75,26 +86,30 @@ export function useOfflineQueue() {
    * Flush pending offline actions sequentially
    * @param {Function} processor Async callback to process each item
    */
-  async function flushQueue(processor) {
+  async function flushQueue(processor = defaultProcessor) {
+    if (typeof processor !== "function") return;
     if (pendingQueue.value.length === 0 || !isOnline.value || isFlushing) return;
     isFlushing = true;
     try {
-      // Sort by sequenceId and timestamp to guarantee strictly ordered execution
-      pendingQueue.value.sort((a, b) => a.timestamp - b.timestamp || a.sequenceId - b.sequenceId);
+      while (pendingQueue.value.length > 0 && isOnline.value) {
+        // Sort by sequenceId and timestamp to guarantee strictly ordered execution
+        pendingQueue.value.sort((a, b) => a.timestamp - b.timestamp || a.sequenceId - b.sequenceId);
 
-      const queueCopy = [...pendingQueue.value];
-      for (const item of queueCopy) {
-        try {
-          if (processor) {
+        const queueCopy = [...pendingQueue.value];
+        let failed = false;
+        for (const item of queueCopy) {
+          try {
             await processor(item);
+            // Remove processed item only after processor succeeds
+            pendingQueue.value = pendingQueue.value.filter((i) => i.id !== item.id);
+            saveQueue(pendingQueue.value);
+          } catch (err) {
+            logger.error(`Error flushing offline item ${item.id}:`, err);
+            failed = true;
+            break; // Stop on first failure to prevent out-of-order processing
           }
-          // Remove processed item
-          pendingQueue.value = pendingQueue.value.filter((i) => i.id !== item.id);
-          saveQueue(pendingQueue.value);
-        } catch (err) {
-          logger.error(`Error flushing offline item ${item.id}:`, err);
-          break; // Stop on first failure to prevent out-of-order processing
         }
+        if (failed) break;
       }
     } finally {
       isFlushing = false;
@@ -105,6 +120,7 @@ export function useOfflineQueue() {
     isOnline,
     pendingQueue,
     enqueueAction,
-    flushQueue
+    flushQueue,
+    setProcessor,
   };
 }

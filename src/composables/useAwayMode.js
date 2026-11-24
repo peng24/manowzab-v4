@@ -26,7 +26,7 @@ export function useAwayMode() {
             return;
         }
 
-        const diff = Math.floor((Date.now() - awayStartTime) / 1000);
+        const diff = Math.max(0, Math.floor((Date.now() - awayStartTime) / 1000));
         const hours = Math.floor(diff / 3600);
         const minutes = Math.floor((diff % 3600) / 60);
         const seconds = diff % 60;
@@ -102,8 +102,25 @@ export function useAwayMode() {
             }
         });
 
-        activeAwayUnsubscribe = unsubscribe;
-        return unsubscribe; // Return unsubscribe function if needed
+        const cleanup = () => {
+            try {
+                unsubscribe();
+            } catch (e) {}
+            if (activeAwayUnsubscribe === cleanup) {
+                activeAwayUnsubscribe = null;
+            }
+            if (awayInterval) {
+                clearInterval(awayInterval);
+                awayInterval = null;
+            }
+            localIsAwayState = false;
+            systemStore.isAway = false;
+            awayStartTime = 0;
+            awayTimer.value = "00:00";
+        };
+
+        activeAwayUnsubscribe = cleanup;
+        return cleanup; // Return full cleanup function
     }
 
     // Auto cleanup interval when component using this composable is unmounted

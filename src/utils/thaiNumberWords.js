@@ -84,11 +84,38 @@ export function numberToThaiWords(num) {
  * @param {string} text
  * @returns {string}
  */
+const PHONE_ONLY_REGEX = /0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{3,4}/g;
+
 export function replaceNumbersWithThaiWords(text) {
   if (!text) return "";
 
   // 1. Normalize Thai digits (๑, ๒, ...) to Arabic digits (1, 2, ...)
   let result = thaiToArabic(String(text));
+
+  // 1b. Protect Thai phone numbers BEFORE laughter/slash/number replacements (so "081-555-1234" isn't turned into "081-ฮ่าๆๆ-...")
+  // Use alphabetic token index (NO digits) so subsequent digit-to-Thai conversion never mutates the placeholder!
+  const toAlphaIdx = (n) => {
+    let s = "";
+    let v = n;
+    do {
+      s = String.fromCharCode(65 + (v % 26)) + s;
+      v = Math.floor(v / 26) - 1;
+    } while (v >= 0);
+    return s;
+  };
+  const fromAlphaIdx = (s) => {
+    let n = 0;
+    for (let i = 0; i < s.length; i++) {
+      n = n * 26 + (s.charCodeAt(i) - 64);
+    }
+    return n - 1;
+  };
+  const protectedPhones = [];
+  result = result.replace(PHONE_ONLY_REGEX, (phone) => {
+    const token = `\uE000PHONE_${toAlphaIdx(protectedPhones.length)}\uE001`;
+    protectedPhones.push(phone);
+    return token;
+  });
 
   // 2. Handle Thai chat laughter 555+ -> ฮ่าๆๆ
   result = result.replace(LAUGHTER_REGEX, "ฮ่าๆๆ");
@@ -120,6 +147,10 @@ export function replaceNumbersWithThaiWords(text) {
 
     return numberToThaiWords(num);
   });
+
+  if (protectedPhones.length > 0) {
+    result = result.replace(/\uE000PHONE_([A-Z]+)\uE001/g, (_, alpha) => protectedPhones[fromAlphaIdx(alpha)] || "");
+  }
 
   return result;
 }

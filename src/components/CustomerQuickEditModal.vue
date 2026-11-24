@@ -533,7 +533,10 @@ async function save() {
 
   const trimmedNick = formData.value.nickname.trim();
   const rawReal = realNameStr.value;
-  const targetUid = currentChat.value.uid || rawReal || trimmedNick;
+  // Capture original displayName & uid BEFORE mutating chatStore.messages in-place!
+  const originalDisplayName = currentChat.value.displayName || "";
+  const originalUid = currentChat.value.uid || null;
+  const targetUid = originalUid || rawReal || trimmedNick;
   if (!targetUid && !trimmedNick) {
     close();
     return;
@@ -552,7 +555,7 @@ async function save() {
       updatedAt: timestamp,
     };
 
-    if (currentChat.value.uid && rawReal && currentChat.value.uid !== rawReal) {
+    if (originalUid && rawReal && originalUid !== rawReal) {
       const safeReal = sanitizeDbKey(rawReal);
       if (safeReal !== safeTargetUid) {
         multiPathUpdates[`nicknames/${safeReal}`] = {
@@ -563,15 +566,13 @@ async function save() {
       }
     }
 
-    // Instant local memory update for all chat rows
+    // Instant local memory update for matching chat rows (never match null === null!)
     if (chatStore.messages) {
       chatStore.messages.forEach((m) => {
-        if (
-          m.uid === currentChat.value.uid ||
-          m.realName === rawReal ||
-          m.authorName === rawReal ||
-          m.displayName === currentChat.value.displayName
-        ) {
+        const matchesUid = Boolean(originalUid && m.uid && m.uid === originalUid);
+        const matchesReal = Boolean(rawReal && (m.realName === rawReal || m.authorName === rawReal));
+        const matchesDisplay = Boolean(originalDisplayName && m.displayName === originalDisplayName);
+        if (matchesUid || matchesReal || matchesDisplay) {
           m.displayName = trimmedNick;
         }
       });
@@ -579,7 +580,7 @@ async function save() {
   }
 
   // 2. Prepare Address, Contact Channel & Payment Type
-  const primaryName = trimmedNick || currentChat.value.displayName || rawReal;
+  const primaryName = trimmedNick || originalDisplayName || rawReal;
   const normKey = normalizeName(primaryName).replace(/[.#$[\]/]/g, "_");
   const cleanAddress = formData.value.address.trim();
   let phoneVal = formData.value.phone.trim();
@@ -690,10 +691,10 @@ async function save() {
       console.warn("CustomerQuickEditModal: Failed to fetch stock snapshot, falling back to local:", e);
     }
 
-    const oldDisplayName = currentChat.value.displayName;
+    const oldDisplayName = originalDisplayName;
     const chatAuthor = currentChat.value.authorName;
     const chatReal = currentChat.value.realName;
-    const chatUid = currentChat.value.uid;
+    const chatUid = originalUid;
 
     const matchCandidates = [
       oldDisplayName,
@@ -735,9 +736,11 @@ async function save() {
       let newQueue = null;
 
       // Check main owner
+      let ownerChanged = false;
       if (item.owner && item.owner !== trimmedNick && isCustomerMatch(item.owner, item.uid)) {
         multiPathUpdates[`stock/${targetVideoId}/${num}/owner`] = trimmedNick;
         itemChanged = true;
+        ownerChanged = true;
       }
 
       // Check reservation queue
@@ -761,7 +764,7 @@ async function save() {
 
       if (itemChanged) {
         updatedStockCount++;
-        affectedStockItems.push({ num, newQueue });
+        affectedStockItems.push({ num, ownerChanged, newQueue });
       }
     });
   }
@@ -769,12 +772,12 @@ async function save() {
   try {
     await update(dbRef(db), multiPathUpdates);
 
-    // Local memory update for stock items
+    // Local memory update for stock items (only update owner when owner actually matched!)
     if (trimmedNick && affectedStockItems.length > 0 && stockStore.stockData) {
-      affectedStockItems.forEach(({ num, newQueue }) => {
+      affectedStockItems.forEach(({ num, ownerChanged, newQueue }) => {
         const item = stockStore.stockData[num];
         if (item) {
-          if (item.owner && item.owner !== trimmedNick) {
+          if (ownerChanged && item.owner && item.owner !== trimmedNick) {
             item.owner = trimmedNick;
           }
           if (newQueue) {
@@ -789,7 +792,7 @@ async function save() {
       syncDeliveryCustomerForOwner(trimmedNick, targetUid, targetVideoId).catch((e) =>
         console.warn("Delivery sync error for new name:", e)
       );
-      const oldName = currentChat.value.displayName;
+      const oldName = originalDisplayName;
       if (oldName && oldName !== trimmedNick) {
         syncDeliveryCustomerForOwner(oldName, targetUid, targetVideoId).catch((e) =>
           console.warn("Delivery sync error for old name:", e)

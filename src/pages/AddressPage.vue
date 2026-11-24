@@ -306,7 +306,12 @@
       <CustomerQuickEditModal ref="quickEditModalRef" />
 
       <!-- 📥 Modal นำเข้าที่อยู่จาก Note / แชท -->
-      <AddressImportModal v-if="showImportModal" @close="showImportModal = false" />
+      <AddressImportModal
+        v-if="showImportModal"
+        :customers="allCustomers"
+        :addressBook="addressBook"
+        @close="showImportModal = false"
+      />
     </template>
   </div>
 </template>
@@ -624,39 +629,48 @@ async function confirmDeleteCustomer(cust) {
     try {
       const multiPathUpdates = {};
       const norm = normalizeName(cust.name);
+      const safeNorm = norm ? norm.replace(/[.#$[\]/]/g, "_") : "";
 
-      // 1. ลบจาก address_book (ทุก key ที่ตรงกับลูกค้ารายนี้)
+      // 1. ลบจาก address_book เท่านั้น (ป้องกัน Firebase invalid key จากจุด/สัญลักษณ์)
       if (Array.isArray(cust.addressBookKeys) && cust.addressBookKeys.length > 0) {
         cust.addressBookKeys.forEach((key) => {
-          multiPathUpdates[`address_book/${key}`] = null;
+          if (key && !/[.#$[\]/]/.test(key)) {
+            multiPathUpdates[`address_book/${key}`] = null;
+          }
         });
       }
-      if (cust.normKey) {
+      if (cust.normKey && !/[.#$[\]/]/.test(cust.normKey)) {
         multiPathUpdates[`address_book/${cust.normKey}`] = null;
       }
-      if (norm) {
-        multiPathUpdates[`address_book/${norm}`] = null;
-        multiPathUpdates[`address_book/${norm.replace(/[.#$[\]/]/g, "_")}`] = null;
+      if (safeNorm) {
+        multiPathUpdates[`address_book/${safeNorm}`] = null;
       }
       Object.entries(addressBook.value || {}).forEach(([k, b]) => {
-        if (b && (normalizeName(b.name || "") === norm || normalizeName(k) === norm)) {
+        if (b && (normalizeName(b.name || "") === norm || normalizeName(k) === norm) && !/[.#$[\]/]/.test(k)) {
           multiPathUpdates[`address_book/${k}`] = null;
         }
       });
 
-      // 2. ลบจาก delivery_customers (ทุก id ที่ตรงกับลูกค้ารายนี้)
+      // 2. เคลียร์เฉพาะข้อมูลที่อยู่ใน delivery_customers (ห้ามลบ record ลูกค้า เพื่อรักษายอดจองและประวัติสะสม 100%)
+      const clearAddressFields = (id) => {
+        multiPathUpdates[`delivery_customers/${id}/address`] = "";
+        multiPathUpdates[`delivery_customers/${id}/phone`] = "";
+        multiPathUpdates[`delivery_customers/${id}/postalCode`] = "";
+        multiPathUpdates[`delivery_customers/${id}/recipientName`] = "";
+        multiPathUpdates[`delivery_customers/${id}/addresses`] = null;
+        multiPathUpdates[`delivery_customers/${id}/selectedAddressId`] = null;
+        multiPathUpdates[`delivery_customers/${id}/updatedAt`] = Date.now();
+      };
       if (Array.isArray(cust.deliveryIds) && cust.deliveryIds.length > 0) {
-        cust.deliveryIds.forEach((id) => {
-          multiPathUpdates[`delivery_customers/${id}`] = null;
-        });
+        cust.deliveryIds.forEach((id) => clearAddressFields(id));
       }
       Object.entries(deliveryCustomers.value || {}).forEach(([id, c]) => {
         if (c && (normalizeName(c.name || "") === norm || normalizeName(id) === norm)) {
-          multiPathUpdates[`delivery_customers/${id}`] = null;
+          clearAddressFields(id);
         }
       });
 
-      // 3. ดำเนินการลบแบบ Atomic Multi-Path Update พร้อมกันทั้งหมด
+      // 3. ดำเนินการลบที่อยู่แบบ Atomic Multi-Path Update (ไม่ลบข้อมูลการจองลูกค้า)
       await update(dbRef(db), multiPathUpdates);
 
       Swal.fire({
@@ -743,12 +757,20 @@ function refreshData() {
   }, 400);
 }
 
-// Global Keyboard Shortcut: '/' to focus search
+// Global Keyboard Shortcut: '/' to focus search (never hijack typing inside inputs/modals)
 function handleKeydown(e) {
-  if (e.key === "/" && document.activeElement !== searchInputRef.value) {
+  const activeEl = document.activeElement;
+  const isTyping =
+    activeEl &&
+    (activeEl.tagName === "INPUT" ||
+      activeEl.tagName === "TEXTAREA" ||
+      activeEl.tagName === "SELECT" ||
+      activeEl.isContentEditable);
+
+  if (e.key === "/" && !isTyping && activeEl !== searchInputRef.value) {
     e.preventDefault();
     searchInputRef.value?.focus();
-  } else if (e.key === "Escape" && document.activeElement === searchInputRef.value) {
+  } else if (e.key === "Escape" && activeEl === searchInputRef.value) {
     searchQuery.value = "";
     searchInputRef.value?.blur();
   }

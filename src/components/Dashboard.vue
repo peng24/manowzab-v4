@@ -124,7 +124,6 @@
                   </span>
                 </div>
               </td>
-              <td style="font-size: 0.9em">{{ item.itemsText }}</td>
               <td style="text-align: center">
                 <button
                   class="btn-icon-chat"
@@ -134,6 +133,7 @@
                   <i class="fa-solid fa-comments"></i>
                 </button>
               </td>
+              <td style="font-size: 0.9em">{{ item.itemsText }}</td>
               <td style="color: #ffd700; font-weight: bold">
                 ฿{{ item.totalPrice.toLocaleString() }}
               </td>
@@ -267,8 +267,8 @@ const customerOrders = computed(() => {
       const normName = normalizeCustomerName(item.owner);
       const delivery = deliveryByName.value[normName];
       if (!isOutstandingBooking(delivery?.sessions?.[systemStore.currentVideoId], num, item)) return;
-      // Group key: Use normalized customer name so ALL items of this person merge into one order!
-      const groupKey = normName ? `name:${normName}` : (item.uid || `box-${num}`);
+      // Group key: Use sanitized normalized customer name so ALL items of this person merge safely into one valid Firebase key!
+      const groupKey = normName ? `name:${sanitizeDbKey(normName)}` : (item.uid ? sanitizeDbKey(item.uid) : `box-${num}`);
 
       if (!orders[groupKey]) {
         orders[groupKey] = {
@@ -471,14 +471,20 @@ async function addToShipping() {
 
   // 1. Mark ready in shipping (system/shipping)
   try {
+    const safeShippingUid = sanitizeDbKey(shippingUid);
+    const safeGroupKey = sanitizeDbKey(groupKey);
     const updates = {};
-    updates[`system/shipping/${videoId}/${shippingUid}/ready`] = true;
-    updates[`system/shipping/${videoId}/${shippingUid}/timestamp`] = Date.now();
-    if (groupKey && groupKey !== shippingUid) {
-      updates[`system/shipping/${videoId}/${groupKey}/ready`] = true;
-      updates[`system/shipping/${videoId}/${groupKey}/timestamp`] = Date.now();
+    if (safeShippingUid) {
+      updates[`system/shipping/${videoId}/${safeShippingUid}/ready`] = true;
+      updates[`system/shipping/${videoId}/${safeShippingUid}/timestamp`] = Date.now();
     }
-    await update(dbRef(db), updates);
+    if (safeGroupKey && safeGroupKey !== safeShippingUid) {
+      updates[`system/shipping/${videoId}/${safeGroupKey}/ready`] = true;
+      updates[`system/shipping/${videoId}/${safeGroupKey}/timestamp`] = Date.now();
+    }
+    if (Object.keys(updates).length > 0) {
+      await update(dbRef(db), updates);
+    }
   } catch (err) {
     logger.warn("Shipping mark ready error:", err);
   }
@@ -549,15 +555,18 @@ function removeFromShipping(uid) {
       const order = customerOrders.value[uid];
       const videoId = systemStore.currentVideoId;
       const updates = {};
-      updates[`system/shipping/${videoId}/${uid}/ready`] = null;
+      const safeUid = sanitizeDbKey(uid);
+      if (safeUid) updates[`system/shipping/${videoId}/${safeUid}/ready`] = null;
       if (order?.uid && order.uid !== uid) {
-        updates[`system/shipping/${videoId}/${order.uid}/ready`] = null;
+        const safeOrderUid = sanitizeDbKey(order.uid);
+        if (safeOrderUid) updates[`system/shipping/${videoId}/${safeOrderUid}/ready`] = null;
       }
       if (order?.name) {
         const normName = normalizeCustomerName(order.name);
-        Object.values(stockStore.stockData).forEach((item) => {
+        Object.values(stockStore.stockData || {}).forEach((item) => {
           if (item && normalizeCustomerName(item.owner) === normName && item.uid) {
-            updates[`system/shipping/${videoId}/${item.uid}/ready`] = null;
+            const safeItemUid = sanitizeDbKey(item.uid);
+            if (safeItemUid) updates[`system/shipping/${videoId}/${safeItemUid}/ready`] = null;
           }
         });
       }

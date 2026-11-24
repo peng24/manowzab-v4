@@ -1,7 +1,7 @@
 # Manowzab Command Center Project Rules
 
 ### 📌 กฎเหล็กประจำระบบ: ห้ามทำอะไร (DO NOT) & ให้ทำอะไร (MUST DO)
-*(อัปเดตล่าสุด: 17 พ.ย. 69 — ปฏิบัติตามอย่างเคร่งครัดและอัปเดตต่อเนื่องทุกครั้งที่มีการเปลี่ยนแปลง)*
+*(อัปเดตล่าสุด: 24 พ.ย. 69 — ปฏิบัติตามอย่างเคร่งครัดและอัปเดตต่อเนื่องทุกครั้งที่มีการเปลี่ยนแปลง)*
 
 #### 🚫 สิ่งที่ห้ามทำเด็ดขาด (DO NOT / NEVER)
 1. **ห้ามส่งเสียงราคา และห้ามประกาศราคาลงช่องแชท (Zero Price TTS & Zero Chat Invariant):**
@@ -55,6 +55,10 @@
 10. **มาตรฐานสีการ์ดสต็อกและช่องแชทแบบผสม (Deep Crimson Stock Cards, Background-Free Numbers & Hybrid Chat UI):**
    - **การ์ดสต็อก (`StockItemCard.vue`, `HistoryModal.vue`):** รายการที่ **จองแล้ว** ใช้สีแดงเข้มโทนอุ่นสบายตา (`rgba(185, 28, 28, 0.42)` ➔ `rgba(69, 10, 10, 0.88)`) ขอบทึบ `rgba(248, 113, 113, 0.65)` ส่วนรายการ **ว่าง** ใช้พื้นมืดจมตัวขอบเส้นประ `1.5px dashed`; ทั้ง **เลขรายการ** (`.stock-num`) และ **เลขราคา** (`.stock-price-pill`) ต้อง **ไม่มีพื้นหลังกล่อง** (`background: transparent; border: none;`) และป้องกันการลากคลุมสีฟ้า (`user-select: none`) บน `.header`, `.stock-panel`, `.stock-item`, `.grid-item` (คง `user-select: text` ให้ `input`/`textarea`)
    - **ช่องแชทแบบผสม Hybrid (`ChatPanel.vue`, `style.css`):** ใช้การ์ดชั้นเดียวไร้กรอบซ้อน (`.chat-bubble` โปร่งใส), แถบแท็บ 7 ปุ่มพอดีไม่ล้นขอบขวา, แชทลูกค้าใช้พื้นหลังไล่สีประจำตัว **360 องศา (`getCustomerRowColor`)** เพื่อแยกตัวบุคคลชัดเจน ส่วนคำสั่งสำคัญแยกด้วย **ขอบและแถบซ้าย `4.5px` + ป้ายใต้รูป** (`#10b981` จอง, `#a855f7` ส่ง, `#f43f5e` ยกเลิกพร้อมพื้นแดงเตือนภัย, และการ์ดแอดมินสีทองพร้อมแถบซ้ายตามคำสั่ง)
+11. **ความปลอดภัยข้อมูล Firebase, Race Condition & Print XSS (`v5.7.7+` Audit Invariants):**
+   - **Empty VideoId & Load-Gated Reconciliation (`stock.js`, `useDeliveryReconciliation.js`):** ห้าม `remove()`/`runTransaction()`/`set()` บน `stock/${videoId}` เมื่อ `videoId` ว่าง, capture `videoId` ก่อน `await` ทุกครั้ง, และรอ `stockStore.loadedVideoId === currentVideoId` ก่อน reconcile เพื่อไม่ให้สต็อกที่ยังไม่โหลดไปทับยอดลูกค้าเป็น 0; ใช้ `_pendingProxyUids` รวม concurrent proxy bookings ของลูกค้ารายใหม่
+   - **Sanitized Keys, Print XSS & Lifecycle (`blacklist.js`, `ShippingLabelModal.vue`, `YouTubeLiveChat.js`, `thaiNumberWords.js`, `useOfflineQueue.js`):** ต้องใช้ `sanitizeDbKey()` ก่อนเขียน path Firebase ทุกจุด, `escapeHtml()` ทุกฟิลด์ก่อน `doc.write()` ในใบปะหน้า, ใช้ `pollGeneration` + ล้าง `liveChatId`/`nextPageToken` ตอน `stopPolling()`, ใช้ placeholder ไร้ตัวเลขปกป้องเบอร์โทรที่มี `555` ใน `thaiNumberWords.js`, และห้ามลบรายการออกจาก `useOfflineQueue` เมื่อไม่มี processor
+   - **AI Price Detector Integrity (`live-product-capture-ai`):** ข้าม `update_history_totals` เมื่อ `get_stock_snapshot()` เป็น `None`, ห้ามรีเซ็ต `totalSales`/`totalItems` เป็น `0` เมื่อ GET พลาดหรือมีข้อมูลเดิม, ค้นหาวันที่ย้อนหลังครบทั้ง 12 เดือนด้วยขอบเขต `(?<!\d)` และ regex YouTube ID `^[a-zA-Z0-9_-]{11}$`, ล้าง `recent_texts` เมื่อเปลี่ยนรายการ (`set_item`), กัน `trailing_text` ไม่ให้ล็อกราคาประโยคไร้ตัวเลข, และกัน `ChromeCaptionReader` ไม่ให้จับหน้าต่างเบราว์เซอร์หลัก (`- Google Chrome`)
 
 
 ## 🔊 Audio and TTS Sync Invariant

@@ -439,7 +439,9 @@ export class TextToSpeech {
           } catch(e) {}
           this.currentSource = null;
         }
-        window.speechSynthesis.cancel();
+        if (typeof window !== "undefined") {
+          window.speechSynthesis?.cancel();
+        }
 
         // ✅ Resolve pending Promise before moving on (prevents outer queue deadlock)
         if (this._currentOnComplete) {
@@ -466,7 +468,9 @@ export class TextToSpeech {
       this.speakingCheckRetries = (this.speakingCheckRetries || 0) + 1;
       if (this.speakingCheckRetries > 20) {
         logger.warn("SpeechSynthesis stuck in speaking state for >2s — force cancelling");
-        window.speechSynthesis.cancel();
+        if (typeof window !== "undefined") {
+          window.speechSynthesis?.cancel();
+        }
         this.speakingCheckRetries = 0;
       } else {
         setTimeout(() => this.processQueue(), 100);
@@ -592,7 +596,9 @@ export class TextToSpeech {
     }
 
     // Stop native speech synthesis
-    window.speechSynthesis.cancel();
+    if (typeof window !== "undefined") {
+      window.speechSynthesis?.cancel();
+    }
 
     // Clear queue and state — resolve any pending onComplete callbacks
     this.queue.forEach((item) => {

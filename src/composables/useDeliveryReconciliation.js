@@ -27,12 +27,12 @@ export function deliverySyncPlan(stock, customers, videoId) {
   return owners;
 }
 
-export function useDeliveryReconciliation({ stock, customers, videoId, authorized, sync, delay = 1000 }) {
+export function useDeliveryReconciliation({ stock, customers, videoId, authorized, sync, stockLoaded = () => true, delay = 1000 }) {
   const plan = computed(() => deliverySyncPlan(stock(), customers(), videoId()));
   let previous = new Map();
   let previousVideo = null;
-  return watch([plan, videoId, authorized], ([next, video, allowed], _old, onCleanup) => {
-    if (!allowed || !video || video === 'demo') {
+  return watch([plan, videoId, authorized, stockLoaded], ([next, video, allowed, loaded], _old, onCleanup) => {
+    if (!allowed || !video || video === 'demo' || !loaded) {
       previous = new Map();
       previousVideo = null;
       return;

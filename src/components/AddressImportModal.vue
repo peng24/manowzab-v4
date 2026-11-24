@@ -208,36 +208,42 @@ async function saveAllAddresses() {
     const multiPathUpdates = {};
     const timestamp = Date.now();
 
+    const batchAddressesByKey = new Map();
+
     toSave.forEach((entry) => {
       const cleanName = entry.name.trim();
       const normKey = normalizeName(cleanName).replace(/[.#$[\]/]/g, "_");
       const recName = (entry.recipientName || "").trim();
       const newAddrId = "addr_" + timestamp + "_" + Math.random().toString(36).substring(2, 6);
 
-      // Check existing addresses in customer or address book
+      // Check existing addresses in same batch first, then customer or address book
       const matched = getMatchedCustomer(cleanName);
-      const existingInCust = matched?.addresses;
-      const existingInBook = props.addressBook && props.addressBook[normKey]?.addresses;
-      const rawExisting = existingInCust || existingInBook;
       let existingList = [];
-
-      if (Array.isArray(rawExisting)) {
-        existingList = [...rawExisting].filter(Boolean);
-      } else if (rawExisting && typeof rawExisting === "object") {
-        existingList = Object.values(rawExisting).filter(Boolean);
+      if (batchAddressesByKey.has(normKey)) {
+        existingList = [...batchAddressesByKey.get(normKey)];
       } else {
-        // Fallback: check if single address existed before
-        const singleOldAddr = matched?.address || (props.addressBook && props.addressBook[normKey]?.address);
-        if (singleOldAddr && singleOldAddr.trim()) {
-          existingList.push({
-            id: matched?.selectedAddressId || "addr_prev_" + timestamp,
-            label: "ที่อยู่ 1",
-            recipientName: matched?.recipientName || props.addressBook?.[normKey]?.recipientName || cleanName,
-            phone: matched?.phone || props.addressBook?.[normKey]?.phone || "",
-            address: singleOldAddr.trim(),
-            postalCode: matched?.postalCode || props.addressBook?.[normKey]?.postalCode || "",
-            paymentType: matched?.paymentType || "",
-          });
+        const existingInCust = matched?.addresses;
+        const existingInBook = props.addressBook && props.addressBook[normKey]?.addresses;
+        const rawExisting = existingInCust || existingInBook;
+
+        if (Array.isArray(rawExisting)) {
+          existingList = [...rawExisting].filter(Boolean);
+        } else if (rawExisting && typeof rawExisting === "object") {
+          existingList = Object.values(rawExisting).filter(Boolean);
+        } else {
+          // Fallback: check if single address existed before
+          const singleOldAddr = matched?.address || (props.addressBook && props.addressBook[normKey]?.address);
+          if (singleOldAddr && singleOldAddr.trim()) {
+            existingList.push({
+              id: matched?.selectedAddressId || "addr_prev_" + timestamp,
+              label: "ที่อยู่ 1",
+              recipientName: matched?.recipientName || props.addressBook?.[normKey]?.recipientName || cleanName,
+              phone: matched?.phone || props.addressBook?.[normKey]?.phone || "",
+              address: singleOldAddr.trim(),
+              postalCode: matched?.postalCode || props.addressBook?.[normKey]?.postalCode || "",
+              paymentType: matched?.paymentType || "",
+            });
+          }
         }
       }
 
@@ -270,6 +276,8 @@ async function saveAllAddresses() {
         existingList.push(newAddrObj);
       }
 
+      batchAddressesByKey.set(normKey, existingList);
+
       // 1. Save to Central address_book
       multiPathUpdates[`address_book/${normKey}/name`] = cleanName;
       multiPathUpdates[`address_book/${normKey}/recipientName`] = recName;
@@ -291,7 +299,9 @@ async function saveAllAddresses() {
         multiPathUpdates[`delivery_customers/${matched.id}/phone`] = entry.phone || "";
         multiPathUpdates[`delivery_customers/${matched.id}/address`] = entry.address || "";
         multiPathUpdates[`delivery_customers/${matched.id}/postalCode`] = entry.postalCode || "";
-        multiPathUpdates[`delivery_customers/${matched.id}/paymentType`] = entry.paymentType || "";
+        if (entry.paymentType) {
+          multiPathUpdates[`delivery_customers/${matched.id}/paymentType`] = entry.paymentType;
+        }
         multiPathUpdates[`delivery_customers/${matched.id}/selectedAddressId`] = newAddrObj.id;
         multiPathUpdates[`delivery_customers/${matched.id}/addresses`] = existingList;
         multiPathUpdates[`delivery_customers/${matched.id}/updatedAt`] = timestamp;

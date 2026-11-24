@@ -13,12 +13,13 @@ export const useBlacklistStore = defineStore("blacklist", () => {
   const blacklistMap = ref({});
   const isLoaded = ref(false);
   let blacklistListenerUnsub = null;
+  let blacklistCleanupWrapper = null;
 
   /**
    * ✅ Initialize real-time Firebase listener for blacklist
    */
   function initBlacklistListener() {
-    if (blacklistListenerUnsub) return blacklistListenerUnsub;
+    if (blacklistCleanupWrapper) return blacklistCleanupWrapper;
 
     const bRef = dbRef(db, BLACKLIST_DB_PATH);
     blacklistListenerUnsub = onValue(
@@ -33,12 +34,14 @@ export const useBlacklistStore = defineStore("blacklist", () => {
       }
     );
 
-    return () => {
+    blacklistCleanupWrapper = () => {
       if (blacklistListenerUnsub) {
         blacklistListenerUnsub();
         blacklistListenerUnsub = null;
       }
+      blacklistCleanupWrapper = null;
     };
+    return blacklistCleanupWrapper;
   }
 
   /**
@@ -48,37 +51,7 @@ export const useBlacklistStore = defineStore("blacklist", () => {
    * @returns {boolean}
    */
   function isBanned(uid, name) {
-    const list = blacklistMap.value;
-    if (!list || Object.keys(list).length === 0) return false;
-
-    // 1. Direct channelId/uid check
-    if (uid) {
-      const safeUid = sanitizeDbKey(uid);
-      if (list[safeUid]) return true;
-    }
-
-    // 2. Normalized name check (with space-agnostic Thai fallback)
-    if (name) {
-      const norm = normalizeCustomerName(name);
-      const compactNorm = norm ? norm.replace(/\s+/g, "") : "";
-      if (norm && list[norm]) return true;
-      if (compactNorm && list[compactNorm]) return true;
-
-      // 3. Scan through entries for matching normName, compact name, or channelId
-      for (const key in list) {
-        const item = list[key];
-        if (item) {
-          if (uid && (item.channelId === uid || item.uid === uid)) return true;
-          if (norm && (item.normName === norm || (item.displayName && normalizeCustomerName(item.displayName) === norm))) return true;
-          if (compactNorm && (
-            (item.normName && item.normName.replace(/\s+/g, "") === compactNorm) ||
-            (item.displayName && normalizeCustomerName(item.displayName).replace(/\s+/g, "") === compactNorm)
-          )) return true;
-        }
-      }
-    }
-
-    return false;
+    return Boolean(getBanInfo(uid, name));
   }
 
   /**
@@ -89,29 +62,39 @@ export const useBlacklistStore = defineStore("blacklist", () => {
    */
   function getBanInfo(uid, name) {
     const list = blacklistMap.value;
-    if (!list) return null;
+    if (!list || Object.keys(list).length === 0) return null;
 
     if (uid) {
       const safeUid = sanitizeDbKey(uid);
-      if (list[safeUid]) return list[safeUid];
+      if (safeUid && list[safeUid]) return list[safeUid];
+      const lowerSafeUid = safeUid ? safeUid.toLowerCase() : "";
+      if (lowerSafeUid && list[lowerSafeUid]) return list[lowerSafeUid];
     }
 
-    if (name) {
-      const norm = normalizeCustomerName(name);
-      const compactNorm = norm ? norm.replace(/\s+/g, "") : "";
-      if (norm && list[norm]) return list[norm];
-      if (compactNorm && list[compactNorm]) return list[compactNorm];
+    const norm = name ? normalizeCustomerName(name) : "";
+    const compactNorm = norm ? norm.replace(/\s+/g, "") : "";
 
+    if (norm) {
+      const safeNorm = sanitizeDbKey(norm);
+      const safeCompact = compactNorm ? sanitizeDbKey(compactNorm) : "";
+      if (list[norm]) return list[norm];
+      if (safeNorm && list[safeNorm]) return list[safeNorm];
+      if (compactNorm && list[compactNorm]) return list[compactNorm];
+      if (safeCompact && list[safeCompact]) return list[safeCompact];
+    }
+
+    if (uid || norm) {
+      const uidLower = uid ? String(uid).trim().toLowerCase() : "";
       for (const key in list) {
         const item = list[key];
-        if (item) {
-          if (uid && (item.channelId === uid || item.uid === uid)) return item;
-          if (norm && (item.normName === norm || (item.displayName && normalizeCustomerName(item.displayName) === norm))) return item;
-          if (compactNorm && (
-            (item.normName && item.normName.replace(/\s+/g, "") === compactNorm) ||
-            (item.displayName && normalizeCustomerName(item.displayName).replace(/\s+/g, "") === compactNorm)
-          )) return item;
-        }
+        if (!item) continue;
+        if (uid && (item.channelId === uid || item.uid === uid)) return item;
+        if (uidLower && item.normName && item.normName === uidLower) return item;
+        if (norm && (item.normName === norm || (item.displayName && normalizeCustomerName(item.displayName) === norm))) return item;
+        if (compactNorm && (
+          (item.normName && item.normName.replace(/\s+/g, "") === compactNorm) ||
+          (item.displayName && normalizeCustomerName(item.displayName).replace(/\s+/g, "") === compactNorm)
+        )) return item;
       }
     }
 
@@ -127,17 +110,23 @@ export const useBlacklistStore = defineStore("blacklist", () => {
    * @param {string} [banData.bannedBy] - Admin ID / device
    */
   async function banUser({ channelId, displayName, reason = "CF แล้วไม่โอน / ก่อกวน", bannedBy = "แอดมิน" }) {
-    if (!channelId && !displayName) {
+    const cleanChannelId = typeof channelId === "string" ? channelId.trim() : "";
+    const cleanDisplayName = typeof displayName === "string" ? displayName.trim() : "";
+
+    if (!cleanChannelId && !cleanDisplayName) {
       throw new Error("ต้องระบุ channelId หรือ displayName ในการแบน");
     }
 
-    const key = channelId ? sanitizeDbKey(channelId) : normalizeCustomerName(displayName);
-    const norm = displayName ? normalizeCustomerName(displayName) : "";
+    const norm = cleanDisplayName ? normalizeCustomerName(cleanDisplayName) : "";
+    const key = cleanChannelId ? sanitizeDbKey(cleanChannelId) : sanitizeDbKey(norm);
+    if (!key) {
+      throw new Error("ต้องระบุ channelId หรือ displayName ในการแบน");
+    }
 
     const payload = {
-      channelId: channelId || "",
-      uid: channelId || "",
-      displayName: displayName || "ไม่ระบุชื่อ",
+      channelId: cleanChannelId,
+      uid: cleanChannelId,
+      displayName: cleanDisplayName || "ไม่ระบุชื่อ",
       normName: norm,
       reason: reason || "CF แล้วไม่โอน / ก่อกวน",
       bannedAt: Date.now(),
@@ -146,7 +135,7 @@ export const useBlacklistStore = defineStore("blacklist", () => {
 
     const targetRef = dbRef(db, `${BLACKLIST_DB_PATH}/${key}`);
     await set(targetRef, payload);
-    logger.success(`🚫 Banned user: ${displayName || channelId} (${payload.reason})`);
+    logger.success(`🚫 Banned user: ${cleanDisplayName || cleanChannelId} (${payload.reason})`);
     return payload;
   }
 

@@ -16,6 +16,7 @@ const STORE_NAME = "full_log";
 const DB_VERSION = 1;
 
 let _db = null;
+let _dbPromise = null;
 
 // 🚀 Write Buffer Configuration for high-frequency chat streams
 const BUFFER_MAX_SIZE = 20;
@@ -23,6 +24,7 @@ const BUFFER_FLUSH_INTERVAL_MS = 1500;
 
 let _writeBuffer = [];
 let _flushTimer = null;
+let _inFlightFlush = null;
 
 /**
  * Open (or reuse) the IndexedDB connection.
@@ -30,7 +32,8 @@ let _flushTimer = null;
  */
 function getDb() {
   if (_db) return Promise.resolve(_db);
-  return new Promise((resolve, reject) => {
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
 
     req.onupgradeneeded = (e) => {
@@ -44,19 +47,27 @@ function getDb() {
 
     req.onsuccess = (e) => {
       _db = e.target.result;
+      _dbPromise = null;
 
-      // Re-open on version change (other tab upgraded the DB)
+      // Re-open on version change or browser-forced close (Safari/iOS tab backgrounding)
       _db.onversionchange = () => {
-        _db.close();
+        _db?.close();
+        _db = null;
+      };
+      _db.onclose = () => {
         _db = null;
       };
 
       resolve(_db);
     };
 
-    req.onerror = (e) => reject(e.target.error);
+    req.onerror = (e) => {
+      _dbPromise = null;
+      reject(e.target.error);
+    };
     req.onblocked = () => console.warn("[ChatIdb] DB open blocked");
   });
+  return _dbPromise;
 }
 
 /**
@@ -69,29 +80,44 @@ export async function flushChatArchiveBuffer() {
     _flushTimer = null;
   }
 
+  if (_inFlightFlush) {
+    await _inFlightFlush;
+  }
+
   if (_writeBuffer.length === 0) return;
 
   const entriesToFlush = _writeBuffer.splice(0);
 
-  try {
-    const db = await getDb();
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
+  const runFlush = (async () => {
+    try {
+      const db = await getDb();
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
 
-    entriesToFlush.forEach(({ entry, videoId }) => {
-      if (entry && entry.id) {
-        store.put({ ...entry, videoId });
+      entriesToFlush.forEach(({ entry, videoId }) => {
+        if (entry && entry.id) {
+          store.put({ ...entry, videoId });
+        }
+      });
+
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onerror = (e) => reject(e.target.error);
+        tx.onabort = (e) => reject(e.target.error);
+      });
+    } catch (e) {
+      // Re-queue failed entries at the front so they are not lost
+      _writeBuffer.unshift(...entriesToFlush);
+      console.warn("[ChatIdb] flushChatArchiveBuffer failed:", e);
+    } finally {
+      if (_inFlightFlush === runFlush) {
+        _inFlightFlush = null;
       }
-    });
+    }
+  })();
 
-    await new Promise((resolve, reject) => {
-      tx.oncomplete = resolve;
-      tx.onerror = (e) => reject(e.target.error);
-      tx.onabort = (e) => reject(e.target.error);
-    });
-  } catch (e) {
-    console.warn("[ChatIdb] flushChatArchiveBuffer failed:", e);
-  }
+  _inFlightFlush = runFlush;
+  await runFlush;
 }
 
 // 🛡️ Automatic flush on page visibility change or tab close to prevent data loss
@@ -183,11 +209,12 @@ export async function clearChatEntries(videoId) {
         if (cursor) {
           store.delete(cursor.primaryKey);
           cursor.continue();
-        } else {
-          resolve();
         }
       };
       req.onerror = (e) => reject(e.target.error);
+      tx.oncomplete = resolve;
+      tx.onerror = (e) => reject(e.target.error);
+      tx.onabort = (e) => reject(e.target.error);
     });
   } catch (e) {
     console.warn("[ChatIdb] clearChatEntries failed:", e);

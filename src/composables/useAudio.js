@@ -284,7 +284,7 @@ export function useAudio() {
           }
         }
 
-        if (!audioCtx || generation !== audioGeneration) {
+        if (!audioCtx || audioCtx.state !== "running" || generation !== audioGeneration) {
           resolve();
           return;
         }
@@ -292,7 +292,7 @@ export function useAudio() {
         if (!sleepAudioBuffer) {
           await ensureSleepAudioLoaded().catch(() => {});
         }
-        if (generation !== audioGeneration) { resolve(); return; }
+        if (generation !== audioGeneration || audioCtx.state !== "running") { resolve(); return; }
 
         if (sleepAudioBuffer) {
           const source = audioCtx.createBufferSource();
@@ -408,9 +408,12 @@ export function useAudio() {
     prefetchNextAudio();
 
     try {
-      // 1. Play SFX and wait for it to finish
+      // 1. Play SFX and wait for it to finish (with safety timeout to prevent deadlock)
       if (task.sfxType) {
-        await playSfx(task.sfxType);
+        await Promise.race([
+          playSfx(task.sfxType),
+          new Promise((resolve) => setTimeout(resolve, 15000)),
+        ]);
       }
       if (generation !== audioGeneration) return;
 

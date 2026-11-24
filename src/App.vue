@@ -464,6 +464,7 @@ useDeliveryReconciliation({
   customers: () => customerStore.deliveryCustomersRaw,
   videoId: () => systemStore.currentVideoId,
   authorized: () => authStore.isAuthenticated,
+  stockLoaded: () => stockStore.loadedVideoId === systemStore.currentVideoId,
   sync: syncDeliveryCustomerForOwner,
 });
 

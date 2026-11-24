@@ -218,10 +218,14 @@ async function handleAddBan() {
       ? (newCustomReason.value.trim() || "CF แล้วไม่โอน / ก่อกวน")
       : newBanReason.value;
 
+  const inputVal = newBanName.value.trim();
+  const isLikelyChannelId = /^(?:UC[\w-]{20,}|channel_[\w-]+)$/i.test(inputVal);
+
   isSubmitting.value = true;
   try {
     await blacklistStore.banUser({
-      displayName: newBanName.value.trim(),
+      channelId: isLikelyChannelId ? inputVal : "",
+      displayName: inputVal,
       reason,
       bannedBy: "แอดมิน (หน้าต่าง Blacklist)",
     });

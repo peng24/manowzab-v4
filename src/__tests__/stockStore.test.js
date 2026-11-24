@@ -140,6 +140,10 @@ describe("Stock Store", () => {
   });
 
   describe("processCancel() — Price Preservation & Owner Name Safety", () => {
+    beforeEach(async () => {
+      const { useSystemStore } = await import("../stores/system");
+      useSystemStore().currentVideoId = "test_vid_cancel";
+    });
     it("preserves item price when the sole owner cancels an item that has a price set", async () => {
       const { runTransaction } = await import("firebase/database");
       let transactionResult;

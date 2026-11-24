@@ -772,7 +772,7 @@ const chatAuthorFilter = ref("");
 const historyChatViewport = ref(null);
 
 // Scoped Customer Total Purchases State
-const deliveryCustomers = ref([]);
+const deliveryCustomers = computed(() => customerStore.deliveryCustomersList);
 const activeOwnerName = ref(null);
 const pastItems = ref([]);
 
@@ -806,27 +806,21 @@ function cleanupSessionListeners() {
   sessionListeners.length = 0;
 }
 
+let unsubCustomerStore = null;
+
 onMounted(() => {
   history.fetchHistoryList();
-  customerStore.initCustomerSync();
-
-  // Listen to delivery customers for badge counts + past summaries
-  const unsubDelivery = onValue(dbRef(db, "delivery_customers"), (snapshot) => {
-    const data = snapshot.val() || {};
-    deliveryCustomers.value = Object.keys(data).map((key) => ({
-      id: key,
-      uid: key,
-      ...data[key],
-    }));
-  });
-  pageListeners.push(unsubDelivery);
+  unsubCustomerStore = customerStore.initCustomerListeners();
 
   window.addEventListener('keydown', handleGlobalKeydown);
 });
 
 onUnmounted(() => {
   cleanupSessionListeners();
-  customerStore.stopCustomerSync();
+  if (unsubCustomerStore) {
+    unsubCustomerStore();
+    unsubCustomerStore = null;
+  }
   pageListeners.forEach(unsub => {
     if (typeof unsub === "function") unsub();
   });
@@ -841,8 +835,17 @@ onUnmounted(() => {
   if (typeof Swal !== "undefined" && Swal.isVisible()) {
     Swal.close();
   }
-  if (historySalesAnimFrame) cancelAnimationFrame(historySalesAnimFrame);
-  if (pulsingSalesTimer) clearTimeout(pulsingSalesTimer);
+  cancelAnimHandle(soldAnimFrame);
+  cancelAnimHandle(pctAnimFrame);
+  cancelAnimHandle(historySalesAnimFrame);
+  if (pulsingPercentTimer) {
+    clearTimeout(pulsingPercentTimer);
+    pulsingPercentTimer = null;
+  }
+  if (pulsingSalesTimer) {
+    clearTimeout(pulsingSalesTimer);
+    pulsingSalesTimer = null;
+  }
   window.removeEventListener('keydown', handleGlobalKeydown);
 });
 
@@ -1253,6 +1256,7 @@ const animatedPercentage = ref(0);
 const isPulsingPercent = ref(false);
 let soldAnimFrame = null;
 let pctAnimFrame = null;
+let pulsingPercentTimer = null;
 
 function easeOutQuart(t) {
   return 1 - Math.pow(1 - t, 4);
@@ -1261,7 +1265,9 @@ function easeOutQuart(t) {
 function animateValue(fromVal, toVal, duration, onUpdate, onDone) {
   const startTime = performance.now();
   let frame = null;
+  let cancelled = false;
   function step(now) {
+    if (cancelled) return;
     const elapsed = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
     const easedProgress = easeOutQuart(progress);
@@ -1270,15 +1276,30 @@ function animateValue(fromVal, toVal, duration, onUpdate, onDone) {
     if (progress < 1) {
       frame = requestAnimationFrame(step);
     } else {
+      frame = null;
       if (onDone) onDone();
     }
   }
   frame = requestAnimationFrame(step);
-  return frame;
+  return {
+    cancel() {
+      cancelled = true;
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+        frame = null;
+      }
+    },
+  };
+}
+
+function cancelAnimHandle(handle) {
+  if (!handle) return;
+  if (typeof handle.cancel === "function") handle.cancel();
+  else cancelAnimationFrame(handle);
 }
 
 watch(soldCount, (newVal, oldVal) => {
-  if (soldAnimFrame) cancelAnimationFrame(soldAnimFrame);
+  cancelAnimHandle(soldAnimFrame);
   const from = oldVal ?? 0;
   soldAnimFrame = animateValue(from, newVal, 500, (v) => {
     animatedSoldCount.value = v;
@@ -1286,12 +1307,16 @@ watch(soldCount, (newVal, oldVal) => {
 }, { immediate: true });
 
 watch(soldPercentage, (newVal, oldVal) => {
-  if (pctAnimFrame) cancelAnimationFrame(pctAnimFrame);
+  cancelAnimHandle(pctAnimFrame);
   const from = oldVal ?? 0;
   isPulsingPercent.value = false;
   void document.body.offsetWidth; // force reflow
   isPulsingPercent.value = true;
-  setTimeout(() => { isPulsingPercent.value = false; }, 600);
+  if (pulsingPercentTimer) clearTimeout(pulsingPercentTimer);
+  pulsingPercentTimer = setTimeout(() => {
+    isPulsingPercent.value = false;
+    pulsingPercentTimer = null;
+  }, 600);
   pctAnimFrame = animateValue(from, newVal, 500, (v) => {
     animatedPercentage.value = v;
   });
@@ -1340,7 +1365,7 @@ const historySalesTooltip = computed(() => {
 });
 
 watch(historyTotalSales, (newVal, oldVal) => {
-  if (historySalesAnimFrame) cancelAnimationFrame(historySalesAnimFrame);
+  cancelAnimHandle(historySalesAnimFrame);
   const from = oldVal ?? 0;
   isPulsingSales.value = true;
   if (pulsingSalesTimer) clearTimeout(pulsingSalesTimer);
@@ -1571,7 +1596,15 @@ function dragStart(index) {
 }
 
 function drop(index) {
+  if (draggingIndex === null || draggingIndex === index || draggingIndex < 0 || draggingIndex >= tempQueue.value.length) {
+    draggingIndex = null;
+    return;
+  }
   const itemToMove = tempQueue.value[draggingIndex];
+  if (!itemToMove) {
+    draggingIndex = null;
+    return;
+  }
   tempQueue.value.splice(draggingIndex, 1);
   tempQueue.value.splice(index, 0, itemToMove);
   draggingIndex = null;
@@ -1704,10 +1737,14 @@ async function saveQueueChanges(preventClose = false) {
   const currentDbItem = getStockItem(num);
   const newOwnerName = tempQueue.value.length > 0 ? tempQueue.value[0].owner : null;
 
+  const validQueue = tempQueue.value
+    .map((entry) => ({ ...entry, owner: typeof entry.owner === "string" ? entry.owner.trim() : "" }))
+    .filter((entry) => entry.owner.length > 0);
+
   let newData = null;
-  if (tempQueue.value.length > 0) {
-    const first = tempQueue.value[0];
-    const rest = tempQueue.value.slice(1);
+  if (validQueue.length > 0) {
+    const first = validQueue[0];
+    const rest = validQueue.slice(1);
 
     newData = {
       owner: first.owner,
@@ -2189,6 +2226,7 @@ async function showOwnerItems(ownerName) {
       });
 
       await Promise.all(promises);
+      if (activeOwnerName.value !== ownerName) return;
       pastItems.value = fetchedPastItems;
       updateOwnerItemsModal();
     } catch (e) {
@@ -2294,8 +2332,8 @@ async function openCleanupModal() {
     const livesListHtml = preview.olderLives.map(live => {
       const dateStr = formatDate(live.timestamp);
       return `<li style="text-align: left; padding: 6px 8px; border-bottom: 1px solid #334155; font-size: 0.9em; display: flex; justify-content: space-between;">
-        <span style="color: #cbd5e1;">${live.title || 'ไม่มีชื่อไลฟ์'}</span>
-        <span style="color: #f87171; font-weight: bold; font-family: monospace;">[${dateStr.split(' ')[0]}]</span>
+        <span style="color: #cbd5e1;">${escapeHtml(live.title || 'ไม่มีชื่อไลฟ์')}</span>
+        <span style="color: #f87171; font-weight: bold; font-family: monospace;">[${escapeHtml(dateStr.split(' ')[0])}]</span>
       </li>`;
     }).slice(0, 8).join('') + (preview.olderLivesCount > 8 ? `<li style="text-align: center; padding-top: 8px; color: #94a3b8; font-style: italic;">...และอีก ${preview.olderLivesCount - 8} ไลฟ์</li>` : '');
 

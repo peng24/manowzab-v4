@@ -87,7 +87,27 @@ const BACKDATED_ORDER_REGEX = /เมื่อวาน|เมือวาน|�
 const STRIP_LEADING_NON_LETTER_REGEX = /^[^\u0E00-\u0E7Fa-zA-Z]+/;
 const STRIP_EDGE_PUNCT_REGEX = /^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g;
 const SHIP_TMR_REGEX = /ส่งพรุ่งนี้|พรุ่งนี้ส่ง(?!\s*(?:รูป|ภาพ))|ส่งวันพรุ่งนี้/;
-const SHIP_DATE_REGEX = /ส่ง(?:วันที่\s*)?(\d{1,2})(?:\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)?/;
+const SHIP_DATE_REGEX = /(?<!ค่า)ส่ง\s*(?:วันที่\s*)?([1-2]\d|3[01]|0?[1-9])(?!\d|\s*(?:บาท|บ\.|ตัว|ชิ้น|ใบ))(?:\s*(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม))?/;
+const CANCEL_TARGET_POLITE_STRIP_REGEX = /(?:ค่ะ|ค่า+|ครับ|นะคะ|นะครับ|จ้า|จร้า|จ้ะ|จ่ะ|นะ|คะ|เด้อ|ด้วย)+$/gi;
+const CANCEL_HONORIFIC_STRIP_REGEX = /^(?:คุณ|พี่|น้อง|ป้า|น้า|อา|แม่|ยาย)\s*/i;
+function isMatchingSelfCancelOwner(actualName, targetName) {
+  if (!actualName || !targetName) return false;
+  const a = String(actualName).trim().toLowerCase();
+  const b = String(targetName).trim().toLowerCase();
+  if (a === b) return true;
+  const normA = a.replace(CANCEL_HONORIFIC_STRIP_REGEX, "").replace(/\s+/g, " ").trim();
+  const normB = b.replace(CANCEL_HONORIFIC_STRIP_REGEX, "").replace(/\s+/g, " ").trim();
+  return Boolean(normA && normB && normA === normB);
+}
+function extractRawCancelTarget(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  const cleaned = raw
+    .replace(STRIP_EDGE_PUNCT_REGEX, "")
+    .replace(CANCEL_TARGET_POLITE_STRIP_REGEX, "")
+    .replace(STRIP_EDGE_PUNCT_REGEX, "")
+    .trim();
+  return cleaned.length >= 2 ? cleaned : null;
+}
 const SHIP_NOW_REGEX = /ส่งเลย|ส่งวันนี้|ส่งครับ|ส่งค่ะ|ส่งด้วย|พร้อมส่ง|ขอส่ง|แจ้งส่ง|รวมส่ง|(?:^|[^\u0E00-\u0E7F])(?<!คน|พนักงาน|พิมพ์|กด)ส่ง(?!\s*(?:รูป|ภาพ|สติกเกอร์|ข้อความ|คลิป|เสียง|กำลังใจ|ใจ|จุ๊บ))(?:$|[^\u0E00-\u0E7F\w])/;
 const TRANSFER_SLIP_REGEX = /โอนแล้ว|แจ้งโอน|สลิป/;
 const STRIP_PREFIX_OF_REGEX = /^(?:ของพี่|ของ|พี่)\s*/;
@@ -337,28 +357,36 @@ export function useChatProcessor() {
     let forcedOwnerName = null;
 
     // 💡 Auto-learn nickname from customer self-introduction (e.g. "บุญญาภาค่ะ", "บุญญาภาครับ")
+    // 🛡️ Check Blacklist BEFORE persisting any auto-learned nickname to Firebase
+    let learnedSelfName = null;
     if (!isAdmin && uid) {
-      const selfName = extractCustomerSelfName(normalizedMsg);
-      if (selfName) {
-        const hasExistingNick =
-          nicknameStore.hasNickname(uid, realName) ||
-          nicknameStore.hasNickname(uid, displayName);
+      learnedSelfName = extractCustomerSelfName(normalizedMsg);
+    }
 
-        // Rule 1: Never overwrite existing nickname (respect CUSTOM_NICKNAME_OVERRIDE.md)
-        if (!hasExistingNick) {
-          const safeUid = sanitizeDbKey(uid);
-          update(dbRef(db, `nicknames/${safeUid}`), {
-            nick: selfName,
-            phonetic: selfName,
-            realName: realName,
-          }).catch((e) => logger.warn("Auto-learn nickname error:", e));
-          displayName = selfName;
-        }
+    // 🛡️ Blacklist Guard for Regular Customers: Block all buying, cancelling, shipping, and nickname writes
+    const isUserBanned =
+      !isAdmin &&
+      (blacklistStore.isBanned(uid, realName) ||
+        blacklistStore.isBanned(uid, displayName) ||
+        (learnedSelfName && blacklistStore.isBanned(uid, learnedSelfName)));
+
+    if (!isUserBanned && learnedSelfName && !isAdmin && uid) {
+      const hasExistingNick =
+        nicknameStore.hasNickname(uid, realName) ||
+        nicknameStore.hasNickname(uid, displayName);
+
+      // Rule 1: Never overwrite existing nickname (respect CUSTOM_NICKNAME_OVERRIDE.md)
+      if (!hasExistingNick) {
+        const safeUid = sanitizeDbKey(uid);
+        update(dbRef(db, `nicknames/${safeUid}`), {
+          nick: learnedSelfName,
+          phonetic: learnedSelfName,
+          realName: realName,
+        }).catch((e) => logger.warn("Auto-learn nickname error:", e));
+        displayName = learnedSelfName;
       }
     }
 
-    // 🛡️ Blacklist Guard for Regular Customers: Block all buying, cancelling, and shipping
-    const isUserBanned = !isAdmin && (blacklistStore.isBanned(uid, realName) || blacklistStore.isBanned(uid, displayName));
     if (isUserBanned) {
       logger.warn(`🚫 Blocked banned customer chat: ${displayName} (${uid})`);
       chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
@@ -550,12 +578,13 @@ export function useChatProcessor() {
       : null;
     if (matchMultiBuy) {
       const numbersStr = matchMultiBuy[2] || matchMultiBuy[1]; // "26 38 74"
-      const proxyName =
-        matchMultiBuy[1] && matchMultiBuy[2]
-          ? matchMultiBuy[1].trim()
-          : matchMultiBuy[3]
-          ? matchMultiBuy[3].trim()
-          : null; // Optional client name (prefix or suffix)
+      const rawPrefix = matchMultiBuy[1] && matchMultiBuy[2] ? matchMultiBuy[1].trim() : null;
+      const rawSuffix = matchMultiBuy[3] ? matchMultiBuy[3].trim() : null;
+      const cleanPrefix = rawPrefix ? sanitizeAdminCustomerName(rawPrefix) : null;
+      const cleanSuffix = rawSuffix ? sanitizeAdminCustomerName(rawSuffix) : null;
+      const fallbackPrefix = rawPrefix && !nonNameWordsRegex.test(rawPrefix) ? rawPrefix : null;
+      const fallbackSuffix = rawSuffix && !nonNameWordsRegex.test(rawSuffix) ? rawSuffix : null;
+      const proxyName = cleanPrefix || cleanSuffix || fallbackPrefix || fallbackSuffix || null; // Optional client name (prefix or suffix)
 
       // Parse all IDs (Allow IDs > stockSize, but cap at MAX_ITEM_ID)
       const itemIds = numbersStr
@@ -690,6 +719,7 @@ export function useChatProcessor() {
     // 🔴 CANCEL CHECK (Supports single or multi-item cancel e.g. "ยกเลิก 12 15", "12 มะระ ยกเลิก")
     let isCancel = false;
     let cancelTargetName = null;
+    let hasExplicitCancelTarget = false;
     let cancelIds = [];
 
     if (isCancellationRequest(normalizedMsg)) {
@@ -701,7 +731,12 @@ export function useChatProcessor() {
         cancelIds = parsedNumFirst;
         targetId = parsedNumFirst[0];
         if (matchNumFirst[2]) {
-          cancelTargetName = sanitizeAdminCustomerName(matchNumFirst[2]);
+          const sanitized = sanitizeAdminCustomerName(matchNumFirst[2]);
+          const rawTarget = extractRawCancelTarget(matchNumFirst[2]);
+          if (sanitized || rawTarget) {
+            hasExplicitCancelTarget = true;
+            cancelTargetName = sanitized || rawTarget;
+          }
         }
         method = "regex-cancel-num-first";
       }
@@ -714,7 +749,12 @@ export function useChatProcessor() {
           isCancel = true;
           cancelIds = parsedNameFirst;
           targetId = parsedNameFirst[0];
-          cancelTargetName = sanitizeAdminCustomerName(matchNameKeywordNum[1]);
+          const sanitized = sanitizeAdminCustomerName(matchNameKeywordNum[1]);
+          const rawTarget = extractRawCancelTarget(matchNameKeywordNum[1]);
+          if (sanitized || rawTarget) {
+            hasExplicitCancelTarget = true;
+            cancelTargetName = sanitized || rawTarget;
+          }
           method = "regex-cancel-name-first";
         }
       }
@@ -728,7 +768,12 @@ export function useChatProcessor() {
           cancelIds = parsedWithNum;
           targetId = parsedWithNum[0];
           if (matchWithNum[2]) {
-            cancelTargetName = sanitizeAdminCustomerName(matchWithNum[2]);
+            const sanitized = sanitizeAdminCustomerName(matchWithNum[2]);
+            const rawTarget = extractRawCancelTarget(matchWithNum[2]);
+            if (sanitized || rawTarget) {
+              hasExplicitCancelTarget = true;
+              cancelTargetName = sanitized || rawTarget;
+            }
           }
           method = "regex-cancel-with-num";
         }
@@ -844,9 +889,11 @@ export function useChatProcessor() {
         autoShipDate = calcNextDayOfWeekDate(dayName);
       } else if (shipDateMatch) {
         isAutoShip = true;
-        autoShipDate = new Date();
-        const day = parseInt(shipDateMatch[1]);
-        autoShipDate.setDate(day);
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const day = parseInt(shipDateMatch[1], 10);
+        let targetYear = now.getFullYear();
+        let targetMonth = now.getMonth();
 
         const monthStr = shipDateMatch[2];
         if (monthStr) {
@@ -882,12 +929,19 @@ export function useChatProcessor() {
           let mIndex = mNamesShort.indexOf(cleanMonth);
           if (mIndex === -1) mIndex = mNamesFull.indexOf(cleanMonth);
           if (mIndex !== -1) {
-            autoShipDate.setMonth(mIndex);
+            targetMonth = mIndex;
+            const candidate = new Date(targetYear, targetMonth, day);
+            if (candidate < todayStart && (todayStart - candidate) > 30 * 86400000) {
+              targetYear += 1;
+            }
+          }
+        } else {
+          const candidate = new Date(targetYear, targetMonth, day);
+          if (candidate < todayStart && todayStart.getDate() - day > 15) {
+            targetMonth += 1;
           }
         }
-        if (autoShipDate < new Date() && new Date().getDate() - day > 15) {
-          autoShipDate.setMonth(autoShipDate.getMonth() + 1);
-        }
+        autoShipDate = new Date(targetYear, targetMonth, day);
       } else if ((shipNowMatch || TRANSFER_SLIP_REGEX.test(normalizedMsg)) && !holdRegex.test(normalizedMsg)) {
         // Default to active Shipping Cycle (e.g. Thursday, Today, etc.) for explicit ship/transfer keywords AND NOT a hold request
         isAutoShip = true;
@@ -943,6 +997,7 @@ export function useChatProcessor() {
       if (
         isAdmin &&
         (m = normalizedMsg.match(adminProxyNameFirstRegex)) &&
+        parseInt(m[2]) >= 1 &&
         parseInt(m[2]) <= MAX_ITEM_ID &&
         sanitizeAdminCustomerName(m[1])
       ) {
@@ -953,6 +1008,7 @@ export function useChatProcessor() {
       } else if (
         isAdmin &&
         (m = normalizedMsg.match(adminProxyNumFirstRegex)) &&
+        parseInt(m[1]) >= 1 &&
         parseInt(m[1]) <= MAX_ITEM_ID
       ) {
         intent = "buy";
@@ -961,6 +1017,7 @@ export function useChatProcessor() {
         method = "admin-proxy-num-first";
       } else if (
         (m = normalizedMsg.match(pureNumberRegex)) &&
+        parseInt(m[1]) >= 1 &&
         parseInt(m[1]) <= MAX_ITEM_ID
       ) {
         intent = "buy";
@@ -968,6 +1025,7 @@ export function useChatProcessor() {
         method = "regex-pure";
       } else if (
         (m = normalizedMsg.match(fuzzyNumberRegex)) &&
+        parseInt(m[1]) >= 1 &&
         parseInt(m[1]) <= MAX_ITEM_ID
       ) {
         intent = "buy";
@@ -975,6 +1033,7 @@ export function useChatProcessor() {
         method = "regex-fuzzy";
       } else if (
         (m = normalizedMsg.match(explicitBuyRegex)) &&
+        parseInt(m[1] || m[2]) >= 1 &&
         parseInt(m[1] || m[2]) <= MAX_ITEM_ID
       ) {
         intent = "buy";
@@ -982,6 +1041,7 @@ export function useChatProcessor() {
         method = "regex-explicit";
       } else if (
         (m = normalizedMsg.match(numberWithPoliteRegex)) &&
+        parseInt(m[1]) >= 1 &&
         parseInt(m[1]) <= MAX_ITEM_ID
       ) {
         intent = "buy";
@@ -991,6 +1051,7 @@ export function useChatProcessor() {
         (m = normalizedMsg.match(dashBuyRegex)) &&
         !PURE_DIGITS_TEST_REGEX.test(m[1].trim()) &&
         !sizeRangeRegex.test(normalizedMsg) &&
+        parseInt(m[2]) >= 1 &&
         parseInt(m[2]) <= MAX_ITEM_ID
       ) {
         intent = "buy";
@@ -998,6 +1059,7 @@ export function useChatProcessor() {
         method = "regex-dash";
       } else if (
         (m = normalizedMsg.match(customerNameNumRegex)) &&
+        parseInt(m[2]) >= 1 &&
         parseInt(m[2]) <= MAX_ITEM_ID
       ) {
         // Guard: ต้องเป็นชื่อคนจริงๆ ไม่ใช่คำลักษณนาม (เช่น "ตัว 100") หรือคำถาม/shipping keyword
@@ -1015,6 +1077,7 @@ export function useChatProcessor() {
         }
       } else if (
         (m = normalizedMsg.match(numAndDescRegex)) &&
+        parseInt(m[1]) >= 1 &&
         parseInt(m[1]) <= MAX_ITEM_ID
       ) {
         const desc = m[2].trim();
@@ -1235,18 +1298,22 @@ export function useChatProcessor() {
           currentItem.queue.some(
             (q) =>
               (uid && q.uid === uid) ||
-              (displayName && q.owner === displayName),
+              (displayName && isMatchingSelfCancelOwner(q.owner, displayName)),
           );
         const isUserOwner =
           currentItem &&
           ((uid && currentItem.uid === uid) ||
-            (displayName && currentItem.owner === displayName));
+            (displayName && isMatchingSelfCancelOwner(currentItem.owner, displayName)));
 
         if (isAdmin || isUserOwner || isUserInQueue) {
           const isAdminProxyCancel = isAdmin && !isUserOwner && !isUserInQueue;
           const cancelUid = isAdminProxyCancel ? null : uid;
-          // 🛡️ Safety: When Admin specifies a target customer name (e.g. "12 มะระ ยกเลิก"),
+          // 🛡️ Safety: When Admin specifies a target customer name (e.g. "12 มะระ ยกเลิก", "ยกเลิก 12 ส้ม"),
           // NEVER fall back to null (wildcard cancel). Only use null when Admin gave no name (e.g. "ยกเลิก 12").
+          if (isAdminProxyCancel && hasExplicitCancelTarget && !cancelTargetName) {
+            logger.warn(`⚠️ Admin cancel skipped for item #${idToCancel}: explicit target name could not be resolved safely`);
+            continue;
+          }
           const cancelOwnerName = isAdminProxyCancel
             ? cancelTargetName || null
             : displayName;
@@ -1316,28 +1383,26 @@ export function useChatProcessor() {
       });
     } else {
       // --- Other Intents / General Chat ---
-      if (intent === "shipping") {
-        if (!isVoiceChat) {
-          const shippingRef = dbRef(
-            db,
-            `system/shipping/${systemStore.currentVideoId}/${uid}`,
-          );
-          update(shippingRef, {
-            ready: true,
-            timestamp: Date.now(),
-            lastMessage: msg,
-          }).catch((e) => logger.error("Shipping update error:", e));
+      if (intent === "shipping" && !isVoiceChat && !holdRegex.test(normalizedMsg) && !isAdmin) {
+        const shippingRef = dbRef(
+          db,
+          `system/shipping/${systemStore.currentVideoId}/${uid}`,
+        );
+        update(shippingRef, {
+          ready: true,
+          timestamp: Date.now(),
+          lastMessage: msg,
+        }).catch((e) => logger.error("Shipping update error:", e));
 
-          const historyRef = dbRef(
-            db,
-            `system/shipping/${systemStore.currentVideoId}/${uid}/history`,
-          );
-          push(historyRef, {
-            text: msg,
-            timestamp: Date.now(),
-            type: "user",
-          }).catch((e) => logger.warn("Shipping history push warning:", e));
-        }
+        const historyRef = dbRef(
+          db,
+          `system/shipping/${systemStore.currentVideoId}/${uid}/history`,
+        );
+        push(historyRef, {
+          text: msg,
+          timestamp: Date.now(),
+          type: "user",
+        }).catch((e) => logger.warn("Shipping history push warning:", e));
       }
 
       const proxyCustomerName = isAdmin ? extractAdminCustomerName(msg) : null;

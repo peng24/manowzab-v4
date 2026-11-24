@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.7.2 (Chat & AI v1.4.3 Verified) — 2026-11-22** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.7.8 Full-Stack Bug Audit & Hardening (`manowzab-v4` + `live-product-capture-ai` v1.5.1) — 2026-11-24** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -606,3 +606,17 @@ description: Mandatory verification checklist after every code change
   - `npm test` (`vitest run`): ผ่านครบ **32 ไฟล์ / 848 tests** (เพิ่ม 6 เคสใหม่ใน `thaiNumberWords.test.js` และ `chatProcessorLogRegression.test.js`)
   - `main-*.css` ตรวจซ้ำ: ไม่มี `aspect-ratio: 1.35` และเหลือ `.stock-item` เฉพาะของ `StockItemCard.vue`
   - **ขอบเขตที่ยังต้องตรวจหน้างาน**: การแสดงผลสดบนเบราว์เซอร์และการฟังเสียง TTS multi-buy ผ่านลำโพงจริงหลังรีเฟรชเป็น `v5.5.1`
+
+## 🛡️ ผลตรวจ Full-Stack Bug Audit & Hardening — v5.7.8 (2026-11-24)
+
+- **สิ่งที่ตรวจสอบและแก้ไขฝั่ง `manowzab-v4`**:
+  1. **Firebase Data Safety & Reconciliation**: ป้องกัน `clearAllStock()`/`processOrder()`/`processCancel()`/`updateItemData()` เขียนหรือลบ `stock/` เมื่อ `currentVideoId` ว่าง, capture `videoId` ก่อน `await`, รองรับ Firebase sparse array (`null` holes), ล้าง `backdated` ค้างตอนจองปกติ, รอ `stockStore.loadedVideoId === currentVideoId` ก่อน reconcile, และรวม concurrent proxy bookings ผ่าน `_pendingProxyUids`
+  2. **Blacklist, Chat, Audio & Lifecycle**: ตรวจแบนทั้ง `realName` และ `displayName` + Channel ID แม้ไม่มีชื่อ, sanitize key ด้วย `sanitizeDbKey`, กันไม่ให้ `chatStore.addMessage` ทับชื่อลูกค้า proxy ด้วยชื่อเล่นแอดมิน, กันแอดมินยกเลิกแบบระบุชื่อไม่ให้ตกเป็น wildcard `null`, แก้ `multiBuyRegex` `"เอา 12 15 มะระ"`, แก้ `isDateMismatch` `"วันที่ 3 ส.ค. 15"` และ `"รอบ 2 เอา 15"`, แก้ `YouTubeLiveChat` `pollGeneration` & reset token, แก้ `useOfflineQueue` ไม่ลบคิวเมื่อไม่มี processor, แก้ `thaiNumberWords.js` ปกป้องเบอร์โทรที่มี `555` ด้วย placeholder ไร้ตัวเลข, และแก้ `addressParser.js` / `smartAnswerUtils.js`
+  3. **UI Components, Pages & Security**: แก้ `HistoryModal.vue` (`initCustomerListeners` + `computed(() => customerStore.deliveryCustomersList)`), แก้ `ShippingLabelModal.vue` (ลบ `onMounted` ซ้ำที่ล้าง `initialSelectedId` + `escapeHtml()` ปิด Print XSS), แก้ `AddressPage.vue` (ส่ง props ให้ `AddressImportModal` + ลบลูกค้าแบบ Non-destructive เฉพาะที่อยู่), แก้ `ShippingPage.vue` แท็บส่งแล้ว (`done`), แก้ `Dashboard.vue` คอลัมน์สลับ + sanitize key, แก้ `CustomerQuickEditModal.vue` (เก็บชื่อ/UID เดิมก่อนแก้ไข), และแก้ `StockGrid.vue` animation handle / drag guard / watcher
+- **สิ่งที่ตรวจสอบและแก้ไขฝั่ง `live-product-capture-ai`**:
+  1. **Firebase Integrity & Session Resolver**: ป้องกัน `_finalize_session()` รีเซ็ตยอดขายเป็น 0 เมื่อ `get_stock_snapshot()` เป็น `None`, ป้องกัน `ensure_firebase_history_entry()` รีเซ็ต `totalSales`/`totalItems` เมื่อ GET ล้มเหลวหรือมีข้อมูลเดิม, ขยาย `search_history_by_date_query()` ครบทั้ง 12 เดือนพร้อม `(?<!\d)`, ตรวจ YouTube ID ด้วย `^[a-zA-Z0-9_-]{11}$`, และใช้ `re.finditer` + `try/except ValueError` ใน `extract_thai_date_from_title`
+  2. **Detection Accuracy & Chrome Live Caption**: ล้าง `recent_texts` เมื่อเปลี่ยนรายการ (`set_item`) เพื่อไม่ให้ทิ้งคำพูดราคาซ้ำ (`"ราคา 60 บาทค่ะ"`), กัน `trailing_text` ไม่ให้ล็อกราคาประโยคไร้ตัวเลข, normalize คำตัวเลขไทยก่อนแยก pre/post cue (`"รายการที่ ยี่สิบ"`), แก้ `thai_number_normalizer` (`ร้อยห้าสิบ`/`สองร้อยห้าสิบ`), เพิ่ม `เป็น` ใน `INTRO_SHIPPING_GUARD_REGEX` & `SHIPPING_POLICY_LINE_REGEX` (`"ตั้งแต่ 20 เป็นจนถึง 100"`), รองรับรหัส 3 หลัก `100-120` พร้อม `(?<!\d)`, กัน `"อก 42 60 บาท"` ไม่ให้รวมราคาเข้าช่วงอก, กัน `ChromeCaptionReader` ไม่ให้จับหน้าต่างเบราว์เซอร์หลัก (`- Google Chrome`), และเพิ่มคำหลักสิบ `สามสิบ`..`เก้าสิบ`
+  3. **Process, SQLite, Launcher & GUI Hardening**: เก็บ tail audio chunk ท้ายสตรีม + ปิด pipe/wait process ใน `live_stream_detector.py` & `live_source.py`, ซิงค์ `confirm` override `target_vid` ใน `run_live_launcher.py`, เพิ่ม UTF-8 `subprocess.run` + `import re` ใน `src/main.py`, ใช้ `contextlib.closing` ใน `database.py`, ทำ `save_summary()` idempotent + sanitize filename ใน `live_logger.py`, รองรับ UTF-8 BOM ใน `subtitle_source.py`, รองรับ Try-On merge และ `db=None` ใน `capture_coordinator.py`, และเพิ่ม `closeEvent` + CPU fallback ใน `main_window.py` / `audio_transcriber.py`
+- **ผลตรวจ Automated & Build**:
+  - `manowzab-v4`: `npm test` ผ่าน **36 ไฟล์ / 923 tests** (รวม `bugAuditRegression.test.js` 16 เคสใหม่), `npm run test:transcriber` ผ่าน **3 tests**, `npm run build` ผ่านครบทุก entry + PWA 67 precache entries
+  - `live-product-capture-ai`: `unittest` ผ่าน **95 tests** (รวม `test_bug_audit_regression.py` 11 เคสใหม่)

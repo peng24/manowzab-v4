@@ -59,7 +59,10 @@ const THAI_SHORT_MONTHS = [
  */
 export function formatSmartDeliveryDate(dateStr) {
   if (!dateStr) return "";
-  const target = new Date(dateStr);
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr).trim());
+  const target = isoMatch
+    ? new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]))
+    : new Date(dateStr);
   if (isNaN(target.getTime())) return dateStr;
 
   const today = new Date();
@@ -322,24 +325,37 @@ export function getCustomerStoredPortfolio(
   todayQueued.sort((a, b) => a.id - b.id);
 
   // 2. Delivery / Accumulated Sessions lookup
+  const dbKey = normName ? normName.replace(/[.#$[\]/]/g, "_") : "";
+  const dbRealKey = normReal ? normReal.replace(/[.#$[\]/]/g, "_") : "";
   let deliveryRecord = null;
   if (customerUid && deliveryByNormKey[customerUid]) {
     deliveryRecord = deliveryByNormKey[customerUid];
+  } else if (dbKey && deliveryByNormKey[dbKey]) {
+    deliveryRecord = deliveryByNormKey[dbKey];
   } else if (normName && deliveryByNormKey[normName]) {
     deliveryRecord = deliveryByNormKey[normName];
   } else if (customerName && deliveryByNormKey[customerName]) {
     deliveryRecord = deliveryByNormKey[customerName];
+  } else if (dbRealKey && deliveryByNormKey[dbRealKey]) {
+    deliveryRecord = deliveryByNormKey[dbRealKey];
   } else if (normReal && deliveryByNormKey[normReal]) {
     deliveryRecord = deliveryByNormKey[normReal];
   } else if (normNoSpace) {
-    // Fallback space-agnostic scan on deliveryByNormKey
+    // Fallback space-agnostic scan on deliveryByNormKey (prefer active non-done record over done)
     const keys = Object.keys(deliveryByNormKey);
+    let fallbackDone = null;
     for (let i = 0; i < keys.length; i++) {
       const cand = deliveryByNormKey[keys[i]];
       if (cand?.name && normalizeCustomerName(cand.name).replace(/\s+/g, "") === normNoSpace) {
-        deliveryRecord = cand;
-        break;
+        if (cand.status !== "done") {
+          deliveryRecord = cand;
+          break;
+        }
+        if (!fallbackDone) fallbackDone = cand;
       }
+    }
+    if (!deliveryRecord && fallbackDone) {
+      deliveryRecord = fallbackDone;
     }
   }
 
@@ -381,16 +397,22 @@ export function getCustomerStoredPortfolio(
   const totalBookings = deliveryRecord?.totalBookings || 0;
 
   // 3. Address Book & Contact Metadata
-  const dbKey = normName ? normName.replace(/[.#$[\]/]/g, "_") : "";
-  const dbRealKey = normReal ? normReal.replace(/[.#$[\]/]/g, "_") : "";
   const addrEntry =
     (dbKey && addressBook?.[dbKey]) ||
     (dbRealKey && addressBook?.[dbRealKey]) ||
     null;
 
+  const addrListHasValid = (list) => {
+    if (!list) return false;
+    const arr = Array.isArray(list) ? list : Object.values(list);
+    return arr.some((a) => a && (String(a.address || "").trim() || String(a.phone || "").trim()));
+  };
+
   const addressText = String(addrEntry?.address || deliveryRecord?.address || "").trim();
   const phoneText = String(addrEntry?.phone || deliveryRecord?.phone || "").trim();
-  const hasAddress = Boolean(addressText || phoneText);
+  const hasAddress = Boolean(
+    addressText || phoneText || addrListHasValid(addrEntry?.addresses) || addrListHasValid(deliveryRecord?.addresses)
+  );
   const contactChannel = addrEntry?.contactChannel || deliveryRecord?.contactChannel || null;
   const paymentType = addrEntry?.paymentType || deliveryRecord?.paymentType || null;
 

@@ -690,7 +690,9 @@ const sortedCustomers = computed(() => {
 });
 
 const filteredCustomers = computed(() => {
-  let list = sortedCustomers.value;
+  let list = activeFilter.value === 'done'
+    ? [...allCustomers.value].filter(c => c.status === 'done')
+    : sortedCustomers.value;
 
   if (activeFilter.value === 'requested') {
     list = list.filter(c => c.status !== 'done' && c.deliveryDate && c.deliveryDate.trim() !== "");
@@ -706,8 +708,6 @@ const filteredCustomers = computed(() => {
       const d = getCountdown(c.deliveryDate).days;
       return d > 1 && c.status !== 'done' && c.deliveryDate;
     });
-  } else if (activeFilter.value === 'done') {
-    list = list.filter(c => c.status === 'done');
   }
 
   if (searchQuery.value.trim()) {

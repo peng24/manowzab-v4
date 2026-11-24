@@ -7,7 +7,7 @@
 export const MAX_ITEM_ID = 300;
 
 // 🚀 Regex patterns enhanced from real live stream CSV logs (v4.67.0 / v5.2.0 / v5.3.3)
-export const multiBuyRegex = /^(?:([ก-๙a-zA-Z][ก-๙a-zA-Z\s]*?)\s+)?(?:F|f|cf|CF|รับ|เอา|เิา|จอง|เมื่อวาน|เมือวาน|ย้อนหลัง)?\s*ๆ*\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
+export const multiBuyRegex = /^(?:(?!(?:F|f|cf|CF|รับ|เอา|เิา|จอง|เอฟ|เมื่อวาน|เมือวาน|ย้อนหลัง)\s)([ก-๙a-zA-Z][ก-๙a-zA-Z\s]*?)\s+)?(?:F|f|cf|CF|รับ|เอา|เิา|จอง|เอฟ|เมื่อวาน|เมือวาน|ย้อนหลัง)?\s*ๆ*\s*(\d+(?:[\s,_]+\d+)+)(?:\s+(.*))?$/i;
 export const adminProxyNumFirstRegex = /^(\d+)\s+([ก-๛a-zA-Z].*)$/;
 export const adminProxyNameFirstRegex = /^([ก-๛a-zA-Z]+(?:\s+[ก-๛a-zA-Z]+)*?)\s*(?:[-_:=]|\s*(?:เอา|รับ|จอง|เอฟ|cf|CF|เิา|เค|ok|ของ|เมื่อวาน|เมือวาน|เมี่อวาน|ย้อนหลัง)\s*)?\s*(\d+)(?:\s*(?:ค่ะ|ครับ|จ้า|จร้า|จ้ะ|จ่ะ|นะ|คะ|ด้วย))?$/i; // Supports "พี่อ้อย20", "อิ๋ว เอา 22", "ตุ๊ก บำรุงรัตน์ 18", "ตุ๊ก บำรุงรัตน์ เมือวาน 32", "พี่กวาง 19 ด้วย"
 export const adminActionNoteRegex = /^([ก-๛a-zA-Z]{2,}(?:\s+[ก-๛a-zA-Z]{2,})?)\s+(?:รับ|เอา|cf|CF|จอง|เิา|เค|ok|สี|ลาย|ไซส์|ไซร์|ไชส์|ขนาด|อยากได้|อยสกได้|เพิ่ม|ลด|เปลี่ยน|เลือก|ส่งรูป|พรุ่งนี้ส่งรูป|เมื่อวาน|เมือวาน|เมี่อวาน|ย้อนหลัง)/i;
@@ -323,7 +323,11 @@ export function parseCancelIds(numsStr) {
 }
 
 // Module-scoped date parsing regexes
-const DATE_MISMATCH_REGEX = /(?:วันที่|วันที|รอบวันที่|รอบวันที|รอบ)\s*(\d{1,2})\s*(?:[\/\.-]|\s*)(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|\d{1,2})?(?:\s*(?:[\/\.-]|\s*)\s*(\d{2,4}))?/i;
+const THAI_MONTH_ALT = "ม\\.?ค\\.?|ก\\.?พ\\.?|มี\\.?ค\\.?|เม\\.?ย\\.?|พ\\.?ค\\.?|มิ\\.?ย\\.?|ก\\.?ค\\.?|ส\\.?ค\\.?|ก\\.?ย\\.?|ต\\.?ค\\.?|พ\\.?ย\\.?|ธ\\.?ค\\.?|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม";
+const DATE_MISMATCH_REGEX = new RegExp(
+  `(?:(?:วันที่|วันที|รอบวันที่|รอบวันที)\\s*(\\d{1,2})(?:\\s*(${THAI_MONTH_ALT})|[\\/\\-]\\s*(\\d{1,2}))?(?:[\\/\\-]\\s*(\\d{2,4})|\\s+(25\\d{2}|20\\d{2}|6[5-9]|7[0-9])(?!\\d))?|รอบ\\s*(\\d{1,2})(?:\\s*(${THAI_MONTH_ALT})|[\\/\\-]\\s*(\\d{1,2}))(?:[\\/\\-]\\s*(\\d{2,4})|\\s+(25\\d{2}|20\\d{2}|6[5-9]|7[0-9])(?!\\d))?)`,
+  "i"
+);
 const DIGITS_1_OR_2_REGEX = /^\d{1,2}$/;
 const DOT_REGEX = /\./g;
 const DIGITS_ONLY_REGEX = /^\d+$/;
@@ -483,8 +487,8 @@ export function extractAdminCustomerName(text) {
   // 6. Multi-buy: e.g. "3 4 วาศินา" or "วาศินา 3 4" or "26 38 74 มะระ"
   const mb = normalized.match(multiBuyRegex);
   if (mb) {
-    const candidate = mb[1]?.trim() || mb[3]?.trim();
-    const clean = sanitizeAdminCustomerName(candidate);
+    const clean = sanitizeAdminCustomerName(mb[1]?.trim()) || sanitizeAdminCustomerName(mb[3]?.trim());
+
     if (clean) return clean;
   }
 
@@ -512,7 +516,7 @@ export function isDateMismatch(text, liveTimestamp = Date.now()) {
   const match = normalized.match(DATE_MISMATCH_REGEX);
   if (!match) return false;
 
-  const day = parseInt(match[1], 10);
+  const day = parseInt(match[1] || match[6], 10);
   if (isNaN(day) || day < 1 || day > 31) return false;
 
   const liveDate = new Date(liveTimestamp);
@@ -527,7 +531,7 @@ export function isDateMismatch(text, liveTimestamp = Date.now()) {
   }
 
   // Check Month if provided
-  const monthStr = match[2];
+  const monthStr = match[2] || match[3] || match[7] || match[8];
   if (monthStr) {
     let monthNum = null;
     if (DIGITS_1_OR_2_REGEX.test(monthStr)) {
@@ -547,7 +551,7 @@ export function isDateMismatch(text, liveTimestamp = Date.now()) {
   }
 
   // Check Year if provided
-  const yearStr = match[3];
+  const yearStr = match[4] || match[5] || match[9] || match[10];
   if (yearStr) {
     const parsedYear = parseInt(yearStr, 10);
     let yearBE = parsedYear;

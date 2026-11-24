@@ -44,17 +44,32 @@ import { onMounted, onUnmounted, watch, defineAsyncComponent } from "vue";
 import { useAuthStore } from "../stores/auth";
 const AuthGate = defineAsyncComponent(() => import("../components/AuthGate.vue"));
 import { useNicknameStore } from "../stores/nickname";
+import { useBlacklistStore } from "../stores/blacklist";
 import HistoryModalContent from "../components/HistoryModal.vue";
 import Swal from "sweetalert2";
 
 const baseUrl = import.meta.env.BASE_URL || "/";
 const authStore = useAuthStore();
 const nicknameStore = useNicknameStore();
+const blacklistStore = useBlacklistStore();
 let unsubNickname = null;
+let unsubBlacklist = null;
 
-function setupNicknameListener() {
-  if (authStore.isAuthenticated && !unsubNickname) {
-    unsubNickname = nicknameStore.initNicknameListener();
+function setupListeners() {
+  if (authStore.isAuthenticated) {
+    if (!unsubNickname) unsubNickname = nicknameStore.initNicknameListener();
+    if (!unsubBlacklist) unsubBlacklist = blacklistStore.initBlacklistListener();
+  }
+}
+
+function teardownListeners() {
+  if (unsubNickname) {
+    unsubNickname();
+    unsubNickname = null;
+  }
+  if (unsubBlacklist) {
+    unsubBlacklist();
+    unsubBlacklist = null;
   }
 }
 
@@ -71,10 +86,7 @@ async function handleLogout() {
   });
 
   if (res.isConfirmed) {
-    if (unsubNickname) {
-      unsubNickname();
-      unsubNickname = null;
-    }
+    teardownListeners();
     if (typeof Swal !== "undefined" && Swal.isVisible()) {
       Swal.close();
     }
@@ -94,10 +106,9 @@ watch(
   () => authStore.isAuthenticated,
   (isAuth) => {
     if (isAuth) {
-      setupNicknameListener();
-    } else if (unsubNickname) {
-      unsubNickname();
-      unsubNickname = null;
+      setupListeners();
+    } else {
+      teardownListeners();
       if (typeof Swal !== "undefined" && Swal.isVisible()) {
         Swal.close();
       }
@@ -106,14 +117,11 @@ watch(
 );
 
 onMounted(() => {
-  setupNicknameListener();
+  setupListeners();
 });
 
 onUnmounted(() => {
-  if (unsubNickname) {
-    unsubNickname();
-    unsubNickname = null;
-  }
+  teardownListeners();
   if (typeof Swal !== "undefined" && Swal.isVisible()) {
     Swal.close();
   }

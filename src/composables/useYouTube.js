@@ -24,7 +24,9 @@ if (API_KEYS.length === 0) {
 // ✅ Round-Robin: โหลด key index ล่าสุดจาก localStorage แล้วเริ่มจาก key ถัดไป
 const STORAGE_KEY = "ytApiKeyIndex";
 function getNextKeyIndex() {
-  const lastIndex = parseInt(localStorage.getItem(STORAGE_KEY) || "0");
+  if (API_KEYS.length === 0) return 0;
+  const parsed = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10);
+  const lastIndex = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
   const nextIndex = (lastIndex + 1) % API_KEYS.length;
   localStorage.setItem(STORAGE_KEY, String(nextIndex));
   logger.auth(
@@ -34,6 +36,7 @@ function getNextKeyIndex() {
 }
 
 function saveKeyIndex(index) {
+  if (!Number.isFinite(index) || index < 0) return;
   localStorage.setItem(STORAGE_KEY, String(index));
 }
 
@@ -48,6 +51,8 @@ export function useYouTube() {
   const activeChatId = ref("");
   const viewerIntervalId = ref(null);
   const subscriberIntervalId = ref(null);
+  let announceShippingTimer = null;
+  let autoDisconnectTimer = null;
 
 
   // ✅ เริ่มจาก key ถัดจากครั้งก่อน (Round-Robin)
@@ -199,6 +204,25 @@ export function useYouTube() {
         const { processMessage } = useChatProcessor();
         processMessageFunc = processMessage;
 
+        // Clear any leftover polling/timers from a previous session
+        chatService.stopPolling();
+        if (viewerIntervalId.value) {
+          clearInterval(viewerIntervalId.value);
+          viewerIntervalId.value = null;
+        }
+        if (subscriberIntervalId.value) {
+          clearInterval(subscriberIntervalId.value);
+          subscriberIntervalId.value = null;
+        }
+        if (announceShippingTimer) {
+          clearTimeout(announceShippingTimer);
+          announceShippingTimer = null;
+        }
+        if (autoDisconnectTimer) {
+          clearTimeout(autoDisconnectTimer);
+          autoDisconnectTimer = null;
+        }
+
         // Start Chat Service
         chatService.liveChatId = activeChatId.value;
         chatService.startPolling(videoId, async (msg) => {
@@ -317,14 +341,19 @@ export function useYouTube() {
             viewerIntervalId.value = null;
 
             // 🔊 Read out names of customers who requested delivery with 5s delay after stream ends
-            setTimeout(() => {
+            if (announceShippingTimer) clearTimeout(announceShippingTimer);
+            announceShippingTimer = setTimeout(() => {
+              announceShippingTimer = null;
               announceShippingCustomers(videoId);
             }, CONSTANTS.YOUTUBE.ANNOUNCE_SHIPPING_DELAY_MS);
 
             const delaySec = CONSTANTS.YOUTUBE.DISCONNECT_DELAY_MS / 1000;
             logger.youtube(`Disconnecting in ${delaySec} seconds...`);
-            setTimeout(() => {
-              if (systemStore.isConnected) {
+            if (autoDisconnectTimer) clearTimeout(autoDisconnectTimer);
+            const endedVideoId = videoId;
+            autoDisconnectTimer = setTimeout(() => {
+              autoDisconnectTimer = null;
+              if (systemStore.isConnected && systemStore.currentVideoId === endedVideoId) {
                 queueAudio(null, "", "กำลังตัดการเชื่อมต่อครับ");
                 disconnect();
               }
@@ -354,6 +383,16 @@ export function useYouTube() {
     if (subscriberIntervalId.value) {
       clearInterval(subscriberIntervalId.value);
       subscriberIntervalId.value = null;
+    }
+
+    if (announceShippingTimer) {
+      clearTimeout(announceShippingTimer);
+      announceShippingTimer = null;
+    }
+
+    if (autoDisconnectTimer) {
+      clearTimeout(autoDisconnectTimer);
+      autoDisconnectTimer = null;
     }
 
 

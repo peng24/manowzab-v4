@@ -62,18 +62,20 @@ export const useChatStore = defineStore("chat", () => {
       return;
     }
 
-    // ✅ Resolve current nickname dynamically from nicknameStore
-    try {
-      const nicknameStore = useNicknameStore();
-      const resolved = nicknameStore.getNickname(
-        message.uid,
-        message.realName || message.authorName || message.displayName
-      );
-      if (resolved) {
-        message.displayName = resolved;
+    // ✅ Resolve current nickname dynamically from nicknameStore (without clobbering Admin Proxy or auto-learned names)
+    if (!message.proxyCustomerName && !message.isAdminNote) {
+      try {
+        const nicknameStore = useNicknameStore();
+        const lookupReal = message.realName || message.authorName;
+        if (nicknameStore.hasNickname(message.uid, lookupReal)) {
+          const resolved = nicknameStore.getNickname(message.uid, lookupReal);
+          if (resolved) {
+            message.displayName = resolved;
+          }
+        }
+      } catch (e) {
+        // Store not ready
       }
-    } catch (e) {
-      // Store not ready
     }
 
     // ✅ Sanitize proxyCustomerName if it accidentally contains action command phrases
@@ -186,8 +188,8 @@ export const useChatStore = defineStore("chat", () => {
   async function downloadChatCSV(videoId) {
     const targetVideoId = videoId || currentVideoId;
 
-    // 1. ดึงจาก RAM
-    const inMemory = [...fullChatLog.value];
+    // 1. ดึงจาก RAM (เฉพาะเมื่อเป็น session เดียวกัน ป้องกันแชทปนข้ามไลฟ์)
+    const inMemory = !videoId || videoId === currentVideoId ? [...fullChatLog.value] : [];
 
     // 2. ดึงจาก IndexedDB archive (ข้อความที่ถูก trim ออกไปแล้ว)
     const archived = await getAllChatEntries(targetVideoId).catch(() => []);
@@ -288,12 +290,16 @@ export const useChatStore = defineStore("chat", () => {
         // This handles deduplication and logging
         addMessage(messageData);
 
-        // ✅ 🛡️ Blacklist Guard: Never play audio (TTS/SFX) for banned users
+        // ✅ 🛡️ Blacklist Guard: Never play audio (TTS/SFX) for banned users (check BOTH realName and displayName)
         let isUserBanned = messageData.isBanned || messageData.type === "banned";
         if (!isUserBanned) {
           try {
             const blacklistStore = useBlacklistStore();
-            if (blacklistStore.isBanned(messageData.uid, messageData.realName || messageData.displayName || messageData.authorName)) {
+            const rawReal = messageData.realName || messageData.authorName;
+            if (
+              blacklistStore.isBanned(messageData.uid, rawReal) ||
+              (messageData.displayName && blacklistStore.isBanned(messageData.uid, messageData.displayName))
+            ) {
               isUserBanned = true;
             }
           } catch (e) {}
@@ -327,7 +333,9 @@ export const useChatStore = defineStore("chat", () => {
     return () => {
       logger.firebase(`Cleaning up chat listener for ${videoId}`);
       listener();
-      currentChatListener = null;
+      if (currentChatListener === listener) {
+        currentChatListener = null;
+      }
     };
   }
 

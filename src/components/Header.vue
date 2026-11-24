@@ -554,6 +554,7 @@ function handleClickOutside(event) {
 // ✅ Extract YouTube Video ID from various URL formats
 function extractVideoId(input) {
   if (!input) return "";
+  const trimmed = String(input).trim();
 
   // Handle common YouTube URL formats:
   // - youtube.com/watch?v=ID
@@ -561,11 +562,11 @@ function extractVideoId(input) {
   // - youtube.com/live/ID
   // - youtube.com/shorts/ID
   const regExp =
-    /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
-  const match = input.match(regExp);
+    /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?/\s]{11}).*/;
+  const match = trimmed.match(regExp);
 
-  // Return the extracted ID if it's 11 characters, otherwise return original input
-  return match && match[2].length === 11 ? match[2] : input;
+  // Return the extracted ID if it's 11 characters, otherwise return trimmed input
+  return match && match[2].length === 11 ? match[2] : trimmed;
 }
 
 async function toggleConnection() {
@@ -584,12 +585,12 @@ async function toggleConnection() {
     videoId.value = cleanId; // Update UI to show only the clean ID
   }
 
-  if (!videoId.value.trim()) {
+  if (!videoId.value.trim() || /[.#$[\]/]/.test(videoId.value.trim())) {
     Swal.fire({
       icon: "error",
       title: "Error",
-      text: "ใส่ Video ID ก่อน",
-      timer: 2000,
+      text: !videoId.value.trim() ? "ใส่ Video ID ก่อน" : "รูปแบบ Video ID หรือลิงก์ YouTube ไม่ถูกต้อง",
+      timer: 2500,
       toast: true,
       position: "top-end",
       showConfirmButton: false,
@@ -598,17 +599,19 @@ async function toggleConnection() {
   }
 
   isConnecting.value = true;
-  systemStore.isConnected = true;
-  systemStore.currentVideoId = videoId.value;
-  stockStore.connectToStock(videoId.value);
-
-  // ✅ เพิ่ม: ส่งรหัสไลฟ์ขึ้น Firebase เพื่อให้เครื่องอื่นรู้
-  set(dbRef(db, "system/activeVideo"), videoId.value).catch((err) =>
-    console.error("Sync Error:", err),
-  );
-
   try {
-    const success = await connectVideo(videoId.value);
+    const cleanVid = videoId.value.trim();
+    videoId.value = cleanVid;
+    systemStore.isConnected = true;
+    systemStore.currentVideoId = cleanVid;
+    stockStore.connectToStock(cleanVid);
+
+    // ✅ เพิ่ม: ส่งรหัสไลฟ์ขึ้น Firebase เพื่อให้เครื่องอื่นรู้
+    set(dbRef(db, "system/activeVideo"), cleanVid).catch((err) =>
+      console.error("Sync Error:", err),
+    );
+
+    const success = await connectVideo(cleanVid);
     if (success) {
       systemStore.statusChat = "ok";
       queueAudio(null, "", "เชื่อมต่อสำเร็จ กำลังอ่านคอมเมนต์");

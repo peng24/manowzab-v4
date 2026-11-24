@@ -377,6 +377,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName, cleanShippingLabelAddress } from "../utils/addressParser";
+import { escapeHtml } from "../utils/dbUtils";
 import CustomerAddressModal from "./CustomerAddressModal.vue";
 import Swal from "sweetalert2";
 
@@ -552,10 +553,12 @@ onMounted(() => {
     filterType.value = "all-requested";
     selectedIds.value = [props.initialSelectedId];
     searchQuery.value = "";
+  } else if (todayCount.value > 0) {
+    setFilter("today");
+  } else if (packTonightCount.value > 0) {
+    setFilter("pack-tonight");
   } else {
-    // Default to all-requested so all ready-to-ship customers in this list are selected and ready to print
-    filterType.value = "all-requested";
-    selectedIds.value = currentPool.value.map((c) => c.id);
+    setFilter("all-requested");
   }
 });
 
@@ -980,26 +983,30 @@ function handlePrint() {
   iframe.style.zIndex = "-9999";
   document.body.appendChild(iframe);
 
-  const senderName = sender.value.name || "มะนาวแซ่บ";
-  const senderPhone = sender.value.phone || "095-155-5706";
-  const senderAddress = (sender.value.address || "191 หมู่3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000").replace(/\n/g, "<br>");
-  const thankYou = sender.value.thankYouText || "🙏 ขอบคุณที่อุดหนุนนะคะ ❤️";
+  const senderName = escapeHtml(sender.value.name || "มะนาวแซ่บ");
+  const senderPhone = escapeHtml(sender.value.phone || "095-155-5706");
+  const senderAddress = escapeHtml(
+    sender.value.address || "191 หมู่3 ต.ขามใหญ่ อ.เมือง จ.อุบลราชธานี 34000"
+  ).replace(/\n/g, "<br>");
+  const thankYou = escapeHtml(sender.value.thankYouText || "🙏 ขอบคุณที่อุดหนุนนะคะ ❤️");
 
   const fontMultiplier = labelFontScale.value === "compact" ? 0.9 : labelFontScale.value === "large" ? 1.2 : 1.0;
   const fSize = (basePt) => `${(basePt * fontMultiplier).toFixed(1)}pt`;
 
   const cardsHtml = printableCustomers.value
     .map((customer) => {
-      const recipient = getRecipientDisplayName(customer);
-      const address = getCustomerCleanAddress(customer) || "⚠️ ยังไม่มีที่อยู่จัดส่ง";
-      const zip = getCustomerZip(customer);
-      const phone = getCustomerPhone(customer) || "-";
-      const paymentDisplay = getPaymentTypeDisplay(customer);
-      const systemName = getSystemNameDisplay(customer);
-      const contactChannelDisplay = getContactChannelShort(customer);
-      const nameSizeClass = recipient.length > 26 ? "name-long" : "";
+      const rawRecipient = getRecipientDisplayName(customer);
+      const rawAddress = getCustomerCleanAddress(customer) || "⚠️ ยังไม่มีที่อยู่จัดส่ง";
+      const recipient = escapeHtml(rawRecipient);
+      const address = escapeHtml(rawAddress);
+      const zip = escapeHtml(getCustomerZip(customer));
+      const phone = escapeHtml(getCustomerPhone(customer) || "-");
+      const paymentDisplay = escapeHtml(getPaymentTypeDisplay(customer));
+      const systemName = escapeHtml(getSystemNameDisplay(customer));
+      const contactChannelDisplay = escapeHtml(getContactChannelShort(customer));
+      const nameSizeClass = rawRecipient.length > 26 ? "name-long" : "";
       const addrSizeClass =
-        address.length > 130 ? "addr-xlong" : address.length > 85 ? "addr-long" : "";
+        rawAddress.length > 130 ? "addr-xlong" : rawAddress.length > 85 ? "addr-long" : "";
 
       if (isLandscape) {
         return `
@@ -1398,16 +1405,6 @@ function exportExcelForApp() {
     confirmButtonColor: "#3b82f6",
   });
 }
-
-onMounted(() => {
-  if (todayCount.value > 0) {
-    setFilter("today");
-  } else if (packTonightCount.value > 0) {
-    setFilter("pack-tonight");
-  } else {
-    setFilter("all-requested");
-  }
-});
 </script>
 
 <style scoped>

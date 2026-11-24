@@ -4,6 +4,7 @@ import { db } from "./useFirebase";
 import { isPriceAnnouncementMessage } from "../stores/chat";
 import { useNicknameStore } from "../stores/nickname";
 import { resolveStoredProxyName } from "../utils/chatDisplayUtils";
+import { logger } from "../utils/logger";
 
 export function useHistory() {
     const historyList = ref([]);
@@ -100,13 +101,13 @@ export function useHistory() {
                     ...msg,
                 };
 
-                if (nicknameStore) {
-                    const resolved = nicknameStore.getNickname(
-                        entry.uid,
-                        entry.realName || entry.authorName || entry.displayName
-                    );
-                    if (resolved) {
-                        entry.displayName = resolved;
+                if (nicknameStore && !entry.proxyCustomerName && !entry.isAdminNote) {
+                    const lookupReal = entry.realName || entry.authorName;
+                    if (nicknameStore.hasNickname(entry.uid, lookupReal)) {
+                        const resolved = nicknameStore.getNickname(entry.uid, lookupReal);
+                        if (resolved) {
+                            entry.displayName = resolved;
+                        }
                     }
                 }
 
@@ -145,8 +146,8 @@ export function useHistory() {
                     ...data,
                     updatedAt: Date.now() // Track edit time
                 };
-                // If it's a new entry (was empty), ensure time exists if not provided
-                if (!updateData.time && !updateData.updatedAt) updateData.time = Date.now();
+                // If it's a new owned entry (was empty), ensure time exists if not provided
+                if (data.owner && !updateData.time) updateData.time = Date.now();
                 
                 await update(itemRef, updateData);
             } else {
@@ -388,10 +389,14 @@ export function useHistory() {
                     let totalSales = 0;
                     let totalItems = 0;
                     
-                    Object.values(stockData).forEach(order => {
-                        if (order.owner && order.price) {
-                            totalSales += parseInt(order.price);
-                            totalItems++;
+                    Object.values(stockData || {}).forEach(order => {
+                        if (!order || !order.owner) return;
+                        totalItems++;
+                        if (order.price) {
+                            const p = parseInt(order.price, 10);
+                            if (!isNaN(p) && p > 0) {
+                                totalSales += p;
+                            }
                         }
                     });
 

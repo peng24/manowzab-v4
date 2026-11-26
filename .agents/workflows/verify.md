@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.8.0 — Smart Size, History UX Redesign, AuthSplash & Full-System 79-File Bug/Animation Hardening — 2026-11-26** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.8.1 — Auto Cleanup Index Fallback & Silent Chat Dedup Hotfix — 2026-11-26** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -652,3 +652,4 @@ description: Mandatory verification checklist after every code change
   - `npm run build`: **✓ ผ่าน** (`142 modules transformed`, 4 entry points `index.html`, `shipping/index.html`, `history/index.html`, `address/index.html`)
   - `npm test -- --run`: **✓ ผ่านครบ 38/38 Test Files / 942/942 Tests** (รวม `systemAuditWave2.test.js` 14 เคสใหม่, `4.68s`)
   - อัปเดตกฎโปรเจกต์ครบ 4 ไฟล์ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) และ `.agents/workflows/verify.md` แล้ว
+  - **Post-Deploy Hotfix (26 พ.ย. 69):** เพิ่ม `".indexOn": ["timestamp"]` ที่ `/history` ใน `database.rules.json` + fallback ใน `useAutoCleanup.js` เมื่อ Firebase ยังไม่ได้ deploy index rules และปรับการข้ามข้อความแชทซ้ำใน `src/stores/chat.js` ให้เงียบ (`logger.debug` + skip ใน `onChildAdded`) ลด console warning noise (ผ่าน **38 ไฟล์ / 944 tests**)

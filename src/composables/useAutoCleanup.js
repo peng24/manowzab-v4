@@ -40,11 +40,21 @@ export function useAutoCleanup() {
 
             logger.system(`Cutoff Date: ${cutoffDate.toLocaleDateString()} (${cutoffTimestamp})`);
 
-            // 4. Query 'history' node for old videos
+            // 4. Query 'history' node for old videos (with graceful fallback if '.indexOn: timestamp' is not deployed yet)
             const historyRef = dbRef(db, "history");
-            const oldHistoryQuery = query(historyRef, orderByChild("timestamp"), endAt(cutoffTimestamp));
-
-            const snapshot = await get(oldHistoryQuery);
+            let snapshot;
+            try {
+                const oldHistoryQuery = query(historyRef, orderByChild("timestamp"), endAt(cutoffTimestamp));
+                snapshot = await get(oldHistoryQuery);
+            } catch (queryErr) {
+                const errMsg = String(queryErr?.message || queryErr || "");
+                if (errMsg.includes("Index not defined")) {
+                    logger.debug("Auto Cleanup: '/history' timestamp index not deployed yet; falling back to client-side filter.");
+                    snapshot = await get(historyRef);
+                } else {
+                    throw queryErr;
+                }
+            }
 
             if (!snapshot.exists()) {
                 logger.system("Auto Cleanup: No old history found.");

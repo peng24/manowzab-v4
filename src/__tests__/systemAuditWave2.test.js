@@ -32,13 +32,19 @@ vi.mock("firebase/database", () => ({
   update: vi.fn().mockResolvedValue(true),
   remove: vi.fn().mockResolvedValue(true),
   push: vi.fn().mockResolvedValue({ key: "mock-key" }),
-  query: vi.fn((r) => r),
+  query: vi.fn((r) => ({ ...r, isQuery: true })),
+  orderByChild: vi.fn((field) => ({ orderByChild: field })),
+  endAt: vi.fn((val) => ({ endAt: val })),
   limitToLast: vi.fn((n) => n),
   runTransaction: vi.fn().mockResolvedValue({ committed: true }),
 }));
 
 vi.mock("../composables/useFirebase", () => ({
   db: {},
+}));
+
+vi.mock("../stores/auth", () => ({
+  useAuthStore: () => ({ isAuthenticated: true }),
 }));
 
 import { configureSwal } from "../utils/swalConfig";
@@ -55,7 +61,9 @@ import { numberToThaiWords, replaceNumbersWithThaiWords } from "../utils/thaiNum
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useBlacklistStore } from "../stores/blacklist";
+import { useChatStore } from "../stores/chat";
 import { useHistory } from "../composables/useHistory";
+import { useAutoCleanup } from "../composables/useAutoCleanup";
 import { completeDelivery, restoreDelivery } from "../utils/deliveryActions";
 
 describe("Full-System Bug & Animation Audit Regression Suite (Wave 1-3)", () => {
@@ -244,6 +252,53 @@ describe("Full-System Bug & Animation Audit Regression Suite (Wave 1-3)", () => 
       expect(blacklistStore.getBanInfo("", "")).toBeNull();
       await blacklistStore.unbanUser("");
       expect(fb.remove).not.toHaveBeenCalled();
+    });
+
+    it("useAutoCleanup falls back to full history read when Firebase '/history' timestamp index is not deployed", async () => {
+      vi.useFakeTimers();
+      try {
+        const fb = await import("firebase/database");
+        const oldTs = Date.now() - 45 * 86400000;
+        const recentTs = Date.now() - 2 * 86400000;
+        const entries = [
+          { key: "OLD_VID", val: () => ({ timestamp: oldTs, title: "Old Live" }) },
+          { key: "NEW_VID", val: () => ({ timestamp: recentTs, title: "New Live" }) },
+        ];
+        fb.get.mockImplementation(async (refObj) => {
+          if (refObj?.isQuery) {
+            throw new Error('Index not defined, add ".indexOn": "timestamp", for path "/history", to the rules');
+          }
+          return {
+            exists: () => true,
+            forEach: (cb) => entries.forEach(cb),
+          };
+        });
+
+        const { initAutoCleanup } = useAutoCleanup();
+        const cancel = await initAutoCleanup();
+        await vi.advanceTimersByTimeAsync(20000);
+        if (cancel) cancel();
+
+        const removedPaths = fb.remove.mock.calls.map((c) => c[0]?.path);
+        expect(removedPaths).toContain("history/OLD_VID");
+        expect(removedPaths).toContain("chats/OLD_VID");
+        expect(removedPaths).not.toContain("history/NEW_VID");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("chatStore.addMessage deduplicates repeated IDs quietly without console.warn spam", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const chatStore = useChatStore();
+        chatStore.addMessage({ id: "LCC.dup1", authorName: "A", text: "15", timestamp: Date.now() });
+        chatStore.addMessage({ id: "LCC.dup1", authorName: "A", text: "15", timestamp: Date.now() });
+        expect(chatStore.messages).toHaveLength(1);
+        expect(warnSpy).not.toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 });

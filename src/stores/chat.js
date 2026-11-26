@@ -52,7 +52,7 @@ export const useChatStore = defineStore("chat", () => {
 
   function addMessage(message) {
     if (seenMessageIds.value[message.id]) {
-      logger.warn("Duplicate message:", message.id);
+      logger.debug("Duplicate message skipped:", message.id);
       return;
     }
 
@@ -286,6 +286,9 @@ export const useChatStore = defineStore("chat", () => {
         }
 
         const isNew = !seenMessageIds.value[messageData.id];
+        if (!isNew) {
+          return;
+        }
 
         // Add message through the existing addMessage function
         // This handles deduplication and logging

@@ -303,4 +303,20 @@ describe('reviewed chat log regressions — 2026-10-31', () => {
     expect(parseIntentDetails('ใช่อยากดูวันนี้').type).toBe('UNKNOWN');
     expect(parseIntentDetails('หาไซใหญ่ๆมาลงให้หน่อยค่ะไว้จะดูใหม่นะคะขอบคุณค่ะป้ามีอายุขมีแขนสามส่วน').type).toBe('UNKNOWN');
   });
+
+  // Audited Nov 23 live chat CSV (92 rows anonymized)
+  it('handles Nov 23 multi-buy เเละ, fit typo ไหคะ, casual browsing, photo request, and self-name guards', () => {
+    expect(parseIntentDetails('รับ12เเละ13')).toMatchObject({ type: 'MULTI_BUY', itemIds: [12, 13] });
+    expect(parseIntentDetails('รับ 12 และ 13')).toMatchObject({ type: 'MULTI_BUY', itemIds: [12, 13] });
+    expect(parseIntentDetails('สีเำหลัง64พี่ใส่ได้ไหคะ').type).toBe('QUESTION');
+    expect(parseIntentDetails('พี่ขอดูไปเรื่อยๆก่อนค่ะ').type).toBe('UNKNOWN');
+    expect(parseIntentDetails('พรุ่งนี้ส่งรูปให้พี่ดูด้วย').type).toBe('UNKNOWN');
+    expect(extractCustomerSelfName('พึ่งเข้ามา')).toBeNull();
+    expect(extractCustomerSelfName('นี่ค่ะ')).toBeNull();
+    expect(parseIntentDetails('ของพี่จ่ายวันนี้หมดเลยแต่ฝากไว้ก่อนค่ะ')).toEqual({
+      type: 'SHIPPING',
+      customerName: null,
+      method: 'hold-keyword',
+    });
+  });
 });

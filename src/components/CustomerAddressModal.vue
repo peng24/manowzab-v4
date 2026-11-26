@@ -284,17 +284,20 @@ const normKey = computed(() => {
   return normalizeName(props.customer.name).replace(/[.#$[\]/]/g, "_");
 });
 
-// Build raw address list
+function normalizeAddressArray(raw) {
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (raw && typeof raw === "object") return Object.values(raw).filter(Boolean);
+  return [];
+}
+
+// Build raw address list (handles sparse arrays & Firebase plain-object maps cleanly)
 const addressList = computed(() => {
   const list = [];
-  const existingInCust = props.customer?.addresses;
-  const existingInBook = props.addressBook && props.addressBook[normKey.value]?.addresses;
+  const custAddrs = normalizeAddressArray(props.customer?.addresses);
+  const bookAddrs = normalizeAddressArray(props.addressBook && props.addressBook[normKey.value]?.addresses);
 
-  const rawList = existingInCust || existingInBook;
-
-  if (Array.isArray(rawList) && rawList.length > 0) {
-    return rawList;
-  }
+  if (custAddrs.length > 0) return custAddrs;
+  if (bookAddrs.length > 0) return bookAddrs;
 
   // Fallback: Check single address on customer or address book
   const custAddr = props.customer?.address;
@@ -332,30 +335,26 @@ watch(
 
 function isSelected(addr) {
   if (!addr) return false;
-
-  // 1. Local selection state (Instant Optimistic UI)
-  if (currentSelectedAddrId.value && addr.id) {
-    if (currentSelectedAddrId.value === addr.id) return true;
-  }
-  if (currentSelectedAddressText.value && addr.address) {
-    if (currentSelectedAddressText.value.trim() === addr.address.trim()) return true;
-  }
-
-  // 2. Customer props fallback
-  if (props.customer?.selectedAddressId && addr.id) {
-    if (props.customer.selectedAddressId === addr.id) return true;
-  }
-  if (props.customer?.address && addr.address) {
-    if (props.customer.address.trim() === addr.address.trim()) return true;
-  }
-
-  // 3. Address book fallback
   const bookEntry = props.addressBook && props.addressBook[normKey.value];
-  if (bookEntry?.selectedAddressId && addr.id) {
-    if (bookEntry.selectedAddressId === addr.id) return true;
+
+  // Resolve a single canonical active target with exclusive priority (prevents double-highlighting)
+  const activeId =
+    currentSelectedAddrId.value ||
+    props.customer?.selectedAddressId ||
+    bookEntry?.selectedAddressId ||
+    "";
+  if (activeId && addr.id) {
+    return activeId === addr.id;
   }
-  if (bookEntry?.address && addr.address) {
-    if (bookEntry.address.trim() === addr.address.trim()) return true;
+
+  const activeText = (
+    currentSelectedAddressText.value ||
+    props.customer?.address ||
+    bookEntry?.address ||
+    ""
+  ).trim();
+  if (activeText && addr.address) {
+    return activeText === addr.address.trim();
   }
 
   return false;
@@ -486,10 +485,15 @@ async function saveForm() {
     contactChannel: formData.value.contactChannel || "",
   };
 
-  // Extract postal code if missing
-  if (!newAddrObj.postalCode) {
-    const match = newAddrObj.address.match(/\b[1-9]\d{4}\b/);
-    if (match) newAddrObj.postalCode = match[0];
+  // Always re-extract postal code from edited address (prevents stale zip from previous province)
+  const zipMatch = newAddrObj.address.match(/\b[1-9]\d{4}\b/);
+  if (zipMatch) {
+    newAddrObj.postalCode = zipMatch[0];
+  } else if (
+    editingIndex.value !== null &&
+    currentList[editingIndex.value]?.address?.trim() !== newAddrObj.address
+  ) {
+    newAddrObj.postalCode = "";
   }
 
   if (editingIndex.value !== null) {
@@ -499,32 +503,29 @@ async function saveForm() {
   }
 
   const timestamp = Date.now();
-  const cleanName = props.customer.name.trim();
+  const cleanName = (props.customer?.name || "").trim();
   const shouldBeActive = formData.value.setAsActive || currentList.length === 1;
 
   const updates = {};
-  updates[`delivery_customers/${props.customer.id}/addresses`] = currentList;
-  updates[`delivery_customers/${props.customer.id}/paymentType`] = formData.value.paymentType || "";
-  updates[`delivery_customers/${props.customer.id}/contactChannel`] = formData.value.contactChannel || "";
-  if (props.customer) {
-    props.customer.paymentType = formData.value.paymentType || "";
-    props.customer.contactChannel = formData.value.contactChannel || "";
+  if (props.customer?.id) {
+    updates[`delivery_customers/${props.customer.id}/addresses`] = currentList;
+    updates[`delivery_customers/${props.customer.id}/paymentType`] = formData.value.paymentType || "";
+    updates[`delivery_customers/${props.customer.id}/contactChannel`] = formData.value.contactChannel || "";
+    updates[`delivery_customers/${props.customer.id}/updatedAt`] = timestamp;
   }
-  updates[`address_book/${normKey.value}/addresses`] = currentList;
-  updates[`address_book/${normKey.value}/name`] = cleanName;
-  if (formData.value.paymentType !== undefined) {
-    updates[`address_book/${normKey.value}/paymentType`] = formData.value.paymentType || "";
-    if (props.addressBook && props.addressBook[normKey.value]) {
-      props.addressBook[normKey.value].paymentType = formData.value.paymentType || "";
+  if (normKey.value) {
+    updates[`address_book/${normKey.value}/addresses`] = currentList;
+    if (cleanName) {
+      updates[`address_book/${normKey.value}/name`] = cleanName;
     }
-  }
-  if (formData.value.contactChannel !== undefined) {
-    updates[`address_book/${normKey.value}/contactChannel`] = formData.value.contactChannel || "";
-    if (props.addressBook && props.addressBook[normKey.value]) {
-      props.addressBook[normKey.value].contactChannel = formData.value.contactChannel || "";
+    if (formData.value.paymentType !== undefined) {
+      updates[`address_book/${normKey.value}/paymentType`] = formData.value.paymentType || "";
     }
+    if (formData.value.contactChannel !== undefined) {
+      updates[`address_book/${normKey.value}/contactChannel`] = formData.value.contactChannel || "";
+    }
+    updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
   }
-  updates[`address_book/${normKey.value}/updatedAt`] = timestamp;
 
   if (shouldBeActive) {
     currentSelectedAddrId.value = newAddrObj.id;
@@ -547,19 +548,29 @@ async function saveForm() {
     }
   }
 
-  await update(dbRef(db), updates);
+  if (Object.keys(updates).length === 0) return;
 
-  Swal.fire({
-    icon: "success",
-    title: "บันทึกที่อยู่สำเร็จ",
-    toast: true,
-    position: "top-end",
-    timer: 1500,
-    showConfirmButton: false,
-  });
+  try {
+    await update(dbRef(db), updates);
+    Swal.fire({
+      icon: "success",
+      title: "บันทึกที่อยู่สำเร็จ",
+      toast: true,
+      position: "top-end",
+      timer: 1500,
+      showConfirmButton: false,
+    });
 
-  isEditingForm.value = false;
-  editingIndex.value = null;
+    isEditingForm.value = false;
+    editingIndex.value = null;
+  } catch (err) {
+    console.error("Failed to save customer address:", err);
+    Swal.fire({
+      icon: "error",
+      title: "บันทึกที่อยู่ไม่สำเร็จ",
+      text: err?.message || "กรุณาลองใหม่อีกครั้ง",
+    });
+  }
 }
 
 async function deleteAddress(index) {
@@ -632,15 +643,25 @@ async function deleteAddress(index) {
       }
     }
 
-    await update(dbRef(db), updates);
-    Swal.fire({
-      icon: "success",
-      title: "ลบที่อยู่เรียบร้อย",
-      toast: true,
-      position: "top-end",
-      timer: 1200,
-      showConfirmButton: false,
-    });
+    if (Object.keys(updates).length === 0) return;
+    try {
+      await update(dbRef(db), updates);
+      Swal.fire({
+        icon: "success",
+        title: "ลบที่อยู่เรียบร้อย",
+        toast: true,
+        position: "top-end",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      console.error("Failed to delete customer address:", err);
+      Swal.fire({
+        icon: "error",
+        title: "ลบที่อยู่ไม่สำเร็จ",
+        text: err?.message || "กรุณาลองใหม่อีกครั้ง",
+      });
+    }
   }
 }
 
@@ -926,7 +947,12 @@ onMounted(() => {
   border: 1px solid rgba(16, 185, 129, 0.3);
   padding: 2px 8px;
   border-radius: 8px;
-  animation: fadeIn 0.3s ease;
+  animation: camFadeIn 0.25s ease;
+}
+
+@keyframes camFadeIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .cam-quick-input-wrap {

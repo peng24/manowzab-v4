@@ -82,7 +82,7 @@ import {
 } from "../utils/chatParserUtils";
 
 // 🚀 Pre-compiled Module-Scoped Regexes (Zero allocation per chat message)
-const SPLIT_NUMS_REGEX = /[\s,_]+/;
+const SPLIT_NUMS_REGEX = /(?:[\s,_]+|\s*(?:และ|เเละ|กับ|กะ)\s*)+/;
 const BACKDATED_ORDER_REGEX = /เมื่อวาน|เมือวาน|ย้อนหลัง|รอบเมื่อวาน/i;
 const STRIP_LEADING_NON_LETTER_REGEX = /^[^\u0E00-\u0E7Fa-zA-Z]+/;
 const STRIP_EDGE_PUNCT_REGEX = /^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g;
@@ -139,6 +139,7 @@ let _lastVideoId = null; // ✅ Track current session for auto-clear
 const incomingBatchQueue = [];
 let isBatchProcessing = false;
 let batchFlushTimer = null;
+let batchSeqCounter = 0;
 const MICRO_BATCH_DELAY_MS = 80;
 
 export function useChatProcessor() {
@@ -153,19 +154,17 @@ export function useChatProcessor() {
   // 🚀 Phase 1.3: Memoized name→uid reverse lookup (computed — recomputes only when nicknames change)
   // แทนที่ getNameToUidMap() ที่ O(n) ทุกครั้งที่มี shipping message
   const nameToUidMap = computed(() => {
-    const map = {};
+    const map = Object.create(null);
     const data = nicknameStore.nicknames || {};
     Object.keys(data).forEach((uid) => {
       const entry = data[uid];
-      const nick = typeof entry === "object" ? entry.nick : entry;
+      const nick = typeof entry === "object" ? entry?.nick : entry;
       if (nick) {
-        map[nick.trim().toLowerCase()] = uid;
+        map[String(nick).trim().toLowerCase()] = uid;
       }
     });
     return map;
   });
-
-  let batchSeqCounter = 0;
 
   function processMessage(item) {
     return new Promise((resolve, reject) => {
@@ -227,9 +226,16 @@ export function useChatProcessor() {
   }
 
   async function processSingleMessage(item) {
+    // Capture session videoId & finite timestamp at entry to prevent cross-session contamination & NaN writes
+    const sessionVideoId = systemStore.currentVideoId;
+    const rawPublishedMs = item?.snippet?.publishedAt
+      ? new Date(item.snippet.publishedAt).getTime()
+      : NaN;
+    const safeMsgTimestamp = Number.isFinite(rawPublishedMs) ? rawPublishedMs : Date.now();
+
     // ✅ Auto-clear session state when video changes
-    if (systemStore.currentVideoId !== _lastVideoId) {
-      _lastVideoId = systemStore.currentVideoId;
+    if (sessionVideoId !== _lastVideoId) {
+      _lastVideoId = sessionVideoId;
       processingLocks.clear();
       // The queue already contains this video's first poll batch. Clearing it
       // here would discard all messages after the first and strand their promises.
@@ -389,7 +395,7 @@ export function useChatProcessor() {
 
     if (isUserBanned) {
       logger.warn(`🚫 Blocked banned customer chat: ${displayName} (${uid})`);
-      chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+      await chatStore.sendMessageToFirebase(sessionVideoId, {
         id: item.id,
         text: msg,
         messageRuns: getMessageRuns(),
@@ -406,8 +412,8 @@ export function useChatProcessor() {
         sfxType: null,
         ttsText: "",
         detectionMethod: "blacklist-blocked",
-        timestamp: new Date(item.snippet.publishedAt).getTime(),
-      });
+        timestamp: safeMsgTimestamp,
+      }).catch((e) => logger.warn("Banned chat sync warning:", e));
       return;
     }
 
@@ -956,15 +962,16 @@ export function useChatProcessor() {
 
         // ✅ DEDUP: Check if customer with same name already exists in delivery_customers
         let targetUid = await resolveDeliveryUid(autoShipUid, autoShipName);
-
-        update(dbRef(db, `delivery_customers/${targetUid}`), {
-          name: autoShipName,
-          deliveryDate: parsedDate,
-          status: "pending",
-          labelPrinted: false,
-          labelPrintedAt: null,
-          updatedAt: Date.now(),
-        });
+        if (targetUid) {
+          await update(dbRef(db, `delivery_customers/${targetUid}`), {
+            name: autoShipName,
+            deliveryDate: parsedDate,
+            status: "pending",
+            labelPrinted: false,
+            labelPrintedAt: null,
+            updatedAt: Date.now(),
+          }).catch((e) => logger.warn("Auto-ship delivery update error:", e));
+        }
 
         Toast.fire({
           icon: "success",
@@ -1154,6 +1161,31 @@ export function useChatProcessor() {
         return;
       }
 
+      // 🛡️ Blacklist Guard on forcedOwnerName (blocks alternate-account name-first bookings like "สมชาย 40")
+      if (!isAdmin && forcedOwnerName && blacklistStore.isBanned(null, forcedOwnerName)) {
+        logger.warn(`🚫 Blocked banned customer via name-first booking: ${forcedOwnerName} (${uid})`);
+        await chatStore.sendMessageToFirebase(sessionVideoId, {
+          id: item.id,
+          text: msg,
+          messageRuns: getMessageRuns(),
+          authorName: realName,
+          displayName,
+          phoneticName,
+          realName,
+          uid,
+          avatar,
+          color: stringToColor(uid),
+          isAdmin: false,
+          isBanned: true,
+          type: "banned",
+          sfxType: null,
+          ttsText: "",
+          detectionMethod: "blacklist-blocked",
+          timestamp: safeMsgTimestamp,
+        }).catch((e) => logger.warn("Blacklist message sync error:", e));
+        return;
+      }
+
       // ✅ Auto-Expand Stock for Single Buy
       if (targetId > stockStore.stockSize) {
         const newSize = Math.ceil(targetId / 10) * 10;
@@ -1183,12 +1215,13 @@ export function useChatProcessor() {
           .replace(STRIP_EDGE_PUNCT_REGEX, "")
           .trim();
 
+        const randSuffix = Math.random().toString(36).slice(2, 7);
         if (cleanName.length > 0 && !isAdminUser(cleanName)) {
           ownerName = cleanName;
-          ownerUid = "admin-proxy-" + Date.now();
+          ownerUid = `admin-proxy-${Date.now()}-${randSuffix}`;
         } else {
           ownerName = displayName;
-          ownerUid = "admin-proxy-" + Date.now();
+          ownerUid = `admin-proxy-${Date.now()}-${randSuffix}`;
         }
       }
 
@@ -1202,7 +1235,7 @@ export function useChatProcessor() {
       const pushBuyMessage = (finalSfxType) => {
         const resolvedSfx =
           finalSfxType === "success" && isNewCustomerChat ? "bell" : finalSfxType;
-        return chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+        return chatStore.sendMessageToFirebase(sessionVideoId, {
           id: item.id,
           text: msg,
           messageRuns: getMessageRuns(),
@@ -1220,7 +1253,7 @@ export function useChatProcessor() {
           sfxType: resolvedSfx,
           ttsText: isVoiceChat ? "" : ttsMessage,
           detectionMethod: method,
-          timestamp: new Date(item.snippet.publishedAt).getTime(),
+          timestamp: safeMsgTimestamp,
         });
       };
 
@@ -1383,30 +1416,33 @@ export function useChatProcessor() {
       });
     } else {
       // --- Other Intents / General Chat ---
-      if (intent === "shipping" && !isVoiceChat && !holdRegex.test(normalizedMsg) && !isAdmin) {
-        const shippingRef = dbRef(
-          db,
-          `system/shipping/${systemStore.currentVideoId}/${uid}`,
-        );
-        update(shippingRef, {
-          ready: true,
-          timestamp: Date.now(),
-          lastMessage: msg,
-        }).catch((e) => logger.error("Shipping update error:", e));
+      if (intent === "shipping" && !isVoiceChat && !holdRegex.test(normalizedMsg) && !isAdmin && sessionVideoId) {
+        const safeShipUid = sanitizeDbKey(uid || displayName || "guest");
+        if (safeShipUid && safeShipUid !== "invalid_key") {
+          const shippingRef = dbRef(
+            db,
+            `system/shipping/${sessionVideoId}/${safeShipUid}`,
+          );
+          update(shippingRef, {
+            ready: true,
+            timestamp: Date.now(),
+            lastMessage: msg,
+          }).catch((e) => logger.error("Shipping update error:", e));
 
-        const historyRef = dbRef(
-          db,
-          `system/shipping/${systemStore.currentVideoId}/${uid}/history`,
-        );
-        push(historyRef, {
-          text: msg,
-          timestamp: Date.now(),
-          type: "user",
-        }).catch((e) => logger.warn("Shipping history push warning:", e));
+          const historyRef = dbRef(
+            db,
+            `system/shipping/${sessionVideoId}/${safeShipUid}/history`,
+          );
+          push(historyRef, {
+            text: msg,
+            timestamp: Date.now(),
+            type: "user",
+          }).catch((e) => logger.warn("Shipping history push warning:", e));
+        }
       }
 
       const proxyCustomerName = isAdmin ? extractAdminCustomerName(msg) : null;
-      await chatStore.sendMessageToFirebase(systemStore.currentVideoId, {
+      await chatStore.sendMessageToFirebase(sessionVideoId, {
         id: item.id,
         text: msg,
         messageRuns: getMessageRuns(),
@@ -1427,7 +1463,7 @@ export function useChatProcessor() {
         sfxType: isNewCustomerChat ? "bell" : null,
         ttsText: isVoiceChat ? "" : ttsMessage,
         detectionMethod: method,
-        timestamp: new Date(item.snippet.publishedAt).getTime(),
+        timestamp: safeMsgTimestamp,
       });
     }
   }

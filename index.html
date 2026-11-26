@@ -14,7 +14,9 @@
     />
     <title>Manowzab Command Center</title>
 
-    <!-- ✅ Google Thai Fonts: Kanit, Noto Sans Thai & Sarabun -->
+    <!-- ✅ Preconnect Firebase Auth & Google Fonts for faster boot -->
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
@@ -23,11 +25,11 @@
     <link
       rel="preload"
       as="style"
-      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700;800&display=swap"
     />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700;800&display=swap"
     />
 
     <!-- Font Awesome (Non-blocking for instant LCP) -->
@@ -55,16 +57,30 @@
     <noscript>กรุณาเปิดใช้งาน JavaScript เพื่อใช้ระบบ Manowzab Command Center</noscript>
     <div id="app"></div>
     <script>
-      // Clear old service workers once to break the PWA caching loop (non-blocking)
-      if ('serviceWorker' in navigator && !localStorage.getItem('sw_reset_v4_36_5')) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for (let registration of registrations) {
-            registration.unregister();
-          }
-          localStorage.setItem('sw_reset_v4_36_5', '1');
-          window.location.reload();
-        });
-      }
+      // Clear old service workers once to break legacy PWA caching loop (non-blocking, no double-reload on clean install)
+      (function () {
+        if (!('serviceWorker' in navigator)) return;
+        var hasReset = false;
+        try {
+          hasReset = Boolean(localStorage.getItem('sw_reset_v4_36_5'));
+        } catch (e) {
+          return;
+        }
+        if (hasReset) return;
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          try {
+            localStorage.setItem('sw_reset_v4_36_5', '1');
+          } catch (e) {}
+          if (!registrations || registrations.length === 0) return;
+          Promise.all(
+            registrations.map(function (registration) {
+              return registration.unregister().catch(function () {});
+            })
+          ).then(function () {
+            window.location.reload();
+          });
+        }).catch(function () {});
+      })();
     </script>
     <script type="module" src="/src/main.js"></script>
   </body>

@@ -1,5 +1,6 @@
 import confetti from "canvas-confetti";
 import { audioCtx } from "../composables/useAudio";
+import { useSystemStore } from "../stores/system";
 import { logger } from "./logger";
 
 // Preload cache variables
@@ -39,36 +40,61 @@ export function triggerCelebration(percentage) {
   const duration = 5000; // Celebration burst (5 seconds)
   const animationEnd = Date.now() + duration;
 
-  // ✅ Play the preloaded audio buffer directly from memory
-  if (audioCtx && celebrationAudioBuffer) {
-    try {
-      if (audioCtx.state === "suspended") {
-        audioCtx.resume();
+  // Respect mute state before playing celebration sound
+  let isSoundOn = true;
+  try {
+    isSoundOn = useSystemStore().isSoundOn !== false;
+  } catch {
+    /* Pinia may not be initialized in isolated tests */
+  }
+
+  // ✅ Play the preloaded audio buffer directly from memory (only when sound is ON)
+  if (isSoundOn) {
+    if (audioCtx && celebrationAudioBuffer) {
+      try {
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume().catch(() => {});
+        }
+        const source = audioCtx.createBufferSource();
+        source.buffer = celebrationAudioBuffer;
+
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.2; // 20% volume (very soft)
+
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        source.onended = () => {
+          try {
+            source.disconnect();
+            gainNode.disconnect();
+          } catch {}
+        };
+
+        source.start(0);
+      } catch (err) {
+        logger.warn("Audio buffer playback error:", err);
       }
-      const source = audioCtx.createBufferSource();
-      source.buffer = celebrationAudioBuffer;
-
-      const gainNode = audioCtx.createGain();
-      gainNode.gain.value = 0.2; // 20% volume (very soft)
-
-      source.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-
-      source.start(0);
-    } catch (err) {
-      logger.warn("Audio buffer playback error:", err);
+    } else {
+      // Fallback just in case the trigger happens before the preload finishes
+      try {
+        const audio = new Audio(
+          "https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3",
+        );
+        audio.volume = 0.2;
+        audio
+          .play()
+          .catch((e) => logger.warn("Fallback audio autoplay blocked", e));
+      } catch (e) {}
     }
-  } else {
-    // Fallback just in case the trigger happens before the preload finishes
-    try {
-      const audio = new Audio(
-        "https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3",
-      );
-      audio.volume = 0.2;
-      audio
-        .play()
-        .catch((e) => logger.warn("Fallback audio autoplay blocked", e));
-    } catch (e) {}
+  }
+
+  // Respect OS reduced-motion preference before firing continuous confetti
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    return;
   }
 
   // ✅ Trigger Confetti

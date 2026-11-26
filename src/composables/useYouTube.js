@@ -117,20 +117,24 @@ export function useYouTube() {
     }
   }
 
+  let connectGeneration = 0;
+
   /**
    * Connects to a YouTube Video.
    * Fetches metadata, initializes chat polling, and starts viewer tracking.
    *
    * @param {string} videoId - The YouTube Video ID.
-   * @returns {Promise<boolean>} True if connection successful, false otherwise.
+   * @returns {Promise<boolean>} True if connection successful with active live chat, false otherwise.
    */
   async function connectVideo(videoId) {
+    const gen = ++connectGeneration;
     try {
       logger.youtube("Connecting to video:", videoId);
       logger.youtube("Direct Mode: Fetching YouTube API...");
 
-      const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${videoId}`;
+      const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${encodeURIComponent(videoId)}`;
       const data = await smartFetch(url);
+      if (gen !== connectGeneration) return false;
 
       if (!data.items || data.items.length === 0) {
         throw new Error("Invalid Video ID");
@@ -232,28 +236,21 @@ export function useYouTube() {
         });
 
         // Start Viewer Count Loop
-        updateViewerCount(videoId);
+        updateViewerCount(videoId, gen);
         viewerIntervalId.value = setInterval(
-          () => updateViewerCount(videoId),
+          () => updateViewerCount(videoId, gen),
           CONSTANTS.YOUTUBE.VIEWER_POLL_INTERVAL_MS,
         );
 
         // Start Subscriber Count Tracking Loop
         const channelId = item.snippet?.channelId;
         if (channelId) {
-          updateSubscriberCount(channelId);
+          updateSubscriberCount(channelId, gen);
           subscriberIntervalId.value = setInterval(
-            () => updateSubscriberCount(channelId),
+            () => updateSubscriberCount(channelId, gen),
             CONSTANTS.YOUTUBE.SUBSCRIBER_POLL_INTERVAL_MS,
           );
         }
-
-        // Voice Announcement
-        queueAudio(
-          null,
-          "",
-          `การเชื่อมต่อสำเร็จ กำลังอ่านแชดสดจาก ${item.snippet.title}`,
-        );
 
         return true;
       } else {
@@ -261,9 +258,10 @@ export function useYouTube() {
         return false;
       }
     } catch (e) {
+      if (gen !== connectGeneration) return false;
       logger.error("Connect video error:", e);
       systemStore.statusApi = "err";
-      return false;
+      throw e;
     }
   }
 
@@ -271,11 +269,12 @@ export function useYouTube() {
    * Polls Channel Subscriber Count and Triggers Voice + Toast Notification when count increases.
    * @param {string} channelId
    */
-  async function updateSubscriberCount(channelId) {
+  async function updateSubscriberCount(channelId, expectedGen = connectGeneration) {
     if (!channelId) return;
     try {
-      const url = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}`;
+      const url = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${encodeURIComponent(channelId)}`;
       const data = await smartFetch(url);
+      if (expectedGen !== connectGeneration) return;
       const stats = data.items?.[0]?.statistics;
 
       if (stats && !stats.hiddenSubscriberCount && stats.subscriberCount) {
@@ -316,10 +315,13 @@ export function useYouTube() {
    * Updates Concurrent Viewers and Detects Stream End.
    * @param {string} videoId
    */
-  async function updateViewerCount(videoId) {
+  async function updateViewerCount(videoId, expectedGen = connectGeneration) {
     try {
-      const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${videoId}`;
+      const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${encodeURIComponent(videoId)}`;
       const data = await smartFetch(url);
+      if (expectedGen !== connectGeneration || (systemStore.currentVideoId && systemStore.currentVideoId !== videoId)) {
+        return;
+      }
       const details = data.items?.[0]?.liveStreamingDetails;
 
       if (details) {
@@ -370,6 +372,7 @@ export function useYouTube() {
    * Disconnects from YouTube, stops polling, and resets state.
    */
   function disconnect() {
+    connectGeneration++;
     logger.youtube("Disconnecting...");
     systemStore.isConnected = false;
 

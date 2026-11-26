@@ -17,6 +17,23 @@
 
 export const changelog = [
   {
+    version: '5.8.0',
+    date: '2026-11-26',
+    changes: {
+      added: [
+        'หน้าโหลดพรีเมียม 🍋 Splash Screen (`AuthSplash.vue`) ครอบระหว่างรอตรวจสิทธิ์ Firebase Auth ครบทั้ง 4 หน้าหลัก/หน้าย่อย — แอดมินที่ล็อกอินอยู่แล้วจะไม่เห็นหน้า Login แวบขึ้นมาอีก พร้อม `preconnect` ไป Firebase Auth และลบดีเลย์เทียมใน `AuthGate.vue` ให้เข้าเว็บไวขึ้นทันที',
+        'แสดงไซส์สินค้าแบบกระชับไร้กรอบบนการ์ดสต็อก (`stockSizeUtils.js`, `StockItemCard.vue`, `StockGrid.vue`, `HistoryModal.vue`) — โชว์เช่น `อก54`, `อก52-54`, `2XL` แถวล่างคู่ป้ายราคา พร้อม Tooltip สเปกเต็ม ช่องแก้ไขไซส์ใน Queue Modal และค้นหาสินค้าตามไซส์ได้ทันที',
+      ],
+      improved: [
+        'ปรับโฉมหน้าประวัติการจองให้ใช้งานง่ายและเป็นมิตรมากขึ้น (`HistoryModal.vue`, `HistoryPage.vue`) — ขยาย Modal 1320px, แถบข้าง 280px โทน Champagne Gold พร้อมตัวนับไลฟ์/ยอดขาย และ Mobile Drawer, ปุ่ม "เปิดไลฟ์ล่าสุด" 1 คลิก, ชิป KPI คลิกกรองได้, Segmented Control (กระดาน/รายการ/แชท) และแสดงที่มาเป็นภาษาไทย',
+        'ยกระดับแอนิเมชันและ CSS ทั้งระบบให้ลื่นไหล 60fps — เปลี่ยน infinite keyframes ทั้งหมด (`style.css`, `StockItemCard.vue`, `ChatPanel.vue`, `ShippingManager.vue`, `ShippingPage.vue`, `AuthGate.vue`, `Dashboard.vue`, `ChangelogModal.vue`, `NoteBanner.vue`) เป็น GPU compositor (`transform`/`opacity`), ลบ double `backdrop-filter` และ `filter: blur` ขนาดใหญ่, รองรับ `prefers-reduced-motion` ทุกหน้า และกด `Esc` ปิด Modal ได้ครบทุกหน้าต่าง',
+      ],
+      fixed: [
+        'กวาดล้างบั๊กระดับระบบครบทั้ง 79 ไฟล์ (Wave 1–3) — รวมศูนย์ `configureSwal` (`swalConfig.js`) แก้ SweetAlert2 v11 Toast mixin, รวมศูนย์ `thaiDateUtils.js` แปลง พ.ศ. 2 หลัก (`69 ➔ 2026`) และกัน day-31/UTC rollover, รวมศูนย์ `useCustomerStore` ใน `AddressPage.vue`/`ShippingPage.vue` ปิดบั๊ก `delivery_customers/undefined`, แก้ Owner-Replace UID ใน `StockGrid.vue`/`HistoryModal.vue`, ปิด XSS (`titleText` + event delegation), แก้ ReDoS `multiBuyRegex`, ปิด root Firebase write/delete guards, แก้ `PhoneticManager.vue` เข้าคิว `queueAudio()` และแก้ race/memory leak ทั่วทั้ง stores/composables (ผ่านครบ 38 ไฟล์ / 942 tests)',
+      ],
+    },
+  },
+  {
     version: '5.7.9',
     date: '2026-11-26',
     changes: {
@@ -229,19 +246,6 @@ export const changelog = [
       improved: [
         'รองรับ Responsive บนมือถือแบบกระชับ — บนหน้าจอมือถือ (`<= 768px`) ซ่อนคำว่า `ยอด:` อัตโนมัติ แสดงเฉพาะ `฿...` ขนาดกะทัดรัด ไม่เบียดจอและไม่ทำให้ส่วนหัวล้นบรรทัด',
         'แสดงยอดขายรวมในหน้าประวัติย้อนหลัง (HistoryModal.vue) — ปรับส่วนหัวสรุปสถิติในหน้าประวัติย้อนหลังให้แสดงยอดขายรวมของไลฟ์นั้นๆ ในรูปแบบป้ายสีทองเรืองแสงเช่นเดียวกัน',
-      ],
-    },
-  },
-  {
-    version: '5.4.33',
-    date: '2026-11-12',
-    changes: {
-      added: [
-        'เชื่อมโยงการตรวจจับราคาจากไลฟ์ย้อนหลังตรงตามวันที่จริง (Past Live Stream Replay & Exact Date Sync) — เพิ่มระบบเชื่อมโยงราคาจาก Manowzab AI เมื่อตรวจจับไลฟ์ย้อนหลัง (เช่น วันที่ 11 พ.ย. 69) ให้อัปเดตเข้าสต็อกและประวัติของวันที่นั้นๆ โดยตรงทั้งในสต็อก (`stock/{videoId}`) และประวัติ (`history/{videoId}`)',
-        'ปุ่มเปิดไลฟ์ที่หน้าหลักในหน้าประวัติ (Open Live on Main Board) — เพิ่มปุ่ม "เปิดที่หน้าหลัก" ใน HistoryModal.vue ช่วยให้แอดมินสลับเปิดไลฟ์ย้อนหลังขึ้นมาดูและจัดการบนหน้าจอกระดานหลัก (Main Stock Grid) ได้ในคลิกเดียว',
-      ],
-      improved: [
-        'แสดงป้ายราคาบนสินค้าที่ยังว่างในหน้าประวัติย้อนหลัง — ปรับปรุง HistoryModal.vue ให้แสดงป้ายราคาสีทองสำหรับสินค้าที่มีการตรวจจับราคาได้ ทั้งตัวที่จองแล้วและตัวที่ยังว่างอยู่ เพื่อให้ตรวจเช็กราคาย้อนหลังได้อย่างชัดเจน',
       ],
     },
   },

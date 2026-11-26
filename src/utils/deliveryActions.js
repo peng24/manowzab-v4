@@ -12,11 +12,15 @@ class LegacyDeliveryReviewError extends Error {
 }
 
 export async function completeDelivery(customer, reviewedLegacy = null) {
+  if (!customer?.id || typeof customer.id !== 'string' || !customer.id.trim()) {
+    throw new Error('ไม่พบรหัสลูกค้าสำหรับบันทึกการจัดส่ง');
+  }
   const fallbackItems = {};
   const missingSessions = {};
   const evidence = [];
   // Capture identities for existing records created before item-level tracking.
   for (const [vid, session] of Object.entries(customer.sessions || {})) {
+    if (!vid || typeof vid !== 'string' || !vid.trim()) continue;
     if (session && session.status !== 'done' && !Object.keys(session.items || {}).length) {
       const snapshot = await get(dbRef(db, `stock/${vid}`));
       fallbackItems[vid] = Object.fromEntries(Object.entries(bookingItems(snapshot.val() || {}, customer.name))
@@ -54,6 +58,9 @@ export async function completeDelivery(customer, reviewedLegacy = null) {
 }
 
 export async function restoreDelivery(customer) {
+  if (!customer?.id || typeof customer.id !== 'string' || !customer.id.trim()) {
+    throw new Error('ไม่พบรหัสลูกค้าสำหรับย้อนสถานะการจัดส่ง');
+  }
   const undoKey = deliveryUndoKey(customer);
   if (!undoKey) {
     throw new Error('รายการเก่านี้ไม่มีข้อมูลรอบสำหรับย้อนอย่างปลอดภัย กรุณาตรวจสอบและแก้รายการด้วยตนเอง');

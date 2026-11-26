@@ -453,16 +453,29 @@ export const useSystemStore = defineStore("system", () => {
     }
   }
 
+  let activeRolloverTimer = null;
+
   function initTtsUsageListener() {
     if (!googleCloudTtsEnabled) return null;
     ensureCurrentQuotaMonth();
     const currentMonth = getCurrentTtsQuotaMonth();
     bindUsageMonthListener(currentMonth);
-    const rolloverTimer = setInterval(() => {
+    if (activeRolloverTimer) {
+      clearInterval(activeRolloverTimer);
+    }
+    const timer = setInterval(() => {
       ensureCurrentQuotaMonth();
     }, 60000);
+    activeRolloverTimer = timer;
     return () => {
-      clearInterval(rolloverTimer);
+      clearInterval(timer);
+      if (activeRolloverTimer === timer) {
+        activeRolloverTimer = null;
+      }
+      if (usageFlushTimer) {
+        clearTimeout(usageFlushTimer);
+        usageFlushTimer = null;
+      }
       if (activeUsageUnsub) {
         activeUsageUnsub();
         activeUsageUnsub = null;

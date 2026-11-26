@@ -1,6 +1,6 @@
 import { computed, watch } from 'vue';
 
-const normalize = name => name.trim().toLowerCase().replace(/\s+/g, ' ');
+const normalize = name => String(name ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 // Read only booking fields: queue/lock/colour changes do not invalidate this plan.
 export function deliverySyncPlan(stock, customers, videoId) {
@@ -47,7 +47,11 @@ export function useDeliveryReconciliation({ stock, customers, videoId, authorize
     if (!changed.length) return;
     const timer = setTimeout(() => {
       previous = next;
-      for (const owner of changed) sync(owner.name, owner.uid, video, stock(), owner.items);
+      for (const owner of changed) {
+        Promise.resolve(sync(owner.name, owner.uid, video, stock(), owner.items)).catch((e) =>
+          console.warn('Delivery reconciliation sync error:', e)
+        );
+      }
     }, delay);
     onCleanup(() => clearTimeout(timer));
   }, { immediate: true });

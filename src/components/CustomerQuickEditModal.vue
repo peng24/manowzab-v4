@@ -206,7 +206,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from "vue";
+import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
 import { ref as dbRef, get, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName, parseSingleAddress } from "../utils/addressParser";
@@ -276,7 +276,7 @@ async function handleToggleBan() {
 
   if (isCustomerBanned.value) {
     const res = await Swal.fire({
-      title: `ปลดแบนคุณ ${name}?`,
+      titleText: `ปลดแบนคุณ ${name}?`,
       text: "ลูกค้าจะสามารถส่งเสียงอ่านและจองสินค้าได้ตามปกติ",
       icon: "question",
       showCancelButton: true,
@@ -287,12 +287,18 @@ async function handleToggleBan() {
     });
 
     if (res.isConfirmed) {
-      await blacklistStore.unbanUser(uid || name);
+      const unbanKey =
+        banInfo.value?.channelId ||
+        banInfo.value?.normName ||
+        banInfo.value?.displayName ||
+        uid ||
+        name;
+      await blacklistStore.unbanUser(unbanKey);
       Swal.fire({
         toast: true,
         position: "top-end",
         icon: "success",
-        title: `ปลดแบนคุณ ${name} แล้ว`,
+        titleText: `ปลดแบนคุณ ${name} แล้ว`,
         showConfirmButton: false,
         timer: 2000,
         timerProgressBar: true,
@@ -300,7 +306,7 @@ async function handleToggleBan() {
     }
   } else {
     const { value: formValues } = await Swal.fire({
-      title: `🚫 แบนคุณ ${name}?`,
+      titleText: `🚫 แบนคุณ ${name}?`,
       html: `
         <div style="text-align: left; font-size: 0.9rem; margin-top: 10px;">
           <p style="color: #94a3b8; margin-bottom: 8px;">ผู้ใช้ที่ถูกแบนจะไม่สามารถจองสินค้าได้ และระบบจะปิดเสียงอ่าน/เอฟเฟกต์อัตโนมัติ</p>
@@ -405,11 +411,20 @@ function handleNicknameEnter() {
   save();
 }
 
+function normalizeSavedAddresses(raw) {
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (raw && typeof raw === "object") return Object.values(raw).filter(Boolean);
+  return [];
+}
+
+let openSeq = 0;
+
 /**
  * Open Modal with chat item
  */
 async function open(chat) {
   if (!chat) return;
+  const seq = ++openSeq;
   currentChat.value = chat;
   isOpen.value = true;
   isLoading.value = true;
@@ -440,10 +455,12 @@ async function open(chat) {
     let bookData = null;
     if (normName) {
       const snap = await get(dbRef(db, `address_book/${normName}`));
+      if (seq !== openSeq || !isOpen.value) return;
       if (snap.exists()) bookData = snap.val();
     }
     if (!bookData && normReal && normReal !== normName) {
       const snapReal = await get(dbRef(db, `address_book/${normReal}`));
+      if (seq !== openSeq || !isOpen.value) return;
       if (snapReal.exists()) bookData = snapReal.val();
     }
 
@@ -454,17 +471,19 @@ async function open(chat) {
       if (bookData.phone) formData.value.phone = bookData.phone;
       if (bookData.recipientName) formData.value.recipientName = bookData.recipientName;
       if (bookData.postalCode) formData.value.postalCode = bookData.postalCode;
-      if (Array.isArray(bookData.addresses)) existingAddressList.value = bookData.addresses;
+      const bookAddrs = normalizeSavedAddresses(bookData.addresses);
+      if (bookAddrs.length > 0) existingAddressList.value = bookAddrs;
       if (bookData.selectedAddressId) existingActiveAddrId.value = bookData.selectedAddressId;
 
       if (!formData.value.paymentType && existingAddressList.value.length > 0) {
-        const activeAddr = existingAddressList.value.find((a) => a.id === existingActiveAddrId.value) || existingAddressList.value[0];
+        const activeAddr = existingAddressList.value.find((a) => a && a.id === existingActiveAddrId.value) || existingAddressList.value[0];
         if (activeAddr?.paymentType) formData.value.paymentType = activeAddr.paymentType;
       }
     }
 
     // 2. Search in delivery_customers
     const custSnap = await get(dbRef(db, "delivery_customers"));
+    if (seq !== openSeq || !isOpen.value) return;
     if (custSnap.exists()) {
       const allCusts = custSnap.val();
       const matched = Object.entries(allCusts).find(([id, c]) => {
@@ -498,8 +517,9 @@ async function open(chat) {
         if (!formData.value.postalCode && custData.postalCode) {
           formData.value.postalCode = custData.postalCode;
         }
-        if (Array.isArray(custData.addresses) && custData.addresses.length > 0) {
-          existingAddressList.value = custData.addresses;
+        const custAddrs = normalizeSavedAddresses(custData.addresses);
+        if (custAddrs.length > 0) {
+          existingAddressList.value = custAddrs;
         }
         if (custData.selectedAddressId) {
           existingActiveAddrId.value = custData.selectedAddressId;
@@ -509,13 +529,15 @@ async function open(chat) {
   } catch (err) {
     console.warn("CustomerQuickEditModal load error:", err);
   } finally {
-    isLoading.value = false;
-    nextTick(() => {
-      if (nicknameInputRef.value) {
-        nicknameInputRef.value.focus();
-        nicknameInputRef.value.select();
-      }
-    });
+    if (seq === openSeq && isOpen.value) {
+      isLoading.value = false;
+      nextTick(() => {
+        if (nicknameInputRef.value) {
+          nicknameInputRef.value.focus();
+          nicknameInputRef.value.select();
+        }
+      });
+    }
   }
 }
 
@@ -565,18 +587,6 @@ async function save() {
         };
       }
     }
-
-    // Instant local memory update for matching chat rows (never match null === null!)
-    if (chatStore.messages) {
-      chatStore.messages.forEach((m) => {
-        const matchesUid = Boolean(originalUid && m.uid && m.uid === originalUid);
-        const matchesReal = Boolean(rawReal && (m.realName === rawReal || m.authorName === rawReal));
-        const matchesDisplay = Boolean(originalDisplayName && m.displayName === originalDisplayName);
-        if (matchesUid || matchesReal || matchesDisplay) {
-          m.displayName = trimmedNick;
-        }
-      });
-    }
   }
 
   // 2. Prepare Address, Contact Channel & Payment Type
@@ -590,9 +600,10 @@ async function save() {
   const paymentTypeVal = formData.value.paymentType || "";
 
   if (cleanAddress) {
-    if (!zipVal) {
-      const zipMatch = cleanAddress.match(/\b[1-9]\d{4}\b/);
-      if (zipMatch) zipVal = zipMatch[0];
+    // Always re-extract postal code from edited address so province changes never retain stale zip
+    const zipMatch = cleanAddress.match(/\b[1-9]\d{4}\b/);
+    if (zipMatch) {
+      zipVal = zipMatch[0];
     }
     if (!phoneVal) {
       const phoneMatch = cleanAddress.match(/0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4}/);
@@ -605,14 +616,16 @@ async function save() {
     multiPathUpdates[`address_book/${normKey}/name`] = primaryName;
     multiPathUpdates[`address_book/${normKey}/contactChannel`] = contactChannelVal;
     multiPathUpdates[`address_book/${normKey}/paymentType`] = paymentTypeVal;
+    if (phoneVal) multiPathUpdates[`address_book/${normKey}/phone`] = phoneVal;
+    if (recipientVal) multiPathUpdates[`address_book/${normKey}/recipientName`] = recipientVal;
     if (cleanAddress) {
       multiPathUpdates[`address_book/${normKey}/address`] = cleanAddress;
       multiPathUpdates[`address_book/${normKey}/recipientName`] = recipientVal || primaryName;
       multiPathUpdates[`address_book/${normKey}/phone`] = phoneVal || "";
       multiPathUpdates[`address_book/${normKey}/postalCode`] = zipVal || "";
 
-      // Maintain addresses list
-      const addrs = [...existingAddressList.value];
+      // Maintain addresses list (filter null holes safely)
+      const addrs = existingAddressList.value.filter(Boolean).map((a) => ({ ...a }));
       const activeId = existingActiveAddrId.value || "addr_" + timestamp;
       const addrObj = {
         id: activeId,
@@ -625,7 +638,7 @@ async function save() {
         paymentType: paymentTypeVal,
       };
       if (addrs.length > 0) {
-        const foundIdx = addrs.findIndex((a) => a.id === activeId);
+        const foundIdx = addrs.findIndex((a) => a && a.id === activeId);
         if (foundIdx >= 0) addrs[foundIdx] = { ...addrs[foundIdx], ...addrObj };
         else addrs[0] = { ...addrs[0], ...addrObj };
       } else {
@@ -644,13 +657,15 @@ async function save() {
     }
     multiPathUpdates[`delivery_customers/${matchedCustId.value}/contactChannel`] = contactChannelVal;
     multiPathUpdates[`delivery_customers/${matchedCustId.value}/paymentType`] = paymentTypeVal;
+    if (phoneVal) multiPathUpdates[`delivery_customers/${matchedCustId.value}/phone`] = phoneVal;
+    if (recipientVal) multiPathUpdates[`delivery_customers/${matchedCustId.value}/recipientName`] = recipientVal;
     if (cleanAddress) {
       multiPathUpdates[`delivery_customers/${matchedCustId.value}/address`] = cleanAddress;
       multiPathUpdates[`delivery_customers/${matchedCustId.value}/recipientName`] = recipientVal || primaryName;
       multiPathUpdates[`delivery_customers/${matchedCustId.value}/phone`] = phoneVal || "";
       multiPathUpdates[`delivery_customers/${matchedCustId.value}/postalCode`] = zipVal || "";
 
-      const addrs = [...existingAddressList.value];
+      const addrs = existingAddressList.value.filter(Boolean).map((a) => ({ ...a }));
       const activeId = existingActiveAddrId.value || "addr_" + timestamp;
       const addrObj = {
         id: activeId,
@@ -663,7 +678,7 @@ async function save() {
         paymentType: paymentTypeVal,
       };
       if (addrs.length > 0) {
-        const foundIdx = addrs.findIndex((a) => a.id === activeId);
+        const foundIdx = addrs.findIndex((a) => a && a.id === activeId);
         if (foundIdx >= 0) addrs[foundIdx] = { ...addrs[foundIdx], ...addrObj };
         else addrs[0] = { ...addrs[0], ...addrObj };
       } else {
@@ -772,6 +787,18 @@ async function save() {
   try {
     await update(dbRef(db), multiPathUpdates);
 
+    // Local memory update for chat rows ONLY AFTER Firebase write succeeds
+    if (trimmedNick && chatStore.messages) {
+      chatStore.messages.forEach((m) => {
+        const matchesUid = Boolean(originalUid && m.uid && m.uid === originalUid);
+        const matchesReal = Boolean(rawReal && (m.realName === rawReal || m.authorName === rawReal));
+        const matchesDisplay = Boolean(originalDisplayName && m.displayName === originalDisplayName);
+        if (matchesUid || matchesReal || matchesDisplay) {
+          m.displayName = trimmedNick;
+        }
+      });
+    }
+
     // Local memory update for stock items (only update owner when owner actually matched!)
     if (trimmedNick && affectedStockItems.length > 0 && stockStore.stockData) {
       affectedStockItems.forEach(({ num, ownerChanged, newQueue }) => {
@@ -826,6 +853,15 @@ async function save() {
     isSaving.value = false;
   }
 }
+
+function handleEscKey(e) {
+  if (e.key === "Escape" && isOpen.value && !isSaving.value) {
+    close();
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", handleEscKey));
+onUnmounted(() => window.removeEventListener("keydown", handleEscKey));
 
 defineExpose({
   open,

@@ -188,7 +188,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 
 const isOpen = ref(false);
 
@@ -199,6 +199,15 @@ function open() {
 function close() {
   isOpen.value = false;
 }
+
+function handleEscKey(e) {
+  if (e.key === "Escape" && isOpen.value) {
+    close();
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", handleEscKey));
+onUnmounted(() => window.removeEventListener("keydown", handleEscKey));
 
 defineExpose({
   open,

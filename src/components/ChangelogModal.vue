@@ -229,16 +229,23 @@ const totalChanges = computed(() => {
 })
 
 const allExpanded = computed(() => {
-  return filteredChangelog.value.every((e) =>
-    expandedVersions.value.has(e.version)
+  return (
+    filteredChangelog.value.length > 0 &&
+    filteredChangelog.value.every((e) => expandedVersions.value.has(e.version))
   )
 })
 
 async function open() {
   isOpen.value = true
   searchQuery.value = ''
+  // Lock body scroll immediately so rapid close during import restores cleanly
+  document.body.style.overflow = 'hidden'
   // 🚀 Load changelog data on first open
   await loadChangelog()
+  if (!isOpen.value) {
+    document.body.style.overflow = ''
+    return
+  }
   // Reset expanded state: open first N
   expandedVersions.value = new Set(
     changelog.value.slice(0, DEFAULT_EXPANDED_COUNT).map((e) => e.version)
@@ -247,8 +254,6 @@ async function open() {
   nextTick(() => {
     if (searchInput.value) searchInput.value.focus()
   })
-  // Lock body scroll
-  document.body.style.overflow = 'hidden'
 }
 
 function close() {
@@ -278,7 +283,12 @@ function collapseAll() {
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
+  const parts = String(dateStr).split('-')
+  const d =
+    parts.length === 3
+      ? new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+      : new Date(dateStr)
+  if (isNaN(d.getTime())) return String(dateStr)
   const months = [
     'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
     'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
@@ -306,11 +316,15 @@ function getCategorySummary(entry) {
 
 function highlightSearch(text) {
   if (!text) return ''
-  const safeText = escapeHtml(text)
-  if (!searchQuery.value.trim()) return safeText
-  const q = escapeHtml(searchQuery.value.trim()).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const regex = new RegExp(`(${q})`, 'gi')
-  return safeText.replace(regex, '<mark>$1</mark>')
+  const raw = String(text)
+  const q = searchQuery.value.trim()
+  if (!q) return escapeHtml(raw)
+  const escapedPattern = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escapedPattern})`, 'gi')
+  return raw
+    .split(regex)
+    .map((part, idx) => (idx % 2 === 1 ? `<mark>${escapeHtml(part)}</mark>` : escapeHtml(part)))
+    .join('')
 }
 
 // Keyboard support
@@ -344,6 +358,7 @@ watch(isOpen, (val) => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  document.body.style.overflow = ''
 })
 
 // Expose open() for parent component
@@ -596,13 +611,13 @@ defineExpose({ open })
   height: 14px;
   background: linear-gradient(135deg, #6366f1, #a78bfa);
   border-color: #a78bfa;
-  box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
-  animation: pulse-dot 2s ease-in-out infinite;
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.6);
+  animation: pulse-dot-opacity 2s ease-in-out infinite;
 }
 
-@keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 12px rgba(99, 102, 241, 0.5); }
-  50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.8); }
+@keyframes pulse-dot-opacity {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.72; transform: scale(1.12); }
 }
 
 .timeline-line {
@@ -882,23 +897,19 @@ defineExpose({ open })
   transform: scale(0.97) translateY(-5px);
 }
 
-/* Expand / Collapse transition */
+/* Expand / Collapse transition (GPU-only, zero max-height/padding reflow) */
 .expand-enter-active {
-  transition: all 0.3s ease;
-  overflow: hidden;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .expand-leave-active {
-  transition: all 0.2s ease;
-  overflow: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .expand-enter-from,
 .expand-leave-to {
   opacity: 0;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
+  transform: translateY(-6px);
 }
 
 /* ──────────────────── Responsive ──────────────────── */

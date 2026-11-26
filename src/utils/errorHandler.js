@@ -9,7 +9,9 @@ export function globalErrorHandler(err, instance, info) {
     console.groupEnd();
 
     // 2. Extract Message
-    const message = err.message || "An unexpected error occurred.";
+    const message =
+        err?.message ||
+        (typeof err === 'string' && err.trim() ? err : "An unexpected error occurred.");
 
     // 3. User Notification (Swal Toast)
     Swal.fire({

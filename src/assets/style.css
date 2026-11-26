@@ -239,8 +239,8 @@ body {
 .ds-pack-tonight {
   background: linear-gradient(135deg, rgba(249, 115, 22, 0.34), rgba(234, 88, 12, 0.2));
   color: #fdba74;
-  border: 1px solid rgba(251, 146, 60, 0.6);
-  animation: ds-pack-glow 2.5s ease-in-out infinite;
+  border: 1px solid rgba(251, 146, 60, 0.65);
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.2);
 }
 .ds-soon {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.32), rgba(126, 34, 206, 0.2));
@@ -261,11 +261,6 @@ body {
 @keyframes ds-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
-}
-
-@keyframes ds-pack-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.2); }
-  50% { box-shadow: 0 0 10px 2px rgba(249, 115, 22, 0.18); }
 }
 
 /* Status Cluster */
@@ -303,12 +298,14 @@ body {
 .status-item.err {
   color: #ef4444;
   opacity: 1;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.55);
   animation: blinkRed 1s infinite alternate;
 }
 
 .status-item.warn {
   color: var(--accent-amber);
   opacity: 1;
+  text-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
   animation: statusBlink 1s infinite;
 }
 
@@ -317,6 +314,7 @@ body {
   color: #ff9800;
   /* Orange color for thinking/processing */
   opacity: 1;
+  text-shadow: 0 0 10px rgba(255, 152, 0, 0.6);
   animation: workingPulse 1.5s ease-in-out infinite;
 }
 
@@ -332,14 +330,10 @@ body {
   0%,
   100% {
     opacity: 1;
-    text-shadow: 0 0 10px rgba(255, 152, 0, 0.6);
-    filter: drop-shadow(0 0 6px rgba(255, 152, 0, 0.4));
   }
 
   50% {
-    opacity: 0.6;
-    text-shadow: 0 0 18px rgba(255, 152, 0, 0.85);
-    filter: drop-shadow(0 0 10px rgba(255, 152, 0, 0.6));
+    opacity: 0.52;
   }
 }
 
@@ -348,27 +342,21 @@ body {
   50%,
   100% {
     opacity: 1;
-    text-shadow: 0 0 10px rgba(255, 152, 0, 0.6);
   }
 
   25%,
   75% {
-    opacity: 0.3;
-    text-shadow: none;
+    opacity: 0.35;
   }
 }
 
 @keyframes blinkRed {
   from {
     opacity: 1;
-    text-shadow: 0 0 10px var(--primary);
-    filter: drop-shadow(0 0 6px rgba(211, 47, 47, 0.6));
   }
 
   to {
     opacity: 0.4;
-    text-shadow: none;
-    filter: none;
   }
 }
 
@@ -423,11 +411,13 @@ body {
 @keyframes pulse {
   0%,
   100% {
-    box-shadow: 0 0 8px var(--success);
+    opacity: 1;
+    transform: scale(1);
   }
 
   50% {
-    box-shadow: 0 0 15px var(--success);
+    opacity: 0.65;
+    transform: scale(1.16);
   }
 }
 
@@ -690,8 +680,8 @@ body {
 }
 
 @keyframes badge-pulse {
-  0%, 100% { box-shadow: 0 0 6px rgba(239, 68, 68, 0.5); }
-  50% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.8); }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.82; transform: scale(1.08); }
 }
 
 .tts-control-group {
@@ -932,7 +922,7 @@ body {
   font-weight: 500;
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
   border-bottom: none !important;
 }
@@ -940,7 +930,7 @@ body {
 .dropdown-content a:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  padding-left: 16px;
+  transform: translateX(4px);
 }
 
 .dropdown-content a:active {
@@ -998,7 +988,6 @@ body {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  transition: all 0.32s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ========================================
@@ -1027,7 +1016,6 @@ body {
               max-width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
               opacity 0.24s ease,
               border-color 0.32s ease;
-  will-change: width, min-width;
 }
 
 .chat-panel.collapsed {
@@ -1184,10 +1172,10 @@ body {
 
 @keyframes pulseChatToggle {
   0%, 100% {
-    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 2px 16px rgba(59, 130, 246, 0.6);
+    opacity: 0.84;
   }
 }
 
@@ -1203,11 +1191,11 @@ body {
 @keyframes pulseBadgeGlow {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
+    opacity: 1;
   }
   50% {
     transform: scale(1.12);
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+    opacity: 0.88;
   }
 }
 
@@ -1249,7 +1237,7 @@ body {
 .chat-row {
   display: flex;
   gap: 10px;
-  animation: slideIn 0.25s ease-out;
+  animation: slideIn 0.15s ease-out;
   border-radius: var(--radius-md);
   padding: 9px 11px;
   background: rgba(18, 24, 38, 0.52);
@@ -1268,12 +1256,12 @@ body {
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translateX(15px);
+    transform: translateY(4px);
   }
 
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 
@@ -1366,19 +1354,7 @@ body {
 .badge-nick.vip-admin {
   background: linear-gradient(45deg, #ffd700, #ffed4e) !important;
   color: #000 !important;
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-  animation: adminGlow 2s infinite;
-}
-
-@keyframes adminGlow {
-  0%,
-  100% {
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-  }
-
-  50% {
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
-  }
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.45);
 }
 
 .real-name-sub {
@@ -1392,44 +1368,6 @@ body {
   font-size: var(--chat-size);
   line-height: 1.5;
   word-wrap: break-word;
-}
-
-/* ✅ New Message Button */
-.new-msg-btn {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(245, 158, 11, 0.95) 100%);
-  color: #ffffff;
-  padding: 8px 22px;
-  border-radius: 30px;
-  font-weight: 700;
-  font-size: 0.9em;
-  letter-spacing: 0.3px;
-  border: 1px solid rgba(251, 191, 36, 0.4);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 16px rgba(16, 185, 129, 0.4);
-  cursor: pointer;
-  z-index: 50;
-  animation: bounceUp 0.6s infinite alternate;
-  backdrop-filter: blur(8px);
-  transition: all 0.25s ease;
-}
-
-.new-msg-btn:hover {
-  transform: translateX(-50%) scale(1.05);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 22px rgba(251, 191, 36, 0.6);
-}
-
-
-@keyframes bounceUp {
-  from {
-    transform: translateX(-50%) translateY(0);
-  }
-
-  to {
-    transform: translateX(-50%) translateY(-5px);
-  }
 }
 
 /* ========================================
@@ -1448,17 +1386,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 /* ========================================
    👑 QUEUE MODAL - LUXURY GREEN & GOLD THEME
    ======================================== */
 .queue-modal {
-  background: rgba(15, 23, 20, 0.94);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(15, 23, 20, 0.97);
   width: 700px;
   max-width: 96%;
   min-height: 420px;
@@ -2316,9 +2250,7 @@ body {
 }
 
 .dashboard-content {
-  background: rgba(11, 15, 23, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(11, 15, 23, 0.96);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(251, 191, 36, 0.15);
   max-width: 95%;
@@ -2496,9 +2428,8 @@ body {
   color: white;
   padding: 14px 28px;
   border-radius: 30px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(124, 77, 255, 0.25);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(124, 77, 255, 0.3);
   z-index: 9999;
-  animation: pulseAway 3s infinite;
   max-width: 90%;
 }
 
@@ -2581,16 +2512,7 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-@keyframes pulseAway {
-  0%,
-  100% {
-    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
-  }
 
-  50% {
-    box-shadow: 0 8px 40px rgba(118, 75, 162, 0.6);
-  }
-}
 
 /* ========================================
    UTILITY & SWAL
@@ -2936,12 +2858,12 @@ body {
 
 @keyframes pulse-away-icon {
   0% {
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
     transform: scale(1);
+    opacity: 0.9;
   }
   100% {
-    box-shadow: 0 4px 14px rgba(139, 92, 246, 0.6);
     transform: scale(1.1);
+    opacity: 1;
   }
 }
 
@@ -3354,8 +3276,8 @@ body {
 }
 
 @keyframes ledPulse {
-  0%, 100% { box-shadow: 0 0 6px #00e676; }
-  50% { box-shadow: 0 0 14px #00e676; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.15); }
 }
 
 @keyframes ledBlink {
@@ -3473,6 +3395,18 @@ html.swal2-height-auto,
 body.swal2-height-auto {
   height: 100dvh !important;
   overflow: hidden !important;
+}
+
+/* ♿ Respect OS Reduced Motion preference (battery & visual comfort on iPad/mobile) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 

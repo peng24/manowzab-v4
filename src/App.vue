@@ -1,7 +1,10 @@
 <template>
   <div class="app-container">
+    <!-- 🍋 Minimalist Splash while checking Firebase auth session -->
+    <AuthSplash v-if="!authStore.authReady" />
+
     <!-- 🔒 High-Security Authentication Gate -->
-    <AuthGate v-if="!authStore.isAuthenticated" />
+    <AuthGate v-else-if="!authStore.isAuthenticated" />
 
     <!-- Protected Application Views -->
     <template v-else>
@@ -119,6 +122,7 @@ import StockGrid from "./components/StockGrid.vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import UpdatePrompt from "./components/UpdatePrompt.vue"; // ✅ Import PWA Update Prompt
 import NoteBanner from "./components/NoteBanner.vue"; // ✅ Import Note Banner
+import AuthSplash from "./components/AuthSplash.vue"; // 🍋 Lightweight synchronous splash while authReady is false
 import { useVoiceLearningStore } from "./stores/voiceLearning";
 import { useCustomerStore } from "./stores/customer";
 import { syncDeliveryCustomerForOwner } from "./utils/deliverySync";
@@ -254,10 +258,15 @@ function startAppListeners() {
 
   // ✅ Track connection and auth state separately
   const isDbConnected = ref(false);
+  let presenceCleanup = null;
 
-  // ✅ Setup presence only when BOTH conditions are met
+  // ✅ Setup presence only when BOTH conditions are met (single active cleanup handle)
   function setupPresence() {
     if (isDbConnected.value && authStore.isAuthenticated) {
+      if (presenceCleanup) {
+        presenceCleanup();
+        presenceCleanup = null;
+      }
       const myConnectionRef = dbRef(db, `presence/${systemStore.myDeviceId}`);
       set(myConnectionRef, {
         online: true,
@@ -270,13 +279,19 @@ function startAppListeners() {
 
       const disconnect = onDisconnect(myConnectionRef);
       disconnect.remove().catch(err => logger.warn('Presence disconnect setup failed:', err));
-      cleanupFns.push(() => {
+      presenceCleanup = () => {
         disconnect.cancel().catch(() => {});
         remove(myConnectionRef).catch(() => {});
-      });
+      };
       logger.info("✅ Presence setup complete");
     }
   }
+  cleanupFns.push(() => {
+    if (presenceCleanup) {
+      presenceCleanup();
+      presenceCleanup = null;
+    }
+  });
 
   // ✅ Firebase Connection Status
   let hasConnectedOnce = false;
@@ -315,6 +330,7 @@ function startAppListeners() {
       systemStore.currentVideoId = "";
       systemStore.liveTitle = "รอกระแสข้อมูล...";
       systemStore.isLiveFinished = false;
+      stockStore.stopStockSync();
     }
   });
   cleanupFns.push(unsubActiveVideo);
@@ -354,6 +370,7 @@ onMounted(() => {
 let stopAuthWatchOnUnmount = null;
 
 function handleGlobalHotkeys(e) {
+  if (!authStore.isAuthenticated) return;
   const activeEl = document.activeElement;
   const isTyping = activeEl && (
     activeEl.tagName === "INPUT" ||
@@ -423,19 +440,14 @@ onUnmounted(() => {
   }
 });
 
-// ✅ Watcher: เมื่อผู้ใช้ Logout ให้ล้าง presence, modals, audio queue, และสถานะการเชื่อมต่อทันที
+// ✅ Watcher: เมื่อผู้ใช้ Logout ให้ปิด modals, audio queue, และสถานะการเชื่อมต่อทันที (presence ถูกล้างแบบไม่ชนกันใน stopAppListeners)
 watch(
   () => authStore.isAuthenticated,
   (isAuth) => {
     if (!isAuth) {
-      logger.info("🚪 User logged out: Cleaning up presence, modals, audio, and live state...");
-      // 1. ปลด Presence ออกจาก Firebase
-      try {
-        const myConnectionRef = dbRef(db, `presence/${systemStore.myDeviceId}`);
-        set(myConnectionRef, { online: false, lastSeen: Date.now() }).catch(() => {});
-      } catch (e) {}
+      logger.info("🚪 User logged out: Cleaning up modals, audio, and live state...");
 
-      // 2. ปิด Modal ทั้งหมด และปิด SweetAlert2 ทันที
+      // 1. ปิด Modal ทั้งหมด และปิด SweetAlert2 ทันที
       showDashboard.value = false;
       showHistory.value = false;
       showShippingManager.value = false;
@@ -444,13 +456,13 @@ watch(
         Swal.close();
       }
 
-      // 3. รีเซ็ตเสียงพูดที่ค้างอยู่
+      // 2. รีเซ็ตเสียงพูดที่ค้างอยู่
       try {
         const { resetVoice } = useAudio();
         resetVoice();
       } catch (e) {}
 
-      // 4. รีเซ็ตสถานะ YouTube Live
+      // 3. รีเซ็ตสถานะ YouTube Live
       systemStore.isConnected = false;
       systemStore.statusApi = "idle";
       systemStore.statusChat = "idle";
@@ -487,153 +499,5 @@ useDeliveryReconciliation({
   padding-bottom: env(safe-area-inset-bottom);
   padding-top: env(safe-area-inset-top);
 }
-
-.away-banner {
-  position: fixed;
-  top: 70px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 15px 30px;
-  border-radius: 30px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  z-index: 9999;
-  animation: pulseAway 3s infinite;
-  max-width: 90%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-.away-content {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  white-space: nowrap;
-}
-
-.away-icon {
-  font-size: 2em;
-  animation: moonSway 4s ease-in-out infinite;
-}
-
-@keyframes moonSway {
-  0%,
-  100% {
-    transform: rotate(-10deg);
-  }
-  50% {
-    transform: rotate(10deg);
-  }
-}
-
-.away-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.away-title {
-  font-size: 1.3em;
-  font-weight: bold;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.away-subtitle {
-  font-size: 0.85em;
-  opacity: 0.9;
-}
-
-.away-timer {
-  font-family: "Courier New", monospace;
-  font-size: 1.4em;
-  font-weight: bold;
-  background: rgba(0, 0, 0, 0.25);
-  padding: 6px 14px;
-  border-radius: 10px;
-  min-width: 90px;
-  text-align: center;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.away-btn {
-  background: white;
-  color: #667eea;
-  border: none;
-  padding: 8px 20px;
-  border-radius: 20px;
-  font-weight: bold;
-  cursor: pointer;
-  font-family: "Kanit", sans-serif;
-  transition: all 0.3s;
-  font-size: 0.95em;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.away-btn:hover {
-  background: #f0f0f0;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-}
-
-.away-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-@keyframes pulseAway {
-  0%,
-  100% {
-    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
-  }
-  50% {
-    box-shadow: 0 8px 40px rgba(118, 75, 162, 0.6);
-  }
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .away-banner {
-    top: 60px;
-    padding: 12px 20px;
-  }
-
-  .away-content {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-  }
-
-  .away-text {
-    align-items: center;
-    text-align: center;
-  }
-
-  .away-icon {
-    font-size: 1.5em;
-  }
-
-  .away-title {
-    font-size: 1.1em;
-  }
-
-  .away-subtitle {
-    display: none;
-  }
-
-  .away-timer {
-    font-size: 1.1em;
-    min-width: 70px;
-    padding: 4px 10px;
-  }
-
-  .away-btn {
-    padding: 6px 16px;
-    font-size: 0.85em;
-    width: 100%;
-    justify-content: center;
-  }
-}
+/* .away-banner styles are defined in src/assets/style.css (single source of truth) */
 </style>

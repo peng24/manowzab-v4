@@ -67,13 +67,17 @@ function getDismissedIds() {
 }
 
 function saveDismissedIds(ids) {
-  localStorage.setItem(DISMISSED_KEY, JSON.stringify(ids));
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(ids));
+  } catch (e) {
+    logger.warn("NoteBanner: failed to persist dismissed note ids:", e);
+  }
 }
 
 const visibleNotes = computed(() => {
   const dismissed = getDismissedIds();
   return Object.entries(allNotes.value)
-    .filter(([id, note]) => note.active && !dismissed.includes(id))
+    .filter(([id, note]) => note && note.active && !dismissed.includes(id))
     .map(([id, note]) => ({ id, ...note }))
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     .slice(0, 5); // Max 5 notes visible
@@ -137,14 +141,13 @@ onUnmounted(() => {
 
 .note-banner {
   pointer-events: auto;
-  background: rgba(30, 30, 30, 0.25);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(24, 28, 38, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-radius: 10px;
   border-left: 4px solid var(--note-color);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.08);
-  animation: noteAppear 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255,255,255,0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   overflow: hidden;
 }
 
@@ -232,7 +235,7 @@ onUnmounted(() => {
 }
 
 .note-slide-leave-active {
-  transition: all 0.25s ease-in;
+  transition: opacity 0.22s ease-in, transform 0.22s ease-in;
 }
 
 .note-slide-leave-to {

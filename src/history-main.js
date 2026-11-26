@@ -5,30 +5,10 @@ import { globalErrorHandler } from "./utils/errorHandler";
 import { logger } from "./utils/logger";
 
 import Swal from "sweetalert2";
+import { configureSwal } from "./utils/swalConfig";
 
-// ✅ Global SweetAlert2 Config
-const originalSwalFire = Swal.fire;
-Swal.fire = function (...args) {
-  let opts = args[0];
-  if (typeof opts === "string") {
-    opts = { title: args[0], html: args[1], icon: args[2] };
-    args = [opts];
-  }
-  const isToast = Boolean(opts && (opts.toast || (this && this.defaultParams && this.defaultParams.toast)));
-  if (opts && typeof opts === "object") {
-    if (!isToast) {
-      if (opts.heightAuto === undefined) opts.heightAuto = false;
-      if (opts.returnFocus === undefined) opts.returnFocus = false;
-      if (opts.showCloseButton === undefined) opts.showCloseButton = true;
-      if (opts.allowOutsideClick === undefined) opts.allowOutsideClick = true;
-    } else {
-      // Incompatible with toasts in SweetAlert2
-      delete opts.heightAuto;
-      delete opts.returnFocus;
-    }
-  }
-  return originalSwalFire.apply(this, args);
-};
+// ✅ Global SweetAlert2 Config (supports Swal.mixin({ toast: true }) in v11)
+configureSwal(Swal);
 
 const app = createApp(HistoryPage);
 app.use(createPinia());

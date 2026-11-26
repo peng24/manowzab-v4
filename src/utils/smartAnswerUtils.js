@@ -227,7 +227,10 @@ export function extractQueriedItemId(normalizedText) {
   // 2. Item spec query with number first ("14อกเท่าไรคะ", "48ราคา", "21 อกเท่าไหร่ สมฤทธิ์")
   const specMatch = normalizedText.match(ITEM_SPEC_QUERY_REGEX);
   if (specMatch && specMatch[1]) {
-    const numStr = specMatch[1]; const prefix = normalizedText.slice(0, normalizedText.indexOf(numStr)); const num = !SIZE_PREFIX_GUARD_REGEX.test(prefix) ? parseInt(numStr, 10) : NaN;
+    const numStr = specMatch[1];
+    const matchIndex = specMatch.index || 0;
+    const prefix = normalizedText.slice(0, matchIndex + specMatch[0].indexOf(numStr));
+    const num = !SIZE_PREFIX_GUARD_REGEX.test(prefix) ? parseInt(numStr, 10) : NaN;
     if (num >= 1 && num <= MAX_ITEM_ID) {
       return num;
     }
@@ -304,7 +307,7 @@ export function getCustomerStoredPortfolio(
       todayOwned.push({
         id: itemId,
         price: priceNum,
-        size: item.size || null,
+        size: item.details || item.size || null,
         backdated: Boolean(item.backdated),
       });
     } else if (Array.isArray(item.queue) && item.queue.length > 0) {
@@ -396,10 +399,11 @@ export function getCustomerStoredPortfolio(
   const deliveryDate = isActiveDelivery ? deliveryRecord.deliveryDate || null : null;
   const totalBookings = deliveryRecord?.totalBookings || 0;
 
-  // 3. Address Book & Contact Metadata
+  // 3. Address Book & Contact Metadata (own-property lookup prevents Object.prototype hits)
+  const hasOwn = Object.prototype.hasOwnProperty;
   const addrEntry =
-    (dbKey && addressBook?.[dbKey]) ||
-    (dbRealKey && addressBook?.[dbRealKey]) ||
+    (dbKey && addressBook && hasOwn.call(addressBook, dbKey) && addressBook[dbKey]) ||
+    (dbRealKey && addressBook && hasOwn.call(addressBook, dbRealKey) && addressBook[dbRealKey]) ||
     null;
 
   const addrListHasValid = (list) => {
@@ -537,7 +541,7 @@ export function resolveSmartAnswer(chat, context = {}) {
     const itemOwner = item?.owner || null;
     const queue = Array.isArray(item?.queue) ? item.queue : [];
     const price = parseInt(item?.price, 10) || 0;
-    const size = item?.size || null;
+    const size = item?.details || item?.size || null;
 
     let headline = "";
     let tone = "sky";

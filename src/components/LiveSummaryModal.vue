@@ -199,7 +199,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject } from "vue";
+import { ref, computed, inject, onMounted, onUnmounted } from "vue";
 import { useSystemStore } from "../stores/system";
 import { useStockStore } from "../stores/stock";
 import { useChatStore } from "../stores/chat";
@@ -375,6 +375,15 @@ function copySummaryText() {
     });
   });
 }
+
+function handleEscKey(e) {
+  if (e.key === "Escape" && isOpen.value) {
+    close();
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", handleEscKey));
+onUnmounted(() => window.removeEventListener("keydown", handleEscKey));
 
 defineExpose({
   open,

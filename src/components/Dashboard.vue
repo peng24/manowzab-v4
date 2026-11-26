@@ -842,7 +842,7 @@ onUnmounted(() => {
 .shimmer {
   position: absolute;
   top: 0;
-  left: -100%;
+  left: 0;
   width: 100%;
   height: 100%;
   background: linear-gradient(
@@ -851,15 +851,16 @@ onUnmounted(() => {
     rgba(255, 255, 255, 0.4) 50%,
     transparent 100%
   );
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.8s linear infinite;
+  will-change: transform;
 }
 
 @keyframes shimmer {
   0% {
-    left: -100%;
+    transform: translate3d(-100%, 0, 0);
   }
   100% {
-    left: 100%;
+    transform: translate3d(100%, 0, 0);
   }
 }
 

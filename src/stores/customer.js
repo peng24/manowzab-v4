@@ -93,11 +93,13 @@ export const useCustomerStore = defineStore("customer", () => {
       (normReal && delivMap[normReal]) ||
       null;
 
+    const bookAddrs = Array.isArray(book?.addresses)
+      ? book.addresses
+      : (book?.addresses && typeof book.addresses === "object" ? Object.values(book.addresses) : []);
     const hasAddress = Boolean(
       (book?.address && book.address.trim()) ||
         (deliv?.address && deliv.address.trim()) ||
-        (Array.isArray(book?.addresses) &&
-          book.addresses.some((a) => a && a.address && a.address.trim())),
+        bookAddrs.some((a) => a && a.address && a.address.trim()),
     );
     const contactChannel = book?.contactChannel || deliv?.contactChannel || "";
     const paymentType = book?.paymentType || deliv?.paymentType || "";

@@ -1,7 +1,10 @@
 <template>
   <div class="history-page-layout">
+    <!-- 🍋 Minimalist Splash while checking Firebase auth session -->
+    <AuthSplash v-if="!authStore.authReady" />
+
     <!-- 🔒 High-Security Authentication Gate -->
-    <AuthGate v-if="!authStore.isAuthenticated" />
+    <AuthGate v-else-if="!authStore.isAuthenticated" />
 
     <template v-else>
       <!-- TOP NAVIGATION BAR -->
@@ -42,9 +45,11 @@
 <script setup>
 import { onMounted, onUnmounted, watch, defineAsyncComponent } from "vue";
 import { useAuthStore } from "../stores/auth";
+import AuthSplash from "../components/AuthSplash.vue";
 const AuthGate = defineAsyncComponent(() => import("../components/AuthGate.vue"));
 import { useNicknameStore } from "../stores/nickname";
 import { useBlacklistStore } from "../stores/blacklist";
+import { useStockStore } from "../stores/stock";
 import HistoryModalContent from "../components/HistoryModal.vue";
 import Swal from "sweetalert2";
 
@@ -52,6 +57,7 @@ const baseUrl = import.meta.env.BASE_URL || "/";
 const authStore = useAuthStore();
 const nicknameStore = useNicknameStore();
 const blacklistStore = useBlacklistStore();
+const stockStore = useStockStore();
 let unsubNickname = null;
 let unsubBlacklist = null;
 
@@ -71,6 +77,7 @@ function teardownListeners() {
     unsubBlacklist();
     unsubBlacklist = null;
   }
+  stockStore.stopStockSync();
 }
 
 async function handleLogout() {
@@ -153,18 +160,40 @@ html, body, #history-app {
 }
 
 .page-nav-bar {
-  height: 52px;
-  background: rgba(15, 23, 42, 0.9);
+  height: 54px;
+  background: rgba(13, 18, 30, 0.96);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding: 0 18px;
   flex-shrink: 0;
   z-index: 100;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  gap: 10px;
+}
+
+@media (max-width: 768px) {
+  .page-nav-bar {
+    height: auto;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+  }
+  .nav-title {
+    display: none;
+  }
+  .nav-actions {
+    width: 100%;
+    overflow-x: auto;
+    gap: 6px;
+  }
+  .nav-btn {
+    padding: 5px 10px;
+    font-size: 0.82em;
+    white-space: nowrap;
+  }
 }
 
 .nav-brand {

@@ -2,7 +2,7 @@ import { ref, onMounted, onUnmounted } from "vue";
 import { logger } from "../utils/logger";
 
 const STORAGE_KEY = "manowzab_offline_queue_v1";
-const isOnline = ref(navigator.onLine);
+const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const pendingQueue = ref(loadQueue());
 let sequenceCounter = 0;
 let isFlushing = false;
@@ -10,8 +10,11 @@ let defaultProcessor = null;
 
 function loadQueue() {
   try {
+    if (typeof localStorage === "undefined") return [];
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     logger.error("Failed to load offline queue:", err);
     return [];

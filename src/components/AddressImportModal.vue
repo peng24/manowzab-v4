@@ -59,7 +59,7 @@
               <button class="btn btn-dark btn-sm" @click="parsedEntries = []">
                 <i class="fa-solid fa-arrow-left"></i> วางใหม่
               </button>
-              <button class="btn btn-success btn-sm" @click="saveAllAddresses" :disabled="isSaving">
+              <button class="btn btn-success btn-sm" @click="saveAllAddresses" :disabled="isSaving || selectedCount === 0">
                 <i class="fa-solid fa-floppy-disk"></i> {{ isSaving ? 'กำลังบันทึก...' : `บันทึกทั้งหมด (${selectedCount})` }}
               </button>
             </div>
@@ -291,21 +291,27 @@ async function saveAllAddresses() {
       }
       multiPathUpdates[`address_book/${normKey}/updatedAt`] = timestamp;
 
-      // 2. Also update delivery_customers if matched
-      if (matched) {
+      // 2. Also update delivery_customers if matched (support both { id } and { deliveryIds } shapes safely)
+      const targetDeliveryIds = matched
+        ? (matched.id
+            ? [matched.id]
+            : (Array.isArray(matched.deliveryIds) ? matched.deliveryIds.filter(Boolean) : []))
+        : [];
+      targetDeliveryIds.forEach((deliveryId) => {
+        if (!deliveryId || typeof deliveryId !== "string" || !deliveryId.trim()) return;
         if (recName) {
-          multiPathUpdates[`delivery_customers/${matched.id}/recipientName`] = recName;
+          multiPathUpdates[`delivery_customers/${deliveryId}/recipientName`] = recName;
         }
-        multiPathUpdates[`delivery_customers/${matched.id}/phone`] = entry.phone || "";
-        multiPathUpdates[`delivery_customers/${matched.id}/address`] = entry.address || "";
-        multiPathUpdates[`delivery_customers/${matched.id}/postalCode`] = entry.postalCode || "";
+        multiPathUpdates[`delivery_customers/${deliveryId}/phone`] = entry.phone || "";
+        multiPathUpdates[`delivery_customers/${deliveryId}/address`] = entry.address || "";
+        multiPathUpdates[`delivery_customers/${deliveryId}/postalCode`] = entry.postalCode || "";
         if (entry.paymentType) {
-          multiPathUpdates[`delivery_customers/${matched.id}/paymentType`] = entry.paymentType;
+          multiPathUpdates[`delivery_customers/${deliveryId}/paymentType`] = entry.paymentType;
         }
-        multiPathUpdates[`delivery_customers/${matched.id}/selectedAddressId`] = newAddrObj.id;
-        multiPathUpdates[`delivery_customers/${matched.id}/addresses`] = existingList;
-        multiPathUpdates[`delivery_customers/${matched.id}/updatedAt`] = timestamp;
-      }
+        multiPathUpdates[`delivery_customers/${deliveryId}/selectedAddressId`] = newAddrObj.id;
+        multiPathUpdates[`delivery_customers/${deliveryId}/addresses`] = existingList;
+        multiPathUpdates[`delivery_customers/${deliveryId}/updatedAt`] = timestamp;
+      });
     });
 
     await update(dbRef(db), multiPathUpdates);

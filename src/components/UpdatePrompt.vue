@@ -22,16 +22,22 @@ const { needRefresh, updateServiceWorker } = useRegisterSW();
 let timeoutId = null;
 
 // ปิดอัตโนมัติภายใน 1 นาที (60 วินาที) ถ้าไม่มีการกดอัปเดต
-watch(needRefresh, (newVal) => {
-  if (newVal) {
-    timeoutId = setTimeout(() => {
-      close();
-    }, 60000);
-  } else if (timeoutId) {
-    clearTimeout(timeoutId);
-    timeoutId = null;
-  }
-});
+watch(
+  needRefresh,
+  (newVal) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    if (newVal) {
+      timeoutId = setTimeout(() => {
+        timeoutId = null;
+        close();
+      }, 60000);
+    }
+  },
+  { immediate: true },
+);
 
 onUnmounted(() => {
   if (timeoutId) clearTimeout(timeoutId);
@@ -121,11 +127,11 @@ function close() {
 
 @keyframes slideIn {
   from {
-    transform: translateY(20px);
+    transform: translate(-50%, 20px);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
 }

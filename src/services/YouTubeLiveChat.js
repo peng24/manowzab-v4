@@ -39,6 +39,7 @@ export class YouTubeLiveChat {
    * Returns true if there's a different key to try, false if all keys exhausted in this cycle
    */
   rotateKey() {
+    if (!this.apiKeys || this.apiKeys.length === 0) return false;
     const prevIndex = this.currentKeyIndex;
     this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
     logger.auth(`Rotating API Key: #${prevIndex + 1} → #${this.currentKeyIndex + 1} (of ${this.apiKeys.length})`);
@@ -53,37 +54,38 @@ export class YouTubeLiveChat {
   /**
    * 1. API Connection: Connect to YouTube API to get liveChatId
    */
-  async fetchLiveChatId(videoId, _triedKeys = 0) {
-    const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${videoId}&key=${this.apiKey}`;
+  async fetchLiveChatId(videoId, _triedKeys = 0, expectedGen = null) {
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${encodeURIComponent(videoId)}&key=${encodeURIComponent(this.apiKey)}`;
 
-    try {
-      const response = await fetch(url);
-      const data = await response.json();
+    const response = await fetch(url);
+    const data = await response.json();
 
-      if (data.error) {
-        if (_triedKeys < this.apiKeys.length - 1 && this.rotateKey()) {
-          return this.fetchLiveChatId(videoId, _triedKeys + 1);
-        }
-        throw new Error(data.error.message);
-      }
-
-      if (!data.items || data.items.length === 0) {
-        throw new Error("Video not found");
-      }
-
-      const details = data.items[0].liveStreamingDetails;
-      if (!details || !details.activeLiveChatId) {
-        throw new Error(
-          "No active live chat found (Stream might be offline or chat disabled)",
-        );
-      }
-
-      this.liveChatId = details.activeLiveChatId;
-      return this.liveChatId;
-    } catch (error) {
-      if (this.onError) this.onError(error);
-      throw error;
+    if (expectedGen !== null && expectedGen !== this.pollGeneration) {
+      return null;
     }
+
+    if (data.error) {
+      if (_triedKeys < this.apiKeys.length - 1 && this.rotateKey()) {
+        return this.fetchLiveChatId(videoId, _triedKeys + 1, expectedGen);
+      }
+      throw new Error(data.error.message);
+    }
+
+    if (!data.items || data.items.length === 0) {
+      throw new Error("Video not found");
+    }
+
+    const details = data.items[0].liveStreamingDetails;
+    if (!details || !details.activeLiveChatId) {
+      throw new Error(
+        "No active live chat found (Stream might be offline or chat disabled)",
+      );
+    }
+
+    if (expectedGen === null || expectedGen === this.pollGeneration) {
+      this.liveChatId = details.activeLiveChatId;
+    }
+    return details.activeLiveChatId;
   }
 
   /**
@@ -99,7 +101,9 @@ export class YouTubeLiveChat {
 
     try {
       if (!this.liveChatId) {
-        await this.fetchLiveChatId(videoId);
+        const fetchedChatId = await this.fetchLiveChatId(videoId, 0, gen);
+        if (gen !== this.pollGeneration || !fetchedChatId) return;
+        this.liveChatId = fetchedChatId;
       }
       if (gen !== this.pollGeneration) return;
 
@@ -107,6 +111,7 @@ export class YouTubeLiveChat {
       this.onMessage = callback;
       this.loadChat(0, gen);
     } catch (error) {
+      if (gen !== this.pollGeneration) return;
       logger.error("Failed to start polling:", error);
       if (this.onError) this.onError(error);
       if (this.onStatusChange) this.onStatusChange("err");

@@ -67,6 +67,10 @@ export const useStockStore = defineStore("stock", () => {
     loadedVideoId.value = "";
     stockData.value = {};
 
+    if (!videoId || typeof videoId !== "string" || !videoId.trim()) {
+      return () => {};
+    }
+
     const stockRef = dbRef(db, `stock/${videoId}`);
 
     let historyWriteTimeout = null;
@@ -200,7 +204,9 @@ export const useStockStore = defineStore("stock", () => {
       let action = "unknown";
       let committedItem = undefined;
 
-      await runTransaction(itemRef, (currentData) => {
+      const txResult = await runTransaction(itemRef, (currentData) => {
+        action = "unknown";
+        committedItem = undefined;
         const markBackdated = (isBackdated || systemStore.isLiveFinished) ? true : null;
         if (currentData === null) {
           // Create new item if not exists
@@ -251,8 +257,10 @@ export const useStockStore = defineStore("stock", () => {
         }
       });
 
-      // ✅ Auto-sync customer to delivery_customers with post-transaction snapshot
-      if (action === "claimed") {
+      const isCommitted = txResult?.committed !== false;
+
+      // ✅ Auto-sync customer to delivery_customers with post-transaction snapshot (only if committed)
+      if (isCommitted && action === "claimed") {
         let syncSnapshot = null;
         if (systemStore.currentVideoId === videoId) {
           const nextStockSnapshot = { ...stockData.value };
@@ -265,6 +273,10 @@ export const useStockStore = defineStore("stock", () => {
         syncDeliveryCustomerForOwner(owner, uid, videoId, syncSnapshot).catch((e) =>
           console.warn("Auto sync delivery error:", e)
         );
+      }
+
+      if (!isCommitted && action !== "already_owned" && action !== "already_queued") {
+        return { success: false, action: "aborted", error: "Transaction not committed" };
       }
 
       return { success: true, action, error: null };
@@ -316,7 +328,7 @@ export const useStockStore = defineStore("stock", () => {
     let committedItem = undefined;
 
     try {
-      await runTransaction(itemRef, (currentData) => {
+      const txResult = await runTransaction(itemRef, (currentData) => {
         previousOwner = null;
         previousUid = null;
         nextOwner = null;
@@ -389,6 +401,19 @@ export const useStockStore = defineStore("stock", () => {
           return currentData;
         }
       });
+
+      const isCommitted = txResult?.committed !== false;
+      if (!isCommitted) {
+        return {
+          success: false,
+          previousOwner: null,
+          previousUid: null,
+          nextOwner: null,
+          nextUid: null,
+          cancelledFromQueue: false,
+          error: "Transaction not committed",
+        };
+      }
 
       // ✅ Update post-transaction stock snapshot and auto-sync delivery_customers
       let syncSnapshot = null;
@@ -592,20 +617,28 @@ export const useStockStore = defineStore("stock", () => {
    */
   function updateStockSize(newSize) {
     if (!systemStore.currentVideoId) return;
+    const parsedSize = parseInt(newSize, 10);
+    if (!Number.isFinite(parsedSize) || parsedSize < 1) return;
     // 🛡️ Safety cap: prevent absurd stock expansion (e.g. customer types "555555")
     const MAX_STOCK_SIZE = 300;
-    if (newSize > MAX_STOCK_SIZE) {
+    const clampedSize = Math.min(parsedSize, MAX_STOCK_SIZE);
+    if (parsedSize > MAX_STOCK_SIZE) {
       console.warn(
-        `⚠️ Stock size ${newSize} exceeds max (${MAX_STOCK_SIZE}). Clamped.`,
+        `⚠️ Stock size ${parsedSize} exceeds max (${MAX_STOCK_SIZE}). Clamped.`,
       );
-      newSize = MAX_STOCK_SIZE;
     }
     const sizeRef = dbRef(
       db,
       `settings/${systemStore.currentVideoId}/stockSize`,
     );
-    set(sizeRef, newSize);
-    localStorage.setItem("lastStockSize", newSize);
+    try {
+      localStorage.setItem("lastStockSize", String(clampedSize));
+    } catch {
+      /* Storage may be unavailable */
+    }
+    return set(sizeRef, clampedSize).catch((err) => {
+      console.warn("[StockStore] updateStockSize failed:", err);
+    });
   }
 
   /**

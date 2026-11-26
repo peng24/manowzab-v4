@@ -211,8 +211,9 @@ import { useNicknameStore } from "../stores/nickname";
 import { ref as dbRef, onValue, update, remove } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ttsService } from "../services/TextToSpeech";
+import { useAudio } from "../composables/useAudio";
 import Swal from "sweetalert2";
-import { sanitizeDbKey } from "../utils/dbUtils";
+import { sanitizeDbKey, escapeHtml } from "../utils/dbUtils";
 import { logger } from "../utils/logger";
 
 // ✅ รายการคำนำหน้า (เหมือนใน nickname store)
@@ -222,6 +223,7 @@ const emit = defineEmits(["close"]);
 
 const stockStore = useStockStore();
 const nicknameStore = useNicknameStore();
+const { queueAudio } = useAudio();
 
 // Form State
 const formUid = ref("");
@@ -273,12 +275,14 @@ const filteredCustomers = computed(() => {
 
 // Parse nicknames into list for display
 const nicknamesList = computed(() => {
-  return Object.entries(nicknamesData.value).map(([uid, data]) => {
-    if (typeof data === "object") {
-      return { uid, nick: data.nick || "", phonetic: data.phonetic || "" };
-    }
-    return { uid, nick: data, phonetic: "" };
-  });
+  return Object.entries(nicknamesData.value || {})
+    .filter(([, data]) => data !== null && data !== undefined)
+    .map(([uid, data]) => {
+      if (data && typeof data === "object") {
+        return { uid, nick: String(data.nick ?? ""), phonetic: String(data.phonetic ?? "") };
+      }
+      return { uid, nick: String(data ?? ""), phonetic: "" };
+    });
 });
 
 // Filter nicknames by search query
@@ -336,16 +340,14 @@ function applyTitlePrefix(name) {
   return hasTitle ? name : "คุณ" + name;
 }
 
-// 🔊 ฟังเสียงตัวอย่าง (Local Preview — ไม่ส่งขึ้น Firebase)
+// 🔊 ฟังเสียงตัวอย่าง (Local Preview — ผ่าน queueAudio เพื่อไม่ให้เสียงซ้อนทับ)
 function previewVoice() {
   const textToRead = formPhonetic.value.trim() || formNick.value.trim();
   if (!textToRead) return;
 
   const finalText = applyTitlePrefix(textToRead);
   logger.debug("🔊 Preview TTS:", finalText);
-
-  // ✅ เรียก ttsService.speak() ตรงๆ — ดังแค่เครื่องที่กด ไม่ผ่าน Firebase
-  ttsService.speak("ทดสอบเสียง", finalText);
+  queueAudio(null, "ทดสอบเสียง", finalText);
 }
 
 // 🔊 ฟังเสียงจากรายการที่มีอยู่แล้ว
@@ -355,7 +357,7 @@ function previewItemVoice(item) {
 
   const finalText = applyTitlePrefix(textToRead);
   logger.debug("🔊 Preview item TTS:", finalText);
-  ttsService.speak("ทดสอบเสียง", finalText);
+  queueAudio(null, "ทดสอบเสียง", finalText);
 }
 
 // 💾 Save phonetic to Firebase (ใช้ update แทน set)
@@ -377,8 +379,13 @@ async function savePhonetic() {
   const phonetic = formPhonetic.value.trim() || null; // ✅ ถ้าไม่กรอก ให้เป็น null
 
   try {
-    // ✅ ใช้ update เพื่อไม่ลบ key อื่นๆ ที่อาจมีอยู่ใน nicknames/${safeUid}
-    await update(dbRef(db, `nicknames/${safeUid}`), { nick, phonetic, realName: uid });
+    // ✅ ใช้ update เพื่อไม่ลบ key อื่นๆ และรักษา realName เดิมไว้
+    const existingRealName = nicknamesData.value?.[safeUid]?.realName;
+    await update(dbRef(db, `nicknames/${safeUid}`), {
+      nick,
+      phonetic,
+      realName: existingRealName || uid,
+    });
 
     // 🚀 Invalidate memoized phonetic and TTS caches
     nicknameStore.clearPhoneticCache?.();
@@ -388,8 +395,8 @@ async function savePhonetic() {
       icon: "success",
       title: editingUid.value ? "อัปเดตสำเร็จ!" : "บันทึกสำเร็จ!",
       html: `<div style="text-align:left; font-size: 0.9em;">
-        <div><b>ชื่อ:</b> ${nick}</div>
-        ${phonetic ? `<div><b>คำอ่าน:</b> ${phonetic}</div>` : `<div style="color:#888">ไม่มีคำอ่าน (ใช้คำนำหน้า "คุณ" อัตโนมัติ)</div>`}
+        <div><b>ชื่อ:</b> ${escapeHtml(nick)}</div>
+        ${phonetic ? `<div><b>คำอ่าน:</b> ${escapeHtml(phonetic)}</div>` : `<div style="color:#888">ไม่มีคำอ่าน (ใช้คำนำหน้า "คุณ" อัตโนมัติ)</div>`}
       </div>`,
       timer: 2000,
       showConfirmButton: false,
@@ -436,7 +443,7 @@ function deleteItem(uid, name) {
       try {
         const safeUid = sanitizeDbKey(uid);
         await remove(dbRef(db, `nicknames/${safeUid}`));
-        if (safeUid !== uid) {
+        if (safeUid !== uid && !/[.#$[\]/]/.test(uid)) {
           await remove(dbRef(db, `nicknames/${uid}`)).catch(() => {});
         }
 
@@ -510,9 +517,7 @@ onUnmounted(() => {
 
 <style scoped>
 .phonetic-modal {
-  background: rgba(18, 18, 22, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(16, 18, 26, 0.96);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   width: 680px;

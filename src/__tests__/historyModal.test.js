@@ -94,6 +94,8 @@ describe("HistoryModal mount & setup regression", () => {
     expect(html).toContain("ประวัติการขาย (History)");
     expect(html).toContain("รายการย้อนหลัง");
     expect(html).toContain("ค้นหาชื่อไลฟ์");
+    expect(html).toContain("เลือกไลฟ์ย้อนหลังที่ต้องการดู");
+    expect(html).toContain("เลือกไลฟ์");
   });
 });
 

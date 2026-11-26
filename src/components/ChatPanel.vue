@@ -734,15 +734,16 @@ const activePinnedAnswer = computed(() => {
   return getSmartAnswer(pinnedSmartHud.value.chat);
 });
 
+function isQuestionTabMessage(m) {
+  if (!m || isPriceAnnouncementMessage(m) || isBannedUser(m)) return false;
+  return m.type === "question" || Boolean(getSmartAnswer(m));
+}
+
 const questionTabCount = computed(() => {
   const msgs = chatStore.messages;
   let count = 0;
   for (let i = 0; i < msgs.length; i++) {
-    const m = msgs[i];
-    if (isBannedUser(m)) continue;
-    if (m.type === "question" || (m.type !== "buy" && m.type !== "cancel" && isSmartQuestionText(m.text))) {
-      count++;
-    }
+    if (isQuestionTabMessage(msgs[i])) count++;
   }
   return count;
 });
@@ -862,7 +863,7 @@ const filteredVisibleMessages = computed(() => {
       (tab === "buy" && m.type === "buy") ||
       (tab === "shipping" && m.type === "shipping") ||
       (tab === "cancel" && m.type === "cancel") ||
-      (tab === "question" && (m.type === "question" || Boolean(getSmartAnswer(m)))) ||
+      (tab === "question" && isQuestionTabMessage(m)) ||
       (tab === "admin" && (m.isAdmin || m.type === "question"))
     ) {
       result.unshift(m);
@@ -892,8 +893,9 @@ async function confirmToggleBan(chat) {
   const isBanned = isBannedUser(chat);
 
   if (isBanned) {
+    const banRecord = blacklistStore.getBanInfo(userUid, userName);
     const res = await Swal.fire({
-      title: `ปลดแบนคุณ ${userName}?`,
+      titleText: `ปลดแบนคุณ ${userName}?`,
       text: "ลูกค้าจะสามารถส่งเสียงอ่านและจองสินค้าได้ตามปกติ",
       icon: "question",
       showCancelButton: true,
@@ -905,12 +907,18 @@ async function confirmToggleBan(chat) {
 
     if (res.isConfirmed) {
       try {
-        await blacklistStore.unbanUser(userUid || userName);
+        const unbanKey =
+          banRecord?.channelId ||
+          banRecord?.normName ||
+          banRecord?.displayName ||
+          userUid ||
+          userName;
+        await blacklistStore.unbanUser(unbanKey);
         Swal.fire({
           toast: true,
           position: "top-end",
           icon: "success",
-          title: `ปลดแบนคุณ ${userName} แล้ว`,
+          titleText: `ปลดแบนคุณ ${userName} แล้ว`,
           showConfirmButton: false,
           timer: 2000,
           timerProgressBar: true,
@@ -926,7 +934,7 @@ async function confirmToggleBan(chat) {
     }
   } else {
     const { value: formValues } = await Swal.fire({
-      title: `🚫 แบนคุณ ${userName}?`,
+      titleText: `🚫 แบนคุณ ${userName}?`,
       html: `
         <div style="text-align: left; font-size: 0.9rem; margin-top: 10px;">
           <p style="color: #94a3b8; margin-bottom: 8px;">ผู้ใช้ที่ถูกแบนจะไม่สามารถจองสินค้าได้ และระบบจะปิดเสียงอ่าน/เอฟเฟกต์อัตโนมัติ</p>
@@ -980,7 +988,7 @@ async function confirmToggleBan(chat) {
           toast: true,
           position: "top-end",
           icon: "success",
-          title: `แบนคุณ ${userName} เรียบร้อยแล้ว`,
+          titleText: `แบนคุณ ${userName} เรียบร้อยแล้ว`,
           showConfirmButton: false,
           timer: 2000,
           timerProgressBar: true,
@@ -1291,7 +1299,7 @@ onUnmounted(() => {
   }
 });
 
-// ✅ Watch for Video ID changes to re-sync
+// ✅ Watch for Video ID changes to re-sync (and unsubscribe cleanly if cleared)
 watch(
   () => systemStore.currentVideoId,
   (newVideoId, oldVideoId) => {
@@ -1304,6 +1312,12 @@ watch(
       if (chatUnsubscribe) chatUnsubscribe();
       chatUnsubscribe = chatStore.syncFromFirebase(newVideoId);
       nextTick(() => scrollToBottom(false));
+    } else if (!newVideoId && oldVideoId) {
+      if (chatUnsubscribe) {
+        chatUnsubscribe();
+        chatUnsubscribe = null;
+      }
+      chatStore.clearChat({ clearIdb: false });
     }
   },
 );
@@ -1341,36 +1355,79 @@ async function forceProcess(chat) {
     preConfirm: () => {
       const numVal = document.getElementById("swal-input1")?.value?.trim();
       const priceVal = document.getElementById("swal-input2")?.value?.trim();
-      if (!numVal) {
-        Swal.showValidationMessage("กรุณาระบุรหัสสินค้า");
+      if (!numVal || !/^\d+$/.test(numVal)) {
+        Swal.showValidationMessage("กรุณาระบุรหัสสินค้าเป็นตัวเลข (1–300)");
         return false;
       }
-      return [numVal, priceVal];
+      const parsedNum = Number.parseInt(numVal, 10);
+      if (parsedNum < 1 || parsedNum > 300) {
+        Swal.showValidationMessage("รหัสสินค้าต้องอยู่ระหว่าง 1 ถึง 300");
+        return false;
+      }
+      let parsedPrice = null;
+      if (priceVal) {
+        if (!/^\d+$/.test(priceVal) || Number.parseInt(priceVal, 10) <= 0) {
+          Swal.showValidationMessage("ราคาต้องเป็นตัวเลขจำนวนเต็มบวก");
+          return false;
+        }
+        parsedPrice = Number.parseInt(priceVal, 10);
+      }
+      return [parsedNum, parsedPrice];
     },
   });
 
   if (formValues) {
-    const [num, price] = formValues;
-    if (!num) return;
+    const [parsedNum, parsedPrice] = formValues;
+    if (!Number.isFinite(parsedNum)) return;
 
-    await stockStore.processOrder(
-      parseInt(num),
+    const res = await stockStore.processOrder(
+      parsedNum,
       chat.displayName, // ใช้ชื่อจากแชท
       chat.uid, // ใช้ UID จากแชท
       "manual-force",
-      price ? parseInt(price) : null,
+      parsedPrice,
       "manual",
     );
 
-    Swal.fire({
-      icon: "success",
-      title: `ตัดสต็อกเบอร์ ${num} ให้ ${chat.displayName} แล้ว`,
-      toast: true,
-      position: "top-end",
-      showConfirmButton: false,
-      timer: 2000,
-      timerProgressBar: true,
-    });
+    if (!res?.success) {
+      Swal.fire({
+        icon: "error",
+        titleText: `ตัดสต็อกเบอร์ ${parsedNum} ไม่สำเร็จ`,
+        text: res?.error || "กรุณาตรวจสอบการเชื่อมต่อไลฟ์",
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 2500,
+      });
+    } else if (res.action === "queued") {
+      Swal.fire({
+        icon: "info",
+        titleText: `เพิ่ม ${chat.displayName} เข้าคิวสำรองเบอร์ ${parsedNum} แล้ว`,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 2200,
+      });
+    } else if (res.action === "already_owned" || res.action === "already_queued") {
+      Swal.fire({
+        icon: "warning",
+        titleText: `${chat.displayName} จอง/อยู่ในคิวเบอร์ ${parsedNum} แล้ว`,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 2200,
+      });
+    } else {
+      Swal.fire({
+        icon: "success",
+        titleText: `ตัดสต็อกเบอร์ ${parsedNum} ให้ ${chat.displayName} แล้ว`,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+      });
+    }
   }
 
   // ✅ รักษาตำแหน่ง Scroll เดิมของช่องแชท ไม่ให้เลื่อนขึ้นด้านบนสุดเอง
@@ -1845,41 +1902,23 @@ async function refreshChat() {
 }
 
 
-/* ✅ TransitionGroup Animations */
+/* ✅ TransitionGroup Animations (GPU-only compositor) */
 .chat-list-enter-active {
-  transition: all 0.34s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.chat-list-enter-active.buy {
-  animation: chatBuyHighlight 1.6s ease-out;
-}
-
-.chat-list-enter-active.cancel {
-  animation: chatCancelHighlight 1.6s ease-out;
-}
-
-@keyframes chatBuyHighlight {
-  0% { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.75), 0 6px 24px rgba(16, 185, 129, 0.38); }
-  100% { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22); }
-}
-
-@keyframes chatCancelHighlight {
-  0% { box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.8), 0 6px 24px rgba(244, 63, 94, 0.38); }
-  100% { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22); }
+  transition: opacity 0.2s ease-out, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .chat-list-leave-active {
-  transition: all 0.2s ease-in;
+  transition: opacity 0.18s ease-in, transform 0.18s ease-in;
 }
 
 .chat-list-enter-from {
   opacity: 0;
-  transform: translateY(14px) scale(0.98);
+  transform: translateY(6px);
 }
 
 .chat-list-leave-to {
   opacity: 0;
-  transform: translateX(-12px);
+  transform: translateX(-10px);
 }
 
 .avatar-col {
@@ -2016,10 +2055,10 @@ async function refreshChat() {
   color: #f1f5f9;
   background: transparent;
   border: 1px solid transparent;
-  padding: 1px 6px 1px 0;
+  padding: 1px 6px 1px 4px;
   border-radius: 6px;
   cursor: pointer;
-  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, padding 0.18s ease;
+  transition: transform 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2044,7 +2083,7 @@ async function refreshChat() {
 .chat-name:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(229, 184, 105, 0.38);
-  padding-left: 6px;
+  transform: translateX(2px);
   color: #ffffff;
 }
 
@@ -2226,31 +2265,12 @@ async function refreshChat() {
   cursor: pointer;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 16px rgba(16, 185, 129, 0.4);
   z-index: 50;
-  animation: bounce 2s infinite;
-  transition: all 0.25s ease;
-  backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .new-msg-btn:hover {
-  transform: scale(1.05);
+  transform: translateY(-2px) scale(1.04);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 22px rgba(251, 191, 36, 0.6);
-}
-
-
-@keyframes bounce {
-  0%,
-  20%,
-  50%,
-  80%,
-  100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-5px);
-  }
-  60% {
-    transform: translateY(-3px);
-  }
 }
 
 /* ✅ Load Previous Messages Button */
@@ -2617,8 +2637,7 @@ async function refreshChat() {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(1.5px);
+  background: rgba(15, 23, 42, 0.82);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2633,11 +2652,11 @@ async function refreshChat() {
 
 @keyframes pulseBanOverlay {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    opacity: 0.88;
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 14px rgba(239, 68, 68, 0.95);
+    opacity: 1;
     transform: scale(1.04);
   }
 }

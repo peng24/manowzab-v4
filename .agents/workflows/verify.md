@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.7.9 + `live-product-capture-ai` v1.5.5 (Start-at-Item-1 Gate & Nov 25 Live/SRT Accuracy Hardening) — 2026-11-26** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.8.0 — Smart Size, History UX Redesign, AuthSplash & Full-System 79-File Bug/Animation Hardening — 2026-11-26** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -66,6 +66,7 @@ description: Mandatory verification checklist after every code change
 | 3.10 | Queue Modal Price Editor & Quick Pills | src/components/StockGrid.vue | สามารถกรอกแก้ไขราคา editingPrice พร้อมปุ่มลัดราคา 50.-, 60.-, 80.-, 100.-, 120.-, 150.- และปุ่มล้างราคา บันทึกแล้วอัปเดตสต็อกและคำนวณ totalPrice ของลูกค้าอัตโนมัติ |
 | 3.11 | Historical Live Session & Replay Price Sync | `src/components/HistoryModal.vue` | ในประวัติย้อนหลัง แสดงป้ายราคา .stock-price สำหรับทั้งสินค้าที่จองแล้วและยังว่างอยู่ (item.price > 0), พร้อมปุ่ม 'เปิดที่หน้าหลัก' (openOnMainBoard) สำหรับสลับ session activeVideo ไปหน้ากระดานหลักทันที |
 | 3.12 | Spoken Permutation & Intervening Customer Name Price Detection | `live-product-capture-ai` (`product_parser.py`, `live_stream_detector.py`) | รองรับการพูดสลับลำดับทั้ง 6 รูปแบบของแม่ค้า (เช่น เบอร์+ชื่อ+ราคา, ราคา+เบอร์, ชื่อ+เบอร์+ราคา) พร้อมกรอง False Positive ป้องกันค่าส่ง/จำนวนตัว ไม่ให้ทับเบอร์สินค้า |
+| 3.13 | Smart Compact Size Display, Editor & Size Search (`stockSizeUtils.js`) | `src/utils/stockSizeUtils.js`, `src/components/StockItemCard.vue`, `src/components/StockGrid.vue`, `src/components/HistoryModal.vue`, `src/__tests__/stockSizeUtils.test.js` | แสดงไซส์กระชับไร้กรอบ (`.stock-size-meta` สีฟ้าอ่อน เช่น `อก54`, `อก52-54`, `อก44-46`, `ฟรีไซส์`, หรือ `2XL`) ที่แถวล่างของการ์ดสต็อกทั้งหน้าหลัก (พร้อม `item.details`/`item.size` ใน `v-memo`) และหน้าประวัติย้อนหลัง, แสดงสเปกเต็มผ่าน Tooltip และช่องแก้ไข `สเปก/ไซส์` ใน Queue Modal (`v-model.number` + atomic write + ล้าง legacy `size: null`), คงค่าทั้ง `price` และ `details` ไว้ทุกจุดยกเลิก (`processCancel`, `processHistoryCancel`, `showOwnerItems` past-session cancel), และค้นหาตามไซส์ (`อก 52`, `อก52`, `2XL`) ได้โดยไม่กวนการค้นหาเลขรายการล้วน |
 
 ---
 
@@ -125,6 +126,7 @@ description: Mandatory verification checklist after every code change
 | 6.6 | `HistoryModal` Mount & `historyTotalSales` | `src/components/HistoryModal.vue`, `src/__tests__/historyModal.test.js` | เปิด `HistoryModal.vue` ได้โดยไม่พังใน `setup()` (ต้องอ่านจาก `selectedItem.value?.orders` ห้ามอ้างอิงตัวแปร `allOrders` ที่ไม่มีอยู่จริง) และคำนวณป้ายยอดขาย `historyTotalSales` ตรงตามออเดอร์ที่โหลดจริงหรือ fallback ไป `selectedItem.value.totalSales` อย่างปลอดภัย |
 | 6.7 | Historical Chat Replay (`แชท` Tab) & Shared Hybrid Helpers | `src/components/HistoryModal.vue`, `src/composables/useHistory.js`, `src/utils/chatDisplayUtils.js`, `src/__tests__/historyModal.test.js` | เปิดแท็บ `แชท` ในประวัติการจองได้โดยดึง `chats/{videoId}` แบบ read-only จาก `fetchHistoryChats(videoId)`, กรอง `isPriceAnnouncementMessage` ทิ้งทั้งหมด, ไม่เล่นเสียง TTS/SFX ใดๆ, ใช้ฟังก์ชันแชร์ร่วมกับ Live Chat (`chatDisplayUtils.js`: สีประจำตัว 360°, ขอบ Hybrid `4.5px`, proxy highlight, YouTube emotes), กรองตาม Intent Tab / ชื่อผู้พิมพ์ / คำค้นหา และ Export CSV แชทได้ครบ (ทำงานได้ทั้งใน Modal และหน้า `/history/`) |
 | 6.8 | จัดเก็บและแสดงชื่อไลฟ์ย้อนหลัง | `src/composables/useYouTube.js`, `src/stores/stock.js`, `src/composables/useHistory.js`, `src/components/HistoryModal.vue`, `src/__tests__/historyPersistence.test.js` | บันทึก `history/{videoId}/title` แบบ non-destructive (`update` ไม่ทับ `totalSales`/`totalItems`/`timestamp` เดิม), ซิงค์ชื่อไลฟ์จาก `stock.js` เมื่อมี `liveTitle` จริง, แสดงแถบชื่อไลฟ์เต็ม + Video ID + วันที่ ใน `.history-live-title-bar`, แสดงชื่อ 2 บรรทัดพร้อมช่องค้นหาใน Sidebar และรองรับแก้ไขชื่อ / ดึงชื่อจาก YouTube (`syncMissingHistoryTitle`, `updateHistoryTitle`) ได้ทันที |
+| 6.9 | History Modal & Page Friendly UX Redesign | `src/components/HistoryModal.vue`, `src/pages/HistoryPage.vue`, `src/__tests__/historyModal.test.js` | ขยายพื้นที่ Modal เป็น `max-width: 1320px; height: 90vh`, ใช้ Sidebar 280px โทน Champagne Gold พร้อมตัวนับจำนวนไลฟ์/จำนวนชิ้น/ยอดขาย + Mobile Drawer (`<= 860px`), หน้าว่างมีปุ่ม "เปิดไลฟ์ล่าสุด" 1 คลิก, แยกปุ่มอันตราย (`ล้างกระดาน`/`ลบไลฟ์`) เป็น Ghost Icon ชัดเจน, เพิ่ม KPI ชิปคลิกกรองได้ (`ขายแล้ว`/`เหลือว่าง` สลับไป `grid` อัตโนมัติเมื่อกดจากโหมดอื่น), ปุ่มกรองสถานะ (`ทั้งหมด`/`ขายแล้ว`/`ว่าง`), Segmented Control (`กระดาน`/`รายการ`/`แชท` จำค่าใน `localStorage` ค่าเริ่มต้น `grid`), การ์ด Grid 3 แถวคลีนเหมือนหน้าหลัก (ลบ legacy CSS `.queue-badge`/`.owner-count-badge` ที่ทับซ้อน), ตาราง List กรองเฉพาะรายการที่มี `owner` และรองรับ sparse array `null` holes พร้อมซ่อน raw UID + แปลงที่มาเป็นภาษาไทย (`แชทสด`/`แอดมินเพิ่ม`/`คิวสำรอง`/`AI`), และ `exportCSV` แนบคอลัมน์ `Details` + `URL.revokeObjectURL` |
 
 ---
 
@@ -151,6 +153,7 @@ description: Mandatory verification checklist after every code change
 |---|---|---|---|
 | 9.1 | `triggerCelebration(percentage)` | `src/utils/celebration.js` | เอฟเฟกต์ดอกไม้ไฟ 50%/80%/100% |
 | 9.2 | Animated Sales % | `src/components/StockGrid.vue` | แสดง % ยอดขาย real-time + animated counting + progress bar |
+| 9.3 | 60fps GPU-Only Main Page Animations & Reduced Motion | `src/components/StockItemCard.vue`, `src/components/StockGrid.vue`, `src/components/HistoryModal.vue`, `src/assets/style.css` | การ์ดจองใหม่ (`.new-order` นาน 8 วิ) คงเลขรายการ `.stock-num` ไร้กรอบ + เด้งป๊อป 1 ครั้ง + แสงทองกวาด GPU `translate3d` 2 รอบ (ไม่มี `infinite` repaint `background`/`box-shadow`), การ์ดยกเลิก (`.cancelled-blink` นาน 10 วิ) สั่น 1 ครั้ง + กะพริบ `opacity` GPU-only, `.mini-shimmer` ใช้ GPU `translate3d`, ถอด `infinite box-shadow` ออกจาก `.ds-pack-glow`/`.vip-admin`, แชทเข้าใหม่สไลด์ขึ้นสั้นๆ `0.15s` (`translateY(4px)`), และรองรับ `@media (prefers-reduced-motion: reduce)` |
 
 ---
 
@@ -634,3 +637,18 @@ description: Mandatory verification checklist after every code change
 - **ผลตรวจ Automated & Replay**:
   - `live-product-capture-ai`: `unittest` ผ่านครบ **105 tests** (รวม `test_nov25_and_srt_accuracy_v154_regression` และ `test_start_at_item_1_gate_blocks_opening_20_100_and_auto_unlocks_mid_live`)
   - ผล Replay 5 ไลฟ์จริง (เปิด Start-at-Item-1 Gate): **311/312 รายการ (99.68%)** — `NOV25` **50/50 (100%, `#10=฿80`)**, `13-11` **50/50 (100%)**, `18-11` **70/70 (100%, `#15=฿60`)**, `21-11` **70/70 (100%)**, `11-11` **71/72 (98.6%)**
+
+## 🚀 ผลตรวจ Full-System 79-File Bug & Animation Audit + AuthSplash (2026-11-26)
+
+- **สิ่งที่ตรวจสอบและแก้ไขครบทั้ง 3 ระยะ (Wave 1–3)**:
+  1. **Minimalist 🍋 Splash Screen & Entry Hardening (`AuthSplash.vue`, `AuthGate.vue`, `swalConfig.js`, 4 `index.html`, 4 `*-main.js`)**: สร้างหน้าโหลดพรีเมียม `AuthSplash.vue` ครอบ `!authStore.authReady` ทุกหน้าหลัก/หน้าย่อย (กันหน้า Login แวบขึ้นมาสำหรับแอดมินที่ล็อกอินแล้ว), เพิ่ม `preconnect` ไป Firebase Auth, ลบดีเลย์เทียม `450ms`/`600ms` ใน `AuthGate.vue`, รวมศูนย์ `configureSwal(Swal)` รักษา SweetAlert2 v11 Toast mixin `defaultParams`, ลบ `vueLenisPlugin` ที่ไม่ได้ใช้, และแก้สคริปต์รีเซ็ต Service Worker ใน `index.html` ไม่ให้ reload ซ้อนเมื่อไม่มี SW
+  2. **Critical & High Data/Security/Race Fixes**:
+     - แก้ `AddressPage.vue` + `AddressImportModal.vue` (`:customers="deliveryCustomersList"` + `useCustomerStore` รวมศูนย์ ปิดบั๊ก `delivery_customers/undefined`)
+     - แก้ `StockGrid.vue` & `HistoryModal.vue` รีเซ็ต/resolve `uid` เมื่อเปลี่ยนชื่อเจ้าของสินค้า, เปลี่ยน `onclick` ใน `showOwnerItems` เป็น event delegation + `titleText` ปิด XSS, และคงค่า `price`/`details`/`backdated`
+     - แก้ `thaiDateUtils.js` (แปลง พ.ศ. 2 หลัก `69 ➔ 2026`, ป้องกัน day-31/next-year/UTC rollover ใน `ShippingManager.vue`, `ShippingPage.vue`, `deliverySync.js`), แก้ `ThaiDatePicker.vue` year bounds & outside-click, แก้ `multiBuyRegex` ReDoS & `SPLIT_NUMS_REGEX` (`และ|เเละ|กับ|กะ`), แก้ `thaiNumberWords.js` phone boundary (`ราคา 100 120 150`) & หลักสิบล้าน, แก้ `dbUtils.js` (`escapeHtml(0) === "0"` & control chars)
+     - ปิด root Firebase write/delete ใน `stock.js` (`connectToStock("")`), `deliveryActions.js` (`completeDelivery`/`restoreDelivery`), `useHistory.js` (`deleteMultipleHistory`, `getCleanupPreview`, lazy `useSystemStore`), และ `blacklist.js`; แก้ race/leak ใน `App.vue` (`presenceCleanup` + auth hotkey guard), `Header.vue` (validate ก่อนเชื่อม), `useYouTube.js` (`connectGeneration`), `YouTubeLiveChat.js` (`apiKeys.length === 0`), `PhoneticManager.vue` (`queueAudio` แทน `ttsService.speak`), `CustomerQuickEditModal.vue` (`openSeq`), `CustomerAddressModal.vue` & `customer.js` (sparse addresses), `chat.js` & `chatIdb.js`, `voiceLearning.js`, `system.js`, `useAwayMode.js`, `useSmoothScroll.js`, `ShippingLabelModal.vue`, `ChangelogModal.vue`, `UpdatePrompt.vue`, `TtsQuotaModal.vue`
+  3. **System-Wide 60fps Animations & UX Polish**: เปลี่ยน infinite `box-shadow`/`text-shadow`/`filter`/`left` keyframes ใน `style.css`, `ChatPanel.vue`, `ShippingManager.vue`, `ShippingPage.vue`, `AuthGate.vue`, `Dashboard.vue`, `ChangelogModal.vue`, `NoteBanner.vue` เป็น GPU compositor (`transform`/`opacity`) ทั้งหมด, ลบ double `backdrop-filter` และ `filter: blur(90px)` บนพื้นหลัง, ลบ `will-change: width, min-width` และ dead CSS, รองรับ `prefers-reduced-motion` ทุกหน้า และเพิ่มคีย์ `Esc` ปิด Modal (`ShortcutsModal`, `BlacklistModal`, `LiveSummaryModal`, `CustomerQuickEditModal`)
+- **ผลตรวจ Automated & Build**:
+  - `npm run build`: **✓ ผ่าน** (`142 modules transformed`, 4 entry points `index.html`, `shipping/index.html`, `history/index.html`, `address/index.html`)
+  - `npm test -- --run`: **✓ ผ่านครบ 38/38 Test Files / 942/942 Tests** (รวม `systemAuditWave2.test.js` 14 เคสใหม่, `4.68s`)
+  - อัปเดตกฎโปรเจกต์ครบ 4 ไฟล์ (`AI_RULES.md`, `GEMINI.md`, `.agents/AGENTS.md`, `.agents/skills/manowzab-core/SKILL.md`) และ `.agents/workflows/verify.md` แล้ว

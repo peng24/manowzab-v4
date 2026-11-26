@@ -3,6 +3,8 @@
     v-memo="[
       item.owner,
       item.price,
+      item.details,
+      item.size,
       item.backdated,
       item.time,
       ownerCount,
@@ -60,23 +62,29 @@
       </div>
     </div>
 
-    <!-- Bottom Micro-Meta Row (Subtle, Non-intrusive) -->
-    <div class="card-meta-row" v-if="item.owner">
+    <!-- Bottom Micro-Meta Row (Subtle, Non-intrusive: Count, Address, Smart Compact Size) -->
+    <div class="card-meta-row" v-if="item.owner || compactSize">
       <div
-        v-if="ownerCount >= 1"
+        v-if="item.owner && ownerCount >= 1"
         class="owner-count-badge"
         :title="`${item.owner} จองทั้งหมด ${ownerCount} ชิ้น — คลิกเพื่อจัดการ`"
         @click.stop="$emit('show-owner', item.owner)"
       >×{{ ownerCount }}</div>
 
       <div
-        v-if="!hasAddress"
+        v-if="item.owner && !hasAddress"
         class="no-addr-indicator"
         :title="`${item.owner} ยังไม่มีที่อยู่จัดส่งในระบบ`"
         @click.stop="$emit('show-owner', item.owner)"
       >
         <span class="no-addr-dot"></span>รอที่อยู่
       </div>
+
+      <span
+        v-if="compactSize"
+        class="stock-size-meta"
+        :title="`สเปกสินค้า: ${fullDetails} (คลิกการ์ดเพื่อแก้ไข)`"
+      >{{ compactSize }}</span>
     </div>
 
     <!-- 🌟 VIP Shimmer Beam (แสงทองวิ่งผ่านตอนจองใหม่) -->
@@ -89,6 +97,7 @@
 <script setup>
 import { computed } from 'vue';
 import { getBookingTooltip } from '../utils/timeFormatUtils.js';
+import { formatCompactStockSize, formatFullStockDetails } from '../utils/stockSizeUtils.js';
 
 const props = defineProps({
   index: { type: Number, required: true },
@@ -109,6 +118,9 @@ defineEmits(['select', 'show-owner']);
 const backdatedTooltip = computed(() => {
   return getBookingTooltip(props.item.time, true);
 });
+
+const fullDetails = computed(() => formatFullStockDetails(props.item));
+const compactSize = computed(() => formatCompactStockSize(props.item));
 
 function isUnsavedOwner(name) {
   return typeof name === 'string' && name.trim().startsWith('@');
@@ -284,13 +296,14 @@ function isUnsavedOwner(name) {
 }
 
 /* ======================================================
-   ✨ BOOKING ANIMATION (CF Confirmed — Pop + Gold Sweep)
+   ✨ BOOKING ANIMATION (CF Confirmed — Calm Luxury Pop + GPU Gold Sweep)
    ====================================================== */
 .stock-item.sold.new-order {
-  animation:
-    orderPopEntry 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1,
-    newOrderLuxPulse 1.5s ease-in-out infinite;
+  animation: orderPopEntry 0.45s cubic-bezier(0.22, 1, 0.36, 1) 1;
   border: 1.5px solid #e5b869 !important;
+  box-shadow:
+    0 0 0 2px rgba(229, 184, 105, 0.38),
+    0 6px 20px rgba(229, 184, 105, 0.28);
   z-index: 10 !important;
 }
 
@@ -299,17 +312,20 @@ function isUnsavedOwner(name) {
   position: absolute;
   inset: -3px;
   border-radius: 17px;
-  border: 1.5px solid rgba(229, 184, 105, 0.75);
+  border: 1.5px solid rgba(229, 184, 105, 0.72);
   pointer-events: none;
-  animation: newOrderRadar 1.6s ease-out infinite;
+  animation: newOrderRadar 1.35s ease-out 2 forwards;
+  will-change: transform, opacity;
   z-index: -1;
 }
 
+/* Keep background-free stock number invariant even during new-order highlight */
 .stock-item.sold.new-order .stock-num {
-  color: #0b0f17 !important;
-  background: linear-gradient(135deg, #f3cf7a 0%, #d4a145 100%) !important;
-  border-color: #fef08a !important;
-  box-shadow: 0 0 10px rgba(229, 184, 105, 0.6);
+  color: #fef08a !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: 0 0 10px rgba(243, 207, 122, 0.85), 0 1px 3px rgba(0, 0, 0, 0.75);
 }
 
 .new-order-shimmer {
@@ -325,53 +341,37 @@ function isUnsavedOwner(name) {
   content: "";
   position: absolute;
   top: -60%;
-  left: -120%;
+  left: 0;
   width: 55%;
   height: 220%;
   background: linear-gradient(
     90deg,
     transparent 0%,
     rgba(255, 255, 255, 0.08) 20%,
-    rgba(243, 207, 122, 0.45) 50%,
-    rgba(255, 255, 255, 0.3) 75%,
+    rgba(243, 207, 122, 0.42) 50%,
+    rgba(255, 255, 255, 0.28) 75%,
     transparent 100%
   );
-  transform: rotate(25deg);
-  animation: vipShimmerSweep 1.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform: translate3d(-180%, 0, 0) rotate(25deg);
+  animation: vipShimmerSweep 1.5s cubic-bezier(0.4, 0, 0.2, 1) 2 forwards;
+  will-change: transform;
 }
 
 @keyframes orderPopEntry {
-  0% { transform: scale(0.9) translateZ(0); }
-  55% { transform: scale(1.06) translateZ(0); }
+  0% { transform: scale(0.92) translateZ(0); }
+  55% { transform: scale(1.05) translateZ(0); }
   100% { transform: scale(1) translateZ(0); }
 }
 
 @keyframes vipShimmerSweep {
-  0% { left: -120%; }
-  60%, 100% { left: 170%; }
-}
-
-@keyframes newOrderLuxPulse {
-  0%, 100% {
-    border-color: #e5b869 !important;
-    background: linear-gradient(155deg, rgba(229, 184, 105, 0.38) 0%, rgba(185, 28, 28, 0.5) 55%, rgba(69, 10, 10, 0.9) 100%) !important;
-    box-shadow:
-      0 0 0 2px rgba(229, 184, 105, 0.42),
-      0 6px 22px rgba(229, 184, 105, 0.34);
-  }
-  50% {
-    border-color: #fca5a5 !important;
-    background: linear-gradient(155deg, rgba(185, 28, 28, 0.54) 0%, rgba(127, 29, 29, 0.7) 55%, rgba(69, 10, 10, 0.92) 100%) !important;
-    box-shadow:
-      0 0 0 1px rgba(252, 165, 165, 0.4),
-      0 6px 18px rgba(185, 28, 28, 0.3);
-  }
+  0% { transform: translate3d(-180%, 0, 0) rotate(25deg); }
+  100% { transform: translate3d(320%, 0, 0) rotate(25deg); }
 }
 
 @keyframes newOrderRadar {
-  0% { transform: scale(0.98); opacity: 0.85; }
-  75% { transform: scale(1.12); opacity: 0; }
-  100% { transform: scale(1.15); opacity: 0; }
+  0% { transform: scale(0.98) translateZ(0); opacity: 0.78; }
+  80% { transform: scale(1.1) translateZ(0); opacity: 0; }
+  100% { transform: scale(1.12) translateZ(0); opacity: 0; }
 }
 
 /* Queue Badge (Neat Top-Right Pill) */
@@ -513,14 +513,38 @@ function isUnsavedOwner(name) {
   color: #ffffff;
 }
 
+/* 📏 Smart Compact Size (Background-Free, Subtle & Scannable) */
+.stock-size-meta {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #7dd3fc;
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  line-height: 1.2;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stock-item.sold .stock-size-meta {
+  color: #bae6fd;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.72);
+}
+
 /* ======================================================
-   🚨 CANCELLATION ANIMATION (Shake + Crimson Pulse)
+   🚨 CANCELLATION ANIMATION (GPU-only Shake + Soft Crimson Pulse)
    ====================================================== */
 .stock-item.cancelled-blink {
-  animation:
-    cancelShakeEntry 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1,
-    cancelPulseLux 1.15s ease-in-out infinite;
-  border: 1.5px solid rgba(244, 63, 94, 0.85) !important;
+  animation: cancelShakeEntry 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
+  border: 1.5px solid rgba(244, 63, 94, 0.88) !important;
+  background: rgba(127, 29, 29, 0.28);
+  box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.22), 0 6px 16px rgba(244, 63, 94, 0.28);
   z-index: 8;
 }
 
@@ -537,8 +561,9 @@ function isUnsavedOwner(name) {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, rgba(244, 63, 94, 0.28) 0%, transparent 72%);
-  animation: cancelFlashFade 1.15s ease-in-out infinite;
+  background: radial-gradient(circle at center, rgba(244, 63, 94, 0.3) 0%, transparent 72%);
+  animation: cancelFlashFade 1.4s ease-in-out infinite;
+  will-change: opacity;
 }
 
 @keyframes cancelShakeEntry {
@@ -549,22 +574,9 @@ function isUnsavedOwner(name) {
   80% { transform: translateX(3px); }
 }
 
-@keyframes cancelPulseLux {
-  0%, 100% {
-    border-color: rgba(244, 63, 94, 0.9);
-    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.25), 0 6px 20px rgba(244, 63, 94, 0.35);
-    background: rgba(127, 29, 29, 0.32);
-  }
-  50% {
-    border-color: rgba(244, 63, 94, 0.38);
-    box-shadow: 0 0 6px rgba(244, 63, 94, 0.15);
-    background: rgba(69, 10, 10, 0.22);
-  }
-}
-
 @keyframes cancelFlashFade {
   0%, 100% { opacity: 0.9; }
-  50% { opacity: 0.25; }
+  50% { opacity: 0.2; }
 }
 
 .cancelled-name {
@@ -575,17 +587,11 @@ function isUnsavedOwner(name) {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  animation: cancelTextPulse 1.15s ease-in-out infinite;
 }
 
 .cancel-x-icon {
   color: #fb7185;
   font-size: 0.95em;
-}
-
-@keyframes cancelTextPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.65; }
 }
 
 .backdated-inline-icon {
@@ -627,6 +633,10 @@ function isUnsavedOwner(name) {
 
   .stock-item.sold .stock-status {
     font-size: 0.98em;
+  }
+
+  .stock-size-meta {
+    font-size: 0.72em;
   }
 }
 </style>

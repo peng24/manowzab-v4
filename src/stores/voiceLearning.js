@@ -79,6 +79,7 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
         priceKeywords.value = mergedPrice;
         unitKeywords.value = mergedUnit;
         candidates.value = data.candidates || {};
+        clearCache();
         
         // Update Firebase if we expanded the keywords
         if (mergedCode.length > (data.codeKeywords || []).length || 
@@ -100,7 +101,10 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
         }).catch((err) => logger.error("VoiceLearning: Failed to set defaults:", err));
       }
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      isInitialized.value = false;
+    };
   }
 
   /**
@@ -145,7 +149,8 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
     const candidateRef = dbRef(db, `settings/voice_patterns/candidates/${safeKey}`);
 
     let promoted = false;
-    await runTransaction(candidateRef, (currentScore) => {
+    const txResult = await runTransaction(candidateRef, (currentScore) => {
+      promoted = false;
       const newScore = (currentScore || 0) + 1;
       logger.system(`🎙️ Voice Learning: Candidate separator found: "${separator}" (Key: "${safeKey}", Score: ${newScore}/2)`);
       if (newScore >= 2) {
@@ -155,12 +160,16 @@ export const useVoiceLearningStore = defineStore("voiceLearning", () => {
       return newScore;
     });
 
-    if (promoted) {
-      // Promote to active price keywords!
-      const newPriceKeywords = [...priceKeywords.value, separator];
+    if (txResult?.committed !== false && promoted) {
+      // Atomically promote to active price keywords with deduplication
+      const priceKeywordsRef = dbRef(db, "settings/voice_patterns/priceKeywords");
+      await runTransaction(priceKeywordsRef, (currentList) => {
+        const list = Array.isArray(currentList) ? [...currentList] : [...priceKeywords.value];
+        if (!list.includes(separator)) list.push(separator);
+        return list;
+      });
       await update(dbRef(db), {
-        "settings/voice_patterns/priceKeywords": newPriceKeywords,
-        [`settings/voice_patterns/candidates/${safeKey}`]: null
+        [`settings/voice_patterns/candidates/${safeKey}`]: null,
       });
 
       logger.success(`🎉 Voice Learning: Auto-learned new price keyword: "${separator}"!`);

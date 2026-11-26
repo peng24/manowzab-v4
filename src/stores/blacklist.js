@@ -64,10 +64,10 @@ export const useBlacklistStore = defineStore("blacklist", () => {
     const list = blacklistMap.value;
     if (!list || Object.keys(list).length === 0) return null;
 
-    if (uid) {
+    if (uid && String(uid).trim()) {
       const safeUid = sanitizeDbKey(uid);
-      if (safeUid && list[safeUid]) return list[safeUid];
-      const lowerSafeUid = safeUid ? safeUid.toLowerCase() : "";
+      if (safeUid && safeUid !== "invalid_key" && list[safeUid]) return list[safeUid];
+      const lowerSafeUid = safeUid && safeUid !== "invalid_key" ? safeUid.toLowerCase() : "";
       if (lowerSafeUid && list[lowerSafeUid]) return list[lowerSafeUid];
     }
 
@@ -78,9 +78,9 @@ export const useBlacklistStore = defineStore("blacklist", () => {
       const safeNorm = sanitizeDbKey(norm);
       const safeCompact = compactNorm ? sanitizeDbKey(compactNorm) : "";
       if (list[norm]) return list[norm];
-      if (safeNorm && list[safeNorm]) return list[safeNorm];
+      if (safeNorm && safeNorm !== "invalid_key" && list[safeNorm]) return list[safeNorm];
       if (compactNorm && list[compactNorm]) return list[compactNorm];
-      if (safeCompact && list[safeCompact]) return list[safeCompact];
+      if (safeCompact && safeCompact !== "invalid_key" && list[safeCompact]) return list[safeCompact];
     }
 
     if (uid || norm) {
@@ -144,7 +144,7 @@ export const useBlacklistStore = defineStore("blacklist", () => {
    * @param {string} channelIdOrKey - YouTube channel ID or normalized name key
    */
   async function unbanUser(channelIdOrKey) {
-    if (!channelIdOrKey) return;
+    if (!channelIdOrKey || !String(channelIdOrKey).trim()) return;
 
     const list = blacklistMap.value;
     const safeKey = sanitizeDbKey(channelIdOrKey);
@@ -152,7 +152,7 @@ export const useBlacklistStore = defineStore("blacklist", () => {
 
     const keysToRemove = new Set();
 
-    if (list[safeKey]) keysToRemove.add(safeKey);
+    if (safeKey && safeKey !== "invalid_key" && list[safeKey]) keysToRemove.add(safeKey);
     if (norm && list[norm]) keysToRemove.add(norm);
 
     // Also look for entries matching channelId or normName
@@ -161,11 +161,11 @@ export const useBlacklistStore = defineStore("blacklist", () => {
       if (item) {
         if (item.channelId === channelIdOrKey || item.uid === channelIdOrKey) keysToRemove.add(k);
         if (norm && item.normName === norm) keysToRemove.add(k);
-        if (item.displayName && normalizeCustomerName(item.displayName) === norm) keysToRemove.add(k);
+        if (norm && item.displayName && normalizeCustomerName(item.displayName) === norm) keysToRemove.add(k);
       }
     }
 
-    if (keysToRemove.size === 0) {
+    if (keysToRemove.size === 0 && safeKey && safeKey !== "invalid_key") {
       // Fallback: direct removal of safeKey
       keysToRemove.add(safeKey);
     }

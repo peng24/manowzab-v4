@@ -123,24 +123,26 @@ export function useAwayMode() {
         return cleanup; // Return full cleanup function
     }
 
-    // Auto cleanup interval when component using this composable is unmounted
-    // Note: Since this is likely used in App.vue which is always mounted, this might not be triggered often
+    // Do NOT tear down global singleton Away listener when a non-owner consumer unmounts;
+    // the caller of initAwayListener() (App.vue) owns and invokes the returned cleanup function.
+    let ownedCleanup = null;
+    const initOwnedAwayListener = () => {
+        ownedCleanup = initAwayListener();
+        return ownedCleanup;
+    };
+
     onUnmounted(() => {
-        if (awayInterval) {
-            clearInterval(awayInterval);
-            awayInterval = null;
-        }
-        if (activeAwayUnsubscribe) {
+        if (ownedCleanup) {
             try {
-                activeAwayUnsubscribe();
+                ownedCleanup();
             } catch (e) {}
-            activeAwayUnsubscribe = null;
+            ownedCleanup = null;
         }
     });
 
     return {
         awayTimer,
         closeAwayMode,
-        initAwayListener
+        initAwayListener: initOwnedAwayListener
     };
 }

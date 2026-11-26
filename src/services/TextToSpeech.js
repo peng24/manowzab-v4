@@ -464,18 +464,25 @@ export class TextToSpeech {
     }
 
     // Guard against native SpeechSynthesis overlapping by checking if it's currently speaking
-    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+    if (typeof window !== "undefined" && window.speechSynthesis && window.speechSynthesis.speaking) {
       this.speakingCheckRetries = (this.speakingCheckRetries || 0) + 1;
       if (this.speakingCheckRetries > 20) {
         logger.warn("SpeechSynthesis stuck in speaking state for >2s — force cancelling");
-        if (typeof window !== "undefined") {
-          window.speechSynthesis?.cancel();
-        }
+        window.speechSynthesis?.cancel();
         this.speakingCheckRetries = 0;
       } else {
-        setTimeout(() => this.processQueue(), 100);
+        if (!this._speakingCheckTimer) {
+          this._speakingCheckTimer = setTimeout(() => {
+            this._speakingCheckTimer = null;
+            this.processQueue();
+          }, 100);
+        }
         return;
       }
+    }
+    if (this._speakingCheckTimer) {
+      clearTimeout(this._speakingCheckTimer);
+      this._speakingCheckTimer = null;
     }
     this.speakingCheckRetries = 0;
 
@@ -563,14 +570,26 @@ export class TextToSpeech {
     if (!textToSpeak) return Promise.resolve();
 
     return new Promise((resolve) => {
+      let settled = false;
+      let fallbackTimer = null;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        if (fallbackTimer) {
+          clearTimeout(fallbackTimer);
+          fallbackTimer = null;
+        }
+        resolve();
+      };
+
+      // Fallback timeout: ensure the Promise always resolves (max 35s) without leaking timer after completion
+      fallbackTimer = setTimeout(done, 35000);
+
       // Add to queue with a completion callback
-      this.queue.push({ text: textToSpeak, onComplete: resolve });
+      this.queue.push({ text: textToSpeak, onComplete: done });
 
       // Process queue
       this.processQueue();
-
-      // Fallback timeout: ensure the Promise always resolves (max 35s)
-      setTimeout(() => resolve(), 35000);
     });
   }
 

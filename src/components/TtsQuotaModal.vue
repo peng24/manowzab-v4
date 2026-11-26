@@ -137,7 +137,10 @@ const showCalibration = ref(false);
 const editChirp3 = ref(0);
 const editStandard = ref(0);
 const thaiMonthLabel = computed(() => formatThaiQuotaMonth(systemStore.ttsUsage.month));
-const nextResetLabel = computed(() => getNextTtsResetLabel());
+const nextResetLabel = computed(() => {
+  void systemStore.ttsUsage.month;
+  return getNextTtsResetLabel();
+});
 
 const chirp3 = computed(() => systemStore.chirp3QuotaStatus);
 const standard = computed(() => systemStore.standardQuotaStatus);
@@ -158,11 +161,20 @@ const statusHeadline = computed(() => {
       : "กำลังใช้เสียงในเครื่อง (ไม่ใช้โควตา Google Cloud)";
   }
   if (mode === "standard") {
+    if (standard.value.isNearLimit) {
+      return "คำเตือน: โควตา Standard-A ใกล้เต็ม (>= 90%) — แนะนำสลับเป็นเสียงในเครื่อง";
+    }
     return chirp3.value.isNearLimit
       ? "โควตา Chirp 3: HD ใกล้เต็ม (>= 90%) — สลับมาใช้ Standard-A แล้ว"
       : "กำลังใช้ Google Cloud Standard (th-TH-Standard-A)";
   }
   const voiceLabel = mode === "achernar" ? "Achernar" : "Aoede";
+  if (chirp3.value.isNearLimit) {
+    return `คำเตือน: โควตา Chirp 3: HD (${voiceLabel}) ใกล้เต็ม (>= 90%)`;
+  }
+  if (chirp3.value.isWarning) {
+    return `ใกล้ถึงเกณฑ์เตือน — กำลังใช้ Chirp 3: HD (${voiceLabel})`;
+  }
   return `ปกติ — กำลังใช้ Chirp 3: HD (${voiceLabel})`;
 });
 

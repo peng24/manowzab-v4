@@ -2,6 +2,8 @@ import { bookingItems, recalculateDelivery, syncDeliverySession } from "./delive
 import { ref as dbRef, get, update, runTransaction } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "./logger";
+import { sanitizeDbKey } from "./dbUtils";
+import { getLocalDiffDays } from "./thaiDateUtils";
 import {
   isAdminUser,
   formatShippingCycleLabel,
@@ -18,8 +20,8 @@ import { useNicknameStore } from "../stores/nickname";
  * @returns {boolean}
  */
 export function isProxyUid(uid) {
+  if (!uid || typeof uid !== "string") return true;
   return (
-    !uid ||
     uid.startsWith("proxy-") ||
     uid.startsWith("admin-proxy-") ||
     uid.startsWith("multi-proxy-") ||
@@ -34,8 +36,8 @@ export function isProxyUid(uid) {
  * @returns {string}
  */
 export function normalizeCustomerName(name) {
-  if (!name) return "";
-  return name.trim().toLowerCase().replace(/\s+/g, " ");
+  if (name === null || name === undefined) return "";
+  return String(name).trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 // 🚀 In-Memory Cache for delivery_customers & address_book snapshots
@@ -87,12 +89,15 @@ async function getCachedDeliveryCustomers() {
 export async function resolveDeliveryUid(uid, name) {
   const normName = normalizeCustomerName(name);
 
+  const safeNonProxyUid = !isProxyUid(uid) ? sanitizeDbKey(uid) : null;
+
   try {
     const data = await getCachedDeliveryCustomers();
 
-    // If valid non-proxy UID, check if direct active key exists first
-    if (!isProxyUid(uid) && data[uid]) {
-      return uid;
+    // If valid non-proxy UID, check if direct active key exists first (sanitized for Firebase key safety)
+    if (safeNonProxyUid && safeNonProxyUid !== "invalid_key") {
+      if (data[safeNonProxyUid]) return safeNonProxyUid;
+      if (!/[.#$[\]/]/.test(uid) && data[uid]) return uid;
     }
 
     // Find matching active (non-done) customer by normalized name
@@ -118,9 +123,9 @@ export async function resolveDeliveryUid(uid, name) {
     logger.warn("resolveDeliveryUid name search error:", e);
   }
 
-  // If non-proxy UID, use UID as new key
-  if (!isProxyUid(uid)) {
-    return uid;
+  // If non-proxy UID, use sanitized UID as new key
+  if (safeNonProxyUid && safeNonProxyUid !== "invalid_key") {
+    return safeNonProxyUid;
   }
 
   // Coalesce concurrent bookings/shipping commands for the same new proxy customer
@@ -129,6 +134,15 @@ export async function resolveDeliveryUid(uid, name) {
     const existingPending = _pendingProxyUids.get(normName);
     if (existingPending && now - existingPending.ts < PENDING_PROXY_UID_TTL_MS) {
       return existingPending.key;
+    }
+  }
+
+  // Prune expired pending entries to prevent unbounded Map growth
+  if (_pendingProxyUids.size > 50) {
+    for (const [k, entry] of _pendingProxyUids.entries()) {
+      if (now - entry.ts >= PENDING_PROXY_UID_TTL_MS) {
+        _pendingProxyUids.delete(k);
+      }
     }
   }
 
@@ -216,13 +230,8 @@ let _lastAnnouncedVideoId = null;
 let _lastAnnounceTimestamp = 0;
 
 function getCountdownDays(deliveryDate) {
-  if (!deliveryDate) return Infinity;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(deliveryDate);
-  if (isNaN(target.getTime())) return Infinity;
-  target.setHours(0, 0, 0, 0);
-  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+  const diff = getLocalDiffDays(deliveryDate);
+  return diff === null ? Infinity : diff;
 }
 
 /**
@@ -398,7 +407,7 @@ export async function restoreDeletedAddressBookCustomers() {
         if (delData[safeKey]) continue;
 
         existingNormNames.add(normName);
-        await runTransaction(dbRef(db, `delivery_customers/${safeKey}`), (current) => {
+        const txResult = await runTransaction(dbRef(db, `delivery_customers/${safeKey}`), (current) => {
           if (current !== null && current !== undefined) return;
           return {
             name: cleanName,
@@ -421,7 +430,9 @@ export async function restoreDeletedAddressBookCustomers() {
             updatedAt: now,
           };
         });
-        restoredCount++;
+        if (txResult?.committed) {
+          restoredCount++;
+        }
       }
 
       return restoredCount;

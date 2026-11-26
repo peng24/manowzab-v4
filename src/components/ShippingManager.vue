@@ -547,6 +547,13 @@ import {
   shipDayOfWeekRegex,
   calcNextDayOfWeekDate,
 } from "../utils/chatParserUtils";
+import {
+  parseDDMMYYYYToISO,
+  formatISOToDDMMYYYYBE,
+  parseISODateLocal,
+  resolveDayMonthShippingDate,
+  getLocalDiffDays,
+} from "../utils/thaiDateUtils";
 import { logger } from "../utils/logger";
 
 const emit = defineEmits(["close"]);
@@ -613,8 +620,8 @@ const thaiMonths = [
 
 function formatThaiDate(dateStr) {
   if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  const d = parseISODateLocal(dateStr);
+  if (!d) return dateStr;
   const day = d.getDate();
   const month = thaiMonths[d.getMonth()];
   const year = (d.getFullYear() + 543) % 100; // พ.ศ. 2 หลัก
@@ -622,28 +629,11 @@ function formatThaiDate(dateStr) {
 }
 
 function formatToDDMMYYYY(dateStr) {
-  if (!dateStr) return "";
-  const parts = dateStr.split("-");
-  if (parts.length === 3) {
-    const [y, m, d] = parts;
-    return `${d}/${m}/${y}`;
-  }
-  return dateStr;
+  return formatISOToDDMMYYYYBE(dateStr);
 }
 
 function parseDDMMYYYY(str) {
-  if (!str) return null;
-  const parts = str.split('/');
-  if (parts.length === 3) {
-    let [d, m, y] = parts;
-    if (y.length === 2) {
-      y = (parseInt(y) > 50 ? '19' : '20') + y;
-    } else if (y.length === 4 && parseInt(y) > 2500) {
-      y = (parseInt(y) - 543).toString();
-    }
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  return null;
+  return parseDDMMYYYYToISO(str);
 }
 
 function formatMaskedDateInput(v) {
@@ -906,12 +896,8 @@ const uniqueCustomerNames = computed(() => {
 // Countdown Logic
 function getCountdown(deliveryDate) {
   if (!deliveryDate) return { text: "ยังไม่กำหนด", color: "gray", days: Infinity };
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(deliveryDate);
-  target.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+  const diffDays = getLocalDiffDays(deliveryDate);
+  if (diffDays === null) return { text: "ยังไม่กำหนด", color: "gray", days: Infinity };
 
   if (diffDays < 0) return { text: `เลย ${Math.abs(diffDays)} วัน!`, color: "overdue", days: diffDays };
   if (diffDays === 0) return { text: "ส่งวันนี้!", color: "red", days: 0 };
@@ -974,22 +960,8 @@ function addManualCustomer() {
          const dayName = shipDayOfWeekMatch[1];
          autoShipDate = calcNextDayOfWeekDate(dayName);
       } else if (shipDateMatch) {
-         const day = parseInt(shipDateMatch[1]);
-         autoShipDate.setDate(day);
-         const monthStr = shipDateMatch[2];
-         if (monthStr) {
-           const mNamesShort = ["มค", "กพ", "มีค", "เมย", "พค", "มิย", "กค", "สค", "กย", "ตค", "พย", "ธค"];
-           const mNamesFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-           const cleanMonth = monthStr.replace(/\./g, '');
-           let mIndex = mNamesShort.indexOf(cleanMonth);
-           if (mIndex === -1) mIndex = mNamesFull.indexOf(cleanMonth);
-           if (mIndex !== -1) {
-             autoShipDate.setMonth(mIndex);
-           }
-         }
-         if (autoShipDate < new Date() && (new Date().getDate() - day) > 15) {
-           autoShipDate.setMonth(autoShipDate.getMonth() + 1);
-         }
+         const resolved = resolveDayMonthShippingDate(parseInt(shipDateMatch[1], 10), shipDateMatch[2] || "");
+         if (resolved) autoShipDate = resolved;
       } else if (shipNowMatch) {
          autoShipDate = resolveShippingCycleDate(systemStore.shippingCycle);
       }
@@ -1346,9 +1318,7 @@ function deleteCustomer(id, name) {
 
 <style scoped>
 .sm-content {
-  background: rgba(11, 15, 23, 0.96);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: rgba(11, 15, 23, 0.98);
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   max-width: 96%;
@@ -1456,9 +1426,9 @@ function deleteCustomer(id, name) {
 }
 
 .sm-stat.pack-tonight {
-  border-color: rgba(251, 146, 60, 0.35);
-  background: rgba(249, 115, 22, 0.07);
-  animation: pack-glow 2.8s ease-in-out infinite;
+  border-color: rgba(251, 146, 60, 0.42);
+  background: rgba(249, 115, 22, 0.08);
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.14);
 }
 
 .sm-stat.total-items .sm-stat-num {
@@ -1998,14 +1968,14 @@ function deleteCustomer(id, name) {
   white-space: nowrap;
 }
 
-.cd-overdue { background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; animation: pulse-urgent 1.8s infinite; }
-.cd-red { background: rgba(239, 68, 68, 0.16); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; animation: pulse-urgent 2.2s infinite; }
+.cd-overdue { background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.45); color: #fca5a5; box-shadow: 0 0 8px rgba(239, 68, 68, 0.2); animation: pulse-urgent-opacity 1.8s ease-in-out infinite; }
+.cd-red { background: rgba(239, 68, 68, 0.16); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; animation: pulse-urgent-opacity 2.2s ease-in-out infinite; }
 .cd-orange { background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.3); color: #fcd34d; }
 .cd-yellow { background: rgba(234, 179, 8, 0.12); border: 1px solid rgba(234, 179, 8, 0.25); color: #fde047; }
 .cd-green { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); color: #6ee7b7; }
 .cd-gray { background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8; }
 
-/* Pack Tonight Badge */
+/* Pack Tonight Badge (GPU-friendly static glow — zero per-row box-shadow repaints) */
 .pack-badge {
   display: inline-flex;
   align-items: center;
@@ -2015,25 +1985,15 @@ function deleteCustomer(id, name) {
   font-size: 0.76em;
   font-weight: 700;
   color: #fdba74;
-  background: rgba(249, 115, 22, 0.14);
-  border: 1px solid rgba(249, 115, 22, 0.3);
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.38);
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.16);
   white-space: nowrap;
-  animation: pack-pulse 2.2s ease-in-out infinite;
 }
 
-@keyframes pulse-urgent {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.25); }
-  50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
-}
-
-@keyframes pack-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.2); }
-  50% { box-shadow: 0 0 8px 1px rgba(249, 115, 22, 0.14); }
-}
-
-@keyframes pack-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.15); }
-  50% { box-shadow: 0 0 12px 2px rgba(249, 115, 22, 0.08); }
+@keyframes pulse-urgent-opacity {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
 }
 
 /* Action Buttons */

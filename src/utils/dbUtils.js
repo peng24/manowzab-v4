@@ -8,7 +8,7 @@
  * @returns {string}
  */
 export function escapeHtml(str) {
-  if (!str) return "";
+  if (str === null || str === undefined) return "";
   return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -19,12 +19,12 @@ export function escapeHtml(str) {
 
 /**
  * Sanitizes a string to be safely used as a Firebase Realtime Database path key.
- * Removes forbidden characters: '.', '#', '$', '[', ']', '/'
+ * Removes forbidden characters: '.', '#', '$', '[', ']', '/', and ASCII control chars
  * @param {string} key 
  * @returns {string}
  */
 export function sanitizeDbKey(key) {
   if (!key) return "invalid_key";
-  const sanitized = String(key).replace(/[.#$\[\]\/]/g, "_").trim();
+  const sanitized = String(key).replace(/[\x00-\x1F\x7F.#$\[\]\/]/g, "_").trim();
   return sanitized || "invalid_key";
 }

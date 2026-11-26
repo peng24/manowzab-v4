@@ -28,13 +28,26 @@ export const useNicknameStore = defineStore("nickname", () => {
     logger.debug("🧹 Nickname store: Phonetic cache cleared");
   }
 
+  let activeNicknameUnsub = null;
+
   function initNicknameListener() {
-    return onValue(dbRef(db, "nicknames"), (snapshot) => {
+    if (activeNicknameUnsub) {
+      activeNicknameUnsub();
+      activeNicknameUnsub = null;
+    }
+    const unsub = onValue(dbRef(db, "nicknames"), (snapshot) => {
       const data = snapshot.val() || {};
       nicknames.value = data;
       clearPhoneticCache(); // Invalidate memoized cache when nicknames change
       logger.debug("📝 Nicknames updated:", Object.keys(data).length);
     });
+    activeNicknameUnsub = unsub;
+    return () => {
+      if (activeNicknameUnsub === unsub) {
+        activeNicknameUnsub = null;
+      }
+      unsub();
+    };
   }
 
   function hasNickname(uid, realName) {
@@ -102,17 +115,17 @@ export const useNicknameStore = defineStore("nickname", () => {
     }
 
     // 2. ถ้าไม่มีในรายการพิเศษ ค่อยไปดูใน Firebase
-    let nameToRead = displayName;
+    let nameToRead = displayName != null ? String(displayName) : "";
     const safeUid = uid ? sanitizeDbKey(uid) : null;
     if (safeUid && nicknames.value[safeUid]?.phonetic) {
-      nameToRead = nicknames.value[safeUid].phonetic;
+      nameToRead = String(nicknames.value[safeUid].phonetic);
     } else if (uid && nicknames.value[uid]?.phonetic) {
-      nameToRead = nicknames.value[uid].phonetic;
+      nameToRead = String(nicknames.value[uid].phonetic);
     }
     
     // 3. ป้องกัน Google Cloud TTS อ่านสะกดคำ (เช่น "ปอ" -> "ปอ ออ", "เอ" -> "ออ เอ")
     // โดยการบังคับเติมคำว่า "คุณ" นำหน้าชื่อที่ไม่มีคำนำหน้า เพื่อให้ AI มองว่าเป็นชื่อคน ไม่ใช่อักษรย่อ
-    nameToRead = nameToRead.replace(EMOJI_REGEX, "").trim();
+    nameToRead = nameToRead ? nameToRead.replace(EMOJI_REGEX, "").trim() : "";
 
     if (nameToRead) {
       const hasTitle = TITLES_LIST.some((t) => nameToRead.startsWith(t));

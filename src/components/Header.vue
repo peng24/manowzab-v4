@@ -602,19 +602,26 @@ async function toggleConnection() {
   try {
     const cleanVid = videoId.value.trim();
     videoId.value = cleanVid;
+
+    // Validate video metadata with YouTube API BEFORE broadcasting system/activeVideo to all devices
+    const hasLiveChat = await connectVideo(cleanVid);
+
     systemStore.isConnected = true;
     systemStore.currentVideoId = cleanVid;
     stockStore.connectToStock(cleanVid);
 
-    // ✅ เพิ่ม: ส่งรหัสไลฟ์ขึ้น Firebase เพื่อให้เครื่องอื่นรู้
+    // ✅ ส่งรหัสไลฟ์ขึ้น Firebase หลังตรวจสอบวิดีโอผ่านแล้วเท่านั้น
     set(dbRef(db, "system/activeVideo"), cleanVid).catch((err) =>
       console.error("Sync Error:", err),
     );
 
-    const success = await connectVideo(cleanVid);
-    if (success) {
+    if (hasLiveChat) {
       systemStore.statusChat = "ok";
-      queueAudio(null, "", "เชื่อมต่อสำเร็จ กำลังอ่านคอมเมนต์");
+      queueAudio(
+        null,
+        "",
+        `การเชื่อมต่อสำเร็จ กำลังอ่านคอมเมนต์จาก ${systemStore.liveTitle || "YouTube Live"}`,
+      );
       Swal.fire({
         icon: "success",
         title: "เชื่อมต่อสำเร็จ",
@@ -644,7 +651,7 @@ async function toggleConnection() {
     Swal.fire({
       icon: "error",
       title: "เชื่อมต่อไม่สำเร็จ",
-      text: error.message,
+      text: error?.message || "ไม่พบวิดีโอหรือ YouTube API ไม่ตอบสนอง",
       timer: 3000,
       toast: true,
       position: "top-end",
@@ -860,20 +867,18 @@ defineExpose({
 onMounted(() => {
   logger.log("🎯 Header mounted");
   window.addEventListener("open-shortcuts-modal", openShortcuts);
-  const unsubShipping = onValue(
-    dbRef(db, "system/shipping"),
-    (snapshot) => {
-      shippingData.value = snapshot.val() || {};
-    },
-    (err) => {
-      logger.warn("Header shipping listener warning:", err);
-    }
-  );
-  cleanupFns.push(unsubShipping);
   document.addEventListener("click", handleClickOutside);
-  const savedVideoId = localStorage.getItem("lastVideoId");
-  if (savedVideoId) {
-    videoId.value = savedVideoId;
+  if (systemStore.currentVideoId) {
+    videoId.value = systemStore.currentVideoId;
+  } else {
+    try {
+      const savedVideoId = localStorage.getItem("lastVideoId");
+      if (savedVideoId) {
+        videoId.value = savedVideoId;
+      }
+    } catch {
+      /* Storage may be unavailable */
+    }
   }
 });
 

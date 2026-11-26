@@ -165,7 +165,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useBlacklistStore } from "../stores/blacklist";
 import Swal from "sweetalert2";
 
@@ -305,6 +305,15 @@ function truncateId(id) {
   if (id.length <= 16) return id;
   return id.substring(0, 8) + "..." + id.substring(id.length - 6);
 }
+
+function handleEscKey(e) {
+  if (e.key === "Escape" && isOpen.value) {
+    close();
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", handleEscKey));
+onUnmounted(() => window.removeEventListener("keydown", handleEscKey));
 
 defineExpose({
   open,

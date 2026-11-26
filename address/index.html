@@ -4,7 +4,9 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="theme-color" content="#0a0a0f" />
+    <link rel="mask-icon" href="/masked-icon.svg" color="#3b82f6" />
+    <meta name="theme-color" content="#121212" />
+    <meta name="robots" content="noindex, nofollow" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
@@ -12,7 +14,9 @@
     <title>📖 สมุดที่อยู่ลูกค้า — Manowzab Command Center</title>
     <meta name="description" content="สมุดที่อยู่ลูกค้าทั้งหมด Manowzab — ค้นหา จัดการหลายที่อยู่ นำเข้าด่วน และส่งออกข้อมูล" />
 
-    <!-- Google Fonts: Kanit & Sarabun -->
+    <!-- Preconnect Firebase Auth & Google Fonts -->
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
@@ -21,11 +25,11 @@
     <link
       rel="preload"
       as="style"
-      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700;800&display=swap"
     />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700;800&display=swap"
     />
 
     <!-- Font Awesome (Non-blocking for instant LCP) -->
@@ -50,6 +54,7 @@
   </head>
 
   <body>
+    <noscript>กรุณาเปิดใช้งาน JavaScript เพื่อใช้ระบบ Manowzab Command Center</noscript>
     <div id="address-app"></div>
     <script type="module" src="/src/address-main.js"></script>
   </body>

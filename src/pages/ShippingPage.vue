@@ -1,7 +1,10 @@
 <template>
   <div class="sp-app">
+    <!-- 🍋 Minimalist Splash while checking Firebase auth session -->
+    <AuthSplash v-if="!authStore.authReady" />
+
     <!-- 🔒 High-Security Authentication Gate -->
-    <AuthGate v-if="!authStore.isAuthenticated" />
+    <AuthGate v-else-if="!authStore.isAuthenticated" />
 
     <template v-else>
       <!-- ============ STICKY HEADER ============ -->
@@ -343,12 +346,21 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from "vue";
 import { useAuthStore } from "../stores/auth";
+import { useCustomerStore } from "../stores/customer";
+import AuthSplash from "../components/AuthSplash.vue";
 const AuthGate = defineAsyncComponent(() => import("../components/AuthGate.vue"));
 import { ref as dbRef, onValue, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import { markDone, undoDone, removeFromShippingList } from "../utils/deliveryActions";
 import { restoreDeletedAddressBookCustomers } from "../utils/deliverySync";
+import {
+  parseDDMMYYYYToISO,
+  formatISOToDDMMYYYYBE,
+  parseISODateLocal,
+  resolveDayMonthShippingDate,
+  getLocalDiffDays,
+} from "../utils/thaiDateUtils";
 import ThaiDatePicker from "../components/ThaiDatePicker.vue";
 
 let refreshTimer = null;
@@ -368,7 +380,8 @@ import {
 
 // ====== State ======
 const authStore = useAuthStore();
-const allCustomers = ref([]);
+const customerStore = useCustomerStore();
+const allCustomers = computed(() => customerStore.deliveryCustomersList || []);
 const newName = ref("");
 const newDate = ref("");
 const showDone = ref(false);
@@ -381,7 +394,7 @@ const showShippingLabels = ref(false);
 const selectedCustomerForPrint = ref(null);
 const showAddressImport = ref(false);
 const selectedCustomerForAddress = ref(null);
-const addressBook = ref({});
+const addressBook = computed(() => customerStore.addressBook || {});
 const cleanupFns = [];
 
 const currentCustomerForModal = computed(() => {
@@ -427,16 +440,30 @@ const currentCycleLabel = computed(() => {
 });
 
 async function onShippingCycleChange(newCycle) {
+  const prevCycle = shippingCycle.value;
   shippingCycle.value = newCycle || "today";
-  await update(dbRef(db), { "settings/shippingCycle": newCycle || "today" });
-  Swal.fire({
-    icon: "success",
-    title: `🚚 ตั้งรอบจัดส่งหลักเป็น: ${formatShippingCycleLabel(newCycle)}`,
-    toast: true,
-    position: "top-end",
-    timer: 1800,
-    showConfirmButton: false,
-  });
+  try {
+    await update(dbRef(db), { "settings/shippingCycle": newCycle || "today" });
+    Swal.fire({
+      icon: "success",
+      titleText: `🚚 ตั้งรอบจัดส่งหลักเป็น: ${formatShippingCycleLabel(newCycle)}`,
+      toast: true,
+      position: "top-end",
+      timer: 1800,
+      showConfirmButton: false,
+    });
+  } catch (err) {
+    shippingCycle.value = prevCycle;
+    console.error("Failed to update shippingCycle:", err);
+    Swal.fire({
+      icon: "error",
+      titleText: "บันทึกรอบจัดส่งไม่สำเร็จ",
+      toast: true,
+      position: "top-end",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+  }
 }
 
 const baseUrl = computed(() => import.meta.env.BASE_URL || '/');
@@ -463,8 +490,8 @@ const newDateFormatted = computed({
 
 function formatThaiDate(dateStr) {
   if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  const d = parseISODateLocal(dateStr);
+  if (!d) return dateStr;
   const day = d.getDate();
   const month = thaiMonths[d.getMonth()];
   const year = (d.getFullYear() + 543) % 100;
@@ -472,25 +499,11 @@ function formatThaiDate(dateStr) {
 }
 
 function formatToDDMMYYYY(dateStr) {
-  if (!dateStr) return "";
-  const parts = dateStr.split("-");
-  if (parts.length === 3) {
-    const [y, m, d] = parts;
-    return `${d}/${m}/${y}`;
-  }
-  return dateStr;
+  return formatISOToDDMMYYYYBE(dateStr);
 }
 
 function parseDDMMYYYY(str) {
-  if (!str) return null;
-  const parts = str.split('/');
-  if (parts.length === 3) {
-    let [d, m, y] = parts;
-    if (y.length === 2) y = (parseInt(y) > 50 ? '19' : '20') + y;
-    else if (y.length === 4 && parseInt(y) > 2500) y = (parseInt(y) - 543).toString();
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  return null;
+  return parseDDMMYYYYToISO(str);
 }
 
 function formatMaskedDateInput(v) {
@@ -516,23 +529,7 @@ function cleanupListeners() {
 
 function initListeners() {
   cleanupListeners();
-  const customersRef = dbRef(db, "delivery_customers");
-  const unsubListener = onValue(customersRef, (snapshot) => {
-    const data = snapshot.val() || {};
-    allCustomers.value = Object.keys(data).map((key) => ({
-      id: key,
-      ...data[key],
-      itemCount: data[key].itemCount || 0,
-      sessions: data[key].sessions || null,
-    }));
-  });
-  cleanupFns.push(unsubListener);
-
-  const addressBookRef = dbRef(db, "address_book");
-  const unsubAddressBook = onValue(addressBookRef, (snapshot) => {
-    addressBook.value = snapshot.val() || {};
-  });
-  cleanupFns.push(unsubAddressBook);
+  cleanupFns.push(customerStore.initCustomerListeners());
 
   const cycleRef = dbRef(db, "settings/shippingCycle");
   const unsubCycle = onValue(cycleRef, (snapshot) => {
@@ -694,19 +691,20 @@ const filteredCustomers = computed(() => {
     ? [...allCustomers.value].filter(c => c.status === 'done')
     : sortedCustomers.value;
 
+  const allowDone = showDone.value;
   if (activeFilter.value === 'requested') {
-    list = list.filter(c => c.status !== 'done' && c.deliveryDate && c.deliveryDate.trim() !== "");
+    list = list.filter(c => (allowDone || c.status !== 'done') && c.deliveryDate && c.deliveryDate.trim() !== "");
   } else if (activeFilter.value === 'unassigned') {
-    list = list.filter(c => c.status !== 'done' && (!c.deliveryDate || c.deliveryDate.trim() === ""));
+    list = list.filter(c => (allowDone || c.status !== 'done') && (!c.deliveryDate || c.deliveryDate.trim() === ""));
   } else if (activeFilter.value === 'urgent') {
     list = list.filter(c => {
       const d = getCountdown(c.deliveryDate).days;
-      return d <= 1 && c.status !== 'done' && c.deliveryDate;
+      return d <= 1 && (allowDone || c.status !== 'done') && c.deliveryDate;
     });
   } else if (activeFilter.value === 'normal') {
     list = list.filter(c => {
       const d = getCountdown(c.deliveryDate).days;
-      return d > 1 && c.status !== 'done' && c.deliveryDate;
+      return d > 1 && (allowDone || c.status !== 'done') && c.deliveryDate;
     });
   }
 
@@ -773,11 +771,8 @@ const filterTabs = computed(() => {
 // ====== Countdown Logic ======
 function getCountdown(deliveryDate) {
   if (!deliveryDate) return { text: "ไม่กำหนด", color: "gray", days: Infinity };
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(deliveryDate);
-  target.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+  const diffDays = getLocalDiffDays(deliveryDate);
+  if (diffDays === null) return { text: "ไม่กำหนด", color: "gray", days: Infinity };
 
   if (diffDays < 0) return { text: `เลย ${Math.abs(diffDays)} วัน!`, color: "overdue", days: diffDays };
   if (diffDays === 0) return { text: "วันนี้!", color: "red", days: 0 };
@@ -837,20 +832,8 @@ function addManualCustomer() {
         const dayName = shipDayOfWeekMatch[1];
         autoShipDate = calcNextDayOfWeekDate(dayName);
       } else if (shipDateMatch) {
-        const day = parseInt(shipDateMatch[1]);
-        autoShipDate.setDate(day);
-        const monthStr = shipDateMatch[2];
-        if (monthStr) {
-          const mNamesShort = ["มค", "กพ", "มีค", "เมย", "พค", "มิย", "กค", "สค", "กย", "ตค", "พย", "ธค"];
-          const mNamesFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-          const cleanMonth = monthStr.replace(/\./g, '');
-          let mIndex = mNamesShort.indexOf(cleanMonth);
-          if (mIndex === -1) mIndex = mNamesFull.indexOf(cleanMonth);
-          if (mIndex !== -1) autoShipDate.setMonth(mIndex);
-        }
-        if (autoShipDate < new Date() && (new Date().getDate() - day) > 15) {
-          autoShipDate.setMonth(autoShipDate.getMonth() + 1);
-        }
+        const resolved = resolveDayMonthShippingDate(parseInt(shipDateMatch[1], 10), shipDateMatch[2] || "");
+        if (resolved) autoShipDate = resolved;
       } else if (shipNowMatch) {
         autoShipDate = resolveShippingCycleDate(shippingCycle.value);
       }
@@ -889,16 +872,25 @@ function addManualCustomer() {
   }).then(() => {
     newName.value = "";
     newDate.value = "";
-    Swal.fire({ icon: "success", title: `เพิ่ม "${name}" แล้ว`, toast: true, position: "top-end", timer: 1500, showConfirmButton: false });
+    Swal.fire({ icon: "success", titleText: `เพิ่ม "${name}" แล้ว`, toast: true, position: "top-end", timer: 1500, showConfirmButton: false });
+  }).catch((err) => {
+    console.error("Failed to add manual customer:", err);
+    Swal.fire({ icon: "error", titleText: "เพิ่มลูกค้าไม่สำเร็จ", text: err?.message || "", toast: true, position: "top-end", timer: 2500, showConfirmButton: false });
   });
 }
 
 function updateField(id, field, value) {
+  if (!id) return;
+  if (field === "name" && (!value || !String(value).trim())) {
+    Swal.fire({ icon: "warning", titleText: "ชื่อลูกค้าห้ามเว้นว่าง", toast: true, position: "top-end", timer: 1500, showConfirmButton: false });
+    return;
+  }
+  const cleanVal = field === "name" ? String(value).trim() : (value ?? "");
   const updates = {
-    [field]: value ?? "",
+    [field]: cleanVal,
     updatedAt: Date.now(),
   };
-  if (field === "deliveryDate" && value) {
+  if (field === "deliveryDate" && cleanVal) {
     const cust = allCustomers.value.find((c) => c.id === id);
     if (cust && cust.status === "done") {
       updates.status = "pending";
@@ -916,29 +908,29 @@ function updateField(id, field, value) {
     const noteLower = value.toLowerCase();
     if (noteLower.includes("cod") || noteLower.includes("ปลายทาง") || noteLower.includes("เก็บเงิน")) {
       updates.paymentType = "cod";
-      if (cust) cust.paymentType = "cod";
       paymentTypeChange = "cod";
     } else if (noteLower.includes("โอน") || noteLower.includes("transfer")) {
       updates.paymentType = "transfer";
-      if (cust) cust.paymentType = "transfer";
       paymentTypeChange = "transfer";
     }
   }
 
-  if (paymentTypeChange && normKey) {
-    if (addressBook.value && addressBook.value[normKey]) {
-      addressBook.value[normKey].paymentType = paymentTypeChange;
-    }
-    const multiPathUpdates = {};
-    Object.entries(updates).forEach(([k, v]) => {
-      multiPathUpdates[`delivery_customers/${id}/${k}`] = v;
-    });
-    multiPathUpdates[`address_book/${normKey}/paymentType`] = paymentTypeChange;
-    multiPathUpdates[`address_book/${normKey}/updatedAt`] = Date.now();
-    update(dbRef(db), multiPathUpdates);
-  } else {
-    update(dbRef(db, `delivery_customers/${id}`), updates);
-  }
+  const writePromise = (paymentTypeChange && normKey)
+    ? (() => {
+        const multiPathUpdates = {};
+        Object.entries(updates).forEach(([k, v]) => {
+          multiPathUpdates[`delivery_customers/${id}/${k}`] = v;
+        });
+        multiPathUpdates[`address_book/${normKey}/paymentType`] = paymentTypeChange;
+        multiPathUpdates[`address_book/${normKey}/updatedAt`] = Date.now();
+        return update(dbRef(db), multiPathUpdates);
+      })()
+    : update(dbRef(db, `delivery_customers/${id}`), updates);
+
+  writePromise.catch((err) => {
+    console.error("Failed to update delivery customer field:", err);
+    Swal.fire({ icon: "error", titleText: "บันทึกข้อมูลไม่สำเร็จ", toast: true, position: "top-end", timer: 2000, showConfirmButton: false });
+  });
 }
 
 function openPrintForCustomer(customer) {
@@ -955,7 +947,7 @@ async function togglePrinted(customer) {
     });
     Swal.fire({
       icon: "success",
-      title: newStatus ? `ทำเครื่องหมาย "${customer.name}" พิมพ์แล้ว` : `ยกเลิกสถานะพิมพ์แล้วของ "${customer.name}"`,
+      titleText: newStatus ? `ทำเครื่องหมาย "${customer.name}" พิมพ์แล้ว` : `ยกเลิกสถานะพิมพ์แล้วของ "${customer.name}"`,
       toast: true,
       position: "top-end",
       timer: 1200,
@@ -1042,16 +1034,27 @@ function getPaymentTypeDisplay(customer) {
   return "ยังไม่ระบุ";
 }
 
+function findActiveAddressIndex(customer, savedAddrs) {
+  if (!savedAddrs || savedAddrs.length === 0) return -1;
+  if (customer.selectedAddressId) {
+    const byId = savedAddrs.findIndex((a) => a && a.id === customer.selectedAddressId);
+    if (byId !== -1) return byId;
+  }
+  const trimmed = (customer.address || "").trim();
+  if (trimmed) {
+    const byText = savedAddrs.findIndex((a) => a && (a.address || "").trim() === trimmed);
+    if (byText !== -1) return byText;
+  }
+  return 0;
+}
+
 async function togglePaymentType(customer) {
-  if (!customer) return;
+  if (!customer || !customer.id) return;
   const current = getCustomerPaymentType(customer);
   const nextType = current === "cod" ? "transfer" : (current === "transfer" ? "cod" : "transfer");
 
-  // ⚡ Optimistic UI update
-  customer.paymentType = nextType;
-
   const timestamp = Date.now();
-  const normKey = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  const normKey = normalizeName(customer.name || "").replace(/[.#$[\]/]/g, "_");
 
   const multiPathUpdates = {
     [`delivery_customers/${customer.id}/paymentType`]: nextType,
@@ -1060,22 +1063,17 @@ async function togglePaymentType(customer) {
 
   if (normKey) {
     multiPathUpdates[`address_book/${normKey}/paymentType`] = nextType;
-    multiPathUpdates[`address_book/${normKey}/name`] = customer.name.trim();
+    multiPathUpdates[`address_book/${normKey}/name`] = (customer.name || "").trim();
     multiPathUpdates[`address_book/${normKey}/updatedAt`] = timestamp;
-    if (addressBook.value && addressBook.value[normKey]) {
-      addressBook.value[normKey].paymentType = nextType;
-    }
   }
 
-  // Also update in customer's active address if available
+  // Update only the single active address (never clobber unrelated addresses)
   const savedAddrs = getCustomerSavedAddresses(customer);
   if (savedAddrs.length > 0) {
-    const updatedAddrs = savedAddrs.map((a) => ({
-      ...a,
-      paymentType: (customer.selectedAddressId && a.id === customer.selectedAddressId) || savedAddrs.length === 1
-        ? nextType
-        : (a.paymentType || nextType),
-    }));
+    const activeIdx = findActiveAddressIndex(customer, savedAddrs);
+    const updatedAddrs = savedAddrs.map((a, idx) =>
+      idx === activeIdx ? { ...a, paymentType: nextType } : a
+    );
     multiPathUpdates[`delivery_customers/${customer.id}/addresses`] = updatedAddrs;
     if (normKey) {
       multiPathUpdates[`address_book/${normKey}/addresses`] = updatedAddrs;
@@ -1086,7 +1084,7 @@ async function togglePaymentType(customer) {
     await update(dbRef(db), multiPathUpdates);
     Swal.fire({
       icon: "success",
-      title: `บันทึกรูปแบบ "${customer.name}" เป็น "${nextType === 'cod' ? 'COD' : 'โอน'}" ไว้ในประวัติลูกค้าแล้ว`,
+      titleText: `บันทึกรูปแบบ "${customer.name}" เป็น "${nextType === 'cod' ? 'COD' : 'โอน'}" ไว้ในประวัติลูกค้าแล้ว`,
       toast: true,
       position: "top-end",
       timer: 1500,
@@ -1094,6 +1092,7 @@ async function togglePaymentType(customer) {
     });
   } catch (err) {
     console.error("Failed to toggle paymentType:", err);
+    Swal.fire({ icon: "error", titleText: "บันทึกรูปแบบการจัดส่งไม่สำเร็จ", toast: true, position: "top-end", timer: 2000, showConfirmButton: false });
   }
 }
 
@@ -1141,15 +1140,12 @@ function getContactChannelDisplay(customer) {
 }
 
 async function toggleContactChannel(customer) {
-  if (!customer) return;
+  if (!customer || !customer.id) return;
   const current = getCustomerContactChannel(customer);
   const next = current === "line" ? "lineoa" : (current === "lineoa" ? "phone" : "line");
 
-  // ⚡ Optimistic UI update
-  customer.contactChannel = next;
-
   const timestamp = Date.now();
-  const normKey = normalizeName(customer.name).replace(/[.#$[\]/]/g, "_");
+  const normKey = normalizeName(customer.name || "").replace(/[.#$[\]/]/g, "_");
 
   const multiPathUpdates = {
     [`delivery_customers/${customer.id}/contactChannel`]: next,
@@ -1158,22 +1154,17 @@ async function toggleContactChannel(customer) {
 
   if (normKey) {
     multiPathUpdates[`address_book/${normKey}/contactChannel`] = next;
-    multiPathUpdates[`address_book/${normKey}/name`] = customer.name.trim();
+    multiPathUpdates[`address_book/${normKey}/name`] = (customer.name || "").trim();
     multiPathUpdates[`address_book/${normKey}/updatedAt`] = timestamp;
-    if (addressBook.value && addressBook.value[normKey]) {
-      addressBook.value[normKey].contactChannel = next;
-    }
   }
 
-  // Also update in customer's active address if available
+  // Update only the single active address (never clobber unrelated addresses)
   const savedAddrs = getCustomerSavedAddresses(customer);
   if (savedAddrs.length > 0) {
-    const updatedAddrs = savedAddrs.map((a) => ({
-      ...a,
-      contactChannel: (customer.selectedAddressId && a.id === customer.selectedAddressId) || savedAddrs.length === 1
-        ? next
-        : (a.contactChannel || next),
-    }));
+    const activeIdx = findActiveAddressIndex(customer, savedAddrs);
+    const updatedAddrs = savedAddrs.map((a, idx) =>
+      idx === activeIdx ? { ...a, contactChannel: next } : a
+    );
     multiPathUpdates[`delivery_customers/${customer.id}/addresses`] = updatedAddrs;
     if (normKey) {
       multiPathUpdates[`address_book/${normKey}/addresses`] = updatedAddrs;
@@ -1185,7 +1176,7 @@ async function toggleContactChannel(customer) {
     const nextLabel = next === "lineoa" ? "LineOA" : (next === "phone" ? "โทรศัพท์" : "Line");
     Swal.fire({
       icon: "success",
-      title: `บันทึกช่องทางติดต่อ "${customer.name}" เป็น "${nextLabel}" ไว้ในประวัติลูกค้าแล้ว`,
+      titleText: `บันทึกช่องทางติดต่อ "${customer.name}" เป็น "${nextLabel}" ไว้ในประวัติลูกค้าแล้ว`,
       toast: true,
       position: "top-end",
       timer: 1500,
@@ -1193,6 +1184,7 @@ async function toggleContactChannel(customer) {
     });
   } catch (err) {
     console.error("Failed to toggle contactChannel:", err);
+    Swal.fire({ icon: "error", titleText: "บันทึกช่องทางติดต่อไม่สำเร็จ", toast: true, position: "top-end", timer: 2000, showConfirmButton: false });
   }
 }
 
@@ -1533,9 +1525,9 @@ body {
 .sp-btn-add:hover:not(:disabled) { filter: brightness(1.1); }
 .sp-btn-add:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.sp-slide-enter-active, .sp-slide-leave-active { transition: all 0.2s ease; overflow: hidden; }
-.sp-slide-enter-from, .sp-slide-leave-to { max-height: 0; opacity: 0; margin-top: 0; }
-.sp-slide-enter-to, .sp-slide-leave-from { max-height: 200px; opacity: 1; }
+.sp-slide-enter-active, .sp-slide-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }
+.sp-slide-enter-from, .sp-slide-leave-to { opacity: 0; transform: translateY(-6px); }
+.sp-slide-enter-to, .sp-slide-leave-from { opacity: 1; transform: translateY(0); }
 
 /* ======== CUSTOMER LIST ======== */
 .sp-list-container {
@@ -1565,7 +1557,7 @@ body {
   border-radius: 12px;
   padding: 10px 12px 10px 12px;
   position: relative;
-  transition: all 0.15s;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 /* Urgency styles */
@@ -1787,11 +1779,11 @@ body {
 }
 
 /* ======== ANIMATIONS ======== */
-.sp-item-anim-enter-active { transition: all 0.25s ease; }
-.sp-item-anim-leave-active { transition: all 0.15s ease; }
+.sp-item-anim-enter-active { transition: opacity 0.22s ease, transform 0.22s ease; }
+.sp-item-anim-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
 .sp-item-anim-enter-from { opacity: 0; transform: translateY(-8px); }
 .sp-item-anim-leave-to { opacity: 0; transform: translateX(20px); }
-.sp-item-anim-move { transition: transform 0.25s ease; }
+.sp-item-anim-move { transition: transform 0.22s ease; }
 
 /* ======== HEADER ACTION BUTTONS ======== */
 .sp-header-act-btn {
@@ -2083,5 +2075,15 @@ body {
 @media (min-width: 600px) {
   .sp-toolbar, .sp-add-wrap, .sp-list-container { max-width: 500px; margin-left: auto; margin-right: auto; width: 100%; }
   .sp-list { max-width: 500px; margin: 0 auto; }
+}
+
+/* ======== REDUCED MOTION (standalone /shipping/ page doesn't import style.css) ======== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 </style>

@@ -4,32 +4,55 @@
       
       <!-- HEADER -->
       <div class="modal-header">
-        <h2><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการขาย (History)</h2>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <a :href="`${baseUrl}history/`" target="_blank" class="btn btn-sm btn-outline" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); text-decoration: none; font-size: 0.85em;">
+        <div class="modal-header-left">
+          <button
+            type="button"
+            class="btn-mobile-sidebar"
+            @click="mobileSidebarOpen = !mobileSidebarOpen"
+            title="แสดง/ซ่อนรายการไลฟ์ย้อนหลัง"
+          >
+            <i class="fa-solid" :class="mobileSidebarOpen ? 'fa-xmark' : 'fa-bars'"></i>
+            <span>เลือกไลฟ์</span>
+          </button>
+          <h2><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการขาย (History)</h2>
+        </div>
+        <div class="modal-header-right">
+          <a :href="`${baseUrl}history/`" target="_blank" class="btn-open-tab" title="เปิดแบบเต็มหน้าจอในแท็บใหม่">
             <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดหน้าแยก
           </a>
-          <button class="btn-close" @click="$emit('close')">
+          <button class="btn-close" @click="$emit('close')" title="ปิดหน้าต่าง">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
       </div>
 
       <div class="modal-body">
+        <!-- Mobile Sidebar Backdrop -->
+        <div
+          v-if="mobileSidebarOpen"
+          class="mobile-sidebar-backdrop"
+          @click="mobileSidebarOpen = false"
+        ></div>
+
         <!-- SIDEBAR: List of Lives -->
-        <div class="sidebar">
+        <div class="sidebar" :class="{ 'mobile-open': mobileSidebarOpen }">
           <div class="sidebar-header">
-            <span>รายการย้อนหลัง</span>
-            <div class="flex gap-1">
-                 <button class="btn-icon-sm-danger" @click="openCleanupModal" title="ล้างประวัติย้อนหลังเกิน 3 เดือน">
-                   <i class="fa-solid fa-broom"></i>
-                 </button>
-                 <button class="btn-icon-sm" @click="fixHistoryData" title="คำนวณยอดใหม่ (Fix Data)">
-                   <i class="fa-solid fa-wrench"></i>
-                 </button>
-                 <button class="btn-icon-sm" @click="history.fetchHistoryList" title="รีเฟรช">
-                   <i class="fa-solid fa-rotate-right"></i>
-                 </button>
+            <div class="sidebar-title-group">
+              <span>รายการย้อนหลัง</span>
+              <span v-if="filteredHistoryList.length > 0" class="sidebar-count-pill">
+                {{ filteredHistoryList.length }}
+              </span>
+            </div>
+            <div class="sidebar-tools">
+              <button class="btn-icon-sm" @click="history.fetchHistoryList" title="รีเฟรชรายการ">
+                <i class="fa-solid fa-rotate-right"></i>
+              </button>
+              <button class="btn-icon-sm" @click="fixHistoryData" title="คำนวณยอดขายใหม่ทั้งหมด">
+                <i class="fa-solid fa-wrench"></i>
+              </button>
+              <button class="btn-icon-sm-danger" @click="openCleanupModal" title="ล้างประวัติเก่าเกิน 3 เดือน">
+                <i class="fa-solid fa-broom"></i>
+              </button>
             </div>
           </div>
           
@@ -52,8 +75,8 @@
             </button>
           </div>
 
-          <div v-if="history.isLoading.value" class="text-center p-10 text-muted">
-            <i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...
+          <div v-if="history.isLoading.value" class="sidebar-state-msg">
+            <i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดรายการ...
           </div>
 
           <div v-else class="sidebar-list">
@@ -62,19 +85,26 @@
                :key="item.videoId"
                class="sidebar-item"
                :class="{ active: selectedId === item.videoId }"
-               @click="selectLive(item)"
+               @click="handleSelectLive(item)"
              >
-               <div class="item-title" :title="item.title || item.videoId">{{ item.title || "ไม่มีชื่อไลฟ์" }}</div>
-               <div class="item-date">
-                 <i class="fa-regular fa-calendar"></i> {{ formatDate(item.timestamp) }}
+               <div class="sidebar-item-top">
+                 <span class="item-date-chip">
+                   <i class="fa-regular fa-calendar"></i> {{ formatDate(item.timestamp) }}
+                 </span>
+                 <span v-if="item.totalItems > 0" class="item-sold-chip">
+                   {{ item.totalItems }} ตัว
+                 </span>
                </div>
+               <div class="item-title" :title="item.title || item.videoId">{{ item.title || "ไม่มีชื่อไลฟ์" }}</div>
                <div class="item-meta">
-                 ยอด: {{ formatCurrency(item.totalSales || 0) }}
+                 <span class="item-meta-label">ยอดขาย</span>
+                 <span class="item-meta-value">฿{{ (item.totalSales || 0).toLocaleString() }}</span>
                </div>
              </div>
              
-             <div v-if="filteredHistoryList.length === 0" class="text-center p-10 text-muted">
-                {{ sidebarSearchQuery ? 'ไม่พบชื่อไลฟ์ที่ค้นหา' : 'ไม่พบข้อมูลประวัติ' }}
+             <div v-if="filteredHistoryList.length === 0" class="sidebar-state-msg">
+                <i class="fa-regular fa-folder-open" style="font-size: 1.5em; opacity: 0.45;"></i>
+                <span>{{ sidebarSearchQuery ? 'ไม่พบชื่อไลฟ์ที่ค้นหา' : 'ยังไม่มีข้อมูลประวัติการขาย' }}</span>
              </div>
           </div>
         </div>
@@ -82,21 +112,78 @@
         <!-- MAIN CONTENT: Details -->
         <div class="main-content">
           <div v-if="!selectedItem" class="empty-state">
-            <i class="fa-solid fa-arrow-left"></i>
-            <p>เลือกรายการทางซ้ายเพื่อดูรายละเอียด</p>
+            <div class="empty-state-card">
+              <div class="empty-state-icon">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+              </div>
+              <h3>เลือกไลฟ์ย้อนหลังที่ต้องการดู</h3>
+              <p>เลือกรายการจากแถบด้านซ้าย เพื่อดูสต็อก ไซส์ ราคา แก้ไขคิว หรือย้อนอ่านแชททั้งหมดของไลฟ์นั้น</p>
+              <div class="empty-state-actions">
+                <button
+                  v-if="filteredHistoryList.length > 0"
+                  type="button"
+                  class="btn btn-open-latest"
+                  @click="handleSelectLive(filteredHistoryList[0])"
+                >
+                  <i class="fa-solid fa-play"></i> เปิดไลฟ์ล่าสุด
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline btn-mobile-pick"
+                  @click="mobileSidebarOpen = true"
+                >
+                  <i class="fa-solid fa-list"></i> เลือกรายการไลฟ์
+                </button>
+              </div>
+            </div>
           </div>
 
           <div v-else class="content-wrapper">
-             <!-- Stats Bar (Styled like StockGrid header) -->
+             <!-- Overview Header (Clean 2-row hierarchy, zero horizontal clipping) -->
              <div class="stats-bar-header">
                 <div class="history-live-title-bar">
                   <div v-if="!isEditingTitle" class="history-live-title-left">
+                    <button
+                      type="button"
+                      class="btn-mobile-inline-menu"
+                      @click="mobileSidebarOpen = true"
+                      title="เปลี่ยนไลฟ์ย้อนหลัง"
+                    >
+                      <i class="fa-solid fa-bars"></i>
+                    </button>
                     <span class="history-live-dot" title="ชื่อไลฟ์ย้อนหลัง">
                       <i class="fa-solid fa-tower-broadcast"></i>
                     </span>
-                    <span class="history-live-title-text" :title="selectedItem.title || selectedItem.videoId">
-                      {{ selectedItem.title || "ไม่มีชื่อไลฟ์" }}
-                    </span>
+                    <div class="history-title-stack">
+                      <span class="history-live-title-text" :title="selectedItem.title || selectedItem.videoId">
+                        {{ selectedItem.title || "ไม่มีชื่อไลฟ์" }}
+                      </span>
+                      <div class="history-title-submeta">
+                        <span v-if="selectedItem.timestamp" class="history-title-date">
+                          <i class="fa-regular fa-calendar"></i> {{ formatDate(selectedItem.timestamp) }}
+                        </span>
+                        <span class="history-title-vid" :title="'YouTube Video ID: ' + selectedItem.videoId">
+                          {{ selectedItem.videoId }}
+                        </span>
+                        <button
+                          type="button"
+                          class="btn-title-icon"
+                          @click="startEditTitle"
+                          title="แก้ไขชื่อไลฟ์"
+                        >
+                          <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-title-icon"
+                          :disabled="isFetchingTitle"
+                          @click="refreshTitleFromYouTube(selectedItem.videoId, false)"
+                          title="ดึงชื่อไลฟ์จาก YouTube"
+                        >
+                          <i class="fa-solid" :class="isFetchingTitle ? 'fa-spinner fa-spin' : 'fa-rotate'"></i>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div v-else class="history-live-title-edit">
                     <input
@@ -116,85 +203,75 @@
                     </button>
                   </div>
 
-                  <div class="history-live-title-meta">
-                    <span v-if="selectedItem.timestamp" class="history-title-date">
-                      <i class="fa-regular fa-calendar"></i> {{ formatDate(selectedItem.timestamp) }}
-                    </span>
-                    <span class="history-title-vid" :title="'YouTube Video ID: ' + selectedItem.videoId">
-                      {{ selectedItem.videoId }}
-                    </span>
-                    <button
-                      v-if="!isEditingTitle"
-                      type="button"
-                      class="btn-title-icon"
-                      @click="startEditTitle"
-                      title="แก้ไขชื่อไลฟ์"
-                    >
-                      <i class="fa-solid fa-pen"></i>
+                  <div class="header-actions">
+                    <button class="btn-hist-primary" @click="openOnMainBoard" title="เปิดไลฟ์นี้ขึ้นกระดานหลัก">
+                      <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                      <span>เปิดที่หน้าหลัก</span>
                     </button>
-                    <button
-                      type="button"
-                      class="btn-title-icon"
-                      :disabled="isFetchingTitle"
-                      @click="refreshTitleFromYouTube(selectedItem.videoId, false)"
-                      title="ดึงชื่อไลฟ์จาก YouTube และบันทึกลงประวัติ"
-                    >
-                      <i class="fa-solid" :class="isFetchingTitle ? 'fa-spinner fa-spin' : 'fa-rotate'"></i>
+                    <button class="btn-hist-secondary" @click="exportCSV" title="ดาวน์โหลดรายงานยอดขายเป็นไฟล์ CSV">
+                      <i class="fa-solid fa-file-csv"></i>
+                      <span>Export CSV</span>
+                    </button>
+                    <span class="header-actions-divider"></span>
+                    <button class="btn-hist-ghost-warn" @click="confirmClearHistoryStock" title="ล้างข้อมูลการจองในกระดานนี้">
+                      <i class="fa-solid fa-eraser"></i>
+                    </button>
+                    <button class="btn-hist-ghost-danger" @click="handleDelete" title="ลบไลฟ์สดนี้ถาวร">
+                      <i class="fa-solid fa-trash"></i>
                     </button>
                   </div>
                 </div>
 
-                <div v-if="isDetailsLoading" class="flex items-center justify-center p-4 w-full text-muted">
-                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังโหลดข้อมูล...
+                <div v-if="isDetailsLoading" class="history-loading-inline">
+                    <i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูลรายการ...
                 </div>
                 <template v-else>
-                  <div class="header-main-row">
-                    <div class="stock-input-group">
-                      รายการ:
+                  <div class="header-kpi-row">
+                    <div class="kpi-chip kpi-stock-size">
+                      <span class="kpi-label">จำนวนรายการ</span>
                       <input
                         type="number"
                         v-model.lazy="localStockSize"
                         class="edit-input"
-                        style="
-                          width: 60px;
-                          text-align: center;
-                          font-size: 1em;
-                          font-weight: bold;
-                        "
+                        min="1"
+                        max="300"
                         @change="saveStockSize"
                       />
                     </div>
 
-                    <div class="stock-stats">
-                      <span class="stats-label">ขายแล้ว:</span>
+                    <button
+                      type="button"
+                      class="kpi-chip kpi-clickable"
+                      :class="{ 'kpi-active': statusFilter === 'sold' && viewMode !== 'chat' }"
+                      @click="toggleStatusFilter('sold')"
+                      title="คลิกเพื่อกรองดูเฉพาะตัวที่ขายแล้ว"
+                    >
+                      <span class="kpi-label">ขายแล้ว</span>
                       <span class="stat-sold">{{ animatedSoldCount }}</span>
-                      <span style="opacity: 0.5; font-size: 0.85em">/{{ selectedItem.stockSize || 70 }}</span>
-                      <div class="sale-percent-badge" :class="[percentColorClass, { 'pulse': isPulsingPercent }]">
+                      <span class="kpi-total">/{{ selectedItem.stockSize || 70 }}</span>
+                      <span class="sale-percent-badge" :class="[percentColorClass, { 'pulse': isPulsingPercent }]">
                         {{ animatedPercentage }}%
-                      </div>
-                      <div
-                        class="total-sales-badge"
-                        :class="{ 'pulse': isPulsingSales }"
-                        :title="historySalesTooltip"
-                      >
-                        <span class="sales-label">ยอด:</span>
-                        <span class="sales-amount">฿{{ animatedHistoryTotalSales.toLocaleString() }}</span>
-                      </div>
-                    </div>
+                      </span>
+                    </button>
 
-                    <div class="header-actions">
-                      <button class="btn btn-primary btn-sm" @click="openOnMainBoard" title="เปิดไลฟ์นี้ขึ้นกระดานหลัก">
-                        <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดที่หน้าหลัก
-                      </button>
-                      <button class="btn btn-warning btn-sm" @click="confirmClearHistoryStock" title="ล้างกระดานประวัติ">
-                        <i class="fa-solid fa-eraser"></i> ล้างกระดาน
-                      </button>
-                      <button class="btn btn-success btn-sm" @click="exportCSV" title="ดาวน์โหลดรายงาน CSV">
-                        <i class="fa-solid fa-file-csv"></i> Export CSV
-                      </button>
-                      <button class="btn btn-danger btn-sm" @click="handleDelete" title="ลบไลฟ์สดนี้ถาวร">
-                        <i class="fa-solid fa-trash"></i> ลบไลฟ์
-                      </button>
+                    <button
+                      type="button"
+                      class="kpi-chip kpi-clickable"
+                      :class="{ 'kpi-active': statusFilter === 'vacant' && viewMode !== 'chat' }"
+                      @click="toggleStatusFilter('vacant')"
+                      title="คลิกเพื่อกรองดูเฉพาะตัวที่ยังว่าง"
+                    >
+                      <span class="kpi-label">เหลือว่าง</span>
+                      <span class="kpi-vacant-val">{{ vacantCount }}</span>
+                    </button>
+
+                    <div
+                      class="total-sales-badge"
+                      :class="{ 'pulse': isPulsingSales }"
+                      :title="historySalesTooltip"
+                    >
+                      <span class="sales-label">ยอดขาย:</span>
+                      <span class="sales-amount">฿{{ animatedHistoryTotalSales.toLocaleString() }}</span>
                     </div>
                   </div>
 
@@ -206,7 +283,7 @@
                 </template>
              </div>
 
-             <!-- Controls -->
+             <!-- Unified Controls Bar: Search + Quick Status Filter + Segmented View Tabs -->
              <div class="controls-bar">
                 <div class="search-wrapper">
                   <i class="fa-solid fa-magnifying-glass search-icon"></i>
@@ -214,76 +291,128 @@
                     v-model="searchQuery" 
                     type="text" 
                     class="search-input" 
-                    :placeholder="viewMode === 'chat' ? 'ค้นหาชื่อลูกค้า, ข้อความแชท...' : 'ค้นหาชื่อลูกค้า, รหัสสินค้า...'"
+                    :placeholder="viewMode === 'chat' ? 'ค้นหาชื่อลูกค้า, ข้อความแชท...' : 'ค้นหาชื่อลูกค้า, รหัส, ไซส์ (เช่น อก52)...'"
                   >
+                  <button
+                    v-if="searchQuery"
+                    type="button"
+                    class="search-clear-btn"
+                    @click="searchQuery = ''"
+                    title="ล้างคำค้นหา"
+                  >
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <div v-if="viewMode === 'grid'" class="status-filter-pills">
+                  <button
+                    type="button"
+                    class="status-pill"
+                    :class="{ active: statusFilter === 'all' }"
+                    @click="statusFilter = 'all'"
+                  >ทั้งหมด</button>
+                  <button
+                    type="button"
+                    class="status-pill pill-sold"
+                    :class="{ active: statusFilter === 'sold' }"
+                    @click="statusFilter = 'sold'"
+                  >ขายแล้ว ({{ soldCount }})</button>
+                  <button
+                    type="button"
+                    class="status-pill pill-vacant"
+                    :class="{ active: statusFilter === 'vacant' }"
+                    @click="statusFilter = 'vacant'"
+                  >ว่าง ({{ vacantCount }})</button>
                 </div>
                 
-                <div class="view-toggles flex gap-2 ml-4">
+                <div class="view-toggles">
+                  <div class="segmented-control">
                     <button 
-                        class="btn btn-sm" 
-                        :class="viewMode === 'list' ? 'btn-primary' : 'btn-outline'"
+                        class="seg-btn" 
+                        :class="{ active: viewMode === 'grid' }"
+                        @click="setViewMode('grid')"
+                        title="มุมมองกระดานสต็อก (Grid View)"
+                    >
+                        <i class="fa-solid fa-table-cells"></i> กระดาน
+                    </button>
+                    <button 
+                        class="seg-btn" 
+                        :class="{ active: viewMode === 'list' }"
                         @click="setViewMode('list')"
-                        title="มุมมองรายการ (List View)"
+                        title="มุมมองรายการตาราง (List View)"
                     >
                         <i class="fa-solid fa-list"></i> รายการ
                     </button>
                     <button 
-                        class="btn btn-sm" 
-                        :class="viewMode === 'grid' ? 'btn-primary' : 'btn-outline'"
-                        @click="setViewMode('grid')"
-                        title="มุมมองตาราง (Grid View)"
-                    >
-                        <i class="fa-solid fa-th"></i> ตาราง
-                    </button>
-                    <button 
-                        class="btn btn-sm btn-chat-mode" 
-                        :class="viewMode === 'chat' ? 'btn-primary' : 'btn-outline'"
+                        class="seg-btn" 
+                        :class="{ active: viewMode === 'chat' }"
                         @click="setViewMode('chat')"
                         title="ดูประวัติแชทย้อนหลัง (เหมือนตอนไลฟ์สด)"
                     >
                         <i class="fa-solid fa-comments"></i> แชท
                         <span v-if="loadedChatVideoId === selectedId && historyChats.length > 0" class="chat-mode-count">{{ historyChats.length }}</span>
                     </button>
-                    <button 
-                        v-if="viewMode === 'grid'"
-                        class="btn btn-sm btn-outline" 
-                        @click="isFullscreen = !isFullscreen"
-                        title="Full Screen"
-                    >
-                        <i class="fa-solid fa-expand"></i>
-                    </button>
+                  </div>
+                  <button 
+                      v-if="viewMode === 'grid'"
+                      class="btn-expand-grid" 
+                      @click="isFullscreen = !isFullscreen"
+                      :title="isFullscreen ? 'ออกจากเต็มจอ' : 'ขยายกระดานเต็มจอ'"
+                  >
+                      <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'"></i>
+                  </button>
                 </div>
              </div>
 
-             <!-- Table (List View) -->
+             <!-- Table (List View — Friendly, No Raw UIDs) -->
              <div v-if="viewMode === 'list'" class="table-container">
                <table class="data-table">
                  <thead>
                    <tr>
-                     <th width="80">ลำดับ</th>
-                     <th width="100">รหัส</th>
-                     <th>ลูกค้า</th>
-                     <th width="120" class="text-right">ราคา</th>
-                     <th width="100" class="text-center">ช่องทาง</th>
-                     <th width="120">เวลา</th>
-                     <th width="120" class="text-center">จัดการ</th>
+                     <th width="64">#</th>
+                     <th width="86">รหัส</th>
+                     <th>ลูกค้า & สเปกสินค้า</th>
+                     <th width="110" class="text-right">ราคา</th>
+                     <th width="115" class="text-center">ที่มา</th>
+                     <th width="110">เวลา</th>
+                     <th width="104" class="text-center">จัดการ</th>
                    </tr>
                  </thead>
                  <tbody>
                    <tr v-if="filteredOrders.length === 0">
-                      <td colspan="7" class="text-center py-20 text-muted">ไม่พบข้อมูลคำสั่งซื้อ</td>
+                      <td colspan="7" class="table-empty-cell">
+                        <i class="fa-regular fa-face-smile-wink" style="margin-right: 6px; opacity: 0.6;"></i>
+                        {{ searchQuery ? 'ไม่พบรายการที่ตรงกับคำค้นหา' : 'ยังไม่มีรายการจองในไลฟ์นี้' }}
+                      </td>
                    </tr>
-                   <tr v-for="(order, index) in filteredOrders" :key="order.stockId" class="hover:bg-slate-700">
-                     <td class="text-muted">#{{ index + 1 }}</td>
-                     <td class="font-bold">{{ order.stockId }}</td>
+                   <tr
+                     v-for="(order, index) in filteredOrders"
+                     :key="order.stockId"
+                     class="order-row-clickable"
+                     @click="openQueueModal(order.stockId)"
+                   >
+                     <td class="text-muted">{{ index + 1 }}</td>
                      <td>
-                        <div class="customer-name">{{ order.owner }}</div>
-                        <div class="customer-uid text-sm text-muted">{{ order.uid }}</div>
+                       <span class="list-stock-badge">#{{ order.stockId }}</span>
                      </td>
-                     <td class="text-right font-mono">{{ formatCurrency(order.price || 0) }}</td>
+                     <td>
+                        <div class="customer-name-row">
+                          <span class="customer-name">{{ order.owner }}</span>
+                          <span v-if="order.backdated" class="list-backdated-tag" :title="getBookingTooltip(order.timestamp, true)">
+                            <i class="fa-solid fa-clock-rotate-left"></i> ย้อนหลัง
+                          </span>
+                        </div>
+                        <div v-if="formatFullStockDetails(order)" class="history-list-spec">
+                          <i class="fa-solid fa-ruler"></i> {{ formatFullStockDetails(order) }}
+                        </div>
+                     </td>
+                     <td class="text-right list-price-cell">
+                       <span v-if="order.price && Number(order.price) > 0">฿{{ Number(order.price).toLocaleString() }}</span>
+                       <span v-else class="text-muted">—</span>
+                     </td>
                      <td class="text-center">
-                        <span class="badge" :class="order.method === 'manual-force' ? 'badge-warn' : 'badge-info'">
-                           {{ order.method || 'System' }}
+                        <span class="source-pill" :class="getSourceBadgeClass(order.method, order.source)">
+                           {{ formatSourceLabel(order.method, order.source) }}
                         </span>
                      </td>
                      <td class="text-sm text-muted">
@@ -291,10 +420,10 @@
                      </td>
                      <td class="text-center">
                         <div class="action-btns">
-                           <button class="btn-action btn-action-edit" @click.stop="openQueueModal(order.stockId)" title="จัดการคิว">
-                             <i class="fa-solid fa-list-ol"></i>
+                           <button class="btn-action btn-action-edit" @click.stop="openQueueModal(order.stockId)" title="แก้ไขคิว / ราคา / ไซส์">
+                             <i class="fa-solid fa-pen-to-square"></i>
                            </button>
-                           <button class="btn-action btn-action-delete" @click.stop="processHistoryCancel(order.stockId, order.uid, order.owner)" title="ลบชื่อคนจอง">
+                           <button class="btn-action btn-action-delete" @click.stop="processHistoryCancel(order.stockId, order.uid, order.owner)" title="ยกเลิกการจอง">
                              <i class="fa-solid fa-user-xmark"></i>
                            </button>
                         </div>
@@ -304,16 +433,27 @@
                </table>
              </div>
              
-             <!-- Grid View (Styled like StockGrid) -->
+             <!-- Grid View (Clean 3-row StockItemCard Hierarchy) -->
              <div v-else-if="viewMode === 'grid'" class="grid-container" :class="{ 'fullscreen-grid': isFullscreen }">
                 <div v-if="isFullscreen" class="fullscreen-header">
-                     <h2>รายการขาย {{ selectedItem.title }}</h2>
-                     <button class="btn btn-danger" @click="isFullscreen = false">
-                        <i class="fa-solid fa-compress"></i> ออก
+                     <h2><i class="fa-solid fa-table-cells"></i> {{ selectedItem.title }}</h2>
+                     <button class="btn btn-danger btn-sm" @click="isFullscreen = false">
+                        <i class="fa-solid fa-compress"></i> ออกจากเต็มจอ
                      </button>
                 </div>
+
+                <div v-if="allGridItems.length === 0" class="grid-empty-msg">
+                  <i class="fa-solid fa-filter-circle-xmark"></i>
+                  <span>ไม่พบรายการที่ตรงกับตัวกรองหรือคำค้นหา</span>
+                  <button
+                    v-if="statusFilter !== 'all' || searchQuery"
+                    type="button"
+                    class="btn btn-sm btn-outline"
+                    @click="statusFilter = 'all'; searchQuery = ''"
+                  >แสดงทั้งหมด</button>
+                </div>
              
-                <div class="grid-content">
+                <div v-else class="grid-content">
                     <div 
                         v-for="item in allGridItems" 
                         :key="item.id"
@@ -321,32 +461,46 @@
                         :class="{ 'empty': item.isEmpty, 'sold': !item.isEmpty }"
                         @click="openQueueModal(item.id)"
                     >
-                        <div class="item-num">{{ item.id }}</div>
-                        
-                        <div class="item-status" :class="{ empty: item.isEmpty }">
-                          <span>{{ item.isEmpty ? 'ว่าง' : item.owner }}</span>
-                          <i
-                            v-if="!item.isEmpty && item.backdated"
-                            class="fa-solid fa-clock-rotate-left backdated-inline-icon"
-                            :title="getBookingTooltip(item.time, true)"
-                          ></i>
+                        <div class="grid-card-top">
+                          <div class="item-num">{{ item.id }}</div>
+                          <div class="grid-card-top-right">
+                            <div
+                              v-if="item.price && Number(item.price) > 0"
+                              class="stock-price"
+                              :title="`ราคา: ฿${Number(item.price).toLocaleString()} บาท`"
+                            >
+                              ฿{{ Number(item.price).toLocaleString() }}
+                            </div>
+                            <div v-if="getQueueLength(item.id) > 0" class="queue-badge" :title="`มีคิวสำรอง ${getQueueLength(item.id)} คน`">
+                              +{{ getQueueLength(item.id) }}
+                            </div>
+                          </div>
                         </div>
                         
-                        <div
-                          v-if="!item.isEmpty && getOwnerCount(item.owner, item.uid) >= 1"
-                           class="owner-count-badge"
-                           :title="`${item.owner} จองทั้งหมด ${getOwnerCount(item.owner, item.uid)} ชิ้น — คลิกเพื่อจัดการ`"
-                           @click.stop="showOwnerItems(item.owner)"
-                        >
-                          👗 {{ getOwnerCount(item.owner, item.uid) }} ตัว
+                        <div class="grid-card-center">
+                          <div class="item-status" :class="{ empty: item.isEmpty }">
+                            <span>{{ item.isEmpty ? 'ว่าง' : item.owner }}</span>
+                            <i
+                              v-if="!item.isEmpty && item.backdated"
+                              class="fa-solid fa-clock-rotate-left backdated-inline-icon"
+                              :title="getBookingTooltip(item.time, true)"
+                            ></i>
+                          </div>
                         </div>
                         
-                        <div v-if="item.price && Number(item.price) > 0" class="stock-price">
-                          {{ item.price }} บาท
-                        </div>
+                        <div class="grid-card-meta" v-if="(!item.isEmpty && getOwnerCount(item.owner, item.uid) >= 1) || formatCompactStockSize(item)">
+                          <div
+                            v-if="!item.isEmpty && getOwnerCount(item.owner, item.uid) >= 1"
+                            class="owner-count-badge"
+                            :title="`${item.owner} จองทั้งหมด ${getOwnerCount(item.owner, item.uid)} ชิ้น — คลิกเพื่อดูรายการทั้งหมด`"
+                            @click.stop="showOwnerItems(item.owner)"
+                          >×{{ getOwnerCount(item.owner, item.uid) }}</div>
 
-                        <div v-if="getQueueLength(item.id) > 0" class="queue-badge">
-                          +{{ getQueueLength(item.id) }}
+                          <span
+                            v-if="formatCompactStockSize(item)"
+                            class="history-size-meta"
+                            :title="`สเปกสินค้า: ${formatFullStockDetails(item)}`"
+                          >{{ formatCompactStockSize(item) }}</span>
                         </div>
                     </div>
                 </div>
@@ -601,13 +755,25 @@
             <div class="price-input-row">
               <input
                 type="number"
-                v-model="editingPrice"
+                v-model.number="editingPrice"
                 ref="priceInputRef"
                 class="price-input-field"
                 placeholder="0"
-                @keyup.enter="saveQueueChanges"
+                @keyup.enter="saveQueueChanges()"
               />
               <span class="price-unit">บาท</span>
+            </div>
+            <div class="details-input-row">
+              <label class="details-inline-label">
+                <i class="fa-solid fa-ruler"></i> สเปก/ไซส์
+              </label>
+              <input
+                type="text"
+                v-model="editingDetails"
+                class="details-input-field"
+                placeholder="เช่น อก 52 ยาว 29 ไซส์ 2XL"
+                @keyup.enter="saveQueueChanges()"
+              />
             </div>
           </div>
           
@@ -710,6 +876,7 @@ import { db } from "../composables/useFirebase";
 import { escapeHtml } from "../utils/dbUtils";
 import { normalizeCustomerName, isProxyUid, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
 import { formatBackdatedDetail, formatNormalBookingTime, getBookingTooltip } from "../utils/timeFormatUtils";
+import { formatCompactStockSize, formatFullStockDetails, matchesStockDetailsQuery } from "../utils/stockSizeUtils";
 import { useSystemStore } from "../stores/system";
 import { useStockStore } from "../stores/stock";
 import { useCustomerStore } from "../stores/customer";
@@ -740,7 +907,13 @@ const selectedId = ref(null);
 const selectedItem = ref(null);
 const searchQuery = ref("");
 const sidebarSearchQuery = ref("");
-const viewMode = ref("list"); // 'list' | 'grid' | 'chat'
+const savedHistoryViewMode =
+  typeof localStorage !== "undefined" ? localStorage.getItem("manowzab_history_view_mode") : null;
+const viewMode = ref(
+  ["grid", "list", "chat"].includes(savedHistoryViewMode) ? savedHistoryViewMode : "grid"
+); // 'grid' | 'list' | 'chat'
+const statusFilter = ref("all"); // 'all' | 'sold' | 'vacant'
+const mobileSidebarOpen = ref(false);
 const isFullscreen = ref(false);
 const isDetailsLoading = ref(false);
 
@@ -780,6 +953,7 @@ const pastItems = ref([]);
 const showQueueModal = ref(false);
 const editingId = ref(null);
 const editingPrice = ref(0);
+const editingDetails = ref("");
 const tempQueue = ref([]);
 const priceInputRef = ref(null);
 let draggingIndex = null;
@@ -816,6 +990,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  isHistoryModalUnmounted = true;
+  selectLiveGeneration++;
   cleanupSessionListeners();
   if (unsubCustomerStore) {
     unsubCustomerStore();
@@ -849,8 +1025,45 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown);
 });
 
+async function handleSelectLive(item) {
+  mobileSidebarOpen.value = false;
+  await selectLive(item);
+}
+
+function toggleStatusFilter(target) {
+  if (viewMode.value !== "grid") {
+    setViewMode("grid");
+    statusFilter.value = target;
+    return;
+  }
+  statusFilter.value = statusFilter.value === target ? "all" : target;
+}
+
+function formatSourceLabel(method, source) {
+  const m = String(method || source || "").toLowerCase();
+  if (m.includes("manual")) return "แอดมินเพิ่ม";
+  if (m.includes("queue")) return "คิวสำรอง";
+  if (m.includes("ai")) return "AI";
+  if (m.includes("regex") || m.includes("chat") || m.includes("explicit") || m.includes("buy") || m.includes("proxy")) {
+    return "แชทสด";
+  }
+  return "ระบบ";
+}
+
+function getSourceBadgeClass(method, source) {
+  const m = String(method || source || "").toLowerCase();
+  if (m.includes("manual")) return "src-manual";
+  if (m.includes("queue")) return "src-queue";
+  if (m.includes("ai")) return "src-ai";
+  return "src-chat";
+}
+
+let selectLiveGeneration = 0;
+let isHistoryModalUnmounted = false;
+
 // Setup dynamic real-time listener when a session is selected
 async function selectLive(item) {
+  const gen = ++selectLiveGeneration;
   cleanupSessionListeners();
 
   isEditingTitle.value = false;
@@ -858,6 +1071,7 @@ async function selectLive(item) {
   selectedId.value = item.videoId;
   selectedItem.value = { ...item, orders: {}, stockSize: 70 };
   searchQuery.value = ""; // Reset search
+  statusFilter.value = "all";
   historyChats.value = [];
   loadedChatVideoId.value = null;
   chatIntentTab.value = "all";
@@ -882,6 +1096,9 @@ async function selectLive(item) {
   isDetailsLoading.value = true;
   // Fetch details initially
   const { orders, stockSize } = await history.fetchHistoryDetails(item.videoId);
+  if (gen !== selectLiveGeneration || isHistoryModalUnmounted || selectedId.value !== item.videoId) {
+    return;
+  }
   selectedItem.value.orders = orders;
   selectedItem.value.stockSize = stockSize;
   isDetailsLoading.value = false;
@@ -1010,6 +1227,11 @@ async function refreshTitleFromYouTube(vid, silent = false) {
 // ======================================================
 async function setViewMode(mode) {
   viewMode.value = mode;
+  try {
+    localStorage.setItem("manowzab_history_view_mode", mode);
+  } catch (e) {
+    // ignore storage errors
+  }
   if (mode !== "grid") {
     isFullscreen.value = false;
   }
@@ -1170,28 +1392,35 @@ async function openOnMainBoard() {
   });
 }
 
-// Convert orders object to array
+// Convert orders object to array (only booked items with owner; guard sparse array null holes)
 const ordersList = computed(() => {
   if (!selectedItem.value || !selectedItem.value.orders) return [];
   
-  return Object.keys(selectedItem.value.orders).map(key => {
-    const item = selectedItem.value.orders[key];
-    return {
-      stockId: key,
-      ...item,
-      timestamp: item.timestamp || item.time || 0
-    };
-  }).sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+  return Object.keys(selectedItem.value.orders)
+    .filter((key) => {
+      const item = selectedItem.value.orders[key];
+      return Boolean(item && typeof item === "object" && item.owner);
+    })
+    .map((key) => {
+      const item = selectedItem.value.orders[key];
+      return {
+        stockId: key,
+        ...item,
+        timestamp: item.timestamp || item.time || 0
+      };
+    })
+    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 });
 
 // Filter Logic
 const filteredOrders = computed(() => {
-  if (!searchQuery.value) return ordersList.value;
-  const q = searchQuery.value.toLowerCase();
+  const q = searchQuery.value.trim().toLowerCase();
+  if (!q) return ordersList.value;
   
   return ordersList.value.filter(o => 
      o.stockId.toString().includes(q) ||
-     (o.owner && o.owner.toLowerCase().includes(q))
+     (o.owner && o.owner.toLowerCase().includes(q)) ||
+     matchesStockDetailsQuery(o, q)
   );
 });
 
@@ -1200,7 +1429,7 @@ const customerNames = computed(() => {
     if (!selectedItem.value || !selectedItem.value.orders) return [];
     const names = new Set();
     Object.values(selectedItem.value.orders).forEach(order => {
-        if (order.owner) names.add(order.owner);
+        if (order && order.owner) names.add(order.owner);
     });
     return [...names].sort();
 });
@@ -1221,21 +1450,34 @@ const allGridItems = computed(() => {
         });
     }
     
+    let filtered = items;
+    if (statusFilter.value === "sold") {
+        filtered = filtered.filter((item) => !item.isEmpty);
+    } else if (statusFilter.value === "vacant") {
+        filtered = filtered.filter((item) => item.isEmpty);
+    }
+
     if (searchQuery.value) {
-        const q = searchQuery.value.toLowerCase();
-        return items.filter(item => 
+        const q = searchQuery.value.trim().toLowerCase();
+        return filtered.filter(item => 
            item.id.toString().includes(q) || 
-           (item.owner && item.owner.toLowerCase().includes(q))
+           (item.owner && item.owner.toLowerCase().includes(q)) ||
+           matchesStockDetailsQuery(item, q)
         );
     }
 
-    return items;
+    return filtered;
 });
 
 // Stats Logic (Progress Bar & Badges)
 const soldCount = computed(() => {
   if (!selectedItem.value || !selectedItem.value.orders) return 0;
-  return Object.values(selectedItem.value.orders).filter((item) => item.owner).length;
+  return Object.values(selectedItem.value.orders).filter((item) => item && item.owner).length;
+});
+
+const vacantCount = computed(() => {
+  const size = selectedItem.value?.stockSize || 70;
+  return Math.max(0, size - soldCount.value);
 });
 
 const soldPercentage = computed(() => {
@@ -1247,7 +1489,10 @@ const soldPercentage = computed(() => {
 
 const totalRevenue = computed(() => {
   if (!selectedItem.value || !selectedItem.value.orders) return 0;
-  return Object.values(selectedItem.value.orders).reduce((sum, o) => sum + (parseInt(o.price) || 0), 0);
+  return Object.values(selectedItem.value.orders).reduce(
+    (sum, o) => sum + (o && o.owner && parseInt(o.price) > 0 ? parseInt(o.price) : 0),
+    0
+  );
 });
 
 // Animated Counter Logic
@@ -1309,8 +1554,6 @@ watch(soldCount, (newVal, oldVal) => {
 watch(soldPercentage, (newVal, oldVal) => {
   cancelAnimHandle(pctAnimFrame);
   const from = oldVal ?? 0;
-  isPulsingPercent.value = false;
-  void document.body.offsetWidth; // force reflow
   isPulsingPercent.value = true;
   if (pulsingPercentTimer) clearTimeout(pulsingPercentTimer);
   pulsingPercentTimer = setTimeout(() => {
@@ -1558,15 +1801,33 @@ function highlightMatch(text, query) {
   return safeText.replace(regex, '<span class="autocomplete-highlight">$1</span>');
 }
 
+function resolveHistoryCustomerUid(ownerName) {
+  const norm = normalizeCustomerName(ownerName || "");
+  if (norm) {
+    for (const order of Object.values(selectedItem.value?.orders || {})) {
+      if (order?.owner && order?.uid && normalizeCustomerName(order.owner) === norm) {
+        return order.uid;
+      }
+    }
+    const cust = (deliveryCustomers.value || []).find(
+      (c) => c?.name && normalizeCustomerName(c.name) === norm && (c.uid || c.id)
+    );
+    if (cust) return cust.uid || cust.id;
+  }
+  return `manual-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
 // Queue modal edits
 function openQueueModal(num) {
   const item = getStockItem(num);
   editingId.value = num;
   editingPrice.value = item.price || 0;
+  editingDetails.value = formatFullStockDetails(item);
   tempQueue.value = [];
   if (item.owner) {
     tempQueue.value.push({
       owner: item.owner,
+      originalOwner: item.owner,
       uid: item.uid || "manual",
       time: item.time || Date.now(),
       source: item.source || "manual",
@@ -1577,7 +1838,12 @@ function openQueueModal(num) {
     try {
       const q = typeof item.queue === 'string' ? JSON.parse(item.queue) : item.queue;
       if (Array.isArray(q)) {
-        tempQueue.value.push(...JSON.parse(JSON.stringify(q)));
+        tempQueue.value.push(
+          ...JSON.parse(JSON.stringify(q)).map((entry) => ({
+            ...entry,
+            originalOwner: entry?.owner || "",
+          }))
+        );
       }
     } catch (e) {
       console.error("Error parsing queue:", e);
@@ -1644,6 +1910,7 @@ function clearItemData() {
   }).then((result) => {
     if (result.isConfirmed) {
       editingPrice.value = 0;
+      editingDetails.value = "";
       tempQueue.value = [];
       Swal.fire({
         icon: 'success',
@@ -1738,33 +2005,58 @@ async function saveQueueChanges(preventClose = false) {
   const newOwnerName = tempQueue.value.length > 0 ? tempQueue.value[0].owner : null;
 
   const validQueue = tempQueue.value
-    .map((entry) => ({ ...entry, owner: typeof entry.owner === "string" ? entry.owner.trim() : "" }))
+    .map((entry) => {
+      const trimmedOwner = typeof entry?.owner === "string" ? entry.owner.trim() : "";
+      const origNorm = normalizeCustomerName(entry?.originalOwner || "");
+      const newNorm = normalizeCustomerName(trimmedOwner);
+      const isDifferentCustomer = Boolean(origNorm && newNorm && origNorm !== newNorm);
+      const { originalOwner, ...cleanEntry } = entry || {};
+      return {
+        ...cleanEntry,
+        owner: trimmedOwner,
+        uid: isDifferentCustomer
+          ? resolveHistoryCustomerUid(trimmedOwner)
+          : (cleanEntry.uid || resolveHistoryCustomerUid(trimmedOwner)),
+        _ownerChanged: isDifferentCustomer,
+      };
+    })
     .filter((entry) => entry.owner.length > 0);
+
+  const cleanPrice = Number(editingPrice.value) || 0;
+  const cleanDetails = typeof editingDetails.value === "string" ? editingDetails.value.trim() : "";
 
   let newData = null;
   if (validQueue.length > 0) {
     const first = validQueue[0];
-    const rest = validQueue.slice(1);
+    const rest = validQueue.slice(1).map(({ _ownerChanged, ...r }) => r);
+    const ownerWasReplaced =
+      first._ownerChanged ||
+      (!currentDbItem.owner && Boolean(first.owner));
 
     newData = {
       owner: first.owner,
-      uid: first.uid || "manual-" + Date.now(),
-      time: first.time || Date.now(),
+      uid: first.uid || resolveHistoryCustomerUid(first.owner),
+      time: ownerWasReplaced ? Date.now() : (first.time || Date.now()),
       source: first.source || "manual-edit",
-      price: editingPrice.value > 0 ? editingPrice.value : null,
+      price: cleanPrice > 0 ? cleanPrice : null,
+      details: cleanDetails || null,
+      size: null,
       queue: rest,
-      backdated: true
+      backdated: ownerWasReplaced ? true : (first.backdated || null),
     };
   }
 
   if (newData) {
     await history.updateHistoryItem(videoId, num, newData);
   } else {
-    await history.updateHistoryItem(videoId, num, null);
-    if (editingPrice.value > 0) {
-      await update(dbRef(db, `stock/${videoId}/${num}`), {
-        price: editingPrice.value
-      });
+    const preserved = {};
+    if (cleanPrice > 0) preserved.price = cleanPrice;
+    if (cleanDetails) preserved.details = cleanDetails;
+    if (Object.keys(preserved).length > 0) {
+      // Atomic single write: clears owner/uid/queue/size while preserving price & details with zero flash
+      await set(dbRef(db, `stock/${videoId}/${num}`), preserved);
+    } else {
+      await history.updateHistoryItem(videoId, num, null);
     }
   }
 
@@ -1815,9 +2107,19 @@ async function processHistoryCancel(num, uid = null, ownerName = null) {
             backdated: next.backdated || null,
           };
         } else {
-          return {
-            price: currentData.price || null
-          };
+          const preservedPrice = Number(currentData.price);
+          const hasPrice = !isNaN(preservedPrice) && preservedPrice > 0;
+          const preservedDetails =
+            typeof currentData.details === "string" && currentData.details.trim()
+              ? currentData.details.trim()
+              : "";
+          if (hasPrice || preservedDetails) {
+            const kept = {};
+            if (hasPrice) kept.price = preservedPrice;
+            if (preservedDetails) kept.details = preservedDetails;
+            return kept;
+          }
+          return null;
         }
       } else {
         if (currentData.queue && currentData.queue.length > 0) {
@@ -2020,10 +2322,8 @@ function updateOwnerItemsModal() {
         </div>
         ${timeText ? `<div style="font-size:0.75em; margin-top:4px; padding-left:2px;">${timeText}</div>` : ''}
       </div>
-      <button onclick="document.dispatchEvent(new CustomEvent('remove-owner-item-history', {detail: '${removeDetail}'}))" 
-              style="background:linear-gradient(135deg, #dc2626, #b91c1c); color:white; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.8em; font-weight:600; flex-shrink:0; transition:all 0.2s; box-shadow:0 2px 6px rgba(220,38,38,0.3);"
-              onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(220,38,38,0.5)'"
-              onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 6px rgba(220,38,38,0.3)'">
+      <button type="button" data-remove-owner-history="${removeDetail}"
+              style="background:linear-gradient(135deg, #dc2626, #b91c1c); color:white; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.8em; font-weight:600; flex-shrink:0; transition:transform 0.2s, box-shadow 0.2s; box-shadow:0 2px 6px rgba(220,38,38,0.3);">
         <i class="fa-solid fa-trash-can"></i> ลบ
       </button>
     </div>`;
@@ -2072,11 +2372,18 @@ async function showOwnerItems(ownerName) {
     });
   }
 
+  if (cleanupHistoryOwnerModal) {
+    cleanupHistoryOwnerModal();
+    cleanupHistoryOwnerModal = null;
+  }
+
   activeOwnerName.value = ownerName;
   pastItems.value = [];
 
+  let localCleanup = null;
+
   Swal.fire({
-    title: `👗 ${ownerName}`,
+    titleText: `👗 ${ownerName}`,
     html: `<div style="text-align:center; padding:30px;"><i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color:#0ea5e9;"></i><div style="margin-top:10px; font-size:0.9em; color:#9ca3af;">กำลังโหลดข้อมูล...</div></div>`,
     background: 'linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%)',
     color: '#fff',
@@ -2086,16 +2393,17 @@ async function showOwnerItems(ownerName) {
     showCloseButton: true,
     width: 420,
     willClose: () => {
-      if (cleanupHistoryOwnerModal) cleanupHistoryOwnerModal();
+      if (localCleanup) localCleanup();
     },
     didOpen: () => {
-      const handler = async (e) => {
-        const [numStr, vid] = e.detail.split('|');
+      const handler = async (detailStr) => {
+        const [numStr, vid] = String(detailStr || '').split('|');
         const num = parseInt(numStr);
+        if (!Number.isFinite(num) || !vid) return;
         const isCurrentSession = vid === videoId;
 
         const result = await Swal.fire({
-          title: `ลบ #${num} ของ ${ownerName}?`,
+          titleText: `ลบ #${num} ของ ${ownerName}?`,
           text: !isCurrentSession
             ? `ยกเลิกรายการจองนี้จากรอบส่งย้อนหลัง (หากมีคิวสำรองจะเลื่อนขึ้นมาแทน)`
             : `ยกเลิกรายการจองนี้ของลูกค้า (หากมีคิวสำรองจะเลื่อนขึ้นมาแทน)`,
@@ -2136,8 +2444,16 @@ async function showOwnerItems(ownerName) {
                   };
                 } else {
                   const preservedPrice = Number(currentData.price);
-                  if (!isNaN(preservedPrice) && preservedPrice > 0) {
-                    return { price: preservedPrice };
+                  const hasPrice = !isNaN(preservedPrice) && preservedPrice > 0;
+                  const preservedDetails =
+                    typeof currentData.details === "string" && currentData.details.trim()
+                      ? currentData.details.trim()
+                      : "";
+                  if (hasPrice || preservedDetails) {
+                    const kept = {};
+                    if (hasPrice) kept.price = preservedPrice;
+                    if (preservedDetails) kept.details = preservedDetails;
+                    return kept;
                   }
                   return null;
                 }
@@ -2171,27 +2487,57 @@ async function showOwnerItems(ownerName) {
         }
       };
 
-      document.addEventListener('remove-owner-item-history', handler);
-      
+      const htmlContainer = Swal.getHtmlContainer();
+      const delegatedClick = (e) => {
+        const btn = e.target?.closest?.('[data-remove-owner-history]');
+        if (btn) {
+          handler(btn.getAttribute('data-remove-owner-history'));
+        }
+      };
+      if (htmlContainer) {
+        htmlContainer.addEventListener('click', delegatedClick);
+      }
+
       const swalEl = Swal.getPopup();
       let observer = null;
+      let observerTimeout = null;
+      let cleaned = false;
 
-      cleanupHistoryOwnerModal = () => {
-        document.removeEventListener('remove-owner-item-history', handler);
-        activeOwnerName.value = null;
+      localCleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        if (htmlContainer) {
+          htmlContainer.removeEventListener('click', delegatedClick);
+        }
+        if (activeOwnerName.value === ownerName) {
+          activeOwnerName.value = null;
+        }
         if (observer) {
           observer.disconnect();
           observer = null;
         }
-        cleanupHistoryOwnerModal = null;
+        if (observerTimeout) {
+          clearTimeout(observerTimeout);
+          observerTimeout = null;
+        }
+        if (cleanupHistoryOwnerModal === localCleanup) {
+          cleanupHistoryOwnerModal = null;
+        }
       };
+      cleanupHistoryOwnerModal = localCleanup;
 
       observer = new MutationObserver(() => {
         if (!document.contains(swalEl)) {
-          if (cleanupHistoryOwnerModal) cleanupHistoryOwnerModal();
+          localCleanup();
         }
       });
       observer.observe(document.body, { childList: true, subtree: true });
+      observerTimeout = setTimeout(() => {
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+      }, 60000);
     },
   });
 
@@ -2248,6 +2594,7 @@ async function handleDelete() {
   });
 
   if (result.isConfirmed) {
+     cleanupSessionListeners();
      await history.deleteHistory(selectedId.value);
      selectedId.value = null;
      selectedItem.value = null;
@@ -2261,14 +2608,15 @@ function exportCSV() {
      return;
   }
 
-  let csvContent = "\uFEFFDate,Time,Stock ID,Customer Name,Price,Source\n";
+  let csvContent = "\uFEFFDate,Time,Stock ID,Customer Name,Price,Source,Details\n";
   const dateStr = formatDate(selectedItem.value.timestamp).split(' ')[0];
 
   filteredOrders.value.forEach(order => {
      const timeStr = formatTime(order.timestamp);
      const safeName = order.owner ? order.owner.replace(/"/g, '""') : "";
+     const safeDetails = formatFullStockDetails(order).replace(/"/g, '""');
      
-     csvContent += `"${dateStr}","${timeStr}",${order.stockId},"${safeName}",${order.price || 0},"${order.method || 'unknown'}"\n`;
+     csvContent += `"${dateStr}","${timeStr}",${order.stockId},"${safeName}",${order.price || 0},"${order.method || 'unknown'}","${safeDetails}"\n`;
   });
   
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -2279,6 +2627,7 @@ function exportCSV() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 async function fixHistoryData() {
@@ -2382,6 +2731,7 @@ async function openCleanupModal() {
       await history.deleteMultipleHistory(videoIdsToDelete);
       
       if (selectedId.value && videoIdsToDelete.includes(selectedId.value)) {
+        cleanupSessionListeners();
         selectedId.value = null;
         selectedItem.value = null;
       }
@@ -2411,115 +2761,195 @@ async function openCleanupModal() {
 
 <style scoped>
 .history-modal-container {
-  background: rgba(11, 15, 23, 0.94);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  width: 95%;
-  max-width: 1100px;
-  height: 85vh;
+  background: rgba(11, 15, 23, 0.98);
+  width: 96vw;
+  max-width: 1320px;
+  height: 90vh;
   border-radius: 20px;
-  border: 1px solid rgba(251, 191, 36, 0.22);
+  border: 1px solid rgba(229, 184, 105, 0.24);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-shadow:
-    0 32px 100px rgba(0, 0, 0, 0.8),
-    0 0 50px rgba(16, 185, 129, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 32px 100px rgba(0, 0, 0, 0.82),
+    0 0 40px rgba(229, 184, 105, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .modal-header {
-  padding: 15px 20px;
-  background: linear-gradient(180deg, rgba(16, 22, 38, 0.95), rgba(11, 15, 23, 0.95));
-  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+  padding: 13px 20px;
+  background: linear-gradient(180deg, rgba(16, 22, 38, 0.96), rgba(11, 15, 23, 0.96));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.25rem;
-  color: #fbbf24;
-  text-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+.modal-header-left,
+.modal-header-right {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
+.btn-mobile-sidebar,
+.btn-mobile-inline-menu,
+.btn-mobile-pick {
+  display: none;
+}
+
+.btn-open-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.32);
+  color: #7dd3fc;
+  text-decoration: none;
+  font-size: 0.84em;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-open-tab:hover {
+  background: rgba(56, 189, 248, 0.2);
+  color: #ffffff;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  color: #f3cf7a;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+}
+
 .btn-close {
-  background: transparent;
-  border: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: #94a3b8;
-  font-size: 1.5rem;
+  font-size: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 .btn-close:hover {
-  color: #fff;
-  transform: rotate(90deg);
+  background: rgba(244, 63, 94, 0.18);
+  border-color: rgba(244, 63, 94, 0.45);
+  color: #ffffff;
 }
 
 .modal-body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
+}
+
+.mobile-sidebar-backdrop {
+  display: none;
 }
 
 /* Sidebar */
 .sidebar {
-  width: 300px;
-  background: rgba(13, 17, 28, 0.92);
+  width: 280px;
+  flex-shrink: 0;
+  background: rgba(13, 18, 30, 0.96);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
 }
 
-
 .sidebar-header {
-  padding: 10px 15px;
-  background: #0f172a;
-  border-bottom: 1px solid #334155;
-  color: #94a3b8;
-  font-size: 0.9em;
-  font-weight: 600;
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  color: #cbd5e1;
+  font-size: 0.88em;
+  font-weight: 700;
   display: flex;
+  align-items: center;
   justify-content: space-between;
+}
+
+.sidebar-title-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sidebar-count-pill {
+  font-size: 0.78em;
+  font-weight: 700;
+  color: #f3cf7a;
+  background: rgba(229, 184, 105, 0.14);
+  border: 1px solid rgba(229, 184, 105, 0.28);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.sidebar-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-state-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 36px 16px;
+  color: #64748b;
+  font-size: 0.88em;
+  text-align: center;
 }
 
 .sidebar-search-bar {
   position: relative;
   display: flex;
   align-items: center;
-  padding: 8px 10px;
-  background: rgba(15, 23, 42, 0.85);
+  padding: 10px 10px;
+  background: rgba(15, 23, 42, 0.6);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
 }
 
 .sidebar-search-icon {
   position: absolute;
-  left: 19px;
+  left: 20px;
   color: #64748b;
-  font-size: 0.78em;
+  font-size: 0.8em;
   pointer-events: none;
 }
 
 .sidebar-search-input {
   width: 100%;
-  padding: 6px 26px 6px 28px;
-  background: rgba(30, 41, 59, 0.85);
+  padding: 7px 28px 7px 30px;
+  background: rgba(30, 41, 59, 0.72);
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 8px;
+  border-radius: 10px;
   color: #f8fafc;
-  font-size: 0.82em;
+  font-size: 0.84em;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .sidebar-search-input:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+  border-color: rgba(229, 184, 105, 0.6);
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow: 0 0 0 2px rgba(229, 184, 105, 0.16);
 }
 
 .sidebar-search-clear {
@@ -2540,75 +2970,174 @@ async function openCleanupModal() {
 .sidebar-list {
   flex: 1;
   overflow-y: auto;
+  padding: 6px 0;
 }
 
 .sidebar-item {
-  padding: 12px 14px;
+  padding: 11px 12px;
   margin: 5px 8px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
 }
 
 .sidebar-item:hover {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(229, 184, 105, 0.28);
   transform: translateX(2px);
 }
 
 .sidebar-item.active {
-  background: linear-gradient(135deg, rgba(0, 230, 118, 0.18) 0%, rgba(0, 200, 83, 0.06) 100%);
-  border: 1.5px solid #00e676;
-  box-shadow: 0 4px 15px rgba(0, 230, 118, 0.2);
+  background: linear-gradient(135deg, rgba(229, 184, 105, 0.18) 0%, rgba(180, 130, 50, 0.08) 100%);
+  border: 1.5px solid rgba(243, 207, 122, 0.72);
+  box-shadow: 0 4px 16px rgba(229, 184, 105, 0.14);
+}
+
+.sidebar-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+
+.item-date-chip {
+  color: #94a3b8;
+  font-size: 0.75em;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-sold-chip {
+  font-size: 0.72em;
+  font-weight: 700;
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.26);
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 .item-title {
-  color: #f1f5f9;
+  color: #e2e8f0;
   font-weight: 600;
-  font-size: 0.92em;
-  line-height: 1.35;
-  margin-bottom: 5px;
+  font-size: 0.9em;
+  line-height: 1.38;
+  margin-bottom: 7px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
 }
-.item-date { color: #94a3b8; font-size: 0.85em; }
+
 .item-meta {
-  margin-top: 5px;
-  color: #ffd700;
-  font-size: 0.95em;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.item-meta-label {
+  color: #64748b;
+  font-size: 0.76em;
+  font-weight: 500;
+}
+
+.item-meta-value {
+  color: #fde047;
+  font-size: 0.94em;
   font-weight: 800;
-  text-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+  font-variant-numeric: tabular-nums;
 }
 
 .sidebar-item.active .item-title { color: #ffffff; }
-.sidebar-item.active .item-date { color: #a7f3d0; }
-.sidebar-item.active .item-meta { color: #ffd700; }
+.sidebar-item.active .item-date-chip { color: #fde68a; }
+.sidebar-item.active .item-meta-label { color: #cbd5e1; }
+.sidebar-item.active .item-meta-value { color: #fef08a; }
 
 /* Main Content */
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #0f172a;
+  background: #0b101b;
   position: relative;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
 .empty-state {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #64748b;
-  font-size: 1.2em;
-  gap: 15px;
+  padding: 24px;
+}
+
+.empty-state-card {
+  max-width: 390px;
+  text-align: center;
+  padding: 32px 28px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+}
+
+.empty-state-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  background: rgba(229, 184, 105, 0.14);
+  border: 1px solid rgba(229, 184, 105, 0.32);
+  color: #f3cf7a;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-state-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.12rem;
+  color: #f8fafc;
+}
+
+.empty-state-card p {
+  margin: 0 0 18px;
+  color: #94a3b8;
+  font-size: 0.9em;
+  line-height: 1.55;
+}
+
+.empty-state-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-open-latest {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+  color: #0b0f17;
+  font-weight: 800;
+  border-radius: 10px;
+  padding: 9px 18px;
+}
+
+.btn-open-latest:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 .content-wrapper {
@@ -2621,45 +3150,55 @@ async function openCleanupModal() {
 
 .stats-bar-header {
   position: relative;
-  padding: 10px 20px 12px 20px;
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
-  min-height: 48px;
+  padding: 12px 18px 13px;
+  background: linear-gradient(180deg, rgba(18, 25, 42, 0.96) 0%, rgba(14, 20, 34, 0.96) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .history-live-title-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 10px;
-  margin-bottom: 9px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.55) 100%);
-  border: 1px solid rgba(251, 191, 36, 0.22);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  margin-bottom: 10px;
 }
 
 .history-live-title-left {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 9px;
   min-width: 0;
   flex: 1;
 }
 
+.history-title-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.history-title-submeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .history-live-dot {
-  color: #fbbf24;
-  font-size: 0.88em;
+  color: #f3cf7a;
+  font-size: 0.92em;
+  margin-top: 3px;
   line-height: 1;
   flex-shrink: 0;
 }
 
 .history-live-title-text {
   color: #f8fafc;
-  font-size: 0.96em;
+  font-size: 1.02em;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.32;
   word-break: break-word;
   user-select: text;
   -webkit-user-select: text;
@@ -2676,9 +3215,9 @@ async function openCleanupModal() {
 .history-title-edit-input {
   flex: 1;
   min-width: 140px;
-  padding: 4px 10px;
-  border-radius: 7px;
-  background: #0f172a;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #0b101b;
   border: 1px solid #38bdf8;
   color: #ffffff;
   font-size: 0.92em;
@@ -2687,12 +3226,12 @@ async function openCleanupModal() {
 }
 
 .btn-title-save {
-  padding: 4px 10px;
-  border-radius: 7px;
+  padding: 6px 12px;
+  border-radius: 8px;
   border: 1px solid rgba(16, 185, 129, 0.5);
   background: rgba(16, 185, 129, 0.2);
   color: #6ee7b7;
-  font-size: 0.8em;
+  font-size: 0.82em;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -2704,20 +3243,13 @@ async function openCleanupModal() {
 }
 
 .btn-title-cancel {
-  padding: 4px 8px;
-  border-radius: 7px;
+  padding: 6px 9px;
+  border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.3);
   background: rgba(15, 23, 42, 0.7);
   color: #cbd5e1;
-  font-size: 0.8em;
+  font-size: 0.82em;
   cursor: pointer;
-}
-
-.history-live-title-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
 }
 
 .history-title-date {
@@ -2732,15 +3264,93 @@ async function openCleanupModal() {
 
 .history-title-vid {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.75em;
-  font-weight: 700;
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  padding: 2px 7px;
+  font-size: 0.73em;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
   border-radius: 6px;
-  user-select: text;
-  -webkit-user-select: text;
+}
+
+.history-loading-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  color: #94a3b8;
+  font-size: 0.9em;
+}
+
+.header-kpi-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kpi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  font-size: 0.86em;
+  font-weight: 600;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.kpi-clickable {
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.kpi-clickable:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(229, 184, 105, 0.35);
+}
+
+.kpi-clickable.kpi-active {
+  background: rgba(229, 184, 105, 0.16);
+  border-color: rgba(243, 207, 122, 0.7);
+}
+
+.kpi-label {
+  color: #94a3b8;
+  font-size: 0.88em;
+  font-weight: 500;
+}
+
+.kpi-total {
+  color: #64748b;
+  font-size: 0.88em;
+}
+
+.kpi-vacant-val {
+  color: #7dd3fc;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-stock-size input.edit-input {
+  width: 54px;
+  text-align: center;
+  font-size: 0.95em;
+  font-weight: 700;
+  background: #0b101b;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 2px 5px;
+  outline: none;
+}
+
+.kpi-stock-size input.edit-input:focus {
+  border-color: #38bdf8;
 }
 
 .btn-title-icon {
@@ -2896,21 +3506,23 @@ async function openCleanupModal() {
 .mini-shimmer {
   position: absolute;
   top: 0;
-  left: -100%;
+  left: 0;
   width: 100%;
   height: 100%;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.45) 50%,
     transparent 100%
   );
-  animation: mini-shimmer-slide 1.8s infinite;
+  transform: translate3d(-100%, 0, 0);
+  animation: mini-shimmer-slide 3.2s linear infinite;
+  will-change: transform;
 }
 
 @keyframes mini-shimmer-slide {
-  0% { left: -100%; }
-  100% { left: 100%; }
+  0% { transform: translate3d(-100%, 0, 0); }
+  100% { transform: translate3d(100%, 0, 0); }
 }
 
 /* 💰 Total Sales Badge */
@@ -2973,39 +3585,258 @@ async function openCleanupModal() {
 
 .header-actions {
   display: flex;
-  gap: 8px;
-  margin-left: auto;
+  align-items: center;
+  gap: 7px;
   flex-shrink: 0;
 }
 
+.header-actions-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 2px;
+}
+
+.btn-hist-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 9px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: linear-gradient(135deg, #2563eb 0%, #0284c7 100%);
+  color: #ffffff;
+  font-size: 0.84em;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+
+.btn-hist-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+
+.btn-hist-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(16, 185, 129, 0.38);
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+  font-size: 0.84em;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+
+.btn-hist-secondary:hover {
+  background: rgba(16, 185, 129, 0.25);
+  color: #ffffff;
+}
+
+.btn-hist-ghost-warn,
+.btn-hist-ghost-danger {
+  width: 33px;
+  height: 33px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-hist-ghost-warn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fcd34d;
+}
+
+.btn-hist-ghost-danger:hover {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #fca5a5;
+}
+
 .controls-bar {
-  padding: 15px 20px;
-  border-bottom: 1px solid #334155;
+  padding: 10px 18px;
+  background: rgba(13, 18, 30, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .search-wrapper {
   position: relative;
-  max-width: 400px;
+  min-width: 210px;
+  max-width: 340px;
   flex: 1;
 }
+
 .search-input {
   width: 100%;
-  padding: 10px 10px 10px 40px;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  color: #fff;
-  font-size: 1em;
+  box-sizing: border-box;
+  padding: 8px 30px 8px 34px;
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  color: #f8fafc;
+  font-family: inherit;
+  font-size: 0.88em;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
+
+.search-input:focus {
+  border-color: rgba(229, 184, 105, 0.6);
+  box-shadow: 0 0 0 2px rgba(229, 184, 105, 0.15);
+}
+
 .search-icon {
   position: absolute;
-  left: 12px;
+  left: 11px;
   top: 50%;
   transform: translateY(-50%);
   color: #64748b;
+  font-size: 0.86em;
+  pointer-events: none;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 0.85em;
+}
+
+.search-clear-btn:hover {
+  color: #ffffff;
+}
+
+.status-filter-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-pill {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: #94a3b8;
+  font-size: 0.8em;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.16s ease;
+}
+
+.status-pill:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.status-pill.active {
+  background: rgba(229, 184, 105, 0.18);
+  border-color: rgba(243, 207, 122, 0.65);
+  color: #fef08a;
+}
+
+.status-pill.pill-sold.active {
+  background: rgba(185, 28, 28, 0.35);
+  border-color: rgba(248, 113, 113, 0.65);
+  color: #fecaca;
+}
+
+.status-pill.pill-vacant.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(125, 211, 252, 0.6);
+  color: #bae6fd;
+}
+
+.view-toggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.segmented-control {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 11px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  gap: 2px;
+}
+
+.seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.84em;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+
+.seg-btn:hover {
+  color: #f8fafc;
+}
+
+.seg-btn.active {
+  background: linear-gradient(135deg, rgba(229, 184, 105, 0.26) 0%, rgba(217, 119, 6, 0.22) 100%);
+  color: #fef08a;
+  box-shadow: inset 0 0 0 1px rgba(243, 207, 122, 0.45);
+}
+
+.btn-expand-grid {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-expand-grid:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
 .table-container {
@@ -3020,23 +3851,115 @@ async function openCleanupModal() {
 }
 
 .data-table th {
-  background: #1e293b;
+  background: rgba(15, 23, 42, 0.96);
   color: #94a3b8;
-  padding: 12px 15px;
+  padding: 11px 14px;
   text-align: left;
-  font-weight: 500;
+  font-size: 0.84em;
+  font-weight: 600;
   position: sticky;
   top: 0;
+  z-index: 2;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .data-table td {
-  padding: 12px 15px;
-  border-bottom: 1px solid #1e293b;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   color: #e2e8f0;
+  vertical-align: middle;
 }
 
-.data-table tr:hover td {
-  background: #1e293b;
+.order-row-clickable {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.order-row-clickable:hover td {
+  background: rgba(30, 41, 59, 0.72);
+}
+
+.table-empty-cell {
+  text-align: center;
+  padding: 48px 16px !important;
+  color: #64748b;
+  font-size: 0.95em;
+}
+
+.list-stock-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 9px;
+  border-radius: 7px;
+  background: rgba(229, 184, 105, 0.14);
+  border: 1px solid rgba(229, 184, 105, 0.3);
+  color: #fde68a;
+  font-weight: 800;
+  font-size: 0.88em;
+  font-variant-numeric: tabular-nums;
+}
+
+.customer-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.customer-name {
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.list-backdated-tag {
+  font-size: 0.72em;
+  font-weight: 600;
+  color: #fdba74;
+  background: rgba(249, 115, 22, 0.16);
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.list-price-cell {
+  color: #fde047;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.source-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.76em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.source-pill.src-chat {
+  background: rgba(56, 189, 248, 0.15);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.32);
+}
+
+.source-pill.src-manual {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.34);
+}
+
+.source-pill.src-queue {
+  background: rgba(168, 85, 247, 0.16);
+  color: #d8b4fe;
+  border: 1px solid rgba(168, 85, 247, 0.34);
+}
+
+.source-pill.src-ai {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.34);
 }
 
 .font-bold { font-weight: 600; }
@@ -3132,40 +4055,62 @@ async function openCleanupModal() {
 
 .grid-content {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 15px;
-    padding-bottom: 50px;
+    grid-template-columns: repeat(auto-fill, minmax(134px, 1fr));
+    grid-auto-rows: minmax(102px, auto);
+    align-items: stretch;
+    gap: 10px;
+    padding-bottom: 40px;
 }
 
-.grid-item {
-    aspect-ratio: 1.4;
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 8px;
+.grid-empty-msg {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 10px;
+    padding: 48px 20px;
+    color: #94a3b8;
+    font-size: 0.95em;
+}
+
+.grid-empty-msg i {
+    font-size: 1.8em;
+    opacity: 0.5;
+}
+
+.grid-item {
+    min-height: 102px;
+    height: auto;
+    box-sizing: border-box;
+    background: rgba(10, 14, 22, 0.48);
+    border: 1.5px dashed rgba(148, 163, 184, 0.24);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
     position: relative;
-    padding: 5px;
+    padding: 8px 9px;
+    gap: 4px;
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
     -webkit-user-drag: none;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.32);
 }
 
 .grid-item:hover {
-    border-color: #3b82f6;
-    transform: scale(1.03);
-    box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+    border-style: solid;
+    border-color: rgba(229, 184, 105, 0.6);
+    background: rgba(24, 31, 48, 0.88);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.42);
 }
 
 .grid-item.empty {
     background: rgba(10, 14, 22, 0.45);
-    border: 1.5px dashed rgba(148, 163, 184, 0.25);
-    opacity: 0.5;
-    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+    border: 1.5px dashed rgba(148, 163, 184, 0.24);
+    opacity: 0.92;
 }
 
 .grid-item.sold {
@@ -3174,33 +4119,62 @@ async function openCleanupModal() {
     box-shadow: 0 4px 14px rgba(153, 27, 27, 0.25), inset 0 1px 0 rgba(254, 202, 202, 0.16);
 }
 
+.grid-item.sold:hover {
+    background: linear-gradient(155deg, rgba(220, 38, 38, 0.52) 0%, rgba(153, 27, 27, 0.74) 55%, rgba(92, 16, 16, 0.94) 100%);
+    border-color: #fca5a5;
+}
+
+.grid-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    width: 100%;
+    min-height: 22px;
+}
+
+.grid-card-top-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
 .item-num {
-    position: absolute;
-    top: 4px;
-    left: 6px;
     font-size: 1.18em;
     font-weight: 800;
     font-family: var(--font-main);
+    font-variant-numeric: tabular-nums;
     color: #fef08a;
     background: transparent;
     border: none;
-    padding: 0;
-    border-radius: 0;
-    line-height: 1.1;
+    padding: 0 2px;
+    line-height: 1.15;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
-    box-shadow: none;
+    flex-shrink: 0;
 }
 
 .grid-item.empty .item-num {
     color: #cbd5e1;
 }
 
+.grid-card-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 28px;
+}
+
 .item-status {
-    font-size: 1.15em;
-    font-weight: 500;
-    color: #e2e8f0;
+    font-size: 1.05em;
+    font-weight: 700;
+    color: #ffffff;
     text-align: center;
     width: 100%;
+    padding: 0 2px;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -3208,24 +4182,136 @@ async function openCleanupModal() {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: normal;
-    line-height: 1.2;
+    line-height: 1.25;
+    word-break: break-word;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
 }
 
 .grid-item.empty .item-status {
-    color: #64748b;
-    font-style: italic;
+    color: #475569;
+    font-weight: 500;
+    font-size: 0.86em;
+    text-shadow: none;
+}
+
+.grid-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    min-height: 18px;
+}
+
+.grid-item .owner-count-badge {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72em;
+    font-variant-numeric: tabular-nums;
+    color: #fecaca;
+    background: rgba(20, 8, 8, 0.45);
+    border: 1px solid rgba(254, 202, 202, 0.38);
+    padding: 0.5px 6px;
+    border-radius: 999px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+.grid-item .owner-count-badge:hover {
+    background: rgba(69, 10, 10, 0.85);
+    color: #ffffff;
+}
+
+.grid-item .queue-badge {
+    position: static;
+    background: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
+    color: #ffffff;
+    border-radius: 6px;
+    padding: 1px 6px;
+    min-width: 20px;
+    font-size: 0.76em;
+    font-weight: 800;
+    line-height: 1.25;
+    border: 1px solid rgba(254, 240, 138, 0.65);
 }
 
 .stock-price {
-  font-size: 0.95em;
+  font-size: 0.96em;
+  font-variant-numeric: tabular-nums;
+  color: #fbbf24;
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  font-weight: 800;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+}
+
+.grid-item.sold .stock-price {
   color: #fde047;
+}
+
+.history-size-meta {
+  font-size: 0.76em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #7dd3fc;
   background: transparent;
   border: none;
   padding: 0;
-  border-radius: 0;
-  font-weight: 800;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
-  margin-top: 3px;
+  margin-top: 1px;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.grid-item.sold .history-size-meta {
+  color: #bae6fd;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.72);
+}
+
+.history-list-spec {
+  font-size: 0.78em;
+  color: #7dd3fc;
+  font-weight: 500;
+  margin-top: 1px;
+}
+
+.details-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.details-inline-label {
+  font-size: 0.84em;
+  font-weight: 600;
+  color: #7dd3fc;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.details-input-field {
+  flex: 1;
+  min-width: 0;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #f1f5f9;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.88em;
+  outline: none;
+}
+
+.details-input-field:focus {
+  border-color: rgba(125, 211, 252, 0.65);
 }
 
 /* Toggle Buttons */
@@ -3263,47 +4349,6 @@ async function openCleanupModal() {
     padding: 20px;
     overflow-y: auto;
     flex: 1;
-}
-
-/* Queue Badge (High-Contrast Inside Top-Right Corner) */
-.queue-badge {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  background: linear-gradient(135deg, #ff6d00 0%, #dd2c00 100%);
-  color: #ffffff;
-  border-radius: 7px;
-  padding: 2px 7px;
-  min-width: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.85em;
-  font-weight: 800;
-  line-height: 1.1;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
-  box-shadow: 0 2px 8px rgba(221, 44, 0, 0.55);
-  z-index: 20;
-  border: 1.5px solid #fde047;
-}
-
-/* Owner Booking Count Badge (👗 N ตัว) */
-.owner-count-badge {
-  display: block;
-  font-size: 0.85em;
-  color: #60a5fa;
-  font-weight: 600;
-  margin-top: 1px;
-  opacity: 0.9;
-  text-align: center;
-  letter-spacing: 0.3px;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.owner-count-badge:hover {
-  color: #93c5fd;
-  text-decoration: underline;
 }
 
 .backdated-inline-icon {
@@ -3866,5 +4911,101 @@ async function openCleanupModal() {
 .history-chat-list :deep(.chat-highlight-name .name-icon) {
   font-size: 0.82em;
   margin-right: 4px;
+}
+
+/* 📱 Friendly Mobile & Tablet Drawer Layout */
+@media (max-width: 860px) {
+  .history-modal-container {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .btn-mobile-sidebar {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(229, 184, 105, 0.35);
+    background: rgba(229, 184, 105, 0.12);
+    color: #fef08a;
+    font-size: 0.84em;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .btn-mobile-inline-menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .btn-mobile-pick {
+    display: inline-flex;
+  }
+
+  .mobile-sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.58);
+    z-index: 25;
+  }
+
+  .sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    width: min(300px, 84vw);
+    transform: translateX(-100%);
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.65);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .history-live-title-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .btn-hist-primary,
+  .btn-hist-secondary {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .controls-bar {
+    padding: 10px 12px;
+  }
+
+  .search-wrapper {
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .view-toggles {
+    margin-left: 0;
+  }
 }
 </style>

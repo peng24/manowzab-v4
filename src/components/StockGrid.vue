@@ -71,7 +71,7 @@
               type="text"
               v-model="stockSearchQuery"
               class="stock-search-input"
-              placeholder="ค้นหาชื่อ/เบอร์"
+              placeholder="ชื่อ/เบอร์/ไซส์"
               @keyup.enter="handleStockSearchEnter"
               @keydown.esc="stockSearchQuery = ''"
             />
@@ -129,6 +129,8 @@
         v-memo="[
           getStockItem(i).owner,
           getStockItem(i).price,
+          getStockItem(i).details,
+          getStockItem(i).size,
           getStockItem(i).backdated,
           getStockItem(i).time,
           getOwnerCount(getStockItem(i).owner, getStockItem(i).uid),
@@ -225,7 +227,7 @@
                   placeholder="0 (ยังไม่ระบุ)"
                   min="0"
                   step="10"
-                  @keyup.enter="saveQueueChanges"
+                  @keyup.enter="saveQueueChanges()"
                 />
                 <span class="price-unit">บาท</span>
                 <button
@@ -245,6 +247,27 @@
                 <button type="button" class="quick-price-btn" :class="{ active: editingPrice === 100 }" @click="editingPrice = 100">100.-</button>
                 <button type="button" class="quick-price-btn" :class="{ active: editingPrice === 120 }" @click="editingPrice = 120">120.-</button>
                 <button type="button" class="quick-price-btn" :class="{ active: editingPrice === 150 }" @click="editingPrice = 150">150.-</button>
+              </div>
+              <div class="details-input-row">
+                <label class="details-inline-label">
+                  <i class="fa-solid fa-ruler"></i> สเปก/ไซส์
+                </label>
+                <input
+                  type="text"
+                  v-model="editingDetails"
+                  class="details-input-field"
+                  placeholder="เช่น อก 52 ยาว 29 ไซส์ 2XL"
+                  @keyup.enter="saveQueueChanges()"
+                />
+                <button
+                  v-if="editingDetails"
+                  type="button"
+                  class="btn-clear-details"
+                  @click="editingDetails = ''"
+                  title="ล้างสเปก/ไซส์"
+                >
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
               </div>
             </div>
 
@@ -410,6 +433,7 @@ import { escapeHtml } from "../utils/dbUtils";
 import { normalizeCustomerName, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
 import { resolveShippingCycleDate, formatDateToYYYYMMDD } from "../utils/chatParserUtils";
 import { formatBackdatedDetail, formatNormalBookingTime, getBookingTooltip } from "../utils/timeFormatUtils";
+import { formatFullStockDetails, matchesStockDetailsQuery } from "../utils/stockSizeUtils";
 import Swal from "sweetalert2";
 
 const DEBUG_MODE = false;
@@ -534,6 +558,9 @@ const visibleItemIds = computed(() => {
         if (searchPrice && (cleanPrice === searchPrice || cleanPrice.includes(searchPrice))) {
           isMatch = true;
         }
+      }
+      if (!isMatch && matchesStockDetailsQuery(item, query)) {
+        isMatch = true;
       }
 
       if (!isMatch) continue;
@@ -763,6 +790,7 @@ watch(
 const showModal = ref(false);
 const editingId = ref(null);
 const editingPrice = ref(0);
+const editingDetails = ref("");
 const priceInputRef = ref(null);
 const tempQueue = ref([]);
 let draggingIndex = null;
@@ -1140,10 +1168,8 @@ function updateOwnerItemsModal() {
         </div>
         ${timeText ? `<div style="font-size:0.75em; margin-top:4px; padding-left:2px;">${timeText}</div>` : ''}
       </div>
-      <button onclick="document.dispatchEvent(new CustomEvent('remove-owner-item', {detail: '${removeDetail}'}))" 
-              style="background:linear-gradient(135deg, #dc2626, #b91c1c); color:white; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.8em; font-weight:600; flex-shrink:0; transition:all 0.2s; box-shadow:0 2px 6px rgba(220,38,38,0.3);"
-              onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(220,38,38,0.5)'"
-              onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 6px rgba(220,38,38,0.3)'">
+      <button type="button" data-remove-owner="${removeDetail}"
+              style="background:linear-gradient(135deg, #dc2626, #b91c1c); color:white; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:0.8em; font-weight:600; flex-shrink:0; transition:transform 0.2s, box-shadow 0.2s; box-shadow:0 2px 6px rgba(220,38,38,0.3);">
         <i class="fa-solid fa-trash-can"></i> ลบ
       </button>
     </div>`;
@@ -1219,7 +1245,7 @@ async function showOwnerItems(ownerName) {
 
   // เปิด Swal ขึ้นมาพร้อมหน้าตา Loading หรือข้อมูลเริ่มต้นทันที
   Swal.fire({
-    title: `👗 ${ownerName}`,
+    titleText: `👗 ${ownerName}`,
     html: `<div style="text-align:center; padding:30px;"><i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color:#0ea5e9;"></i><div style="margin-top:10px; font-size:0.9em; color:#9ca3af;">กำลังโหลดข้อมูล...</div></div>`,
     background: 'linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%)',
     color: '#fff',
@@ -1234,14 +1260,15 @@ async function showOwnerItems(ownerName) {
     },
     didOpen: () => {
 
-      // ฟัง event ลบรายการ
-      const handler = async (e) => {
-        const [numStr, vid] = e.detail.split('|');
+      // ฟัง event ลบรายการ (delegated click — zero inline onclick XSS)
+      const handler = async (detailStr) => {
+        const [numStr, vid] = String(detailStr || '').split('|');
         const num = parseInt(numStr);
+        if (!Number.isFinite(num) || !vid) return;
         const isToday = vid === currentVideoId;
 
         const result = await Swal.fire({
-          title: `ลบ #${num} ของ ${ownerName}?`,
+          titleText: `ลบ #${num} ของ ${ownerName}?`,
           text: !isToday
             ? `ยกเลิกรายการจองนี้จากรอบส่งย้อนหลัง (หากมีคิวสำรองจะเลื่อนขึ้นมาแทน)`
             : `ยกเลิกรายการจองนี้ของลูกค้า (หากมีคิวสำรองจะเลื่อนขึ้นมาแทน)`,
@@ -1287,8 +1314,16 @@ async function showOwnerItems(ownerName) {
                   };
                 } else {
                   const preservedPrice = Number(currentData.price);
-                  if (!isNaN(preservedPrice) && preservedPrice > 0) {
-                    return { price: preservedPrice };
+                  const hasPrice = !isNaN(preservedPrice) && preservedPrice > 0;
+                  const preservedDetails =
+                    typeof currentData.details === "string" && currentData.details.trim()
+                      ? currentData.details.trim()
+                      : "";
+                  if (hasPrice || preservedDetails) {
+                    const kept = {};
+                    if (hasPrice) kept.price = preservedPrice;
+                    if (preservedDetails) kept.details = preservedDetails;
+                    return kept;
                   }
                   return null;
                 }
@@ -1346,7 +1381,16 @@ async function showOwnerItems(ownerName) {
         }
       };
 
-      document.addEventListener('remove-owner-item', handler);
+      const htmlContainer = Swal.getHtmlContainer();
+      const delegatedClick = (e) => {
+        const btn = e.target?.closest?.('[data-remove-owner]');
+        if (btn) {
+          handler(btn.getAttribute('data-remove-owner'));
+        }
+      };
+      if (htmlContainer) {
+        htmlContainer.addEventListener('click', delegatedClick);
+      }
       // cleanup เมื่อปิด
       const swalEl = Swal.getPopup();
       let observerTimeout = null;
@@ -1356,7 +1400,9 @@ async function showOwnerItems(ownerName) {
       localCleanup = () => {
         if (cleaned) return;
         cleaned = true;
-        document.removeEventListener('remove-owner-item', handler);
+        if (htmlContainer) {
+          htmlContainer.removeEventListener('click', delegatedClick);
+        }
         if (activeOwnerName.value === ownerName) {
           activeOwnerName.value = null;
         }
@@ -1482,13 +1528,16 @@ function saveStockSize() {
 }
 
 let lastVideoId = systemStore.currentVideoId;
+let hydratedVideoId = "";
 
 watch(
   () => stockStore.stockData,
   (newVal, oldVal) => {
+    const activeVid = systemStore.currentVideoId;
     // Clear cancelled state if stream changed or board was cleared
-    if (systemStore.currentVideoId !== lastVideoId) {
-      lastVideoId = systemStore.currentVideoId;
+    if (activeVid !== lastVideoId) {
+      lastVideoId = activeVid;
+      hydratedVideoId = "";
       cancelledItems.value.clear();
       Object.keys(cancelledTimers).forEach((key) => {
         clearTimeout(cancelledTimers[key]);
@@ -1499,6 +1548,9 @@ watch(
         clearTimeout(newOrdersTimers[key]);
         delete newOrdersTimers[key];
       });
+      if (newVal && Object.keys(newVal).length > 0 && activeVid) {
+        hydratedVideoId = activeVid;
+      }
       return;
     }
 
@@ -1513,6 +1565,12 @@ watch(
         clearTimeout(newOrdersTimers[key]);
         delete newOrdersTimers[key];
       });
+      return;
+    }
+
+    // Skip flashing/scrolling every existing sold item on initial load / first snapshot after stream switch
+    if (activeVid && hydratedVideoId !== activeVid) {
+      hydratedVideoId = activeVid;
       return;
     }
 
@@ -1536,7 +1594,7 @@ watch(
         newOrdersTimers[num] = setTimeout(() => {
           newOrders.value.delete(num);
           delete newOrdersTimers[num];
-        }, 15000);
+        }, 8000);
         scrollToItem(num);
       }
     });
@@ -1554,11 +1612,11 @@ watch(
           cancelledItems.value.set(num, previousOwner);
           // เคลียร์ timer เก่า (กันซ้ำ)
           if (cancelledTimers[num]) clearTimeout(cancelledTimers[num]);
-          // ตั้ง timer 15 วินาที แล้วหายไป
+          // ตั้ง timer 10 วินาที แล้วหายไป
           cancelledTimers[num] = setTimeout(() => {
             cancelledItems.value.delete(num);
             delete cancelledTimers[num];
-          }, 15000);
+          }, 10000);
         }
       });
     }
@@ -1596,14 +1654,32 @@ function scrollToItem(num) {
   });
 }
 
+function resolveUidForCustomerName(ownerName, fallbackPrefix = "manual") {
+  const norm = normalizeCustomerName(ownerName || "");
+  if (norm) {
+    for (const item of Object.values(stockStore.stockData || {})) {
+      if (item?.owner && item?.uid && normalizeCustomerName(item.owner) === norm) {
+        return item.uid;
+      }
+    }
+    const cust = (deliveryCustomers.value || []).find(
+      (c) => c?.name && normalizeCustomerName(c.name) === norm && (c.uid || c.id)
+    );
+    if (cust) return cust.uid || cust.id;
+  }
+  return `${fallbackPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
 function openQueueModal(num) {
   const item = getStockItem(num);
   editingId.value = num;
   editingPrice.value = item.price || 0;
+  editingDetails.value = formatFullStockDetails(item);
   tempQueue.value = [];
   if (item.owner) {
     tempQueue.value.push({
       owner: item.owner,
+      originalOwner: item.owner,
       uid: item.uid || "manual",
       time: item.time,
       source: item.source,
@@ -1611,7 +1687,12 @@ function openQueueModal(num) {
     });
   }
   if (item.queue) {
-    tempQueue.value.push(...JSON.parse(JSON.stringify(item.queue)));
+    tempQueue.value.push(
+      ...JSON.parse(JSON.stringify(item.queue)).map((q) => ({
+        ...q,
+        originalOwner: q?.owner || "",
+      }))
+    );
   }
 
   // 🟢 หากรายการว่าง (ไม่มีการจอง) ให้เพิ่มรายการใหม่ทันทีเพื่อให้พิมพ์ได้เลย
@@ -1653,6 +1734,7 @@ function clearItemData() {
   }).then((result) => {
     if (result.isConfirmed) {
       editingPrice.value = 0;
+      editingDetails.value = "";
       tempQueue.value = [];
       Swal.fire({
         icon: 'success',
@@ -1798,10 +1880,23 @@ async function saveQueueChanges(preventClose = false) {
   // Re-fetch latest state at save time to prevent race conditions
   const currentDbItem = getStockItem(num);
 
-  // กรองรายการที่มีชื่อจริง ไม่บันทึกช่องว่างเปล่าๆ
-  const validQueue = tempQueue.value.filter(
-    (item) => item && typeof item.owner === "string" && item.owner.trim().length > 0
-  );
+  // กรองรายการที่มีชื่อจริง และรีเซ็ต/หา UID ใหม่เมื่อมีการเปลี่ยนเป็นลูกค้าคนอื่น (กันยอดไขว้กับ UID เจ้าของเดิม)
+  const validQueue = tempQueue.value
+    .filter((item) => item && typeof item.owner === "string" && item.owner.trim().length > 0)
+    .map((entry) => {
+      const trimmedOwner = entry.owner.trim();
+      const origNorm = normalizeCustomerName(entry.originalOwner || "");
+      const newNorm = normalizeCustomerName(trimmedOwner);
+      const isDifferentCustomer = Boolean(origNorm && newNorm && origNorm !== newNorm);
+      const { originalOwner, ...cleanEntry } = entry;
+      return {
+        ...cleanEntry,
+        owner: trimmedOwner,
+        uid: isDifferentCustomer
+          ? resolveUidForCustomerName(trimmedOwner)
+          : (entry.uid || resolveUidForCustomerName(trimmedOwner)),
+      };
+    });
 
   const newOwnerName = validQueue.length > 0 ? validQueue[0].owner.trim() : null;
   const oldOwnerName = currentDbItem.owner;
@@ -1826,12 +1921,17 @@ async function saveQueueChanges(preventClose = false) {
       first.time = Date.now();
     }
 
+    const cleanPrice = Number(editingPrice.value) || 0;
+    const cleanDetails = typeof editingDetails.value === "string" ? editingDetails.value.trim() : "";
+
     newData = {
       owner: first.owner.trim(),
       uid: first.uid,
       time: first.time || Date.now(),
       source: first.source || "manual",
-      price: editingPrice.value > 0 ? editingPrice.value : null,
+      price: cleanPrice > 0 ? cleanPrice : null,
+      details: cleanDetails || null,
+      size: null,
       queue: rest,
     };
 
@@ -1860,9 +1960,13 @@ async function saveQueueChanges(preventClose = false) {
   if (newData) {
     await stockStore.updateItemData(num, newData);
   } else {
-    // เคลียร์ข้อมูลคนจองทั้งหมด แต่ยังเก็บราคาไว้ (ถ้ามี)
+    // เคลียร์ข้อมูลคนจองทั้งหมด แต่ยังเก็บราคาและสเปก/ไซส์ไว้ (ถ้ามี)
+    const cleanPrice = Number(editingPrice.value) || 0;
+    const cleanDetails = typeof editingDetails.value === "string" ? editingDetails.value.trim() : "";
     await stockStore.updateItemData(num, {
-      price: editingPrice.value > 0 ? editingPrice.value : null,
+      price: cleanPrice > 0 ? cleanPrice : null,
+      details: cleanDetails || null,
+      size: null,
       owner: null,
       uid: null,
       queue: null,
@@ -1912,6 +2016,18 @@ async function saveAndNavigate(direction) {
 
 function handleGlobalKeydown(e) {
   if (!showModal.value) return;
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    saveQueueChanges();
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeModal();
+    return;
+  }
 
   if (e.key === 'ArrowLeft') {
     // If they are in a text input, let them move cursor
@@ -2233,21 +2349,23 @@ watch(
 .mini-shimmer {
   position: absolute;
   top: 0;
-  left: -100%;
+  left: 0;
   width: 100%;
   height: 100%;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.45) 50%,
     transparent 100%
   );
-  animation: mini-shimmer-slide 1.8s infinite;
+  transform: translate3d(-100%, 0, 0);
+  animation: mini-shimmer-slide 3.2s linear infinite;
+  will-change: transform;
 }
 
 @keyframes mini-shimmer-slide {
-  0% { left: -100%; }
-  100% { left: 100%; }
+  0% { transform: translate3d(-100%, 0, 0); }
+  100% { transform: translate3d(100%, 0, 0); }
 }
 
 /* 💰 Total Sales Badge (Champagne Gold Quiet Luxury) */
@@ -2397,70 +2515,6 @@ watch(
   gap: 5px;
 }
 
-.motivational-text {
-  font-size: 1.3em;
-  font-weight: 700;
-  color: #ffd700;
-  text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
-  animation: bounce 2s ease-in-out infinite;
-}
-
-@keyframes bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
-}
-
-.progress-bar-container {
-  width: 100px;
-  max-width: 100px;
-  height: 16px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 99px;
-  overflow: hidden;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-  flex-shrink: 0;
-}
-
-.progress-bar {
-  height: 100%;
-  border-radius: 99px;
-  transition:
-    width 0.6s ease-out,
-    background 0.6s ease-out;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 0 10px rgba(255, 107, 53, 0.5);
-}
-
-.progress-shimmer {
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    transparent 100%
-  );
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  0% {
-    left: -100%;
-  }
-  100% {
-    left: 100%;
-  }
-}
-
 .percentage-text {
   font-size: 0.95em;
   font-weight: 700;
@@ -2468,20 +2522,6 @@ watch(
   letter-spacing: 0.5px;
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-/* Animations */
-.stock-list-enter-active,
-.stock-list-leave-active {
-  transition: all 0.4s ease;
-}
-.stock-list-enter-from,
-.stock-list-leave-to {
-  opacity: 0;
-  transform: translateY(20px);
-}
-.stock-list-move {
-  transition: transform 0.4s ease;
 }
 
 /* Stock Grid & Items */
@@ -2763,6 +2803,65 @@ watch(
 .stock-search-clear:hover {
   color: #f87171;
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* 📏 Details / Size Input in Queue Modal */
+.details-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.details-inline-label {
+  font-size: 0.84em;
+  font-weight: 600;
+  color: #7dd3fc;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.details-input-field {
+  flex: 1;
+  min-width: 0;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #f1f5f9;
+  font-family: "Kanit", sans-serif;
+  font-size: 0.88em;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.details-input-field::placeholder {
+  color: #64748b;
+}
+
+.details-input-field:focus {
+  border-color: rgba(125, 211, 252, 0.65);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+}
+
+.btn-clear-details {
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #fda4af;
+  border-radius: 7px;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-size: 0.8em;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn-clear-details:hover {
+  background: rgba(244, 63, 94, 0.3);
+  color: #ffffff;
 }
 
 @media (max-width: 768px) {

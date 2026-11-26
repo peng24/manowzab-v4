@@ -1,7 +1,10 @@
 <template>
   <div class="ap-app">
+    <!-- 🍋 Minimalist Splash while checking Firebase auth session -->
+    <AuthSplash v-if="!authStore.authReady" />
+
     <!-- 🔒 High-Security Authentication Gate -->
-    <AuthGate v-if="!authStore.isAuthenticated" />
+    <AuthGate v-else-if="!authStore.isAuthenticated" />
 
     <template v-else>
       <!-- ============ STICKY HEADER ============ -->
@@ -308,7 +311,7 @@
       <!-- 📥 Modal นำเข้าที่อยู่จาก Note / แชท -->
       <AddressImportModal
         v-if="showImportModal"
-        :customers="allCustomers"
+        :customers="deliveryCustomersList"
         :addressBook="addressBook"
         @close="showImportModal = false"
       />
@@ -319,10 +322,13 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from "vue";
 import { useAuthStore } from "../stores/auth";
+import { useCustomerStore } from "../stores/customer";
+import { useBlacklistStore } from "../stores/blacklist";
+import AuthSplash from "../components/AuthSplash.vue";
 const AuthGate = defineAsyncComponent(() => import("../components/AuthGate.vue"));
 const CustomerQuickEditModal = defineAsyncComponent(() => import("../components/CustomerQuickEditModal.vue"));
 const AddressImportModal = defineAsyncComponent(() => import("../components/AddressImportModal.vue"));
-import { ref as dbRef, onValue, remove, update } from "firebase/database";
+import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName } from "../utils/addressParser";
 import Swal from "sweetalert2";
@@ -331,10 +337,13 @@ let refreshTimer = null;
 
 const baseUrl = import.meta.env.BASE_URL || "/";
 const authStore = useAuthStore();
+const customerStore = useCustomerStore();
+const blacklistStore = useBlacklistStore();
 
-// State
-const addressBook = ref({});
-const deliveryCustomers = ref({});
+// State (backed by Centralized Customer Store)
+const addressBook = computed(() => customerStore.addressBook || {});
+const deliveryCustomers = computed(() => customerStore.deliveryCustomersRaw || {});
+const deliveryCustomersList = computed(() => customerStore.deliveryCustomersList || []);
 const isRefreshing = ref(false);
 const searchQuery = ref("");
 const activeFilter = ref("all");
@@ -344,30 +353,34 @@ const searchInputRef = ref(null);
 const quickEditModalRef = ref(null);
 const cleanupFns = [];
 
-// Load Firebase Real-time listeners
-function initListeners() {
-  const unsubBook = onValue(dbRef(db, "address_book"), (snap) => {
-    addressBook.value = snap.val() || {};
+function cleanupListeners() {
+  cleanupFns.forEach((fn) => {
+    if (typeof fn === "function") fn();
   });
-  cleanupFns.push(unsubBook);
+  cleanupFns.length = 0;
+}
 
-  const unsubDeliv = onValue(dbRef(db, "delivery_customers"), (snap) => {
-    deliveryCustomers.value = snap.val() || {};
-  });
-  cleanupFns.push(unsubDeliv);
+// Load Firebase Real-time listeners via Centralized Stores
+function initListeners() {
+  cleanupListeners();
+  cleanupFns.push(customerStore.initCustomerListeners());
+  cleanupFns.push(blacklistStore.initBlacklistListener());
 }
 
 // Aggregated Unified Customer List
 const allCustomers = computed(() => {
   const map = new Map();
 
-  // 1. Process central address_book entries
+  // 1. Process central address_book entries (merge duplicates instead of overwriting)
   Object.entries(addressBook.value || {}).forEach(([normKey, book]) => {
     if (!book) return;
     const name = book.name || normKey;
     const norm = normalizeName(name);
 
-    const addresses = Array.isArray(book.addresses) ? book.addresses.filter(Boolean) : [];
+    const rawAddrs = book.addresses;
+    const addresses = Array.isArray(rawAddrs)
+      ? rawAddrs.filter(Boolean)
+      : (rawAddrs && typeof rawAddrs === "object" ? Object.values(rawAddrs).filter(Boolean) : []);
     const activeAddr = addresses.find((a) => a.id === book.selectedAddressId) || addresses[0] || null;
 
     const fullAddr = activeAddr?.address || book.address || "";
@@ -376,6 +389,28 @@ const allCustomers = computed(() => {
     const postal = activeAddr?.postalCode || book.postalCode || "";
     const contact = activeAddr?.contactChannel || book.contactChannel || "";
     const payment = activeAddr?.paymentType || book.paymentType || "";
+    const addrCount = Math.max(addresses.length, fullAddr ? 1 : 0);
+
+    if (map.has(norm)) {
+      const existing = map.get(norm);
+      if (!existing.addressBookKeys.includes(normKey)) {
+        existing.addressBookKeys.push(normKey);
+      }
+      if (!existing.hasAddress && fullAddr && fullAddr.trim()) {
+        existing.address = fullAddr;
+        existing.hasAddress = true;
+        existing.recipientName = recName || existing.recipientName;
+        existing.phone = phone || existing.phone;
+        existing.postalCode = postal || existing.postalCode;
+      }
+      existing.addressCount = Math.max(existing.addressCount, addrCount);
+      if (!existing.contactChannel && contact) existing.contactChannel = contact;
+      if (!existing.paymentType && payment) existing.paymentType = payment;
+      if ((book.updatedAt || 0) > (existing.updatedAt || 0)) {
+        existing.updatedAt = book.updatedAt || 0;
+      }
+      return;
+    }
 
     map.set(norm, {
       normKey,
@@ -387,7 +422,7 @@ const allCustomers = computed(() => {
       address: fullAddr,
       postalCode: postal,
       hasAddress: Boolean(fullAddr && fullAddr.trim()),
-      addressCount: Math.max(addresses.length, fullAddr ? 1 : 0),
+      addressCount: addrCount,
       contactChannel: contact,
       paymentType: payment,
       totalBookings: 0,
@@ -615,7 +650,7 @@ function editCustomer(cust) {
 
 async function confirmDeleteCustomer(cust) {
   const res = await Swal.fire({
-    title: `ลบที่อยู่ของ "${cust.name}"?`,
+    titleText: `ลบที่อยู่ของ "${cust.name}"?`,
     text: "ข้อมูลลูกค้าและที่อยู่จะถูกลบออกจากสมุดที่อยู่",
     icon: "warning",
     showCancelButton: true,
@@ -671,13 +706,15 @@ async function confirmDeleteCustomer(cust) {
       });
 
       // 3. ดำเนินการลบที่อยู่แบบ Atomic Multi-Path Update (ไม่ลบข้อมูลการจองลูกค้า)
-      await update(dbRef(db), multiPathUpdates);
+      if (Object.keys(multiPathUpdates).length > 0) {
+        await update(dbRef(db), multiPathUpdates);
+      }
 
       Swal.fire({
         toast: true,
         position: "top-end",
         icon: "success",
-        title: `ลบที่อยู่ของ "${cust.name}" สำเร็จ`,
+        titleText: `ลบที่อยู่ของ "${cust.name}" สำเร็จ`,
         showConfirmButton: false,
         timer: 2000,
       });
@@ -717,7 +754,7 @@ function exportCSV() {
     `"${c.paymentType === 'cod' ? 'COD' : c.paymentType === 'transfer' ? 'โอนเงิน' : ''}"`,
     `"${c.contactChannel || ''}"`,
     c.totalBookings || 0,
-    c.addressCount || 1,
+    c.addressCount ?? 0,
   ]);
 
   const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
@@ -789,10 +826,7 @@ async function handleLogout() {
   });
 
   if (res.isConfirmed) {
-    cleanupFns.forEach((fn) => {
-      if (typeof fn === "function") fn();
-    });
-    cleanupFns.length = 0;
+    cleanupListeners();
     if (typeof Swal !== "undefined" && Swal.isVisible()) {
       Swal.close();
     }
@@ -806,10 +840,7 @@ watch(
     if (isAuth) {
       initListeners();
     } else {
-      cleanupFns.forEach((fn) => {
-        if (typeof fn === "function") fn();
-      });
-      cleanupFns.length = 0;
+      cleanupListeners();
       if (refreshTimer) {
         clearTimeout(refreshTimer);
         refreshTimer = null;
@@ -836,10 +867,7 @@ onUnmounted(() => {
   if (typeof Swal !== "undefined" && Swal.isVisible()) {
     Swal.close();
   }
-  cleanupFns.forEach((fn) => {
-    if (typeof fn === "function") fn();
-  });
-  cleanupFns.length = 0;
+  cleanupListeners();
   window.removeEventListener("keydown", handleKeydown);
 });
 </script>

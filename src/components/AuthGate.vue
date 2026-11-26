@@ -204,6 +204,8 @@ const countdown = ref(0);
 const emailInputRef = ref(null);
 
 let countdownTimer = null;
+let shakeTimer = null;
+let mountReadyTimer = null;
 
 function getParticleStyle(n) {
   const left = (n * 8.3) % 100;
@@ -257,23 +259,18 @@ async function handleSubmit() {
   isLoading.value = true;
   errorMessage.value = "";
 
-  // Smooth verification feedback delay
-  await new Promise((r) => setTimeout(r, 450));
-
   const result = await authStore.login(email.value, password.value);
   isLoading.value = false;
 
   if (result.success) {
     isSuccess.value = true;
-
-    // Trigger success feedback
-    await new Promise((r) => setTimeout(r, 600));
+    const signedInEmail = authStore.currentUser?.email || email.value.trim();
 
     Swal.fire({
       toast: true,
       position: "top-end",
       icon: "success",
-      title: `🔑 ยินดีต้อนรับคุณ ${authStore.currentUser?.email}`,
+      titleText: `🔑 ยินดีต้อนรับคุณ ${signedInEmail}`,
       showConfirmButton: false,
       timer: 2000,
       timerProgressBar: true,
@@ -289,15 +286,18 @@ async function handleSubmit() {
 function triggerShake(msg) {
   errorMessage.value = msg;
   isShaking.value = true;
-  setTimeout(() => {
+  if (shakeTimer) clearTimeout(shakeTimer);
+  shakeTimer = setTimeout(() => {
     isShaking.value = false;
+    shakeTimer = null;
   }, 650);
 }
 
 onMounted(() => {
-  setTimeout(() => {
+  mountReadyTimer = setTimeout(() => {
     isMounted.value = true;
-  }, 50);
+    mountReadyTimer = null;
+  }, 30);
 
   if (emailInputRef.value) {
     emailInputRef.value.focus();
@@ -306,6 +306,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (countdownTimer) clearInterval(countdownTimer);
+  if (shakeTimer) clearTimeout(shakeTimer);
+  if (mountReadyTimer) clearTimeout(mountReadyTimer);
 });
 </script>
 
@@ -348,14 +350,13 @@ onUnmounted(() => {
   100% { transform: perspective(600px) rotateX(60deg) translateY(40px); }
 }
 
-/* Ambient glowing orbs with organic pulse */
+/* Ambient glowing orbs (pre-feathered radial gradients — zero filter: blur / mix-blend-mode GPU storm) */
 .auth-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.35;
+  opacity: 0.28;
   pointer-events: none;
-  mix-blend-mode: screen;
+  will-change: transform;
 }
 
 .orb-1 {
@@ -455,9 +456,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   max-width: 450px;
-  background: rgba(15, 23, 42, 0.82);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: rgba(15, 23, 42, 0.94);
   border: 1px solid rgba(45, 212, 191, 0.25);
   border-radius: 24px;
   padding: 34px 30px;
@@ -470,8 +469,8 @@ onUnmounted(() => {
   gap: 22px;
   z-index: 10;
   opacity: 0;
-  transform: translateY(24px) scale(0.96);
-  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(20px) scale(0.97);
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
   overflow: hidden;
 }
 
@@ -486,20 +485,21 @@ onUnmounted(() => {
   transform: scale(1.02);
 }
 
-/* Card Top Border Beam */
+/* Card Top Border Beam (GPU translate3d) */
 .card-border-glow {
   position: absolute;
   top: 0;
-  left: -100%;
+  left: 0;
   width: 100%;
   height: 2px;
   background: linear-gradient(90deg, transparent, #2dd4bf, #38bdf8, transparent);
   animation: borderBeam 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform;
 }
 
 @keyframes borderBeam {
-  0% { left: -100%; }
-  50%, 100% { left: 100%; }
+  0% { transform: translate3d(-100%, 0, 0); }
+  50%, 100% { transform: translate3d(100%, 0, 0); }
 }
 
 /* Shake Animation on Error */
@@ -900,7 +900,7 @@ onUnmounted(() => {
 .btn-shimmer {
   position: absolute;
   top: -50%;
-  left: -60%;
+  left: 0;
   width: 50%;
   height: 200%;
   background: linear-gradient(
@@ -909,14 +909,19 @@ onUnmounted(() => {
     rgba(255, 255, 255, 0.3) 50%,
     transparent 80%
   );
-  transform: rotate(25deg);
   animation: btnShimmerSweep 4s ease-in-out infinite;
   pointer-events: none;
+  will-change: transform;
+}
+
+.auth-submit-btn:disabled .btn-shimmer {
+  animation: none;
+  opacity: 0;
 }
 
 @keyframes btnShimmerSweep {
-  0% { left: -60%; }
-  35%, 100% { left: 140%; }
+  0% { transform: translate3d(-120%, 0, 0) rotate(25deg); }
+  35%, 100% { transform: translate3d(280%, 0, 0) rotate(25deg); }
 }
 
 .auth-submit-btn:hover:not(:disabled) {

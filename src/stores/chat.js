@@ -165,15 +165,16 @@ export const useChatStore = defineStore("chat", () => {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }
 
-  function clearChat() {
+  function clearChat(options = {}) {
+    const { clearIdb = true } = options || {};
     messages.splice(0); // Clear UI messages
     seenMessageIds.value = {}; // Clear deduplication cache
     seenKeyQueue.length = 0; // Clear FIFO tracking queue
     fullChatLog.value = []; // ✅ Clear RAM log
     streamStartTime.value = null; // ✅ Reset Timer
 
-    // ✅ Clear IndexedDB archive for current session (prevents stale data on re-connect)
-    if (currentVideoId) {
+    // ✅ Only clear IndexedDB archive on explicit user clear (NEVER wipe previous session archive when switching videos)
+    if (clearIdb && currentVideoId) {
       clearChatEntries(currentVideoId).catch(() => {});
     }
 
@@ -227,12 +228,12 @@ export const useChatStore = defineStore("chat", () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `chat_log_${targetVideoId}.csv`);
+    link.setAttribute("download", `chat_log_${targetVideoId || "export"}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   /**
@@ -254,12 +255,12 @@ export const useChatStore = defineStore("chat", () => {
       currentChatListener = null;
     }
 
-    // ✅ Auto-Clear if switching to a new video
+    // ✅ Auto-Clear RAM only when switching videos (preserve previous video's IndexedDB archive for CSV recovery)
     if (currentVideoId && currentVideoId !== videoId) {
       logger.firebase(
-        `Switching video from ${currentVideoId} to ${videoId}. Clearing chat...`,
+        `Switching video from ${currentVideoId} to ${videoId}. Clearing in-memory chat...`,
       );
-      clearChat();
+      clearChat({ clearIdb: false });
     }
 
     currentVideoId = videoId;

@@ -9,7 +9,7 @@ const SLASH_NUM_REGEX = /(\d+)\s*\/\s*(\d+)/g;
 const CF_PREFIX_REGEX = /(?:^|(?<=\s))(?:cf|CF)\s*(?=\d)/gi;
 const STANDALONE_CF_REGEX = /(?:^|(?<=\s))(?:cf|CF)(?=\s|$)/gi;
 const TRAILING_ITEM_PREFIX_REGEX = /รายการที่\s*$/;
-const PHONE_AND_NUM_REGEX = /(0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{3,4})|(?<![:\d])(\d+)(?![:\d])/g;
+const PHONE_AND_NUM_REGEX = /((?<!\d)0[2-9]\d?[-\s]?\d{3,4}[-\s]?\d{3,4}(?!\d))|(?<![:\d])(\d+)(?![:\d])/g;
 
 /**
  * Convert a non-negative integer into standard Thai cardinal words.
@@ -29,6 +29,11 @@ export function numberToThaiWords(num) {
   const n = parseInt(num, 10);
   if (isNaN(n) || n === 0) return "ศูนย์";
   if (n < 0) return "ลบ" + numberToThaiWords(Math.abs(n));
+  if (n >= 1_000_000) {
+    const millions = Math.floor(n / 1_000_000);
+    const remainder = n % 1_000_000;
+    return numberToThaiWords(millions) + "ล้าน" + (remainder > 0 ? numberToThaiWords(remainder) : "");
+  }
 
   const str = String(n);
   const len = str.length;
@@ -84,7 +89,7 @@ export function numberToThaiWords(num) {
  * @param {string} text
  * @returns {string}
  */
-const PHONE_ONLY_REGEX = /0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{3,4}/g;
+const PHONE_ONLY_REGEX = /(?<!\d)0[2-9]\d?[-\s]?\d{3,4}[-\s]?\d{3,4}(?!\d)/g;
 
 export function replaceNumbersWithThaiWords(text) {
   if (!text) return "";

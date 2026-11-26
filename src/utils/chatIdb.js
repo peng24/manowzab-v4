@@ -34,7 +34,14 @@ function getDb() {
   if (_db) return Promise.resolve(_db);
   if (_dbPromise) return _dbPromise;
   _dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    let req;
+    try {
+      req = indexedDB.open(DB_NAME, DB_VERSION);
+    } catch (syncErr) {
+      _dbPromise = null;
+      reject(syncErr);
+      return;
+    }
 
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
@@ -106,8 +113,11 @@ export async function flushChatArchiveBuffer() {
         tx.onabort = (e) => reject(e.target.error);
       });
     } catch (e) {
-      // Re-queue failed entries at the front so they are not lost
+      // Re-queue failed entries at the front with a cap to prevent unbounded RAM growth
       _writeBuffer.unshift(...entriesToFlush);
+      if (_writeBuffer.length > 500) {
+        _writeBuffer.length = 500;
+      }
       console.warn("[ChatIdb] flushChatArchiveBuffer failed:", e);
     } finally {
       if (_inFlightFlush === runFlush) {
@@ -195,6 +205,10 @@ export async function getAllChatEntries(videoId) {
  */
 export async function clearChatEntries(videoId) {
   if (!videoId) return;
+  // Wait for any in-flight batch flush so flushed entries don't re-appear after clear
+  if (_inFlightFlush) {
+    await _inFlightFlush.catch(() => {});
+  }
   // Clear any pending entries for this videoId from the in-memory write buffer
   _writeBuffer = _writeBuffer.filter((item) => item.videoId !== videoId);
   try {

@@ -16,6 +16,14 @@ import Lenis from "lenis";
  *   destroy: () => void
  * }}
  */
+function prefersReducedMotion() {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
 export function useSmoothScroll(containerRef, options = {}) {
   const lenis = shallowRef(null);
   let resizeObserver = null;
@@ -23,10 +31,8 @@ export function useSmoothScroll(containerRef, options = {}) {
 
   function initLenis(el) {
     if (!el || typeof window === "undefined") return;
-    if (lenis.value) {
-      lenis.value.destroy();
-      lenis.value = null;
-    }
+    destroy();
+    if (prefersReducedMotion()) return;
 
     const mergedOptions = {
       wrapper: el,
@@ -152,7 +158,7 @@ export function useSmoothScroll(containerRef, options = {}) {
  */
 export const vSmoothScroll = {
   mounted(el, binding) {
-    if (typeof window === "undefined" || !el) return;
+    if (typeof window === "undefined" || !el || prefersReducedMotion()) return;
     const userOpts = binding.value || {};
     try {
       const lenis = new Lenis({

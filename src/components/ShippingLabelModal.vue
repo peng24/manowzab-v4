@@ -993,7 +993,8 @@ function handlePrint() {
   const fontMultiplier = labelFontScale.value === "compact" ? 0.9 : labelFontScale.value === "large" ? 1.2 : 1.0;
   const fSize = (basePt) => `${(basePt * fontMultiplier).toFixed(1)}pt`;
 
-  const cardsHtml = printableCustomers.value
+  const printedSnapshot = [...printableCustomers.value];
+  const cardsHtml = printedSnapshot
     .map((customer) => {
       const rawRecipient = getRecipientDisplayName(customer);
       const rawAddress = getCustomerCleanAddress(customer) || "⚠️ ยังไม่มีที่อยู่จัดส่ง";
@@ -1292,6 +1293,7 @@ function handlePrint() {
   if (printTimeout) clearTimeout(printTimeout);
   printTimeout = setTimeout(async () => {
     try {
+      if (isLabelModalUnmounted || !iframe.isConnected || !iframe.contentWindow) return;
       const fontLink = doc.getElementById("label-font-link");
       if (fontLink && !fontLink.sheet) {
         await Promise.race([
@@ -1302,21 +1304,24 @@ function handlePrint() {
           new Promise((resolve) => setTimeout(resolve, 800)),
         ]);
       }
-      if (iframe.contentWindow && iframe.contentWindow.document.fonts) {
+      if (isLabelModalUnmounted || !iframe.isConnected || !iframe.contentWindow) return;
+      if (iframe.contentWindow.document?.fonts) {
         await Promise.race([
           iframe.contentWindow.document.fonts.ready,
           new Promise((resolve) => setTimeout(resolve, 800)),
         ]);
       }
     } catch (e) {}
+    if (isLabelModalUnmounted || !iframe.isConnected || !iframe.contentWindow) return;
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
 
-    // Auto mark printed customers in Firebase
+    // Auto mark ONLY the exact snapshot of customers printed in Firebase
     try {
       const updates = {};
       const now = Date.now();
-      printableCustomers.value.forEach((c) => {
+      printedSnapshot.forEach((c) => {
+        if (!c?.id) return;
         updates[`delivery_customers/${c.id}/labelPrinted`] = true;
         updates[`delivery_customers/${c.id}/labelPrintedAt`] = now;
       });
@@ -1330,7 +1335,10 @@ function handlePrint() {
   }, 150);
 }
 
+let isLabelModalUnmounted = false;
+
 onUnmounted(() => {
+  isLabelModalUnmounted = true;
   if (printTimeout) {
     clearTimeout(printTimeout);
     printTimeout = null;
@@ -1355,6 +1363,8 @@ function exportExcelForApp() {
     return;
   }
 
+  const csvCell = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
   const rows = [
     ["ลำดับ", "ชื่อผู้รับ (พิมพ์บนกล่อง)", "ชื่อในระบบ (CF)", "รูปแบบการส่ง", "เบอร์โทร", "ที่อยู่", "รหัสไปรษณีย์", "จำนวนสินค้า", "รอบส่ง", "โน้ต", "ผู้ส่ง", "เบอร์ผู้ส่ง", "ที่อยู่ผู้ส่ง"],
   ];
@@ -1367,18 +1377,18 @@ function exportExcelForApp() {
     const payment = getPaymentTypeDisplay(c);
     rows.push([
       idx + 1,
-      `"${recipient.replace(/"/g, '""')}"`,
-      `"${(c.name || '').replace(/"/g, '""')}"`,
-      `"${payment}"`,
-      `"${phone}"`,
-      `"${addr.replace(/"/g, '""')}"`,
-      `"${zip}"`,
+      csvCell(recipient),
+      csvCell(c.name || ""),
+      csvCell(payment),
+      csvCell(phone),
+      csvCell(addr),
+      csvCell(zip),
       c.itemCount || 0,
-      c.deliveryDate || "",
-      `"${(c.note || '').replace(/"/g, '""')}"`,
-      `"${(sender.value.name || '').replace(/"/g, '""')}"`,
-      `"${(sender.value.phone || '').replace(/"/g, '""')}"`,
-      `"${(sender.value.address || '').replace(/"/g, '""')}"`,
+      csvCell(c.deliveryDate || ""),
+      csvCell(c.note || ""),
+      csvCell(sender.value.name || ""),
+      csvCell(sender.value.phone || ""),
+      csvCell(sender.value.address || ""),
     ]);
   });
 
@@ -1386,12 +1396,14 @@ function exportExcelForApp() {
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  const dateStr = new Date().toISOString().split("T")[0];
+  const nowLocal = new Date();
+  const dateStr = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
   link.setAttribute("href", url);
   link.setAttribute("download", `รายการที่อยู่จัดส่ง_130x76_${dateStr}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 
   Swal.fire({
     icon: "success",

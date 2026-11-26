@@ -1,7 +1,7 @@
 <template>
   <div class="thai-datepicker-container" ref="containerRef">
     <!-- Trigger -->
-    <div class="trigger-wrap" @click.stop="openCalendar" @focusin="openCalendar">
+    <div class="trigger-wrap" @click="openCalendar" @focusin="openCalendar">
       <slot>
         <button type="button" class="fallback-btn">📅</button>
       </slot>
@@ -9,7 +9,7 @@
 
     <!-- Calendar Popup -->
     <Teleport to="body">
-      <div v-if="isOpen" class="td-popup" :style="popupStyle" @click.stop>
+      <div v-if="isOpen" ref="popupRef" class="td-popup" :style="popupStyle" @click.stop>
         <div class="td-header">
         <button type="button" class="td-btn" @click.prevent="prevMonth">&lt;</button>
         <div class="td-month-year">
@@ -59,11 +59,13 @@ const thaiMonthNames = [
 const weekdays = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
 const containerRef = ref(null);
+const popupRef = ref(null);
 const isOpen = ref(false);
 const currentYear = ref(new Date().getFullYear());
 const currentMonth = ref(new Date().getMonth());
 const displayYear = ref(currentYear.value + 543);
 const popupStyle = ref({});
+let isUnmounted = false;
 
 const updatePosition = () => {
   if (!containerRef.value) return;
@@ -103,8 +105,14 @@ watch(currentYear, (val) => {
 });
 
 const onYearChange = () => {
-  if (displayYear.value >= 2500) {
-    currentYear.value = displayYear.value - 543;
+  const val = Number(displayYear.value);
+  if (Number.isInteger(val) && val >= 2400 && val <= 2700) {
+    currentYear.value = val - 543;
+  } else if (Number.isInteger(val) && val >= 1900 && val <= 2200) {
+    currentYear.value = val;
+    displayYear.value = val + 543;
+  } else {
+    displayYear.value = currentYear.value + 543;
   }
 };
 const onMonthYearChange = () => {
@@ -113,18 +121,26 @@ const onMonthYearChange = () => {
 
 watch(isOpen, async (val) => {
   if (val) {
-    if (props.modelValue && props.modelValue.includes('-')) {
+    let parsedValid = false;
+    if (props.modelValue && typeof props.modelValue === 'string' && props.modelValue.includes('-')) {
       const parts = props.modelValue.split('-');
       if (parts.length === 3) {
-        currentYear.value = parseInt(parts[0]);
-        currentMonth.value = parseInt(parts[1]) - 1;
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        if (Number.isFinite(y) && y >= 1900 && y <= 2200 && Number.isFinite(m) && m >= 0 && m <= 11) {
+          currentYear.value = y;
+          currentMonth.value = m;
+          parsedValid = true;
+        }
       }
-    } else {
+    }
+    if (!parsedValid) {
       const d = new Date();
       currentYear.value = d.getFullYear();
       currentMonth.value = d.getMonth();
     }
     await nextTick();
+    if (!isOpen.value || isUnmounted) return;
     updatePosition();
     window.addEventListener('scroll', updatePosition, true);
     window.addEventListener('resize', updatePosition);
@@ -203,13 +219,16 @@ const openCalendar = () => {
   isOpen.value = true;
 };
 const closeCalendar = (e) => {
-  if (containerRef.value && !containerRef.value.contains(e.target) && !e.target.closest('.td-popup')) {
+  const inTrigger = containerRef.value && containerRef.value.contains(e.target);
+  const inOwnPopup = popupRef.value && popupRef.value.contains(e.target);
+  if (!inTrigger && !inOwnPopup) {
     isOpen.value = false;
   }
 };
 
 onMounted(() => document.addEventListener('click', closeCalendar));
 onUnmounted(() => {
+  isUnmounted = true;
   document.removeEventListener('click', closeCalendar);
   window.removeEventListener('scroll', updatePosition, true);
   window.removeEventListener('resize', updatePosition);

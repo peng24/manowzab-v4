@@ -1,8 +1,9 @@
 import { ref } from "vue";
-import { ref as dbRef, get, remove, child, update } from "firebase/database";
+import { ref as dbRef, get, set, remove, child, update } from "firebase/database";
 import { db } from "./useFirebase";
 import { isPriceAnnouncementMessage } from "../stores/chat";
 import { useNicknameStore } from "../stores/nickname";
+import { useSystemStore } from "../stores/system";
 import { resolveStoredProxyName } from "../utils/chatDisplayUtils";
 import { logger } from "../utils/logger";
 
@@ -151,12 +152,17 @@ export function useHistory() {
                 
                 await update(itemRef, updateData);
             } else {
-                // Clear Owner (Soft Delete: Remove owner, uid, but maybe keep history? Or just remove node?)
-                // Requirement usually implies making it "Empty".
-                // In this system, Empty = No Owner.
-                // We can't just remove the node if we want to keep it "in the grid" structure? 
-                // The grid is 1..N based on stockSize. Removing the node makes it empty.
-                await remove(itemRef);
+                // Clear Owner while preserving AI-synced price & size/details if present
+                const existingSnap = await get(itemRef);
+                const existing = existingSnap.exists() ? existingSnap.val() : null;
+                const preserved = {};
+                if (existing?.price > 0) preserved.price = existing.price;
+                if (existing?.details) preserved.details = existing.details;
+                if (Object.keys(preserved).length > 0) {
+                    await set(itemRef, preserved);
+                } else {
+                    await remove(itemRef);
+                }
             }
         } catch (error) {
             console.error("❌ Update Item Error:", error);
@@ -302,7 +308,20 @@ export function useHistory() {
         await fetchHistoryList();
         
         const totalLives = historyList.value.length;
-        const olderLives = historyList.value.filter(item => (item.timestamp || 0) < ninetyDaysAgo);
+        let activeVid = "";
+        try {
+            activeVid = useSystemStore()?.currentVideoId || "";
+        } catch {
+            activeVid = "";
+        }
+        const olderLives = historyList.value.filter(
+            item =>
+                typeof item.timestamp === "number" &&
+                item.timestamp > 0 &&
+                item.timestamp < ninetyDaysAgo &&
+                item.videoId &&
+                item.videoId !== activeVid
+        );
         const olderLivesCount = olderLives.length;
         
         let totalBytes = 0;
@@ -351,9 +370,13 @@ export function useHistory() {
      * @param {Array<string>} videoIds 
      */
     async function deleteMultipleHistory(videoIds) {
-        if (!videoIds || !videoIds.length) return;
+        if (!Array.isArray(videoIds) || !videoIds.length) return;
+        const validIds = videoIds.filter(
+            (id) => typeof id === "string" && id.trim().length > 0 && !/[.#$[\]/]/.test(id)
+        );
+        if (!validIds.length) return;
         
-        const deletePromises = videoIds.map(async (videoId) => {
+        const deletePromises = validIds.map(async (videoId) => {
             try {
                 await Promise.all([
                     remove(dbRef(db, `history/${videoId}`)).catch(e => logger.warn(`History cleanup warning:`, e)),

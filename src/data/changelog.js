@@ -17,6 +17,16 @@
 
 export const changelog = [
   {
+    version: '5.8.2',
+    date: '2026-11-26',
+    changes: {
+      fixed: [
+        'กวาดล้างบั๊กและยกระดับความแม่นยำระบบ AI ตรวจจับราคาและไซส์คู่หู (`live-product-capture-ai` v1.5.6) ครบทั้ง 47 ไฟล์ (3 ระยะ) — กันคำผสมไทย (`ลายดอก`, `แขนยาว`, `เดรสยาว`, `ชอบ`, `กระสอบ`, `บอก`, `ส่งออก`) ไม่ให้ตัดราคา/สร้างสเปกหลอก, คงรหัส 3 หลัก (`#100–#300`), แก้ `"สี่สิบ หนึ่งร้อย"` ไม่ให้รวมเป็น `41100`, ล้าง `trailing_text` ทุกจุด early return และแยกสเปกข้ามรายการ',
+        'เสริมความปลอดภัยและความเสถียรฝั่ง AI (`firebase_sync`, `session_resolver`, `live_status_monitor`, `database`, `chrome_caption_reader`, `capture_coordinator`, Launchers & Batch) — validate `video_id`/`item_num` + `redact_secrets` + retry HTTP 401, พาร์ส `ytInitialPlayerResponse` ด้วย `raw_decode` ไม่หลงจับ sidebar, เปิด SQLite WAL + คงราคาที่แก้เอง (`updated_by_user=1`), รองรับ `.vtt` + กันไฟล์ซับชนกันในวันเดียวกัน, กัน `ChromeCaptionReader` ไม่ให้จับหน้าต่างที่มี `" - "`, และเพิ่มชุดทดสอบ `test_full_audit_wave123.py` (ผ่านครบ 123/123 tests)',
+      ],
+    },
+  },
+  {
     version: '5.8.1',
     date: '2026-11-26',
     changes: {

@@ -87,10 +87,22 @@
       >{{ compactSize }}</span>
     </div>
 
+    <!-- ✨ Floating "ใหม่" Pill (ชัดเจน ดูง่ายจากระยะไกล ไม่บังเบอร์/ชื่อ/ราคา) -->
+    <div v-if="isNewOrder && item.owner" class="new-order-pill" aria-hidden="true">
+      <span class="new-order-dot"></span>
+      <span>ใหม่</span>
+    </div>
+
     <!-- 🌟 VIP Shimmer Beam (แสงทองวิ่งผ่านตอนจองใหม่) -->
-    <div v-if="isNewOrder" class="new-order-shimmer"></div>
+    <div v-if="isNewOrder && item.owner" class="new-order-shimmer" aria-hidden="true"></div>
+
+    <!-- ⏱️ GPU Countdown Bar (8s scaleX — บอกจังหวะจองใหม่ดูง่าย) -->
+    <div v-if="isNewOrder && item.owner" class="new-order-timer-track" aria-hidden="true">
+      <div class="new-order-timer-fill"></div>
+    </div>
+
     <!-- 🚨 Cancel Flash Sweep (แสงแดงแจ้งเตือนตอนยกเลิก) -->
-    <div v-if="isCancelled && !item.owner" class="cancel-flash-sweep"></div>
+    <div v-if="isCancelled && !item.owner" class="cancel-flash-sweep" aria-hidden="true"></div>
   </div>
 </template>
 
@@ -296,25 +308,32 @@ function isUnsavedOwner(name) {
 }
 
 /* ======================================================
-   ✨ BOOKING ANIMATION (CF Confirmed — Calm Luxury Pop + GPU Gold Sweep)
+   ✨ BOOKING ANIMATION (CF Confirmed — Clear Luxury Ruby-Gold Pop, 60fps GPU-Only)
    ====================================================== */
 .stock-item.sold.new-order {
-  animation: orderPopEntry 0.45s cubic-bezier(0.22, 1, 0.36, 1) 1;
-  border: 1.5px solid #e5b869 !important;
+  animation: orderPopEntry 0.56s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  background: linear-gradient(
+    155deg,
+    rgba(217, 119, 6, 0.46) 0%,
+    rgba(180, 42, 24, 0.74) 50%,
+    rgba(92, 16, 16, 0.94) 100%
+  );
+  border: 2px solid #fde047 !important;
   box-shadow:
-    0 0 0 2px rgba(229, 184, 105, 0.38),
-    0 6px 20px rgba(229, 184, 105, 0.28);
+    0 0 0 2px rgba(250, 204, 21, 0.42),
+    0 8px 26px rgba(245, 158, 11, 0.34),
+    inset 0 1px 0 rgba(254, 249, 195, 0.38);
   z-index: 10 !important;
 }
 
 .stock-item.sold.new-order::after {
   content: "";
   position: absolute;
-  inset: -3px;
-  border-radius: 17px;
-  border: 1.5px solid rgba(229, 184, 105, 0.72);
+  inset: -4px;
+  border-radius: 18px;
+  border: 2px solid rgba(253, 224, 71, 0.85);
   pointer-events: none;
-  animation: newOrderRadar 1.35s ease-out 2 forwards;
+  animation: newOrderRadar 1.9s cubic-bezier(0.16, 1, 0.3, 1) 4 forwards;
   will-change: transform, opacity;
   z-index: -1;
 }
@@ -325,7 +344,45 @@ function isUnsavedOwner(name) {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  text-shadow: 0 0 10px rgba(243, 207, 122, 0.85), 0 1px 3px rgba(0, 0, 0, 0.75);
+  text-shadow: 0 0 12px rgba(253, 224, 71, 0.9), 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.stock-item.sold.new-order .stock-status {
+  color: #fffef0;
+  animation: newOrderNameReveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.78);
+}
+
+.new-order-pill {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translate3d(-50%, 0, 0);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1.5px 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fef08a 0%, #f59e0b 100%);
+  color: #1c1917;
+  font-size: 0.68em;
+  font-weight: 800;
+  letter-spacing: 0.25px;
+  line-height: 1.25;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45), 0 0 0 1.5px rgba(254, 249, 195, 0.65);
+  pointer-events: none;
+  z-index: 5;
+  animation: newOrderBadgePop 0.48s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  will-change: transform, opacity;
+}
+
+.new-order-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dc2626;
+  animation: newOrderDotPulse 1.6s ease-in-out 5;
+  will-change: transform, opacity;
 }
 
 .new-order-shimmer {
@@ -342,36 +399,81 @@ function isUnsavedOwner(name) {
   position: absolute;
   top: -60%;
   left: 0;
-  width: 55%;
+  width: 56%;
   height: 220%;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.08) 20%,
-    rgba(243, 207, 122, 0.42) 50%,
-    rgba(255, 255, 255, 0.28) 75%,
+    rgba(255, 255, 255, 0.1) 20%,
+    rgba(254, 240, 138, 0.48) 50%,
+    rgba(255, 255, 255, 0.3) 75%,
     transparent 100%
   );
-  transform: translate3d(-180%, 0, 0) rotate(25deg);
-  animation: vipShimmerSweep 1.5s cubic-bezier(0.4, 0, 0.2, 1) 2 forwards;
+  transform: translate3d(-180%, 0, 0) rotate(24deg);
+  animation: vipShimmerSweep 1.9s cubic-bezier(0.4, 0, 0.2, 1) 4 forwards;
+  will-change: transform;
+}
+
+.new-order-timer-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3.5px;
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.new-order-timer-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #fde047 0%, #f59e0b 65%, #fb923c 100%);
+  transform-origin: left center;
+  transform: scaleX(1) translateZ(0);
+  animation: newOrderCountdown 8s linear 1 forwards;
   will-change: transform;
 }
 
 @keyframes orderPopEntry {
-  0% { transform: scale(0.92) translateZ(0); }
-  55% { transform: scale(1.05) translateZ(0); }
+  0% { transform: scale(0.88) translateZ(0); }
+  48% { transform: scale(1.06) translateZ(0); }
+  76% { transform: scale(0.99) translateZ(0); }
   100% { transform: scale(1) translateZ(0); }
 }
 
+@keyframes newOrderNameReveal {
+  0% { transform: translate3d(0, 4px, 0) scale(0.94); opacity: 0.45; }
+  100% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
+}
+
+@keyframes newOrderBadgePop {
+  0% { transform: translate3d(-50%, 6px, 0) scale(0.65); opacity: 0; }
+  60% { transform: translate3d(-50%, -1px, 0) scale(1.08); opacity: 1; }
+  100% { transform: translate3d(-50%, 0, 0) scale(1); opacity: 1; }
+}
+
+@keyframes newOrderDotPulse {
+  0%, 100% { transform: scale(1) translateZ(0); opacity: 1; }
+  50% { transform: scale(1.45) translateZ(0); opacity: 0.45; }
+}
+
 @keyframes vipShimmerSweep {
-  0% { transform: translate3d(-180%, 0, 0) rotate(25deg); }
-  100% { transform: translate3d(320%, 0, 0) rotate(25deg); }
+  0% { transform: translate3d(-180%, 0, 0) rotate(24deg); }
+  100% { transform: translate3d(320%, 0, 0) rotate(24deg); }
 }
 
 @keyframes newOrderRadar {
-  0% { transform: scale(0.98) translateZ(0); opacity: 0.78; }
-  80% { transform: scale(1.1) translateZ(0); opacity: 0; }
-  100% { transform: scale(1.12) translateZ(0); opacity: 0; }
+  0% { transform: scale(0.97) translateZ(0); opacity: 0.85; }
+  78% { transform: scale(1.12) translateZ(0); opacity: 0; }
+  100% { transform: scale(1.14) translateZ(0); opacity: 0; }
+}
+
+@keyframes newOrderCountdown {
+  0% { transform: scaleX(1) translateZ(0); }
+  100% { transform: scaleX(0) translateZ(0); }
 }
 
 /* Queue Badge (Neat Top-Right Pill) */
@@ -637,6 +739,29 @@ function isUnsavedOwner(name) {
 
   .stock-size-meta {
     font-size: 0.72em;
+  }
+
+  .new-order-pill {
+    top: -7px;
+    padding: 1px 6px;
+    font-size: 0.62em;
+  }
+
+  .new-order-timer-track {
+    height: 3px;
+    border-radius: 0 0 10px 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stock-item.sold.new-order,
+  .stock-item.sold.new-order::after,
+  .stock-item.sold.new-order .stock-status,
+  .new-order-pill,
+  .new-order-dot,
+  .new-order-shimmer::before,
+  .new-order-timer-fill {
+    animation: none !important;
   }
 }
 </style>

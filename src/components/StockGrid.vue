@@ -1555,6 +1555,9 @@ watch(
     }
 
     if (!newVal || Object.keys(newVal).length === 0) {
+      if (activeVid && stockStore.loadedVideoId === activeVid) {
+        hydratedVideoId = activeVid;
+      }
       cancelledItems.value.clear();
       Object.keys(cancelledTimers).forEach((key) => {
         clearTimeout(cancelledTimers[key]);
@@ -2630,7 +2633,7 @@ watch(
     );
     grid-auto-rows: minmax(92px, auto);
     gap: 6px;
-    padding: 6px;
+    padding: 10px 6px 6px;
   }
 }
 

@@ -3397,15 +3397,22 @@ body.swal2-height-auto {
   overflow: hidden !important;
 }
 
-/* ♿ Respect OS Reduced Motion preference (battery & visual comfort on iPad/mobile) */
+/* ♿ Respect OS Reduced Motion preference while keeping essential live-order visual alerts active
+   (Windows laptops with OS window-minimize animation turned off report prefers-reduced-motion: reduce) */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  html,
+  body,
+  .stock-grid,
+  #chat-viewport {
+    scroll-behavior: auto !important;
+  }
+
+  .mini-shimmer,
+  .mini-shimmer-slide,
+  .ds-pack-tonight,
+  .badge-nick.vip-admin {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }
 

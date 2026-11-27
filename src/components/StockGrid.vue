@@ -805,7 +805,7 @@ function setQueueInputRef(el, index) {
 }
 
 const soldCount = computed(
-  () => Object.values(stockStore.stockData).filter((item) => item.owner).length,
+  () => Object.values(stockStore.stockData || {}).filter((item) => item?.owner).length,
 );
 
 const soldPercentage = computed(() => {
@@ -986,8 +986,8 @@ const progressBarColor = computed(() => {
 
 const uniqueBuyerNames = computed(() => {
   const names = new Set();
-  Object.values(stockStore.stockData).forEach((item) => {
-    if (item.owner) names.add(item.owner);
+  Object.values(stockStore.stockData || {}).forEach((item) => {
+    if (item?.owner) names.add(item.owner);
   });
   return Array.from(names).sort();
 });
@@ -1033,8 +1033,8 @@ function getChannelShortText(channel) {
 // 🛢 นับจำนวนสินค้าต่อ owner (แสดงเฉพาะ >= 2 ชิ้น)
 const ownerItemCounts = computed(() => {
   const counts = {};
-  Object.values(stockStore.stockData).forEach((item) => {
-    if (item.owner) {
+  Object.values(stockStore.stockData || {}).forEach((item) => {
+    if (item?.owner) {
       counts[item.owner] = (counts[item.owner] || 0) + 1;
     }
   });
@@ -1578,50 +1578,67 @@ watch(
     }
 
     // ✅ Detect new orders & queue promotions (empty -> sold, or owner changed via queue)
+    let nextNewOrders = null;
+    let nextCancelled = null;
+
     Object.keys(newVal).forEach((key) => {
-      const num = parseInt(key);
+      const num = parseInt(key, 10);
       const newItem = newVal[key];
+      if (!newItem || typeof newItem !== "object" || !Number.isFinite(num) || num < 1) return;
       const oldItem = oldVal?.[key];
       const isNewOrPromoted =
-        newItem.owner &&
+        Boolean(newItem.owner) &&
         (!oldItem || !oldItem.owner || oldItem.owner !== newItem.owner);
       if (isNewOrPromoted) {
         // ถ้าเป็น order ใหม่ ให้เคลียร์ cancelled state ออก (กรณีคิวเลื่อนขึ้น)
         if (cancelledItems.value.has(num)) {
           clearTimeout(cancelledTimers[num]);
           delete cancelledTimers[num];
-          cancelledItems.value.delete(num);
+          if (!nextCancelled) nextCancelled = new Map(cancelledItems.value);
+          nextCancelled.delete(num);
         }
-        newOrders.value.add(num);
+        if (!nextNewOrders) nextNewOrders = new Set(newOrders.value);
+        nextNewOrders.add(num);
         if (newOrdersTimers[num]) clearTimeout(newOrdersTimers[num]);
         newOrdersTimers[num] = setTimeout(() => {
-          newOrders.value.delete(num);
+          const updated = new Set(newOrders.value);
+          updated.delete(num);
+          newOrders.value = updated;
           delete newOrdersTimers[num];
         }, 8000);
         scrollToItem(num);
       }
     });
 
+    if (nextNewOrders) {
+      newOrders.value = nextNewOrders;
+    }
+
     // ✅ Detect cancellations (owner disappeared)
     if (oldVal) {
       Object.keys(oldVal).forEach((key) => {
-        const num = parseInt(key);
+        const num = parseInt(key, 10);
         const oldItem = oldVal[key];
         const newItem = newVal[key];
+        if (!oldItem || typeof oldItem !== "object" || !Number.isFinite(num) || num < 1) return;
         // เฉพาะกรณี: เดิมมี owner แต่ตอนนี้ไม่มีแล้ว (ถูกยกเลิก)
-        if (oldItem?.owner && (!newItem || !newItem.owner)) {
+        if (oldItem.owner && (!newItem || !newItem.owner)) {
           const previousOwner = oldItem.owner;
-          // ตั้งค่า blink effect
-          cancelledItems.value.set(num, previousOwner);
-          // เคลียร์ timer เก่า (กันซ้ำ)
+          if (!nextCancelled) nextCancelled = new Map(cancelledItems.value);
+          nextCancelled.set(num, previousOwner);
           if (cancelledTimers[num]) clearTimeout(cancelledTimers[num]);
-          // ตั้ง timer 10 วินาที แล้วหายไป
           cancelledTimers[num] = setTimeout(() => {
-            cancelledItems.value.delete(num);
+            const updated = new Map(cancelledItems.value);
+            updated.delete(num);
+            cancelledItems.value = updated;
             delete cancelledTimers[num];
           }, 10000);
         }
       });
+    }
+
+    if (nextCancelled) {
+      cancelledItems.value = nextCancelled;
     }
   },
   { deep: true },

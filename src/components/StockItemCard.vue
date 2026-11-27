@@ -93,6 +93,9 @@
       <span>ใหม่</span>
     </div>
 
+    <!-- 💥 Initial Golden Burst Flash (แฟลชแสงทองตอนเพิ่งจองเข้า 0.75s) -->
+    <div v-if="isNewOrder && item.owner" class="new-order-flash" aria-hidden="true"></div>
+
     <!-- 🌟 VIP Shimmer Beam (แสงทองวิ่งผ่านตอนจองใหม่) -->
     <div v-if="isNewOrder && item.owner" class="new-order-shimmer" aria-hidden="true"></div>
 
@@ -173,6 +176,7 @@ function isUnsavedOwner(name) {
 
 @media (hover: hover) {
   .stock-item:hover {
+    content-visibility: visible;
     border-style: solid;
     border-color: rgba(229, 184, 105, 0.55);
     background: rgba(24, 31, 48, 0.85);
@@ -200,8 +204,9 @@ function isUnsavedOwner(name) {
   box-shadow: 0 4px 14px rgba(153, 27, 27, 0.25), inset 0 1px 0 rgba(254, 202, 202, 0.16);
 }
 
-/* 🔎 Search / Jump Highlight */
-.stock-item.highlight {
+/* 🔎 Search / Jump Highlight (do not override active new-order animation) */
+.stock-item.highlight:not(.new-order) {
+  content-visibility: visible;
   border-color: #e5b869 !important;
   box-shadow:
     0 0 0 2px rgba(229, 184, 105, 0.5),
@@ -308,34 +313,45 @@ function isUnsavedOwner(name) {
 }
 
 /* ======================================================
-   ✨ BOOKING ANIMATION (CF Confirmed — Clear Luxury Ruby-Gold Pop, 60fps GPU-Only)
+   ✨ BOOKING ANIMATION (CF Confirmed — Dual-Ring Ruby-Gold Pop, 60fps GPU-Only)
    ====================================================== */
 .stock-item.sold.new-order {
-  animation: orderPopEntry 0.56s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  /* Disable paint containment while animating so floating badge, halo rings & glow never clip */
+  content-visibility: visible;
+  animation: orderPopEntry 0.62s cubic-bezier(0.22, 1, 0.36, 1) 1;
   background: linear-gradient(
     155deg,
-    rgba(217, 119, 6, 0.46) 0%,
-    rgba(180, 42, 24, 0.74) 50%,
-    rgba(92, 16, 16, 0.94) 100%
+    rgba(234, 179, 8, 0.48) 0%,
+    rgba(194, 65, 12, 0.72) 44%,
+    rgba(105, 18, 18, 0.95) 100%
   );
   border: 2px solid #fde047 !important;
   box-shadow:
-    0 0 0 2px rgba(250, 204, 21, 0.42),
-    0 8px 26px rgba(245, 158, 11, 0.34),
-    inset 0 1px 0 rgba(254, 249, 195, 0.38);
-  z-index: 10 !important;
+    0 0 0 2.5px rgba(253, 224, 71, 0.55),
+    0 10px 30px rgba(245, 158, 11, 0.44),
+    inset 0 1px 0 rgba(254, 249, 195, 0.5) !important;
+  z-index: 14 !important;
 }
 
+.stock-item.sold.new-order::before,
 .stock-item.sold.new-order::after {
   content: "";
   position: absolute;
   inset: -4px;
   border-radius: 18px;
-  border: 2px solid rgba(253, 224, 71, 0.85);
+  border: 2px solid rgba(253, 224, 71, 0.9);
   pointer-events: none;
-  animation: newOrderRadar 1.9s cubic-bezier(0.16, 1, 0.3, 1) 4 forwards;
   will-change: transform, opacity;
   z-index: -1;
+}
+
+.stock-item.sold.new-order::before {
+  animation: newOrderRadar 1.9s cubic-bezier(0.16, 1, 0.3, 1) 4 forwards;
+}
+
+.stock-item.sold.new-order::after {
+  border-color: rgba(251, 146, 60, 0.78);
+  animation: newOrderRadar 1.9s cubic-bezier(0.16, 1, 0.3, 1) 0.55s 4 forwards;
 }
 
 /* Keep background-free stock number invariant even during new-order highlight */
@@ -344,35 +360,52 @@ function isUnsavedOwner(name) {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  text-shadow: 0 0 12px rgba(253, 224, 71, 0.9), 0 1px 3px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 0 12px rgba(253, 224, 71, 0.95), 0 1px 3px rgba(0, 0, 0, 0.85);
 }
 
 .stock-item.sold.new-order .stock-status {
   color: #fffef0;
-  animation: newOrderNameReveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) 1;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.78);
+  animation: newOrderNameReveal 0.48s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.82);
+}
+
+.new-order-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(254, 249, 195, 0.92) 0%,
+    rgba(250, 204, 21, 0.45) 48%,
+    transparent 82%
+  );
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  animation: newOrderFlashBurst 0.8s cubic-bezier(0.22, 1, 0.36, 1) 1 forwards;
+  will-change: transform, opacity;
 }
 
 .new-order-pill {
   position: absolute;
-  top: -9px;
+  top: -10px;
   left: 50%;
   transform: translate3d(-50%, 0, 0);
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1.5px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #fef08a 0%, #f59e0b 100%);
+  background: linear-gradient(135deg, #fef9c3 0%, #facc15 48%, #f59e0b 100%);
   color: #1c1917;
-  font-size: 0.68em;
+  font-size: 0.7em;
   font-weight: 800;
-  letter-spacing: 0.25px;
+  letter-spacing: 0.3px;
   line-height: 1.25;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45), 0 0 0 1.5px rgba(254, 249, 195, 0.65);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1.5px rgba(254, 249, 195, 0.8);
   pointer-events: none;
-  z-index: 5;
-  animation: newOrderBadgePop 0.48s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  z-index: 6;
+  animation: newOrderBadgePop 0.52s cubic-bezier(0.22, 1, 0.36, 1) 1;
   will-change: transform, opacity;
 }
 
@@ -381,7 +414,7 @@ function isUnsavedOwner(name) {
   height: 6px;
   border-radius: 50%;
   background: #dc2626;
-  animation: newOrderDotPulse 1.6s ease-in-out 5;
+  animation: newOrderDotPulse 1.4s ease-in-out 5;
   will-change: transform, opacity;
 }
 
@@ -399,18 +432,18 @@ function isUnsavedOwner(name) {
   position: absolute;
   top: -60%;
   left: 0;
-  width: 56%;
+  width: 60%;
   height: 220%;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.1) 20%,
-    rgba(254, 240, 138, 0.48) 50%,
-    rgba(255, 255, 255, 0.3) 75%,
+    rgba(255, 255, 255, 0.14) 20%,
+    rgba(254, 249, 195, 0.62) 50%,
+    rgba(255, 255, 255, 0.36) 75%,
     transparent 100%
   );
   transform: translate3d(-180%, 0, 0) rotate(24deg);
-  animation: vipShimmerSweep 1.9s cubic-bezier(0.4, 0, 0.2, 1) 4 forwards;
+  animation: vipShimmerSweep 1.85s cubic-bezier(0.4, 0, 0.2, 1) 4 forwards;
   will-change: transform;
 }
 
@@ -419,18 +452,18 @@ function isUnsavedOwner(name) {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 3.5px;
+  height: 4px;
   border-radius: 0 0 12px 12px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.32);
   pointer-events: none;
-  z-index: 4;
+  z-index: 5;
 }
 
 .new-order-timer-fill {
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #fde047 0%, #f59e0b 65%, #fb923c 100%);
+  background: linear-gradient(90deg, #fef08a 0%, #facc15 55%, #fb923c 100%);
   transform-origin: left center;
   transform: scaleX(1) translateZ(0);
   animation: newOrderCountdown 8s linear 1 forwards;
@@ -438,26 +471,34 @@ function isUnsavedOwner(name) {
 }
 
 @keyframes orderPopEntry {
-  0% { transform: scale(0.88) translateZ(0); }
-  48% { transform: scale(1.06) translateZ(0); }
-  76% { transform: scale(0.99) translateZ(0); }
+  0% { transform: scale(0.84) translateZ(0); }
+  42% { transform: scale(1.08) translateZ(0); }
+  70% { transform: scale(0.98) translateZ(0); }
+  86% { transform: scale(1.02) translateZ(0); }
   100% { transform: scale(1) translateZ(0); }
 }
 
+@keyframes newOrderFlashBurst {
+  0% { transform: scale(0.85) translateZ(0); opacity: 0.95; }
+  45% { transform: scale(1.03) translateZ(0); opacity: 0.45; }
+  100% { transform: scale(1.08) translateZ(0); opacity: 0; }
+}
+
 @keyframes newOrderNameReveal {
-  0% { transform: translate3d(0, 4px, 0) scale(0.94); opacity: 0.45; }
+  0% { transform: translate3d(0, 6px, 0) scale(0.9); opacity: 0.35; }
+  65% { transform: translate3d(0, -1px, 0) scale(1.04); opacity: 1; }
   100% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
 }
 
 @keyframes newOrderBadgePop {
-  0% { transform: translate3d(-50%, 6px, 0) scale(0.65); opacity: 0; }
-  60% { transform: translate3d(-50%, -1px, 0) scale(1.08); opacity: 1; }
+  0% { transform: translate3d(-50%, 8px, 0) scale(0.55); opacity: 0; }
+  58% { transform: translate3d(-50%, -2px, 0) scale(1.12); opacity: 1; }
   100% { transform: translate3d(-50%, 0, 0) scale(1); opacity: 1; }
 }
 
 @keyframes newOrderDotPulse {
   0%, 100% { transform: scale(1) translateZ(0); opacity: 1; }
-  50% { transform: scale(1.45) translateZ(0); opacity: 0.45; }
+  50% { transform: scale(1.55) translateZ(0); opacity: 0.4; }
 }
 
 @keyframes vipShimmerSweep {
@@ -466,9 +507,9 @@ function isUnsavedOwner(name) {
 }
 
 @keyframes newOrderRadar {
-  0% { transform: scale(0.97) translateZ(0); opacity: 0.85; }
-  78% { transform: scale(1.12) translateZ(0); opacity: 0; }
-  100% { transform: scale(1.14) translateZ(0); opacity: 0; }
+  0% { transform: scale(0.96) translateZ(0); opacity: 0.92; }
+  75% { transform: scale(1.16) translateZ(0); opacity: 0; }
+  100% { transform: scale(1.18) translateZ(0); opacity: 0; }
 }
 
 @keyframes newOrderCountdown {
@@ -643,6 +684,7 @@ function isUnsavedOwner(name) {
    🚨 CANCELLATION ANIMATION (GPU-only Shake + Soft Crimson Pulse)
    ====================================================== */
 .stock-item.cancelled-blink {
+  content-visibility: visible;
   animation: cancelShakeEntry 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
   border: 1.5px solid rgba(244, 63, 94, 0.88) !important;
   background: rgba(127, 29, 29, 0.28);
@@ -754,14 +796,33 @@ function isUnsavedOwner(name) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stock-item.sold.new-order,
-  .stock-item.sold.new-order::after,
-  .stock-item.sold.new-order .stock-status,
-  .new-order-pill,
-  .new-order-dot,
-  .new-order-shimmer::before,
+  /* Preserve essential live-order visual cues even when Windows disables OS window animations */
+  .stock-item.sold.new-order {
+    animation: orderPopEntry 0.45s cubic-bezier(0.22, 1, 0.36, 1) 1 !important;
+  }
+  .stock-item.sold.new-order::before {
+    animation: newOrderRadar 1.9s cubic-bezier(0.16, 1, 0.3, 1) 4 forwards !important;
+  }
+  .stock-item.sold.new-order::after {
+    animation: newOrderRadar 1.9s cubic-bezier(0.16, 1, 0.3, 1) 0.55s 4 forwards !important;
+  }
+  .stock-item.sold.new-order .stock-status {
+    animation: newOrderNameReveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) 1 !important;
+  }
+  .new-order-flash {
+    animation: newOrderFlashBurst 0.8s cubic-bezier(0.22, 1, 0.36, 1) 1 forwards !important;
+  }
+  .new-order-pill {
+    animation: newOrderBadgePop 0.48s cubic-bezier(0.22, 1, 0.36, 1) 1 !important;
+  }
+  .new-order-dot {
+    animation: newOrderDotPulse 1.4s ease-in-out 5 !important;
+  }
+  .new-order-shimmer::before {
+    animation: vipShimmerSweep 1.85s cubic-bezier(0.4, 0, 0.2, 1) 4 forwards !important;
+  }
   .new-order-timer-fill {
-    animation: none !important;
+    animation: newOrderCountdown 8s linear 1 forwards !important;
   }
 }
 </style>

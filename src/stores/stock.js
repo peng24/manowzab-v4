@@ -15,6 +15,33 @@ import { useVoiceLearningStore } from "./voiceLearning";
 import { syncDeliveryCustomerForOwner } from "../utils/deliverySync";
 
 /**
+ * Normalizes a Firebase RTDB stock snapshot into a plain object without null/undefined holes.
+ * Firebase RTDB serializes small numeric keys (1, 2, 3...) as a sparse JS Array `[null, item1, ...]`.
+ * @param {any} raw
+ * @returns {Object}
+ */
+export function normalizeStockSnapshot(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const normalized = {};
+  if (Array.isArray(raw)) {
+    for (let i = 0; i < raw.length; i++) {
+      const entry = raw[i];
+      if (entry && typeof entry === "object") {
+        normalized[i] = entry;
+      }
+    }
+    return normalized;
+  }
+  for (const key of Object.keys(raw)) {
+    const entry = raw[key];
+    if (entry && typeof entry === "object") {
+      normalized[key] = entry;
+    }
+  }
+  return normalized;
+}
+
+/**
  * Stock Store
  * Manages inventory, orders, and real-time syncing with Firebase.
  */
@@ -80,7 +107,7 @@ export const useStockStore = defineStore("stock", () => {
 
     let isInitialLoad = true;
     const unsubStock = onValue(stockRef, (snapshot) => {
-      const val = snapshot.val() || {};
+      const val = normalizeStockSnapshot(snapshot.val());
       stockData.value = val;
       loadedVideoId.value = videoId;
 

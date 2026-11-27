@@ -17,6 +17,18 @@
 
 export const changelog = [
   {
+    version: '5.8.5',
+    date: '2026-11-27',
+    changes: {
+      fixed: [
+        'แก้สาเหตุที่แอนิเมชันจองใหม่ไม่ทำงาน 3 จุดพร้อมกัน — (1) เพิ่ม `normalizeStockSnapshot()` ใน `stock.js` แปลง Firebase RTDB sparse array (`[null, item1, ...]`) เป็น object สะอาด ป้องกันตัวจับออเดอร์ใหม่ใน `StockGrid.vue` พังที่ช่อง 0, (2) ปลด `content-visibility: visible` ขณะการ์ดเป็น `.new-order`/`.cancelled-blink` และกัน `.highlight:not(.new-order)` ไม่ให้ตัดวงแหวน/ป้ายลอย/ทับสไตล์, และ (3) เอา wildcard `* { animation-duration: 0.01ms !important }` ใน `style.css` ออกเพื่อให้แอนิเมชันจองใหม่ทำงานได้แม้บนเครื่อง Windows ที่ปิด Animation effects (`MinAnimate=0`)',
+      ],
+      improved: [
+        'อัปเกรดแอนิเมชันสินค้าจองใหม่ใน `StockItemCard.vue` (60fps GPU-only ตลอด 8 วินาที) — เพิ่มแฟลชแสงทองตอนเข้า (`.new-order-flash`), วงแหวนแสงทองคู่ 2 ชั้นไล่จังหวะ (`::before`/`::after`), เด้ง Spring Pop, ป้ายลอย `● ใหม่` สีทองแชมเปญ, แสงชิมเมอร์ปาดผ่าน 4 รอบ, ชื่อลูกค้าเด้งชัด และแถบนับถอยหลังสีทองด้านล่างการ์ด',
+      ],
+    },
+  },
+  {
     version: '5.8.4',
     date: '2026-11-27',
     changes: {
@@ -235,18 +247,6 @@ export const changelog = [
       ],
       improved: [
         'จัดลำดับการวนสลับเสียงบนปุ่ม Header เป็น `A` (Chirp 3 Achernar) ➔ `C` (Chirp 3 Aoede) ➔ `S` (Google Standard-A) ➔ `🤖` (Native TTS) พร้อมคงระบบสำรองอัตโนมัติ `Chirp 3: HD ➔ Standard-A ➔ Native`',
-      ],
-    },
-  },
-  {
-    version: '5.6.0',
-    date: '2026-11-16',
-    changes: {
-      added: [
-        'อัปเกรดเสียงอ่านแชทเป็น Google Cloud Chirp 3: HD (`th-TH-Chirp3-HD-Aoede`) เป็นเสียงหลัก (ปุ่ม `C1`/`C2` บน Header) — เสียงผู้หญิงโทนอบอุ่น เป็นกันเอง และเป็นธรรมชาติระดับคนจริง พร้อมโควตาฟรี 1 ล้านตัวอักษร/เดือน',
-      ],
-      improved: [
-        'ระบบสลับเสียงสำรองอัตโนมัติ (Chirp 3: HD ➔ Google Standard-A ➔ Native TTS) — หาก Chirp 3: HD ขัดข้องหรือ Timeout ระบบจะสลับไปใช้เสียงเดิม (`th-TH-Standard-A`) และเสียงในเครื่องทันทีโดยไม่สะดุด พร้อมแยก Cooldown รายเสียงไม่ให้บล็อกการ Fallback และยังคงวนสลับโหมด `C` / `S` / `🤖` บน Header ได้เหมือนเดิม',
       ],
     },
   },

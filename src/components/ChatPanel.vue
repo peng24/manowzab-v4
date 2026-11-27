@@ -1024,6 +1024,7 @@ function editProxyCustomer(chat) {
       realName: proxyName,
       authorName: proxyName,
       uid: chat.proxyUid || null,
+      isProxyEdit: true,
     });
   }
 }

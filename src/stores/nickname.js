@@ -4,6 +4,7 @@ import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "../utils/logger";
 import { sanitizeDbKey } from "../utils/dbUtils";
+import { isProxyUid } from "../utils/deliverySync";
 
 export const useNicknameStore = defineStore("nickname", () => {
   const nicknames = ref({});
@@ -50,12 +51,28 @@ export const useNicknameStore = defineStore("nickname", () => {
     };
   }
 
+  function isProxyOrManualBookingUid(uid) {
+    if (!uid || typeof uid !== "string") return false;
+    return uid === "manual" || isProxyUid(uid);
+  }
+
+  function isHandleName(name) {
+    return typeof name === "string" && name.trim().startsWith("@");
+  }
+
   function hasNickname(uid, realName) {
-    const safeUid = uid ? sanitizeDbKey(uid) : null;
+    const isProxyBooking = isProxyOrManualBookingUid(uid);
+    const safeUid = uid && uid !== "manual" ? sanitizeDbKey(uid) : null;
+    if ((safeUid && nicknames.value[safeUid]) || (uid && uid !== "manual" && nicknames.value[uid])) {
+      return true;
+    }
+    // 🛡️ Proxy/manual bookings already store the intended customer display name in `owner`;
+    // never let a stale `nicknames/<plainName>` override override manually-typed or admin-proxy names.
+    if (isProxyBooking && !isHandleName(realName)) {
+      return false;
+    }
     const safeRealName = realName ? sanitizeDbKey(realName) : null;
     return !!(
-      (safeUid && nicknames.value[safeUid]) ||
-      (uid && nicknames.value[uid]) ||
       (safeRealName && nicknames.value[safeRealName]) ||
       (realName && nicknames.value[realName])
     );
@@ -63,17 +80,23 @@ export const useNicknameStore = defineStore("nickname", () => {
 
   // 👁️ สำหรับแสดงผลบนจอ (เอาชื่อสั้นๆ เดิมๆ)
   function getNickname(uid, realName) {
-    const safeUid = uid ? sanitizeDbKey(uid) : null;
-    const safeRealName = realName ? sanitizeDbKey(realName) : null;
+    const isProxyBooking = isProxyOrManualBookingUid(uid);
+    const safeUid = uid && uid !== "manual" ? sanitizeDbKey(uid) : null;
 
     if (safeUid && nicknames.value[safeUid]) {
       const entry = nicknames.value[safeUid];
       return typeof entry === "object" ? entry.nick : entry;
     }
-    if (uid && nicknames.value[uid]) {
+    if (uid && uid !== "manual" && nicknames.value[uid]) {
       const entry = nicknames.value[uid];
       return typeof entry === "object" ? entry.nick : entry;
     }
+    // 🛡️ Proxy/manual bookings already carry the admin-entered customer name;
+    // only fall back to `nicknames[realName]` for real YouTube UIDs or @handles.
+    if (isProxyBooking && !isHandleName(realName)) {
+      return realName;
+    }
+    const safeRealName = realName ? sanitizeDbKey(realName) : null;
     if (safeRealName && nicknames.value[safeRealName]) {
       const entry = nicknames.value[safeRealName];
       return typeof entry === "object" ? entry.nick : entry;

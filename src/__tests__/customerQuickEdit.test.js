@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { normalizeName, parseSingleAddress, extractPhone, extractPostalCode } from "../utils/addressParser";
 import { sanitizeDbKey } from "../utils/dbUtils";
-import { normalizeCustomerName } from "../utils/deliverySync";
+import { isProxyUid, normalizeCustomerName } from "../utils/deliverySync";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 /**
  * Helper to simulate multiPathUpdates for CustomerQuickEditModal
@@ -29,15 +31,22 @@ function buildQuickEditUpdates({
 
   const updates = {};
 
-  // 1. Nickname
+  // 1. Nickname (mirrors CustomerQuickEditModal.vue proxy safety guard)
+  const originalUid = chat.uid || null;
+  const isProxyContext = Boolean(chat.isProxyEdit) || (originalUid !== null && (originalUid === "manual" || isProxyUid(originalUid)));
   if (trimmedNick) {
-    updates[`nicknames/${safeTargetUid}`] = {
-      nick: trimmedNick,
-      realName: rawReal,
-      updatedAt: timestamp,
-    };
+    const canWriteTargetUid =
+      !isProxyContext ||
+      (Boolean(originalUid) && originalUid !== "manual" && safeTargetUid !== "invalid_key");
+    if (canWriteTargetUid) {
+      updates[`nicknames/${safeTargetUid}`] = {
+        nick: trimmedNick,
+        realName: rawReal,
+        updatedAt: timestamp,
+      };
+    }
 
-    if (chat.uid && rawReal && chat.uid !== rawReal) {
+    if (!isProxyContext && originalUid && rawReal && originalUid !== rawReal) {
       const safeReal = sanitizeDbKey(rawReal);
       if (safeReal !== safeTargetUid) {
         updates[`nicknames/${safeReal}`] = {
@@ -299,6 +308,46 @@ describe("CustomerQuickEditModal Logic", () => {
 
     // Item 15 (other customer - untouched)
     expect(updates["stock/live_2026_09_28/15/owner"]).toBeUndefined();
+  });
+
+  it("never writes nicknames/<proxyName> when editing a proxy customer name", () => {
+    const proxyChat = {
+      uid: "multi-proxy-1794320083374-tcwfa",
+      displayName: "กุ้ง",
+      realName: "กุ้ง",
+      authorName: "กุ้ง",
+      isProxyEdit: true,
+    };
+
+    const updates = buildQuickEditUpdates({
+      chat: proxyChat,
+      nickname: "พี่กวาง",
+      timestamp: 1794320275275,
+    });
+
+    expect(updates["nicknames/multi-proxy-1794320083374-tcwfa"]).toEqual({
+      nick: "พี่กวาง",
+      realName: "กุ้ง",
+      updatedAt: 1794320275275,
+    });
+    // Must NEVER hijack the plain name "กุ้ง" globally
+    expect(updates["nicknames/กุ้ง"]).toBeUndefined();
+
+    // When proxy edit has uid=null, must NOT write nicknames/กุ้ง either
+    const proxyNullUidUpdates = buildQuickEditUpdates({
+      chat: { displayName: "กุ้ง", realName: "กุ้ง", uid: null, isProxyEdit: true },
+      nickname: "พี่กวาง",
+      timestamp: 1794320275275,
+    });
+    expect(proxyNullUidUpdates["nicknames/กุ้ง"]).toBeUndefined();
+  });
+
+  it("source enforces proxy nickname guard in ChatPanel and CustomerQuickEditModal", () => {
+    const modalSrc = readFileSync(resolve(process.cwd(), "src/components/CustomerQuickEditModal.vue"), "utf8");
+    const chatPanelSrc = readFileSync(resolve(process.cwd(), "src/components/ChatPanel.vue"), "utf8");
+    expect(chatPanelSrc).toContain("isProxyEdit: true");
+    expect(modalSrc).toContain("isProxyContext");
+    expect(modalSrc).toContain("!isProxyContext && originalUid && rawReal");
   });
 });
 

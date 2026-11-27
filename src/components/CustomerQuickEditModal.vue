@@ -215,7 +215,7 @@ import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useBlacklistStore } from "../stores/blacklist";
-import { normalizeCustomerName, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
+import { isProxyUid, normalizeCustomerName, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
 import Swal from "sweetalert2";
 
 const chatStore = useChatStore();
@@ -569,15 +569,24 @@ async function save() {
   const multiPathUpdates = {};
 
   // 1. Save Nickname
+  // 🛡️ Guard: Proxy/manual edits (e.g. changing admin proxy "กุ้ง" -> "พี่กวาง") MUST NEVER write
+  // `nicknames/<proxyName>` because that permanently hijacks the name "กุ้ง" for all future bookings.
+  const isProxyContext = Boolean(currentChat.value.isProxyEdit) || (originalUid !== null && (originalUid === "manual" || isProxyUid(originalUid)));
   const safeTargetUid = sanitizeDbKey(targetUid);
   if (trimmedNick) {
-    multiPathUpdates[`nicknames/${safeTargetUid}`] = {
-      nick: trimmedNick,
-      realName: rawReal,
-      updatedAt: timestamp,
-    };
+    const canWriteTargetUid =
+      !isProxyContext ||
+      (Boolean(originalUid) && originalUid !== "manual" && safeTargetUid !== "invalid_key");
 
-    if (originalUid && rawReal && originalUid !== rawReal) {
+    if (canWriteTargetUid) {
+      multiPathUpdates[`nicknames/${safeTargetUid}`] = {
+        nick: trimmedNick,
+        realName: rawReal,
+        updatedAt: timestamp,
+      };
+    }
+
+    if (!isProxyContext && originalUid && rawReal && originalUid !== rawReal) {
       const safeReal = sanitizeDbKey(rawReal);
       if (safeReal !== safeTargetUid) {
         multiPathUpdates[`nicknames/${safeReal}`] = {

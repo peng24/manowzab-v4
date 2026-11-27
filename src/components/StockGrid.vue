@@ -1680,7 +1680,7 @@ function openQueueModal(num) {
     tempQueue.value.push({
       owner: item.owner,
       originalOwner: item.owner,
-      uid: item.uid || "manual",
+      uid: item.uid || resolveUidForCustomerName(item.owner),
       time: item.time,
       source: item.source,
       backdated: item.backdated || null,

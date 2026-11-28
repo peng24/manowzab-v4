@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.8.6 — 5-Layer Customer Identity Safety & Duplicate Nickname Prevention — 2026-11-28** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.9.0 — Address Book Duplicate Detection & Atomic Merge — 2026-11-28 (42 Test Files / 968 Tests + Vite Build ผ่านครบ)** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -258,6 +258,7 @@ description: Mandatory verification checklist after every code change
 | 15.8 | Customer Selector & Filter Chips | `src/components/ShippingLabelModal.vue` | ค้นหาชื่อผู้รับ, เลือก/ยกเลิกทั้งหมด, กรองเฉพาะที่ยังไม่พิมพ์ (`unprinted`) และสลับเลือกรายชื่อแบบ Checkbox ได้อย่างอิสระ |
 | 15.9 | Clean Borderless WYSIWYG Label Layout (130x76mm / 76x130mm) | `src/components/ShippingLabelModal.vue` | ดีไซน์สะอาดตา ไร้กรอบดำ ผู้ส่งอยู่ซ้าย ผู้รับอยู่ขวา ขนาดตัวหนังสือสั่งพิมพ์เทียบสัดส่วน 1:1 พอดีเป๊ะตามพรีวิวบนหน้าจอ (`13.5pt` ชื่อผู้รับ, `11pt` ที่อยู่พร้อมย่ออัตโนมัติเมื่อที่อยู่ยาว, `14pt` รหัสไปรษณีย์, `9.5pt` COD/โอน, `10pt` ผู้ส่ง) พร้อมตัวเลือกปรับสเกลฟอนต์ (`labelFontScale`: พอดีตามพรีวิว / กะทัดรัด / ตัวใหญ่) |
 | 15.10 | Multi-Address & Custom Recipient Name | `src/components/CustomerAddressModal.vue` | แยกชื่อผู้รับจริง (`recipientName`) จากชื่อ CF และรองรับการบันทึกหลายที่อยู่ต่อ 1 ลูกค้าลง Address Book |
+| 15.11 | Duplicate Customer Detection & Atomic Merge (`findDuplicateCustomerGroups`, `buildCustomerMergePlan`) | `src/utils/addressMergeUtils.js`, `src/components/AddressMergeModal.vue`, `src/pages/AddressPage.vue`, `src/__tests__/addressMergeUtils.test.js` | ตรวจหาลูกค้าที่ซ้ำหรือมีหลายไอดีแยกกัน (`UC...` + `manual-...`/`cust_...`) โดยแสดง **ไอดี (UID/YouTube Channel ID)**, **เบอร์โทร**, และ **ที่อยู่/ผู้รับ** เปรียบเทียบกันแบบเห็นชัดเจนทั้งโหมดอัตโนมัติและโหมดเลือกคู่รวมเอง (Manual Merge), เตือนสีแดงเมื่อพบ YouTube ID/เบอร์/ที่อยู่ขัดแย้งกัน, และรวมแบบ Atomic Multi-Path Update โดยรักษาทุกที่อยู่ที่ไม่ซ้ำ, ยึด YouTube Channel ID เป็นหลัก, รวม `sessions`/`totalBookings`/วันส่งเร็วสุดครบ 100%, ปฏิบัติตาม Rule #13 สำหรับ `nicknames/`, และซิงค์ `stock/{activeVideo}` อัตโนมัติ |
 
 ---
 
@@ -674,3 +675,12 @@ description: Mandatory verification checklist after every code change
 - **ผลตรวจ Automated**:
   - `compileall`: **✓ ผ่าน 0 errors / 0 warnings** (`src`, `scripts`, `run_live_launcher.py`, `setup_firebase_admin.py`, `tests`)
   - `unittest`: **✓ ผ่านครบ 123/123 Tests** (`1.135s`, รวม `tests/test_full_audit_wave123.py` 18 เคสใหม่ครอบคลุม Wave 1–3)
+
+## 🔀 ผลตรวจระบบตรวจและรวมลูกค้าซ้ำในสมุดที่อยู่ลูกค้า (2026-11-28)
+
+- **สิ่งที่พัฒนาและตรวจสอบ**:
+  1. **`src/utils/addressMergeUtils.js`**: สร้าง `buildInspectableCustomerRecords`, `compareCustomerPair`, `findDuplicateCustomerGroups`, และ `buildCustomerMergePlan` ตรวจเทียบ **ไอดี (YouTube Channel ID `UC...`, `@handle`, ไอดีชั่วคราว `cust_...`/`manual-...`, คีย์ `address_book`)**, **เบอร์โทร (normalized 9–10 หลัก)**, **ที่อยู่ (normalized + บ้านเลขที่/รหัสไปรษณีย์ + Dice similarity)**, **ชื่อผู้รับ**, และ **ชื่อซ้ำ/คล้ายกัน** พร้อมแยกกรณี `confidence` (`high` / `medium` / `warning`) และไม่จัดกลุ่มชื่อคล้ายที่มีเบอร์+ที่อยู่ต่างกันโดยพลการ
+  2. **`src/components/AddressMergeModal.vue` & `src/pages/AddressPage.vue`**: เพิ่มปุ่ม `รวมชื่อซ้ำ` พร้อมตัวเลขนับกลุ่มซ้ำบนหัวหน้าสมุดที่อยู่, แท็บกรอง `🔀 พบซ้ำ`, ป้าย `พบซ้ำ` / `ซ้ำ (N ไอดี)` + ปุ่มรวมในแต่ละแถว, และหน้าต่าง Modal 2 แท็บ (**พบซ้ำอัตโนมัติ** + **เลือกคู่รวมเอง Manual Merge**) ที่แสดง **ไอดี • เบอร์โทร • ที่อยู่** เปรียบเทียบชัดเจน เลือกชื่อหลัก/ติ๊กชื่อรองได้อิสระ พร้อม Atomic Multi-Path Update ที่รักษาทุกที่อยู่, `sessions`, `totalBookings`, วันส่ง, กฎ Rule #13 ของ `nicknames/`, และชื่อเจ้าของบนกระดานไลฟ์ปัจจุบัน
+  3. **ผลตรวจ Automated**:
+     - `npm test`: **✓ ผ่านครบ 42/42 Test Files / 968/968 Tests** (รวม `src/__tests__/addressMergeUtils.test.js` 11 เคสใหม่)
+     - `npm run build`: **✓ ผ่าน** (`AddressMergeModal` แยกเป็น lazy chunk `8.67 kB gzip`, `✓ built in 4.03s`)

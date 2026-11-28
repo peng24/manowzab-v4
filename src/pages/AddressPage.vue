@@ -24,6 +24,16 @@
         </div>
 
         <div class="ap-header-actions">
+          <button
+            class="ap-act-btn merge"
+            :class="{ 'has-dups': duplicateGroups.length > 0 }"
+            @click="openMergeModal('')"
+            title="ตรวจหาและรวมลูกค้าชื่อซ้ำ / ไอดีซ้ำ / เบอร์ซ้ำ / ที่อยู่ซ้ำ"
+          >
+            <i class="fa-solid fa-code-merge"></i>
+            <span>รวมชื่อซ้ำ</span>
+            <span v-if="duplicateGroups.length > 0" class="ap-merge-badge">{{ duplicateGroups.length }}</span>
+          </button>
           <button class="ap-act-btn add" @click="openAddCustomer" title="เพิ่มข้อมูลลูกค้า / ที่อยู่ใหม่">
             <i class="fa-solid fa-user-plus"></i> เพิ่มลูกค้าใหม่
           </button>
@@ -199,9 +209,21 @@
                     <span class="cust-main-name" @click="editCustomer(cust)" title="คลิกเพื่อแก้ไขข้อมูล">
                       {{ cust.name }}
                     </span>
-                    <span v-if="cust.totalBookings > 0" class="badge-vip" title="ยอดซื้อสะสม">
-                      ⭐ {{ cust.totalBookings }} ออเดอร์
-                    </span>
+                    <div class="cust-badges-row">
+                      <span v-if="cust.totalBookings > 0" class="badge-vip" title="ยอดซื้อสะสม">
+                        ⭐ {{ cust.totalBookings }} ออเดอร์
+                      </span>
+                      <button
+                        v-if="isCustomerDuplicate(cust)"
+                        type="button"
+                        class="badge-dup-trigger"
+                        @click.stop="openMergeModal(cust.name)"
+                        title="พบข้อมูลซ้ำกับรายชื่อหรือไอดีอื่น — คลิกเพื่อตรวจสอบไอดี เบอร์โทร ที่อยู่ และรวมชื่อ"
+                      >
+                        <i class="fa-solid fa-code-merge"></i>
+                        {{ cust.deliveryIds.length > 1 ? `ซ้ำ (${cust.deliveryIds.length} ไอดี)` : "พบซ้ำ" }}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </td>
@@ -292,6 +314,14 @@
                   <button class="row-act-btn edit" @click="editCustomer(cust)" title="แก้ไขข้อมูล">
                     <i class="fa-solid fa-pen-to-square"></i>
                   </button>
+                  <button
+                    class="row-act-btn merge"
+                    :class="{ highlight: isCustomerDuplicate(cust) }"
+                    @click="openMergeModal(cust.name)"
+                    title="ตรวจไอดี/เบอร์/ที่อยู่ และรวมชื่อซ้ำ"
+                  >
+                    <i class="fa-solid fa-code-merge"></i>
+                  </button>
                   <button class="row-act-btn copy" @click="copyDeliverySlip(cust)" title="คัดลอกข้อมูลส่งพัสดุ">
                     <i class="fa-solid fa-clipboard-list"></i>
                   </button>
@@ -315,6 +345,19 @@
         :addressBook="addressBook"
         @close="showImportModal = false"
       />
+
+      <!-- 🔀 Modal ตรวจสอบและรวมลูกค้าชื่อซ้ำ (เช็คไอดี เบอร์โทร ที่อยู่) -->
+      <AddressMergeModal
+        v-if="showMergeModal"
+        :visible="showMergeModal"
+        :groups="duplicateGroups"
+        :candidates="duplicateCandidates"
+        :addressBook="addressBook"
+        :deliveryCustomers="deliveryCustomers"
+        :nicknames="nicknamesMap"
+        :initialFocusCustomerName="mergeFocusName"
+        @close="showMergeModal = false"
+      />
     </template>
   </div>
 </template>
@@ -324,13 +367,16 @@ import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } fr
 import { useAuthStore } from "../stores/auth";
 import { useCustomerStore } from "../stores/customer";
 import { useBlacklistStore } from "../stores/blacklist";
+import { useNicknameStore } from "../stores/nickname";
 import AuthSplash from "../components/AuthSplash.vue";
 const AuthGate = defineAsyncComponent(() => import("../components/AuthGate.vue"));
 const CustomerQuickEditModal = defineAsyncComponent(() => import("../components/CustomerQuickEditModal.vue"));
 const AddressImportModal = defineAsyncComponent(() => import("../components/AddressImportModal.vue"));
+const AddressMergeModal = defineAsyncComponent(() => import("../components/AddressMergeModal.vue"));
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName } from "../utils/addressParser";
+import { findDuplicateCustomerGroups } from "../utils/addressMergeUtils";
 import Swal from "sweetalert2";
 
 let refreshTimer = null;
@@ -339,16 +385,20 @@ const baseUrl = import.meta.env.BASE_URL || "/";
 const authStore = useAuthStore();
 const customerStore = useCustomerStore();
 const blacklistStore = useBlacklistStore();
+const nicknameStore = useNicknameStore();
 
 // State (backed by Centralized Customer Store)
 const addressBook = computed(() => customerStore.addressBook || {});
 const deliveryCustomers = computed(() => customerStore.deliveryCustomersRaw || {});
 const deliveryCustomersList = computed(() => customerStore.deliveryCustomersList || []);
+const nicknamesMap = computed(() => nicknameStore.nicknames || {});
 const isRefreshing = ref(false);
 const searchQuery = ref("");
 const activeFilter = ref("all");
 const sortBy = ref("updatedAt");
 const showImportModal = ref(false);
+const showMergeModal = ref(false);
+const mergeFocusName = ref("");
 const searchInputRef = ref(null);
 const quickEditModalRef = ref(null);
 const cleanupFns = [];
@@ -365,6 +415,7 @@ function initListeners() {
   cleanupListeners();
   cleanupFns.push(customerStore.initCustomerListeners());
   cleanupFns.push(blacklistStore.initBlacklistListener());
+  cleanupFns.push(nicknameStore.initNicknameListener());
 }
 
 // Aggregated Unified Customer List
@@ -484,16 +535,49 @@ const allCustomers = computed(() => {
   return Array.from(map.values());
 });
 
+// Duplicate customer detection (checks ID, phone, address, recipient, and similar/split names)
+const duplicateAnalysis = computed(() =>
+  findDuplicateCustomerGroups({
+    addressBook: addressBook.value,
+    deliveryCustomers: deliveryCustomers.value,
+    nicknames: nicknamesMap.value,
+  })
+);
+const duplicateGroups = computed(() => duplicateAnalysis.value.groups || []);
+const duplicateCandidates = computed(() => duplicateAnalysis.value.candidates || []);
+const duplicateCustomerNormNames = computed(() => {
+  const set = new Set();
+  for (const g of duplicateGroups.value) {
+    for (const m of g.members) {
+      if (m.normName) set.add(m.normName);
+    }
+  }
+  return set;
+});
+
+function isCustomerDuplicate(cust) {
+  if (!cust) return false;
+  if (Array.isArray(cust.deliveryIds) && cust.deliveryIds.length > 1) return true;
+  return duplicateCustomerNormNames.value.has(normalizeName(cust.name));
+}
+
+function openMergeModal(focusName = "") {
+  mergeFocusName.value = focusName || "";
+  showMergeModal.value = true;
+}
+
 // Metrics
 const totalCustomersCount = computed(() => allCustomers.value.length);
 const withAddressCount = computed(() => allCustomers.value.filter((c) => c.hasAddress).length);
 const missingAddressCount = computed(() => allCustomers.value.filter((c) => !c.hasAddress).length);
 const multiAddressCount = computed(() => allCustomers.value.filter((c) => c.addressCount > 1).length);
 const vipCount = computed(() => allCustomers.value.filter((c) => c.totalBookings > 0).length);
+const duplicateCustomersCount = computed(() => allCustomers.value.filter((c) => isCustomerDuplicate(c)).length);
 
 // Filter chips
 const filterChips = computed(() => [
   { key: "all", label: "ทั้งหมด", count: totalCustomersCount.value },
+  { key: "duplicates", label: "🔀 พบซ้ำ", count: duplicateCustomersCount.value },
   { key: "hasAddr", label: "📍 มีที่อยู่แล้ว", count: withAddressCount.value },
   { key: "missingAddr", label: "⚠️ ยังไม่มีที่อยู่", count: missingAddressCount.value },
   { key: "multiAddr", label: "🏠 มีหลายที่อยู่", count: multiAddressCount.value },
@@ -507,7 +591,9 @@ const filteredCustomers = computed(() => {
   let list = allCustomers.value;
 
   // Filter Tab
-  if (activeFilter.value === "hasAddr") {
+  if (activeFilter.value === "duplicates") {
+    list = list.filter((c) => isCustomerDuplicate(c));
+  } else if (activeFilter.value === "hasAddr") {
     list = list.filter((c) => c.hasAddress);
   } else if (activeFilter.value === "missingAddr") {
     list = list.filter((c) => !c.hasAddress);
@@ -990,6 +1076,37 @@ html, body, #address-app {
   transform: translateY(-1px);
 }
 
+.ap-act-btn.merge {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+.ap-act-btn.merge.has-dups {
+  background: rgba(245, 158, 11, 0.24);
+  border-color: rgba(251, 191, 36, 0.7);
+  color: #fde68a;
+}
+.ap-act-btn.merge:hover {
+  background: rgba(245, 158, 11, 0.32);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.ap-merge-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #0b0f19;
+  font-size: 0.78em;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .ap-act-btn.import {
   background: rgba(59, 130, 246, 0.15);
   border-color: rgba(59, 130, 246, 0.4);
@@ -1275,7 +1392,7 @@ html, body, #address-app {
 .th-multi { width: 110px; text-align: center; }
 .th-status { width: 140px; }
 .th-updated { width: 110px; }
-.th-actions { width: 120px; text-align: center; }
+.th-actions { width: 146px; text-align: center; }
 
 .ap-table tbody tr {
   background: rgba(15, 23, 42, 0.6);
@@ -1337,6 +1454,14 @@ html, body, #address-app {
   text-decoration: underline;
 }
 
+.cust-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
 .badge-vip {
   font-size: 0.7em;
   font-weight: 700;
@@ -1346,7 +1471,28 @@ html, body, #address-app {
   padding: 1px 5px;
   border-radius: 4px;
   width: fit-content;
-  margin-top: 2px;
+}
+
+.badge-dup-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.69em;
+  font-weight: 700;
+  font-family: inherit;
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.22);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.badge-dup-trigger:hover {
+  background: rgba(245, 158, 11, 0.38);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 /* Recipient Cell */
@@ -1524,6 +1670,8 @@ html, body, #address-app {
 }
 
 .row-act-btn.edit:hover { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); }
+.row-act-btn.merge.highlight { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border-color: rgba(245, 158, 11, 0.45); }
+.row-act-btn.merge:hover { background: rgba(245, 158, 11, 0.28); color: #fde68a; border-color: rgba(251, 191, 36, 0.6); }
 .row-act-btn.copy:hover { background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4); }
 .row-act-btn.delete:hover { background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4); }
 

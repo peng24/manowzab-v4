@@ -212,6 +212,7 @@ import { ref as dbRef, onValue, update, remove } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { ttsService } from "../services/TextToSpeech";
 import { useAudio } from "../composables/useAudio";
+import { findDuplicateNicknameOwner, suggestUniqueNickname } from "../utils/customerIdentityGuard";
 import Swal from "sweetalert2";
 import { sanitizeDbKey, escapeHtml } from "../utils/dbUtils";
 import { logger } from "../utils/logger";
@@ -377,6 +378,54 @@ async function savePhonetic() {
   const safeUid = sanitizeDbKey(uid);
   const nick = formNick.value.trim();
   const phonetic = formPhonetic.value.trim() || null; // ✅ ถ้าไม่กรอก ให้เป็น null
+
+  // 🛡️ Guard: Prevent mapping a plain Thai/customer name key (non-UC / non-@handle) to a DIFFERENT customer's name
+  const isUniqueAccountKey = /^UC[\w-]{6,}$/i.test(uid) || uid.startsWith("@");
+  if (!isUniqueAccountKey && uid.toLowerCase() !== nick.toLowerCase()) {
+    Swal.fire({
+      icon: "warning",
+      title: "ป้องกันชื่อลูกค้าสลับคน",
+      html: `<div style="text-align:left; font-size:0.9em; line-height:1.6;">
+        ช่อง UID <b>"${escapeHtml(uid)}"</b> เป็นชื่อธรรมดา ไม่ใช่รหัส YouTube (<code>UC...</code> หรือ <code>@...</code>)<br/>
+        ห้ามตั้งชื่อที่แสดงเป็น <b>"${escapeHtml(nick)}"</b> ต่างจากเดิม เพราะจะทำให้ชื่อลูกค้าคนอื่นที่ชื่อ "${escapeHtml(uid)}" เปลี่ยนตามไปด้วย<br/><br/>
+        💡 หากต้องการตั้งเฉพาะ <b>คำอ่านเสียง TTS</b> ให้ใส่ชื่อที่แสดงตรงกับ <b>"${escapeHtml(uid)}"</b> แล้วกรอกคำอ่านในช่อง "คำอ่าน" แทนครับ
+      </div>`,
+      background: "#1e1e1e",
+      color: "#fff",
+    });
+    return;
+  }
+
+  // 🛡️ Guard 2: Block duplicate display nickname across different customer accounts
+  const existingRealNameForCheck = nicknamesData.value?.[safeUid]?.realName || "";
+  const dupCheck = findDuplicateNicknameOwner({
+    candidateName: nick,
+    currentUid: uid,
+    currentRealName: existingRealNameForCheck,
+    currentDisplayName: nicknamesData.value?.[safeUid]?.nick || "",
+    nicknames: nicknamesData.value || {},
+  });
+  if (dupCheck.isDuplicate) {
+    const suggestion = suggestUniqueNickname(nick, { nicknames: nicknamesData.value || {} });
+    const res = await Swal.fire({
+      icon: "error",
+      titleText: `ชื่อเล่น "${nick}" ซ้ำกับลูกค้ารายอื่น!`,
+      html: `<div style="text-align:left; font-size:0.9em; line-height:1.6;">
+        ชื่อ <b>"${escapeHtml(nick)}"</b> ถูกใช้งานอยู่แล้วโดย <b>${escapeHtml(dupCheck.conflictRealName || dupCheck.conflictKey || "ลูกค้ารายอื่น")}</b><br/>
+        ห้ามตั้งชื่อแสดงซ้ำกันเพื่อป้องกันยอดจองและที่อยู่ปะปนกัน
+        ${suggestion ? `<br/><br/>💡 แนะนำใช้ชื่อ: <b>"${escapeHtml(suggestion)}"</b>` : ""}
+      </div>`,
+      showCancelButton: Boolean(suggestion),
+      confirmButtonText: suggestion ? `ใช้ชื่อ "${suggestion}" แทน` : "ตกลง",
+      cancelButtonText: "แก้ไขเอง",
+      background: "#1e1e1e",
+      color: "#fff",
+    });
+    if (suggestion && res.isConfirmed) {
+      formNick.value = suggestion;
+    }
+    return;
+  }
 
   try {
     // ✅ ใช้ update เพื่อไม่ลบ key อื่นๆ และรักษา realName เดิมไว้

@@ -4,7 +4,7 @@ import { ref as dbRef, onValue } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { logger } from "../utils/logger";
 import { sanitizeDbKey } from "../utils/dbUtils";
-import { isProxyUid } from "../utils/deliverySync";
+import { isTemporaryOrSyntheticUid, isYouTubeHandle } from "../utils/customerIdentityGuard";
 
 export const useNicknameStore = defineStore("nickname", () => {
   const nicknames = ref({});
@@ -51,24 +51,17 @@ export const useNicknameStore = defineStore("nickname", () => {
     };
   }
 
-  function isProxyOrManualBookingUid(uid) {
-    if (!uid || typeof uid !== "string") return false;
-    return uid === "manual" || isProxyUid(uid);
-  }
-
-  function isHandleName(name) {
-    return typeof name === "string" && name.trim().startsWith("@");
-  }
-
   function hasNickname(uid, realName) {
-    const isProxyBooking = isProxyOrManualBookingUid(uid);
+    const isTempUid = isTemporaryOrSyntheticUid(uid);
     const safeUid = uid && uid !== "manual" ? sanitizeDbKey(uid) : null;
     if ((safeUid && nicknames.value[safeUid]) || (uid && uid !== "manual" && nicknames.value[uid])) {
       return true;
     }
-    // 🛡️ Proxy/manual bookings already store the intended customer display name in `owner`;
-    // never let a stale `nicknames/<plainName>` override override manually-typed or admin-proxy names.
-    if (isProxyBooking && !isHandleName(realName)) {
+    // 🛡️ Strict Read-Side Isolation:
+    // Only allow `nicknames[realName]` fallback for globally unique YouTube `@handles`
+    // or real YouTube account UIDs — NEVER let a stale `nicknames/<plainName>` hijack
+    // manual bookings, admin proxy bookings, or uid-less lookups.
+    if (isTempUid && !isYouTubeHandle(realName)) {
       return false;
     }
     const safeRealName = realName ? sanitizeDbKey(realName) : null;
@@ -80,7 +73,7 @@ export const useNicknameStore = defineStore("nickname", () => {
 
   // 👁️ สำหรับแสดงผลบนจอ (เอาชื่อสั้นๆ เดิมๆ)
   function getNickname(uid, realName) {
-    const isProxyBooking = isProxyOrManualBookingUid(uid);
+    const isTempUid = isTemporaryOrSyntheticUid(uid);
     const safeUid = uid && uid !== "manual" ? sanitizeDbKey(uid) : null;
 
     if (safeUid && nicknames.value[safeUid]) {
@@ -91,9 +84,9 @@ export const useNicknameStore = defineStore("nickname", () => {
       const entry = nicknames.value[uid];
       return typeof entry === "object" ? entry.nick : entry;
     }
-    // 🛡️ Proxy/manual bookings already carry the admin-entered customer name;
-    // only fall back to `nicknames[realName]` for real YouTube UIDs or @handles.
-    if (isProxyBooking && !isHandleName(realName)) {
+    // 🛡️ Strict Read-Side Isolation:
+    // Manual/proxy/uid-less lookups with plain names MUST return the entered name as-is.
+    if (isTempUid && !isYouTubeHandle(realName)) {
       return realName;
     }
     const safeRealName = realName ? sanitizeDbKey(realName) : null;

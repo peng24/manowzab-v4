@@ -17,6 +17,19 @@
 
 export const changelog = [
   {
+    version: '5.8.6',
+    date: '2026-11-28',
+    changes: {
+      added: [
+        'ระบบป้องกันชื่อเล่นซ้ำระหว่างลูกค้าคนละบัญชี (`customerIdentityGuard.js` — `findDuplicateNicknameOwner` & `suggestUniqueNickname`) ครบทุกจุดตั้งชื่อ (`CustomerQuickEditModal.vue`, `PhoneticManager.vue`, `Dashboard.vue`, และ auto-learn ใน `useChatProcessor.js`) — แจ้งเตือนสีแดงทันทีเมื่อชื่อซ้ำกับลูกค้าอื่น, บล็อกการบันทึกชื่อซ้ำข้ามบัญชี YouTube, และมีปุ่มคลิก 1 ทีแนะนำชื่อไม่ซ้ำอัตโนมัติ (เช่น `"พี่นก 2"`)',
+        'เกราะป้องกันชื่อและที่อยู่ลูกค้า 5 ชั้น ป้องกันการส่งของผิดคน (`CustomerQuickEditModal.vue`, `nickname.js`) — เตือนทันทีและขอคำยืนยันเมื่อเปลี่ยนชื่อไปชนลูกค้าเดิมในสมุดที่อยู่/รายการจัดส่ง (`detectCrossCustomerCollision`), บล็อกไม่ให้นำที่อยู่เดิมของลูกค้าคนหนึ่งไปเขียนทับอีกคน และจำกัดการแก้สต็อกของข้อความจองแทนเฉพาะ `uid` ของข้อความนั้น',
+      ],
+      fixed: [
+        'ล็อกคีย์ `nicknames/` ให้บันทึกได้เฉพาะบัญชี YouTube จริง (`UC...` และ `@handle`) เท่านั้น — ห้ามเขียน `nicknames/` จากข้อความจองแทน (`isProxyEdit`), คีย์ชั่วคราว (`proxy-*`, `manual*`, `name:*`), หรือชื่อไทยธรรมดา รวมถึงบล็อกใน `Dashboard.vue` และ `PhoneticManager.vue` พร้อมคง Read-Side Isolation ใน `nickname.js`',
+      ],
+    },
+  },
+  {
     version: '5.8.5',
     date: '2026-11-27',
     changes: {
@@ -235,18 +248,6 @@ export const changelog = [
       ],
       improved: [
         'นับเฉพาะคำขอที่ยิง Google Cloud TTS สำเร็จจริง (ไม่นับข้อความที่ดึงจาก Cache) และเมื่อถึง 90% จะสลับ `Chirp 3: HD ➔ Standard-A ➔ เสียงในเครื่อง` อัตโนมัติทันทีเพื่อป้องกันเกินโควตาฟรี',
-      ],
-    },
-  },
-  {
-    version: '5.6.1',
-    date: '2026-11-16',
-    changes: {
-      added: [
-        'เพิ่มเสียงผู้หญิง Chirp 3: HD `Achernar` (`th-TH-Chirp3-HD-Achernar`, ปุ่ม `A1`/`A2`) และตั้งเป็นเสียงหลักเริ่มต้นใหม่',
-      ],
-      improved: [
-        'จัดลำดับการวนสลับเสียงบนปุ่ม Header เป็น `A` (Chirp 3 Achernar) ➔ `C` (Chirp 3 Aoede) ➔ `S` (Google Standard-A) ➔ `🤖` (Native TTS) พร้อมคงระบบสำรองอัตโนมัติ `Chirp 3: HD ➔ Standard-A ➔ Native`',
       ],
     },
   },

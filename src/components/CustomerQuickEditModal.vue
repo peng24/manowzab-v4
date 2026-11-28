@@ -42,6 +42,43 @@
                 placeholder="เช่น เมธินี"
                 @keydown.enter.prevent="handleNicknameEnter"
               />
+              <div v-if="isProxyEditMode" class="cqe-safety-hint">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>โหมดแก้ชื่อจองแทน: จะไม่ผูกชื่อเล่นถาวรทับลูกค้าคนอื่น</span>
+              </div>
+              <div v-if="!isProxyEditMode && duplicateNicknameInfo.isDuplicate" class="cqe-duplicate-error">
+                <i class="fa-solid fa-circle-xmark"></i>
+                <div class="cqe-duplicate-body">
+                  <div>
+                    <b>ชื่อเล่น "{{ formData.nickname.trim() }}" ซ้ำกับลูกค้ารายอื่นแล้ว!</b>
+                    <span v-if="duplicateNicknameInfo.conflictRealName">
+                      ({{ duplicateNicknameInfo.conflictRealName }})
+                    </span>
+                  </div>
+                  <div class="cqe-duplicate-sub">
+                    กรุณาตั้งชื่อให้ต่างกันเพื่อป้องกันออเดอร์และที่อยู่รวมกันผิดคน
+                  </div>
+                  <button
+                    v-if="suggestedUniqueName"
+                    type="button"
+                    class="cqe-suggest-btn"
+                    @click="applySuggestedUniqueName"
+                  >
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    ใช้ชื่อ "{{ suggestedUniqueName }}" แทน
+                  </button>
+                </div>
+              </div>
+              <div v-else-if="nameCollisionInfo.hasCollision" class="cqe-collision-warning">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <div>
+                  <b>พบลูกค้าชื่อ "{{ formData.nickname.trim() }}" อยู่ในระบบแล้ว</b>
+                  <span v-if="nameCollisionInfo.hasExistingAddress">
+                    (มีที่อยู่เดิมแล้ว: {{ nameCollisionInfo.existingRecipient || formData.nickname.trim() }})
+                  </span>
+                  — ระบบจะป้องกันไม่นำที่อยู่เดิมของ "{{ originalCustomerDisplayName }}" ไปเขียนทับเพื่อกันส่งของผิดคน
+                </div>
+              </div>
             </div>
 
             <!-- 2. ช่องทางการติดต่อ -->
@@ -210,18 +247,29 @@ import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
 import { ref as dbRef, get, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName, parseSingleAddress } from "../utils/addressParser";
-import { sanitizeDbKey } from "../utils/dbUtils";
+import { escapeHtml, sanitizeDbKey } from "../utils/dbUtils";
 import { useChatStore } from "../stores/chat";
 import { useStockStore } from "../stores/stock";
 import { useSystemStore } from "../stores/system";
 import { useBlacklistStore } from "../stores/blacklist";
-import { isProxyUid, normalizeCustomerName, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
+import { useCustomerStore } from "../stores/customer";
+import { useNicknameStore } from "../stores/nickname";
+import { normalizeCustomerName, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
+import {
+  detectCrossCustomerCollision,
+  findDuplicateNicknameOwner,
+  isTemporaryOrSyntheticUid,
+  isYouTubeHandle,
+  suggestUniqueNickname,
+} from "../utils/customerIdentityGuard";
 import Swal from "sweetalert2";
 
 const chatStore = useChatStore();
 const stockStore = useStockStore();
 const systemStore = useSystemStore();
 const blacklistStore = useBlacklistStore();
+const customerStore = useCustomerStore();
+const nicknameStore = useNicknameStore();
 
 const isOpen = ref(false);
 const isLoading = ref(false);
@@ -253,6 +301,61 @@ const realNameStr = computed(() => {
     ""
   );
 });
+
+const originalCustomerDisplayName = computed(() => {
+  return currentChat.value?.displayName || realNameStr.value || "";
+});
+
+const isProxyEditMode = computed(() => {
+  if (!currentChat.value) return false;
+  const uid = currentChat.value.uid || null;
+  return Boolean(currentChat.value.isProxyEdit) || (uid !== null && isTemporaryOrSyntheticUid(uid));
+});
+
+const nameCollisionInfo = computed(() => {
+  if (!currentChat.value) {
+    return { isNameChanged: false, hasCollision: false, hasExistingAddress: false };
+  }
+  return detectCrossCustomerCollision({
+    originalName: originalCustomerDisplayName.value,
+    newName: formData.value.nickname,
+    addressBook: customerStore.addressBook || {},
+    deliveryByNormKey: customerStore.deliveryByNormKey || {},
+    matchedCustId: matchedCustId.value,
+  });
+});
+
+const duplicateNicknameInfo = computed(() => {
+  if (!currentChat.value || isProxyEditMode.value) {
+    return { isDuplicate: false };
+  }
+  return findDuplicateNicknameOwner({
+    candidateName: formData.value.nickname,
+    currentUid: currentChat.value.uid || null,
+    currentRealName: realNameStr.value,
+    currentDisplayName: originalCustomerDisplayName.value,
+    matchedCustId: matchedCustId.value,
+    nicknames: nicknameStore.nicknames || {},
+    addressBook: customerStore.addressBook || {},
+    deliveryByNormKey: customerStore.deliveryByNormKey || {},
+  });
+});
+
+const suggestedUniqueName = computed(() => {
+  if (!duplicateNicknameInfo.value?.isDuplicate) return "";
+  return suggestUniqueNickname(formData.value.nickname, {
+    nicknames: nicknameStore.nicknames || {},
+    addressBook: customerStore.addressBook || {},
+    deliveryByNormKey: customerStore.deliveryByNormKey || {},
+  });
+});
+
+function applySuggestedUniqueName() {
+  if (suggestedUniqueName.value) {
+    formData.value.nickname = suggestedUniqueName.value;
+    nextTick(() => nicknameInputRef.value?.focus());
+  }
+}
 
 // 🛡️ Blacklist Integration
 const isCustomerBanned = computed(() => {
@@ -564,31 +667,105 @@ async function save() {
     return;
   }
 
+  // 🛡️ Layer 1 & 2 Safety: Check proxy/synthetic context, duplicate nickname & cross-customer collision BEFORE touching Firebase!
+  const isProxyContext =
+    Boolean(currentChat.value.isProxyEdit) ||
+    (originalUid !== null && isTemporaryOrSyntheticUid(originalUid));
+
+  // 🛡️ Duplicate Nickname Hard Block for real customer accounts (prevents two YouTube accounts merging orders/addresses!)
+  if (!isProxyContext && trimmedNick) {
+    const dupCheck = findDuplicateNicknameOwner({
+      candidateName: trimmedNick,
+      currentUid: originalUid,
+      currentRealName: rawReal,
+      currentDisplayName: originalDisplayName,
+      matchedCustId: matchedCustId.value,
+      nicknames: nicknameStore.nicknames || {},
+      addressBook: customerStore.addressBook || {},
+      deliveryByNormKey: customerStore.deliveryByNormKey || {},
+    });
+    if (dupCheck.isDuplicate) {
+      const suggestion = suggestUniqueNickname(trimmedNick, {
+        nicknames: nicknameStore.nicknames || {},
+        addressBook: customerStore.addressBook || {},
+        deliveryByNormKey: customerStore.deliveryByNormKey || {},
+      });
+      const safeDupName = escapeHtml(trimmedNick);
+      const safeOwnerInfo = escapeHtml(dupCheck.conflictRealName || dupCheck.conflictRecipient || dupCheck.conflictKey || "ลูกค้ารายอื่น");
+      const safeSuggestion = escapeHtml(suggestion);
+      const res = await Swal.fire({
+        icon: "error",
+        titleText: `ชื่อเล่น "${trimmedNick}" ซ้ำกับลูกค้ารายอื่น!`,
+        html: `<div style="text-align:left; font-size:0.92em; line-height:1.6;">
+          <p style="margin:0 0 8px;">ชื่อ <b>"${safeDupName}"</b> ถูกใช้งานอยู่แล้วโดย <b>${safeOwnerInfo}</b></p>
+          <p style="margin:0 0 8px; color:#fca5a5;">ห้ามตั้งชื่อเล่นซ้ำกันระหว่างลูกค้าคนละคน เพราะจะทำให้ระบบรวมออเดอร์และที่อยู่ผิดคน</p>
+          ${suggestion ? `<p style="margin:0; color:#7dd3fc;">💡 แนะนำให้ตั้งชื่อแยก เช่น <b>"${safeSuggestion}"</b> หรือเติมจังหวัด/นามสกุล</p>` : ""}
+        </div>`,
+        showCancelButton: Boolean(suggestion),
+        confirmButtonText: suggestion ? `ใช้ชื่อ "${suggestion}" แทน` : "กลับไปแก้ไขชื่อ",
+        cancelButtonText: "กลับไปพิมพ์เอง",
+        confirmButtonColor: "#0ea5e9",
+        cancelButtonColor: "#64748b",
+      });
+      if (suggestion && res.isConfirmed) {
+        formData.value.nickname = suggestion;
+        nextTick(() => nicknameInputRef.value?.focus());
+      }
+      return;
+    }
+  }
+
+  const collision = detectCrossCustomerCollision({
+    originalName: originalDisplayName || rawReal,
+    newName: trimmedNick,
+    addressBook: customerStore.addressBook || {},
+    deliveryByNormKey: customerStore.deliveryByNormKey || {},
+    matchedCustId: matchedCustId.value,
+  });
+
+  // 🛡️ If renaming collides with another existing customer, confirm & block address/delivery overwrite!
+  if (collision.hasCollision) {
+    const safeOrig = escapeHtml(originalDisplayName || rawReal);
+    const safeNew = escapeHtml(trimmedNick);
+    const confirmRes = await Swal.fire({
+      icon: "warning",
+      titleText: `พบลูกค้าชื่อ "${trimmedNick}" ในระบบอยู่แล้ว`,
+      html: `<div style="text-align:left; font-size:0.92em; line-height:1.6;">
+        <p style="margin:0 0 8px;">คุณกำลังเปลี่ยนชื่อจาก <b>"${safeOrig}"</b> เป็น <b>"${safeNew}"</b></p>
+        <p style="margin:0 0 8px; color:#fcd34d;">เพื่อป้องกันส่งของผิดคน ระบบจะ <b>ไม่นำที่อยู่เดิมของ "${safeOrig}" ไปเขียนทับ</b> ข้อมูลของ "${safeNew}"</p>
+        <p style="margin:0; color:#94a3b8;">ระบบจะเปลี่ยนเฉพาะชื่อเจ้าของรายการจองที่ตรงกันให้เป็น "${safeNew}" เท่านั้น</p>
+      </div>`,
+      showCancelButton: true,
+      confirmButtonText: "ยืนยัน (ไม่ทับที่อยู่)",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#f59e0b",
+      cancelButtonColor: "#64748b",
+    });
+    if (!confirmRes.isConfirmed) {
+      return;
+    }
+  }
+
   isSaving.value = true;
   const timestamp = Date.now();
   const multiPathUpdates = {};
 
   // 1. Save Nickname
-  // 🛡️ Guard: Proxy/manual edits (e.g. changing admin proxy "กุ้ง" -> "พี่กวาง") MUST NEVER write
-  // `nicknames/<proxyName>` because that permanently hijacks the name "กุ้ง" for all future bookings.
-  const isProxyContext = Boolean(currentChat.value.isProxyEdit) || (originalUid !== null && (originalUid === "manual" || isProxyUid(originalUid)));
+  // 🛡️ Strict Identity Key Guard:
+  // - NEVER write `nicknames/` for proxy/manual edits (prevents permanent global hijacking like "กุ้ง" -> "พี่กวาง").
+  // - For real YouTube accounts, write `nicknames/${safeTargetUid}` (Channel ID) and ONLY write `nicknames/${safeReal}`
+  //   when `rawReal` is a globally unique YouTube `@handle` (never plain Thai names).
   const safeTargetUid = sanitizeDbKey(targetUid);
-  if (trimmedNick) {
-    const canWriteTargetUid =
-      !isProxyContext ||
-      (Boolean(originalUid) && originalUid !== "manual" && safeTargetUid !== "invalid_key");
+  if (trimmedNick && !isProxyContext && originalUid && !isTemporaryOrSyntheticUid(originalUid) && safeTargetUid !== "invalid_key") {
+    multiPathUpdates[`nicknames/${safeTargetUid}`] = {
+      nick: trimmedNick,
+      realName: rawReal,
+      updatedAt: timestamp,
+    };
 
-    if (canWriteTargetUid) {
-      multiPathUpdates[`nicknames/${safeTargetUid}`] = {
-        nick: trimmedNick,
-        realName: rawReal,
-        updatedAt: timestamp,
-      };
-    }
-
-    if (!isProxyContext && originalUid && rawReal && originalUid !== rawReal) {
+    if (rawReal && originalUid !== rawReal && isYouTubeHandle(rawReal)) {
       const safeReal = sanitizeDbKey(rawReal);
-      if (safeReal !== safeTargetUid) {
+      if (safeReal !== safeTargetUid && safeReal !== "invalid_key") {
         multiPathUpdates[`nicknames/${safeReal}`] = {
           nick: trimmedNick,
           realName: rawReal,
@@ -621,7 +798,9 @@ async function save() {
   }
 
   // 3. Save to address_book
-  if (normKey) {
+  // 🛡️ Cross-Customer Address Guard: When renaming to another existing customer (`collision.hasCollision`),
+  // NEVER overwrite target customer's address_book with the old customer's loaded form fields!
+  if (normKey && !collision.hasCollision) {
     multiPathUpdates[`address_book/${normKey}/name`] = primaryName;
     multiPathUpdates[`address_book/${normKey}/contactChannel`] = contactChannelVal;
     multiPathUpdates[`address_book/${normKey}/paymentType`] = paymentTypeVal;
@@ -660,7 +839,9 @@ async function save() {
   }
 
   // 4. Save to delivery_customers (if customer exists in shipping manager)
-  if (matchedCustId.value) {
+  // 🛡️ Cross-Customer Delivery Guard: NEVER rename Customer A's delivery_customers record to Customer B
+  // when Customer B already exists (or during proxy reassign), which would hijack Customer A's orders/address!
+  if (matchedCustId.value && !collision.hasCollision && !(isProxyContext && collision.isNameChanged)) {
     if (trimmedNick) {
       multiPathUpdates[`delivery_customers/${matchedCustId.value}/name`] = trimmedNick;
     }
@@ -703,6 +884,10 @@ async function save() {
   const targetVideoId = currentChat.value.videoId || systemStore.currentVideoId;
   let updatedStockCount = 0;
   const affectedStockItems = [];
+  const reassignedUid =
+    collision.hasCollision || (isProxyContext && collision.isNameChanged)
+      ? (collision.existingDeliveryId || `proxy-reassign-${timestamp}-${Math.random().toString(36).slice(2, 6)}`)
+      : null;
 
   if (trimmedNick && targetVideoId) {
     let currentStockData = stockStore.stockData || {};
@@ -727,10 +912,17 @@ async function save() {
       rawReal,
     ].filter(Boolean);
 
+    // 🛡️ Scoped Proxy Match: When editing a specific proxy message with a unique proxyUid,
+    // ONLY modify stock items belonging to THAT proxyUid (never sweep unrelated bookings of another customer with the same name).
+    const strictProxyUidOnly = Boolean(isProxyContext && chatUid && chatUid !== "manual");
+
     const isCustomerMatch = (itemOwner, itemUid) => {
       // 1. Direct UID match
       if (chatUid && itemUid && itemUid === chatUid) {
         return true;
+      }
+      if (strictProxyUidOnly) {
+        return false;
       }
       // 2. Owner name match
       const normItemOwner = normalizeCustomerName(itemOwner);
@@ -763,6 +955,9 @@ async function save() {
       let ownerChanged = false;
       if (item.owner && item.owner !== trimmedNick && isCustomerMatch(item.owner, item.uid)) {
         multiPathUpdates[`stock/${targetVideoId}/${num}/owner`] = trimmedNick;
+        if (reassignedUid) {
+          multiPathUpdates[`stock/${targetVideoId}/${num}/uid`] = reassignedUid;
+        }
         itemChanged = true;
         ownerChanged = true;
       }
@@ -773,7 +968,7 @@ async function save() {
         newQueue = item.queue.map((q) => {
           if (q && q.owner && q.owner !== trimmedNick && isCustomerMatch(q.owner, q.uid)) {
             queueChanged = true;
-            return { ...q, owner: trimmedNick };
+            return reassignedUid ? { ...q, owner: trimmedNick, uid: reassignedUid } : { ...q, owner: trimmedNick };
           }
           return q;
         });
@@ -794,11 +989,20 @@ async function save() {
   }
 
   try {
-    await update(dbRef(db), multiPathUpdates);
+    if (Object.keys(multiPathUpdates).length > 0) {
+      await update(dbRef(db), multiPathUpdates);
+    }
 
     // Local memory update for chat rows ONLY AFTER Firebase write succeeds
     if (trimmedNick && chatStore.messages) {
       chatStore.messages.forEach((m) => {
+        if (isProxyContext) {
+          if (originalUid && m.proxyUid && m.proxyUid === originalUid) {
+            m.proxyCustomerName = trimmedNick;
+            m._cachedProxyName = trimmedNick;
+          }
+          return;
+        }
         const matchesUid = Boolean(originalUid && m.uid && m.uid === originalUid);
         const matchesReal = Boolean(rawReal && (m.realName === rawReal || m.authorName === rawReal));
         const matchesDisplay = Boolean(originalDisplayName && m.displayName === originalDisplayName);
@@ -815,6 +1019,7 @@ async function save() {
         if (item) {
           if (ownerChanged && item.owner && item.owner !== trimmedNick) {
             item.owner = trimmedNick;
+            if (reassignedUid) item.uid = reassignedUid;
           }
           if (newQueue) {
             item.queue = newQueue;
@@ -823,14 +1028,16 @@ async function save() {
       });
     }
 
-    // Auto-sync delivery customers count for this video
+    // Auto-sync delivery customers count for this video (use separate UIDs when name changed!)
     if (updatedStockCount > 0 && targetVideoId) {
-      syncDeliveryCustomerForOwner(trimmedNick, targetUid, targetVideoId).catch((e) =>
+      const newSyncUid = reassignedUid || (!collision.isNameChanged ? targetUid : null);
+      syncDeliveryCustomerForOwner(trimmedNick, newSyncUid, targetVideoId).catch((e) =>
         console.warn("Delivery sync error for new name:", e)
       );
       const oldName = originalDisplayName;
       if (oldName && oldName !== trimmedNick) {
-        syncDeliveryCustomerForOwner(oldName, targetUid, targetVideoId).catch((e) =>
+        const oldSyncUid = matchedCustId.value || (!reassignedUid ? null : originalUid);
+        syncDeliveryCustomerForOwner(oldName, oldSyncUid, targetVideoId).catch((e) =>
           console.warn("Delivery sync error for old name:", e)
         );
       }
@@ -1294,6 +1501,94 @@ defineExpose({
 .cqe-fade-enter-from,
 .cqe-fade-leave-to {
   opacity: 0;
+}
+
+.cqe-safety-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  color: #7dd3fc;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.cqe-collision-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  color: #fde68a;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.cqe-collision-warning i {
+  margin-top: 2px;
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
+.cqe-duplicate-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(248, 113, 113, 0.65);
+  color: #fecaca;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.cqe-duplicate-error > i {
+  margin-top: 2px;
+  color: #f87171;
+  flex-shrink: 0;
+}
+
+.cqe-duplicate-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.cqe-duplicate-sub {
+  color: #fca5a5;
+  font-size: 0.76rem;
+}
+
+.cqe-suggest-btn {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  background: rgba(14, 165, 233, 0.2);
+  color: #e0f2fe;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.cqe-suggest-btn:hover {
+  background: rgba(14, 165, 233, 0.35);
+  transform: translateY(-1px);
 }
 
 /* Mobile Responsive */

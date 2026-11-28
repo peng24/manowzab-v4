@@ -235,6 +235,7 @@ import { db } from "../composables/useFirebase";
 import Swal from "sweetalert2";
 import { syncDeliveryCustomerForOwner, normalizeCustomerName, isProxyUid, resolveDeliveryUid } from "../utils/deliverySync";
 import { sanitizeDbKey } from "../utils/dbUtils";
+import { findDuplicateNicknameOwner, suggestUniqueNickname } from "../utils/customerIdentityGuard";
 import { logger } from "../utils/logger";
 
 const emit = defineEmits(["close"]);
@@ -589,17 +590,54 @@ function removeFromShipping(uid) {
 
 function updateCustomerName(uid, name) {
   if (!name || !name.trim() || !uid) return;
-  const safeUid = sanitizeDbKey(uid);
+  const trimmedName = name.trim();
   const order = customerOrders.value[uid];
   const updates = {};
-  updates[`nicknames/${safeUid}/nick`] = name.trim();
-  if (order?.uid && order.uid !== uid) {
-    updates[`nicknames/${sanitizeDbKey(order.uid)}/nick`] = name.trim();
+
+  // 🛡️ Never write global `nicknames/` keys for proxy, manual, or synthetic `name:` group keys
+  const isSafeKey = (k) => Boolean(k) && !isProxyGroupKey(k) && !isProxyUid(k) && k !== "manual";
+  const effectiveUid = isSafeKey(uid) ? uid : (order?.uid && isSafeKey(order.uid) ? order.uid : null);
+
+  if (effectiveUid) {
+    const dupCheck = findDuplicateNicknameOwner({
+      candidateName: trimmedName,
+      currentUid: effectiveUid,
+      currentDisplayName: order?.name || "",
+      nicknames: savedNames.value || {},
+    });
+    if (dupCheck.isDuplicate) {
+      const suggestion = suggestUniqueNickname(trimmedName, { nicknames: savedNames.value || {} });
+      Swal.fire({
+        icon: "error",
+        titleText: `ชื่อเล่น "${trimmedName}" ซ้ำกับลูกค้ารายอื่น`,
+        text: suggestion
+          ? `ชื่อนี้มีลูกค้าใช้งานแล้ว (${dupCheck.conflictRealName || dupCheck.conflictKey}) แนะนำให้ตั้งเป็น "${suggestion}" เพื่อป้องกันส่งของผิดคน`
+          : `ชื่อนี้มีลูกค้าใช้งานแล้ว กรุณาตั้งชื่อให้ต่างกันเพื่อป้องกันส่งของผิดคน`,
+        timer: 3500,
+        showConfirmButton: true,
+      });
+      return;
+    }
   }
+
+  if (isSafeKey(uid)) {
+    const safeUid = sanitizeDbKey(uid);
+    if (safeUid && safeUid !== "invalid_key") {
+      updates[`nicknames/${safeUid}/nick`] = trimmedName;
+    }
+  }
+  if (order?.uid && order.uid !== uid && isSafeKey(order.uid)) {
+    const safeOrderUid = sanitizeDbKey(order.uid);
+    if (safeOrderUid && safeOrderUid !== "invalid_key") {
+      updates[`nicknames/${safeOrderUid}/nick`] = trimmedName;
+    }
+  }
+
+  if (Object.keys(updates).length === 0) return;
 
   update(dbRef(db), updates)
     .then(() => {
-      logger.debug("✅ Updated nickname:", name);
+      logger.debug("✅ Updated nickname:", trimmedName);
     })
     .catch((error) => {
       console.error("Error updating nickname:", error);

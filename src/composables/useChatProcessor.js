@@ -4,6 +4,8 @@ import { useSystemStore } from "../stores/system";
 import { useNicknameStore } from "../stores/nickname";
 import { useVoiceLearningStore } from "../stores/voiceLearning";
 import { useBlacklistStore } from "../stores/blacklist";
+import { useCustomerStore } from "../stores/customer";
+import { findDuplicateNicknameOwner } from "../utils/customerIdentityGuard";
 
 import { useAudio } from "./useAudio";
 import {
@@ -148,6 +150,12 @@ export function useChatProcessor() {
   const systemStore = useSystemStore();
   const nicknameStore = useNicknameStore();
   const blacklistStore = useBlacklistStore();
+  let customerStore;
+  try {
+    customerStore = useCustomerStore();
+  } catch {
+    customerStore = { addressBook: {}, deliveryByNormKey: {} };
+  }
 
   const { queueAudio, playSfx, resetVoice } = useAudio();
 
@@ -382,14 +390,28 @@ export function useChatProcessor() {
         nicknameStore.hasNickname(uid, displayName);
 
       // Rule 1: Never overwrite existing nickname (respect CUSTOM_NICKNAME_OVERRIDE.md)
+      // Rule 2: Never auto-learn a nickname that duplicates another existing customer!
       if (!hasExistingNick) {
-        const safeUid = sanitizeDbKey(uid);
-        update(dbRef(db, `nicknames/${safeUid}`), {
-          nick: learnedSelfName,
-          phonetic: learnedSelfName,
-          realName: realName,
-        }).catch((e) => logger.warn("Auto-learn nickname error:", e));
-        displayName = learnedSelfName;
+        const dupSelf = findDuplicateNicknameOwner({
+          candidateName: learnedSelfName,
+          currentUid: uid,
+          currentRealName: realName,
+          currentDisplayName: displayName,
+          nicknames: nicknameStore.nicknames || {},
+          addressBook: customerStore.addressBook || {},
+          deliveryByNormKey: customerStore.deliveryByNormKey || {},
+        });
+        if (dupSelf.isDuplicate) {
+          logger.warn(`🛡️ Skipped auto-learn duplicate nickname "${learnedSelfName}" for ${uid} (conflicts with ${dupSelf.conflictRealName || dupSelf.conflictKey})`);
+        } else {
+          const safeUid = sanitizeDbKey(uid);
+          update(dbRef(db, `nicknames/${safeUid}`), {
+            nick: learnedSelfName,
+            phonetic: learnedSelfName,
+            realName: realName,
+          }).catch((e) => logger.warn("Auto-learn nickname error:", e));
+          displayName = learnedSelfName;
+        }
       }
     }
 
@@ -1100,21 +1122,34 @@ export function useChatProcessor() {
             // Auto-learn customer nickname if not admin and desc is customer name (e.g. "40 บุญญาภา")
             const cleanSelfName = extractCustomerSelfName(normalizedMsg);
             if (cleanSelfName) {
-              forcedOwnerName = cleanSelfName;
-              const hasExistingNick =
-                nicknameStore.hasNickname(uid, realName) ||
-                nicknameStore.hasNickname(uid, displayName);
-              const shouldAutoLearn =
-                !hasExistingNick &&
-                (isHandleOrNonThaiName(displayName) || isHandleOrNonThaiName(realName));
+              const dupSelfNum = findDuplicateNicknameOwner({
+                candidateName: cleanSelfName,
+                currentUid: uid,
+                currentRealName: realName,
+                currentDisplayName: displayName,
+                nicknames: nicknameStore.nicknames || {},
+                addressBook: customerStore.addressBook || {},
+                deliveryByNormKey: customerStore.deliveryByNormKey || {},
+              });
+              if (dupSelfNum.isDuplicate) {
+                logger.warn(`🛡️ Skipped duplicate self-name "${cleanSelfName}" on booking for ${uid} (conflicts with ${dupSelfNum.conflictRealName || dupSelfNum.conflictKey})`);
+              } else {
+                forcedOwnerName = cleanSelfName;
+                const hasExistingNick =
+                  nicknameStore.hasNickname(uid, realName) ||
+                  nicknameStore.hasNickname(uid, displayName);
+                const shouldAutoLearn =
+                  !hasExistingNick &&
+                  (isHandleOrNonThaiName(displayName) || isHandleOrNonThaiName(realName));
 
-              if (shouldAutoLearn) {
-                const safeUid = sanitizeDbKey(uid);
-                update(dbRef(db, `nicknames/${safeUid}`), {
-                  nick: cleanSelfName,
-                  phonetic: cleanSelfName,
-                  realName: realName,
-                }).catch((e) => logger.warn("Auto-learn customer name error:", e));
+                if (shouldAutoLearn) {
+                  const safeUid = sanitizeDbKey(uid);
+                  update(dbRef(db, `nicknames/${safeUid}`), {
+                    nick: cleanSelfName,
+                    phonetic: cleanSelfName,
+                    realName: realName,
+                  }).catch((e) => logger.warn("Auto-learn customer name error:", e));
+                }
               }
             }
           }

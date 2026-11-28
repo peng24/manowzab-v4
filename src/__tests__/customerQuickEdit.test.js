@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { normalizeName, parseSingleAddress, extractPhone, extractPostalCode } from "../utils/addressParser";
 import { sanitizeDbKey } from "../utils/dbUtils";
-import { isProxyUid, normalizeCustomerName } from "../utils/deliverySync";
+import { normalizeCustomerName } from "../utils/deliverySync";
+import { isTemporaryOrSyntheticUid, isYouTubeHandle } from "../utils/customerIdentityGuard";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -31,24 +32,19 @@ function buildQuickEditUpdates({
 
   const updates = {};
 
-  // 1. Nickname (mirrors CustomerQuickEditModal.vue proxy safety guard)
+  // 1. Nickname (mirrors CustomerQuickEditModal.vue strict identity guard)
   const originalUid = chat.uid || null;
-  const isProxyContext = Boolean(chat.isProxyEdit) || (originalUid !== null && (originalUid === "manual" || isProxyUid(originalUid)));
-  if (trimmedNick) {
-    const canWriteTargetUid =
-      !isProxyContext ||
-      (Boolean(originalUid) && originalUid !== "manual" && safeTargetUid !== "invalid_key");
-    if (canWriteTargetUid) {
-      updates[`nicknames/${safeTargetUid}`] = {
-        nick: trimmedNick,
-        realName: rawReal,
-        updatedAt: timestamp,
-      };
-    }
+  const isProxyContext = Boolean(chat.isProxyEdit) || (originalUid !== null && isTemporaryOrSyntheticUid(originalUid));
+  if (trimmedNick && !isProxyContext && originalUid && !isTemporaryOrSyntheticUid(originalUid) && safeTargetUid !== "invalid_key") {
+    updates[`nicknames/${safeTargetUid}`] = {
+      nick: trimmedNick,
+      realName: rawReal,
+      updatedAt: timestamp,
+    };
 
-    if (!isProxyContext && originalUid && rawReal && originalUid !== rawReal) {
+    if (rawReal && originalUid !== rawReal && isYouTubeHandle(rawReal)) {
       const safeReal = sanitizeDbKey(rawReal);
-      if (safeReal !== safeTargetUid) {
+      if (safeReal !== safeTargetUid && safeReal !== "invalid_key") {
         updates[`nicknames/${safeReal}`] = {
           nick: trimmedNick,
           realName: rawReal,
@@ -310,7 +306,7 @@ describe("CustomerQuickEditModal Logic", () => {
     expect(updates["stock/live_2026_09_28/15/owner"]).toBeUndefined();
   });
 
-  it("never writes nicknames/<proxyName> when editing a proxy customer name", () => {
+  it("never writes nicknames/* when editing a proxy customer name or plain non-@handle realName", () => {
     const proxyChat = {
       uid: "multi-proxy-1794320083374-tcwfa",
       displayName: "กุ้ง",
@@ -325,12 +321,8 @@ describe("CustomerQuickEditModal Logic", () => {
       timestamp: 1794320275275,
     });
 
-    expect(updates["nicknames/multi-proxy-1794320083374-tcwfa"]).toEqual({
-      nick: "พี่กวาง",
-      realName: "กุ้ง",
-      updatedAt: 1794320275275,
-    });
-    // Must NEVER hijack the plain name "กุ้ง" globally
+    // Proxy edits must NEVER write any nicknames/* entry
+    expect(updates["nicknames/multi-proxy-1794320083374-tcwfa"]).toBeUndefined();
     expect(updates["nicknames/กุ้ง"]).toBeUndefined();
 
     // When proxy edit has uid=null, must NOT write nicknames/กุ้ง either
@@ -340,6 +332,19 @@ describe("CustomerQuickEditModal Logic", () => {
       timestamp: 1794320275275,
     });
     expect(proxyNullUidUpdates["nicknames/กุ้ง"]).toBeUndefined();
+
+    // Real YouTube UID whose display name is a plain Thai name (not @handle) writes ONLY UC key, never nicknames/กุ้ง
+    const plainRealNameUpdates = buildQuickEditUpdates({
+      chat: { uid: "UC_kung_channel", displayName: "กุ้ง", realName: "กุ้ง" },
+      nickname: "พี่กุ้ง กทม",
+      timestamp: 1794320275275,
+    });
+    expect(plainRealNameUpdates["nicknames/UC_kung_channel"]).toEqual({
+      nick: "พี่กุ้ง กทม",
+      realName: "กุ้ง",
+      updatedAt: 1794320275275,
+    });
+    expect(plainRealNameUpdates["nicknames/กุ้ง"]).toBeUndefined();
   });
 
   it("source enforces proxy nickname guard in ChatPanel and CustomerQuickEditModal", () => {
@@ -347,7 +352,7 @@ describe("CustomerQuickEditModal Logic", () => {
     const chatPanelSrc = readFileSync(resolve(process.cwd(), "src/components/ChatPanel.vue"), "utf8");
     expect(chatPanelSrc).toContain("isProxyEdit: true");
     expect(modalSrc).toContain("isProxyContext");
-    expect(modalSrc).toContain("!isProxyContext && originalUid && rawReal");
+    expect(modalSrc).toContain("isYouTubeHandle(rawReal)");
   });
 });
 

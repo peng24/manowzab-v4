@@ -33,9 +33,12 @@ describe("useNicknameStore proxy & manual booking isolation", () => {
     expect(store.getNickname("multi-proxy-1795787999999-xyz99", "กุ้ง")).toBe("กุ้ง");
     expect(store.getNickname("admin-proxy-1795787999999-zz1", "กุ้ง")).toBe("กุ้ง");
     expect(store.getNickname("manual", "กุ้ง")).toBe("กุ้ง");
+    expect(store.getNickname(null, "กุ้ง")).toBe("กุ้ง");
+    expect(store.getNickname("", "กุ้ง")).toBe("กุ้ง");
     expect(store.hasNickname("manual-1795787999999", "กุ้ง")).toBe(false);
     expect(store.hasNickname("proxy-1795787999999-abc12", "กุ้ง")).toBe(false);
     expect(store.hasNickname("manual", "กุ้ง")).toBe(false);
+    expect(store.hasNickname(null, "กุ้ง")).toBe(false);
 
     // Specific legacy proxy UID mapping still resolves for that historical booking only
     expect(store.getNickname("multi-proxy-1794320083374-tcwfa", "กุ้ง")).toBe("พี่กวาง");

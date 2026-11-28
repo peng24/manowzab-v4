@@ -720,3 +720,15 @@ description: Mandatory verification checklist after every code change
   2. ย้าย `delivery_customers/UCaGVyaBd7qQoiaIIuQqEHSg` (ข้อมูล 100% ครบถ้วน + สำรองไฟล์ไว้แล้ว) ไปที่ `delivery_customers/cust_พี่กวาง` และถอดคีย์ออกจาก UID แอดมิน
   3. เพิ่ม **Layer 6 Admin Identity Guard** ใน `useChatProcessor.js` (ตรวจ `isAccountAdmin` ก่อนดึง `nicknames/`), `ChatPanel.vue` (ไม่แสดงป้ายลูกค้าบนแชทแอดมินปกติ + บล็อกเปิด Modal แก้ไขลูกค้าบนบัญชีแอดมิน), และ `CustomerQuickEditModal.vue` (`isAdminAccount` guard) พร้อมเทสต์ใน `customerIdentityGuard.test.js`
   4. **ผลตรวจ Automated**: `npx vitest run` **✓ 42/42 Test Files / 974/974 Tests**, `npm run build` **✓ ผ่าน (`3.27s`)**
+
+## 🔄 ผลตรวจปรับปรุงช่องเปลี่ยนจำนวนรายการสินค้าให้ซิงค์ทุกเครื่อง 100% (2026-11-28)
+
+- **ปัญหาที่ตรวจพบ**:
+  1. `StockGrid.vue` และ `HistoryModal.vue` ใช้ `v-model.lazy` + `@change` โดยไม่มี `@keydown.enter` — กด Enter หลังพิมพ์ตัวเลขบน Chrome/Safari/iPad ไม่บันทึกขึ้น Firebase ทำให้เครื่องอื่นไม่ซิงค์
+  2. `StockGrid.vue` ไม่ได้ `await stockStore.updateStockSize()` และเด้ง `"บันทึกแล้ว"` หลอกแม้ยังไม่ต่อไลฟ์ (`currentVideoId` ว่าง) หรือเขียน Firebase ล้มเหลว รวมถึงไม่คืนค่าเดิมเมื่อกรอกผิดหรือเกิน 300
+  3. `stock.js` ใช้ `localStorage.lastStockSize` แยกตามแต่ละเครื่องเป็นค่าเริ่มต้นเมื่อเปิดไลฟ์ใหม่ที่ยังไม่มี `settings/{videoId}/stockSize` ทำให้แต่ละเครื่องแสดงจำนวนรายการไม่ตรงกัน และไม่ซิงค์เมื่อปรับตัวเลขก่อนต่อไลฟ์
+- **การแก้ไข**:
+  1. **`src/stores/stock.js` & `src/App.vue`**: เพิ่ม `initDefaultStockSizeListener()` ฟัง `settings/defaultStockSize` กลาง, แก้ `updateStockSize()` ให้เขียน Atomic ไปที่ `settings/{videoId}/stockSize` + `settings/defaultStockSize` พร้อม optimistic update + rollback เมื่อพัง + คืน `{ ok, size, error }`, และให้ไลฟ์ใหม่ที่ยังไม่มีค่า `stockSize` อ้างอิง `defaultStockSize` กลางแทน `localStorage` ส่วนตัว
+  2. **`src/components/StockGrid.vue` & `src/components/HistoryModal.vue`**: เปลี่ยนเป็น `v-model` + `inputmode="numeric"` + `min="1"` + `max="300"` + `@keydown.enter.prevent` + `@change` + `@blur`, `await` ผลบันทึกจริงก่อนขึ้น Toast, กันการยิงซ้ำเมื่อ blur หลัง Enter, และคืนค่าเดิมอัตโนมัติเมื่อกรอกไม่ถูกต้องหรือบันทึกไม่สำเร็จ
+  3. **ผลตรวจ Automated**: `npx vitest run` **✓ 42/42 Test Files / 978/978 Tests** (เพิ่ม 4 เคส cross-device sync ใน `stockStore.test.js`), `npm run build` **✓ ผ่าน**
+  4. **UI ยอดขายรวมไร้กรอบสีสด (`StockGrid.vue`, `HistoryModal.vue`)**: ถอดกรอบ/พื้นหลัง/เงาออก (`background: transparent; border: none; box-shadow: none;`) ปรับเป็นสีทองสด (`#fbbf24` / `#fde047`) และปรับ `@keyframes pulse-sales` ให้ใช้ GPU `transform` ล้วน

@@ -323,5 +323,103 @@ describe("Stock Store", () => {
       expect(stockStore.stockData[5].price).toBe(150);
     });
   });
+
+  describe("updateStockSize & cross-device stockSize sync", () => {
+    it("writes both settings/{videoId}/stockSize and settings/defaultStockSize atomically when live is active", async () => {
+      const { ref: dbRef, update } = await import("firebase/database");
+      const { useSystemStore } = await import("../stores/system");
+      const systemStore = useSystemStore();
+      systemStore.currentVideoId = "live_sync_01";
+
+      dbRef.mockImplementation((_db, path) => ({ path }));
+      update.mockClear();
+
+      const stockStore = useStockStore();
+      const res = await stockStore.updateStockSize(85);
+
+      expect(res).toEqual({ ok: true, size: 85 });
+      expect(stockStore.stockSize).toBe(85);
+      expect(stockStore.defaultStockSize).toBe(85);
+      expect(stockStore.hasRemoteStockSize).toBe(true);
+      expect(update).toHaveBeenCalledWith(
+        { path: "settings" },
+        { defaultStockSize: 85, "live_sync_01/stockSize": 85 },
+      );
+    });
+
+    it("syncs settings/defaultStockSize even when no active live video is connected", async () => {
+      const { ref: dbRef, update } = await import("firebase/database");
+      const { useSystemStore } = await import("../stores/system");
+      const systemStore = useSystemStore();
+      systemStore.currentVideoId = "";
+
+      dbRef.mockImplementation((_db, path) => ({ path }));
+      update.mockClear();
+
+      const stockStore = useStockStore();
+      const res = await stockStore.updateStockSize(60);
+
+      expect(res).toEqual({ ok: true, size: 60 });
+      expect(stockStore.stockSize).toBe(60);
+      expect(update).toHaveBeenCalledWith(
+        { path: "settings" },
+        { defaultStockSize: 60 },
+      );
+    });
+
+    it("clamps stockSize to 300, rejects invalid values, and rolls back on write error", async () => {
+      const { ref: dbRef, update } = await import("firebase/database");
+      const { useSystemStore } = await import("../stores/system");
+      const systemStore = useSystemStore();
+      systemStore.currentVideoId = "live_clamp";
+
+      dbRef.mockImplementation((_db, path) => ({ path }));
+
+      const stockStore = useStockStore();
+      expect(await stockStore.updateStockSize(0)).toEqual({ ok: false, error: "invalid_size" });
+      expect(await stockStore.updateStockSize(-5)).toEqual({ ok: false, error: "invalid_size" });
+
+      const clamped = await stockStore.updateStockSize(999);
+      expect(clamped).toEqual({ ok: true, size: 300 });
+      expect(stockStore.stockSize).toBe(300);
+
+      update.mockRejectedValueOnce(new Error("network_down"));
+      const failed = await stockStore.updateStockSize(120);
+      expect(failed.ok).toBe(false);
+      expect(stockStore.stockSize).toBe(300);
+    });
+
+    it("syncs all devices from settings/defaultStockSize when a new live has no stockSize yet", async () => {
+      const { ref: dbRef, onValue } = await import("firebase/database");
+      const { useSystemStore } = await import("../stores/system");
+      const systemStore = useSystemStore();
+      systemStore.currentVideoId = "brand_new_live";
+
+      const listeners = {};
+      dbRef.mockImplementation((_db, path) => ({ path }));
+      onValue.mockImplementation((refObj, cb) => {
+        listeners[refObj.path] = cb;
+        return vi.fn();
+      });
+
+      const stockStore = useStockStore();
+      stockStore.initDefaultStockSizeListener();
+      stockStore.connectToStock("brand_new_live");
+
+      // Remote default stockSize arrives = 75
+      listeners["settings/defaultStockSize"]({ val: () => 75 });
+      expect(stockStore.stockSize).toBe(75);
+
+      // Brand-new live has null stockSize -> keeps shared default 75
+      listeners["settings/brand_new_live/stockSize"]({ val: () => null });
+      expect(stockStore.stockSize).toBe(75);
+      expect(stockStore.hasRemoteStockSize).toBe(false);
+
+      // Another device changes live stockSize to 90 -> updates immediately
+      listeners["settings/brand_new_live/stockSize"]({ val: () => "90" });
+      expect(stockStore.stockSize).toBe(90);
+      expect(stockStore.hasRemoteStockSize).toBe(true);
+    });
+  });
 });
 

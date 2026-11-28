@@ -230,12 +230,16 @@
                     <div class="kpi-chip kpi-stock-size">
                       <span class="kpi-label">จำนวนรายการ</span>
                       <input
+                        ref="historyStockSizeInputRef"
                         type="number"
-                        v-model.lazy="localStockSize"
+                        inputmode="numeric"
+                        v-model="localStockSize"
                         class="edit-input"
                         min="1"
                         max="300"
-                        @change="saveStockSize"
+                        @keydown.enter.prevent="handleHistoryStockSizeEnter"
+                        @change="saveStockSize()"
+                        @blur="saveStockSize()"
                       />
                     </div>
 
@@ -2150,23 +2154,32 @@ async function processHistoryCancel(num, uid = null, ownerName = null) {
 }
 
 // Scoped navigation and global keys
+const historyStockSizeInputRef = ref(null);
 const localStockSize = ref(70);
+let isSavingHistoryStockSize = false;
 
 watch(
   () => selectedItem.value?.stockSize,
   (newVal) => {
-    if (newVal && newVal !== localStockSize.value) {
-      localStockSize.value = newVal;
+    const parsed = parseInt(newVal, 10);
+    if (Number.isFinite(parsed) && parsed >= 1 && parseInt(localStockSize.value, 10) !== parsed) {
+      localStockSize.value = parsed;
     }
   },
   { immediate: true }
 );
 
-async function saveStockSize() {
-  if (!selectedId.value) return;
-  const newSize = parseInt(localStockSize.value);
+async function handleHistoryStockSizeEnter() {
+  await saveStockSize({ force: true });
+  historyStockSizeInputRef.value?.blur();
+}
 
-  if (!newSize || newSize < 1) {
+async function saveStockSize({ force = false } = {}) {
+  if (!selectedId.value || isSavingHistoryStockSize) return;
+  const rawSize = parseInt(localStockSize.value, 10);
+
+  if (!Number.isFinite(rawSize) || rawSize < 1) {
+    localStockSize.value = selectedItem.value?.stockSize || 70;
     Swal.fire({
       icon: "error",
       title: "ข้อมูลไม่ถูกต้อง",
@@ -2179,20 +2192,52 @@ async function saveStockSize() {
     return;
   }
 
-  const sizeRef = dbRef(db, `settings/${selectedId.value}/stockSize`);
-  await set(sizeRef, newSize);
+  const newSize = Math.min(rawSize, 300);
+  localStockSize.value = newSize;
 
-  await updateDeliveryAndHistoryTotals(selectedId.value);
+  if (!force && newSize === selectedItem.value?.stockSize) {
+    return;
+  }
 
-  Swal.fire({
-    icon: "success",
-    title: "บันทึกแล้ว",
-    text: `จำนวนรายการ: ${newSize}`,
-    toast: true,
-    position: "top-end",
-    showConfirmButton: false,
-    timer: 1500,
-  });
+  isSavingHistoryStockSize = true;
+  try {
+    const sizeRef = dbRef(db, `settings/${selectedId.value}/stockSize`);
+    await set(sizeRef, newSize);
+
+    if (selectedId.value === systemStore.currentVideoId) {
+      await update(dbRef(db, "settings"), { defaultStockSize: newSize }).catch(() => {});
+    }
+
+    if (selectedItem.value) {
+      selectedItem.value.stockSize = newSize;
+    }
+
+    await updateDeliveryAndHistoryTotals(selectedId.value);
+
+    Swal.fire({
+      icon: "success",
+      title: "บันทึกแล้ว",
+      text: `จำนวนรายการ: ${newSize}`,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+      timer: 1500,
+    });
+  } catch (err) {
+    localStockSize.value = selectedItem.value?.stockSize || 70;
+    console.warn("[HistoryModal] saveStockSize failed:", err);
+    Swal.fire({
+      icon: "error",
+      title: "บันทึกไม่สำเร็จ",
+      text: "ไม่สามารถบันทึกจำนวนรายการได้ กรุณาลองใหม่",
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+      timer: 2200,
+    });
+  } finally {
+    isSavingHistoryStockSize = false;
+  }
 }
 
 async function saveAndNavigate(direction) {
@@ -3525,54 +3570,51 @@ async function openCleanupModal() {
   100% { transform: translate3d(100%, 0, 0); }
 }
 
-/* 💰 Total Sales Badge */
+/* 💰 Total Sales Badge (Vivid Gold, Borderless) */
 .total-sales-badge {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
-  font-size: 0.88em;
+  font-size: 0.94em;
   font-weight: 700;
-  padding: 1px 9px;
-  border-radius: 20px;
-  background: rgba(180, 83, 9, 0.35);
-  border: 1px solid rgba(251, 191, 36, 0.55);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), 0 0 8px rgba(251, 191, 36, 0.18);
+  padding: 0 2px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.3px;
   cursor: default;
   user-select: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 .total-sales-badge:hover {
-  background: rgba(217, 119, 6, 0.45);
-  border-color: #fde047;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
   transform: translateY(-1px);
 }
 
 .total-sales-badge.pulse {
-  animation: pulse-sales 0.5s ease-out;
+  animation: pulse-sales 0.45s ease-out;
 }
 
 @keyframes pulse-sales {
   0% { transform: scale(1); }
-  40% { transform: scale(1.12); box-shadow: 0 0 14px rgba(251, 191, 36, 0.6); }
+  40% { transform: scale(1.12); }
   100% { transform: scale(1); }
 }
 
 .total-sales-badge .sales-label {
-  color: #fef08a;
-  font-size: 0.82em;
-  font-weight: 600;
-  opacity: 0.9;
+  color: #fbbf24;
+  font-size: 0.85em;
+  font-weight: 700;
 }
 
 .total-sales-badge .sales-amount {
   color: #fde047;
+  font-size: 1.06em;
   font-weight: 800;
-  text-shadow: 0 0 8px rgba(253, 224, 71, 0.35);
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.45);
 }
 
 .motivational-badge {

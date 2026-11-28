@@ -52,8 +52,22 @@ export const useStockStore = defineStore("stock", () => {
   /** @type {import('vue').Ref<string>} Video ID whose stock snapshot has loaded from Firebase */
   const loadedVideoId = ref("");
 
+  const MAX_STOCK_SIZE = 300;
+
+  function parseValidStockSize(raw) {
+    const parsed = parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) return null;
+    return Math.min(parsed, MAX_STOCK_SIZE);
+  }
+
+  /** @type {import('vue').Ref<number>} Shared default stock size synced via Firebase settings/defaultStockSize */
+  const defaultStockSize = ref(parseValidStockSize(localStorage.getItem("lastStockSize")) || 50);
+
   /** @type {import('vue').Ref<number>} Total number of stock items */
-  const stockSize = ref(parseInt(localStorage.getItem("lastStockSize")) || 50);
+  const stockSize = ref(defaultStockSize.value);
+
+  /** @type {import('vue').Ref<boolean>} Whether the active video has an explicit settings/{videoId}/stockSize value */
+  const hasRemoteStockSize = ref(false);
 
   /** @type {import('vue').Ref<Object>} Tracks which percentage milestones have been celebrated */
   const milestones = ref({ fifty: false, eighty: false, hundred: false });
@@ -61,6 +75,42 @@ export const useStockStore = defineStore("stock", () => {
   const systemStore = useSystemStore();
 
   let currentUnsubscribe = null;
+  let defaultSizeUnsubscribe = null;
+
+  /**
+   * Subscribes to global settings/defaultStockSize so all devices share the same
+   * stock size even before a live is connected or when a new live starts.
+   * @returns {Function} Cleanup function
+   */
+  function initDefaultStockSizeListener() {
+    if (defaultSizeUnsubscribe) {
+      defaultSizeUnsubscribe();
+      defaultSizeUnsubscribe = null;
+    }
+    const defaultRef = dbRef(db, "settings/defaultStockSize");
+    const unsub = onValue(defaultRef, (snapshot) => {
+      const parsed = parseValidStockSize(snapshot.val());
+      if (parsed !== null) {
+        defaultStockSize.value = parsed;
+        try {
+          localStorage.setItem("lastStockSize", String(parsed));
+        } catch {
+          /* Storage may be unavailable */
+        }
+        // Apply immediately when waiting for a live or when the active video has no explicit size yet
+        if (!systemStore.currentVideoId || !hasRemoteStockSize.value) {
+          stockSize.value = parsed;
+        }
+      }
+    });
+    defaultSizeUnsubscribe = () => {
+      unsub();
+      if (defaultSizeUnsubscribe) {
+        defaultSizeUnsubscribe = null;
+      }
+    };
+    return defaultSizeUnsubscribe;
+  }
 
   /**
    * Total sales revenue (฿) of all claimed items with valid prices in the active live stock
@@ -92,6 +142,7 @@ export const useStockStore = defineStore("stock", () => {
     // ✅ Reset milestones & stale stock immediately when connecting to a new session
     milestones.value = { fifty: false, eighty: false, hundred: false };
     loadedVideoId.value = "";
+    hasRemoteStockSize.value = false;
     stockData.value = {};
 
     if (!videoId || typeof videoId !== "string" || !videoId.trim()) {
@@ -185,10 +236,19 @@ export const useStockStore = defineStore("stock", () => {
 
     const sizeRef = dbRef(db, `settings/${videoId}/stockSize`);
     const unsubSize = onValue(sizeRef, (snapshot) => {
-      const val = snapshot.val();
-      if (val) {
-        stockSize.value = val;
-        localStorage.setItem("lastStockSize", val);
+      const parsed = parseValidStockSize(snapshot.val());
+      if (parsed !== null) {
+        hasRemoteStockSize.value = true;
+        stockSize.value = parsed;
+        try {
+          localStorage.setItem("lastStockSize", String(parsed));
+        } catch {
+          /* Storage may be unavailable */
+        }
+      } else {
+        // New live without explicit stockSize yet -> sync all devices to shared defaultStockSize
+        hasRemoteStockSize.value = false;
+        stockSize.value = defaultStockSize.value;
       }
     });
 
@@ -639,33 +699,61 @@ export const useStockStore = defineStore("stock", () => {
   }
 
   /**
-   * Sets the total stock size (max items).
+   * Sets the total stock size (max items) and syncs across all connected devices.
+   * Writes atomically to settings/{videoId}/stockSize (when active) AND settings/defaultStockSize.
    * @param {number} newSize
+   * @returns {Promise<{ok: boolean, size?: number, error?: any}>}
    */
-  function updateStockSize(newSize) {
-    if (!systemStore.currentVideoId) return;
+  async function updateStockSize(newSize) {
     const parsedSize = parseInt(newSize, 10);
-    if (!Number.isFinite(parsedSize) || parsedSize < 1) return;
+    if (!Number.isFinite(parsedSize) || parsedSize < 1) {
+      return { ok: false, error: "invalid_size" };
+    }
     // 🛡️ Safety cap: prevent absurd stock expansion (e.g. customer types "555555")
-    const MAX_STOCK_SIZE = 300;
     const clampedSize = Math.min(parsedSize, MAX_STOCK_SIZE);
     if (parsedSize > MAX_STOCK_SIZE) {
       console.warn(
         `⚠️ Stock size ${parsedSize} exceeds max (${MAX_STOCK_SIZE}). Clamped.`,
       );
     }
-    const sizeRef = dbRef(
-      db,
-      `settings/${systemStore.currentVideoId}/stockSize`,
-    );
+
+    const prevSize = stockSize.value;
+    const prevDefault = defaultStockSize.value;
+    const prevHasRemote = hasRemoteStockSize.value;
+    const videoId = typeof systemStore.currentVideoId === "string"
+      ? systemStore.currentVideoId.trim()
+      : "";
+
+    // Optimistic local update so UI responds immediately
+    stockSize.value = clampedSize;
+    defaultStockSize.value = clampedSize;
+    if (videoId && videoId !== "demo") {
+      hasRemoteStockSize.value = true;
+    }
+
     try {
       localStorage.setItem("lastStockSize", String(clampedSize));
     } catch {
       /* Storage may be unavailable */
     }
-    return set(sizeRef, clampedSize).catch((err) => {
+
+    const payload = {
+      defaultStockSize: clampedSize,
+    };
+    if (videoId && videoId !== "demo") {
+      payload[`${videoId}/stockSize`] = clampedSize;
+    }
+
+    try {
+      await update(dbRef(db, "settings"), payload);
+      return { ok: true, size: clampedSize };
+    } catch (err) {
+      stockSize.value = prevSize;
+      defaultStockSize.value = prevDefault;
+      hasRemoteStockSize.value = prevHasRemote;
       console.warn("[StockStore] updateStockSize failed:", err);
-    });
+      return { ok: false, error: err };
+    }
   }
 
   /**
@@ -717,14 +805,18 @@ export const useStockStore = defineStore("stock", () => {
     currentUnsubscribe?.();
     currentUnsubscribe = null;
     loadedVideoId.value = "";
+    hasRemoteStockSize.value = false;
     stockData.value = {};
   }
 
   return {
     stopStockSync,
+    initDefaultStockSizeListener,
     stockData,
     loadedVideoId,
     stockSize,
+    defaultStockSize,
+    hasRemoteStockSize,
     totalSales,
     milestones,
     connectToStock,

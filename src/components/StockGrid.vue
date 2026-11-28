@@ -5,8 +5,12 @@
         <div class="stock-input-group">
           รายการ:
           <input
+            ref="stockSizeInputRef"
             type="number"
-            v-model.lazy="localStockSize"
+            inputmode="numeric"
+            min="1"
+            max="300"
+            v-model="localStockSize"
             class="edit-input"
             style="
               width: 60px;
@@ -14,7 +18,9 @@
               font-size: 1em;
               font-weight: bold;
             "
-            @change="saveStockSize"
+            @keydown.enter.prevent="handleStockSizeEnter"
+            @change="saveStockSize()"
+            @blur="saveStockSize()"
           />
         </div>
 
@@ -772,16 +778,19 @@ const pullThreshold = 80;
 let touchStartY = 0;
 let canPull = false;
 
-// ✅ Local Stock Size for Input (Synced with Firebase)
-const localStockSize = ref(stockStore.stockSize || 100);
+// ✅ Local Stock Size for Input (Synced with Firebase across all devices)
+const stockSizeInputRef = ref(null);
+const localStockSize = ref(stockStore.stockSize || 50);
+let isSavingStockSize = false;
 
 // ✅ Watch Store Stock Size to Sync Input Field
 watch(
   () => stockStore.stockSize,
   (newVal) => {
-    if (newVal && newVal !== localStockSize.value) {
-      localStockSize.value = newVal;
-      logger.log("📦 Stock Size synced from Firebase:", newVal);
+    const parsed = parseInt(newVal, 10);
+    if (Number.isFinite(parsed) && parsed >= 1 && parseInt(localStockSize.value, 10) !== parsed) {
+      localStockSize.value = parsed;
+      logger.log("📦 Stock Size synced from Firebase:", parsed);
     }
   },
   { immediate: true },
@@ -1496,10 +1505,17 @@ function isNewOrder(num) {
   return newOrders.value.has(num);
 }
 
-function saveStockSize() {
-  const newSize = parseInt(localStockSize.value);
+async function handleStockSizeEnter() {
+  await saveStockSize({ force: true });
+  stockSizeInputRef.value?.blur();
+}
 
-  if (!newSize || newSize < 1) {
+async function saveStockSize({ force = false } = {}) {
+  if (isSavingStockSize) return;
+  const rawSize = parseInt(localStockSize.value, 10);
+
+  if (!Number.isFinite(rawSize) || rawSize < 1) {
+    localStockSize.value = stockStore.stockSize || 50;
     Swal.fire({
       icon: "error",
       title: "ข้อมูลไม่ถูกต้อง",
@@ -1512,19 +1528,47 @@ function saveStockSize() {
     return;
   }
 
-  stockStore.updateStockSize(newSize);
+  const clampedSize = Math.min(rawSize, 300);
+  localStockSize.value = clampedSize;
 
-  Swal.fire({
-    icon: "success",
-    title: "บันทึกแล้ว",
-    text: `จำนวนรายการ: ${newSize}`,
-    toast: true,
-    position: "top-end",
-    showConfirmButton: false,
-    timer: 1500,
-  });
+  // Skip redundant blur writes when value is already synced to Firebase
+  const alreadySynced =
+    clampedSize === stockStore.stockSize &&
+    (!systemStore.currentVideoId || stockStore.hasRemoteStockSize);
+  if (!force && alreadySynced) {
+    return;
+  }
 
-  logger.log("✅ Stock size saved to Firebase:", newSize);
+  isSavingStockSize = true;
+  try {
+    const res = await stockStore.updateStockSize(clampedSize);
+    if (res?.ok) {
+      localStockSize.value = res.size;
+      Swal.fire({
+        icon: "success",
+        title: "บันทึกแล้ว",
+        text: `จำนวนรายการ: ${res.size} (ซิงค์ทุกเครื่องแล้ว)`,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 1500,
+      });
+      logger.log("✅ Stock size synced to Firebase:", res.size);
+    } else {
+      localStockSize.value = stockStore.stockSize || 50;
+      Swal.fire({
+        icon: "error",
+        title: "ซิงค์ไม่สำเร็จ",
+        text: "ไม่สามารถบันทึกจำนวนรายการได้ กรุณาลองใหม่",
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 2500,
+      });
+    }
+  } finally {
+    isSavingStockSize = false;
+  }
 }
 
 let lastVideoId = systemStore.currentVideoId;
@@ -2388,53 +2432,51 @@ watch(
   100% { transform: translate3d(100%, 0, 0); }
 }
 
-/* 💰 Total Sales Badge (Champagne Gold Quiet Luxury) */
+/* 💰 Total Sales Badge (Vivid Gold, Borderless) */
 .total-sales-badge {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
-  font-size: 0.9em;
+  font-size: 0.96em;
   font-weight: 700;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: rgba(229, 184, 105, 0.12);
-  border: 1px solid rgba(229, 184, 105, 0.42);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  padding: 0 2px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.3px;
   cursor: default;
   user-select: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 .total-sales-badge:hover {
-  background: rgba(229, 184, 105, 0.22);
-  border-color: #f3cf7a;
-  box-shadow: 0 2px 8px rgba(229, 184, 105, 0.22);
   transform: translateY(-1px);
 }
 
 .total-sales-badge.pulse {
-  animation: pulse-sales 0.5s ease-out;
+  animation: pulse-sales 0.45s ease-out;
 }
 
 @keyframes pulse-sales {
   0% { transform: scale(1); }
-  40% { transform: scale(1.1); box-shadow: 0 0 12px rgba(229, 184, 105, 0.45); }
+  40% { transform: scale(1.12); }
   100% { transform: scale(1); }
 }
 
 .total-sales-badge .sales-label {
-  color: #e5b869;
-  font-size: 0.82em;
-  font-weight: 600;
-  opacity: 0.92;
+  color: #fbbf24;
+  font-size: 0.85em;
+  font-weight: 700;
 }
 
 .total-sales-badge .sales-amount {
-  color: #f8dfa0;
+  color: #fde047;
+  font-size: 1.08em;
   font-weight: 800;
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.45);
 }
 
 .motivational-badge {
@@ -2608,8 +2650,8 @@ watch(
     display: none;
   }
   .total-sales-badge {
-    font-size: 0.8em;
-    padding: 1px 6px;
+    font-size: 0.88em;
+    padding: 0 2px;
     gap: 2px;
   }
   .total-sales-badge .sales-label {

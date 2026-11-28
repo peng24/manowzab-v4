@@ -354,7 +354,11 @@ function startAppListeners() {
   });
   cleanupFns.push(unsubIsLiveFinished);
 
-  // ✅ stockSize listener is already handled inside connectToStock()
+  // ✅ Global defaultStockSize listener keeps all devices synced even before a live connects
+  const unsubDefaultStockSize = stockStore.initDefaultStockSizeListener();
+  if (unsubDefaultStockSize) cleanupFns.push(unsubDefaultStockSize);
+
+  // ✅ Per-video stockSize listener is handled inside connectToStock()
 
 }
 

@@ -13,6 +13,7 @@ import {
 import { useSystemStore } from "../stores/system";
 import { useAudio } from "../composables/useAudio";
 import { useNicknameStore } from "../stores/nickname";
+import { numberToThaiWords } from "./thaiNumberWords";
 
 /**
  * Checks if a UID is a temporary/proxy UID.
@@ -297,7 +298,96 @@ export async function getShippingRequestedCustomers(targetCycle = null) {
 }
 
 /**
- * Announces the list of customers requesting delivery for this shipping cycle with clear pauses between names.
+ * Calculates total sales revenue (฿) and sold item count for a specific live video session.
+ * Reads directly from Firebase `stock/{videoId}` (freshest state including AI-synced prices),
+ * with fallback to `history/{videoId}` when the stock node is empty.
+ * Counts only claimed items (`item.owner` non-empty) and positive numeric prices (`item.price > 0`).
+ *
+ * @param {string|null} videoId
+ * @returns {Promise<{ totalSales: number, soldCount: number, pricedSoldCount: number }>}
+ */
+export async function getLiveSalesSummary(videoId = null) {
+  const empty = { totalSales: 0, soldCount: 0, pricedSoldCount: 0 };
+  if (!videoId || typeof videoId !== "string") return empty;
+  const cleanVid = videoId.trim();
+  if (!cleanVid || /[.#$[\]/]/.test(cleanVid)) return empty;
+
+  try {
+    const stockSnap = await get(dbRef(db, `stock/${cleanVid}`));
+    const stockVal = stockSnap ? stockSnap.val() : null;
+
+    if (stockVal && typeof stockVal === "object") {
+      let totalSales = 0;
+      let soldCount = 0;
+      let pricedSoldCount = 0;
+
+      Object.values(stockVal).forEach((item) => {
+        if (!item || typeof item !== "object") return;
+        const owner = typeof item.owner === "string" ? item.owner.trim() : "";
+        if (!owner) return;
+        soldCount++;
+        const price = parseInt(item.price, 10);
+        if (!isNaN(price) && price > 0) {
+          totalSales += price;
+          pricedSoldCount++;
+        }
+      });
+
+      if (soldCount > 0 || totalSales > 0) {
+        return { totalSales, soldCount, pricedSoldCount };
+      }
+    }
+
+    if (cleanVid !== "demo") {
+      const historySnap = await get(dbRef(db, `history/${cleanVid}`));
+      const historyVal = historySnap ? historySnap.val() : null;
+      if (historyVal && typeof historyVal === "object") {
+        const histSales = parseInt(historyVal.totalSales, 10);
+        const histItems = parseInt(historyVal.totalItems, 10);
+        const safeSales = !isNaN(histSales) && histSales > 0 ? histSales : 0;
+        const safeItems = !isNaN(histItems) && histItems > 0 ? histItems : 0;
+        return {
+          totalSales: safeSales,
+          soldCount: safeItems,
+          pricedSoldCount: safeSales > 0 ? safeItems : 0,
+        };
+      }
+    }
+
+    return empty;
+  } catch (err) {
+    logger.error("getLiveSalesSummary error:", err);
+    return empty;
+  }
+}
+
+/**
+ * Formats the post-live sales revenue summary phrase in natural Thai spoken words
+ * (using Thai cardinal words without Western commas for clean Chirp 3: HD / Native TTS).
+ *
+ * @param {{ totalSales?: number, soldCount?: number, pricedSoldCount?: number }|null} summary
+ * @returns {string}
+ */
+export function formatLiveSalesSummarySpeech(summary) {
+  if (!summary || typeof summary !== "object") return "";
+  const totalSales = Math.max(0, parseInt(summary.totalSales, 10) || 0);
+  const soldCount = Math.max(0, parseInt(summary.soldCount, 10) || 0);
+
+  if (totalSales > 0 && soldCount > 0) {
+    return `สรุปยอดขายไลฟ์นี้ ขายได้ทั้งหมด ${numberToThaiWords(soldCount)} ชิ้น รวมเป็นเงิน ${numberToThaiWords(totalSales)} บาทค่ะ`;
+  }
+  if (totalSales > 0) {
+    return `สรุปยอดขายไลฟ์นี้ รวมเป็นเงินทั้งหมด ${numberToThaiWords(totalSales)} บาทค่ะ`;
+  }
+  if (soldCount > 0) {
+    return `สรุปยอดขายไลฟ์นี้ ขายได้ทั้งหมด ${numberToThaiWords(soldCount)} ชิ้น ยังไม่มีข้อมูลราคาที่บันทึกไว้ค่ะ`;
+  }
+  return "";
+}
+
+/**
+ * Announces the list of customers requesting delivery for this shipping cycle with clear pauses between names,
+ * followed by the post-live total sales revenue summary (in Baht).
  * @param {string|null} videoId - Video ID of current stream
  * @param {Object} options - { force: boolean, cycle: string|null }
  */
@@ -331,9 +421,29 @@ export async function announceShippingCustomers(videoId = null, options = {}) {
   const cycleSetting = cycle || systemStore.shippingCycle || "today";
   const cycleLabel = formatShippingCycleLabel(cycleSetting);
 
-  const customers = await getShippingRequestedCustomers(cycleSetting);
+  const [customers, salesSummary] = await Promise.all([
+    getShippingRequestedCustomers(cycleSetting),
+    getLiveSalesSummary(activeVid),
+  ]);
+  const salesSummarySpeech = formatLiveSalesSummarySpeech(salesSummary);
 
   if (!customers || customers.length === 0) {
+    if (salesSummarySpeech) {
+      queueAudio(
+        null,
+        "",
+        `ไลฟ์จบแล้วค่ะ ยังไม่มีรายชื่อลูกค้าที่แจ้งจัดส่งรอบ${cycleLabel}ค่ะ`,
+        { delayAfter: 800 },
+      );
+      queueAudio(
+        null,
+        "",
+        `${salesSummarySpeech} ขอบคุณลูกค้าทุกท่านค่ะ`,
+        { delayAfter: 500 },
+      );
+      return;
+    }
+
     queueAudio(
       null,
       "",
@@ -358,13 +468,28 @@ export async function announceShippingCustomers(videoId = null, options = {}) {
     queueAudio(null, "", msg, { delayAfter: 800 });
   });
 
-  // 3. Closing remark
-  queueAudio(
-    null,
-    "",
-    `รวมทั้งหมด ${customers.length} ท่าน ขอบคุณลูกค้าทุกท่านค่ะ`,
-    { delayAfter: 500 },
-  );
+  // 3. Closing shipping count + post-live sales revenue summary
+  if (salesSummarySpeech) {
+    queueAudio(
+      null,
+      "",
+      `รวมทั้งหมด ${customers.length} ท่านค่ะ`,
+      { delayAfter: 800 },
+    );
+    queueAudio(
+      null,
+      "",
+      `${salesSummarySpeech} ขอบคุณลูกค้าทุกท่านค่ะ`,
+      { delayAfter: 500 },
+    );
+  } else {
+    queueAudio(
+      null,
+      "",
+      `รวมทั้งหมด ${customers.length} ท่าน ขอบคุณลูกค้าทุกท่านค่ะ`,
+      { delayAfter: 500 },
+    );
+  }
 }
 
 let _restoreInFlight = null;

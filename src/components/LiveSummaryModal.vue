@@ -35,7 +35,10 @@
                   <div class="kpi-content">
                     <span class="kpi-label">จำนวนขายได้ทั้งหมด</span>
                     <div class="kpi-value highlight-val">{{ metrics.soldCount }} <span class="unit">ชิ้น</span></div>
-                    <span class="kpi-subtext">สำเร็จ {{ metrics.soldPercent }}% ของสต็อก</span>
+                    <span class="kpi-subtext" v-if="metrics.totalSales > 0" style="color: #fbbf24; font-weight: 700;">
+                      ยอดรวม ฿{{ metrics.totalSales.toLocaleString() }} ({{ metrics.soldPercent }}%)
+                    </span>
+                    <span class="kpi-subtext" v-else>สำเร็จ {{ metrics.soldPercent }}% ของสต็อก</span>
                   </div>
                 </div>
 
@@ -118,6 +121,23 @@
 
                   <div class="panel-body">
                     <div class="highlight-cards-grid">
+                      <!-- Total Sales Revenue -->
+                      <div class="highlight-box sales-highlight-box">
+                        <div class="box-icon" style="background: rgba(251, 191, 36, 0.16); color: #fbbf24;">
+                          <i class="fa-solid fa-baht-sign"></i>
+                        </div>
+                        <div class="box-details">
+                          <span class="box-title">ยอดขายรวมประจำไลฟ์</span>
+                          <div class="box-value" style="color: #fde047;">
+                            ฿{{ metrics.totalSales.toLocaleString() }} <span class="unit">บาท</span>
+                            <span class="box-sub" v-if="metrics.pricedSoldCount > 0">
+                              ({{ metrics.pricedSoldCount }}/{{ metrics.soldCount }} ชิ้นที่ระบุราคา)
+                            </span>
+                            <span class="box-sub" v-else>ยังไม่มีข้อมูลราคา</span>
+                          </div>
+                        </div>
+                      </div>
+
                       <!-- Avg Items per Buyer -->
                       <div class="highlight-box">
                         <div class="box-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
@@ -173,8 +193,8 @@
                 <button class="btn btn-primary-gradient" @click="copySummaryText">
                   <i class="fa-solid fa-copy"></i> คัดลอกสรุปข้อความ ( Copy )
                 </button>
-                <button class="btn btn-tts-read" @click="handleAnnounceShipping" :title="`อ่านออกเสียงรายชื่อลูกค้าที่ให้จัดส่งรอบ${cycleLabel}`">
-                  <i class="fa-solid fa-volume-high"></i> อ่านรายชื่อจัดส่ง (รอบ{{ cycleLabel }})
+                <button class="btn btn-tts-read" @click="handleAnnounceShipping" :title="`อ่านออกเสียงรายชื่อลูกค้าที่ให้จัดส่งรอบ${cycleLabel} พร้อมสรุปยอดขาย`">
+                  <i class="fa-solid fa-volume-high"></i> อ่านรายชื่อจัดส่ง + สรุปยอด (รอบ{{ cycleLabel }})
                 </button>
               </div>
 
@@ -221,12 +241,14 @@ const cycleLabel = computed(() => {
 const openShippingManager = inject("openShippingManager", null);
 const openHistory = inject("openHistory", null);
 
-// Calculated Summary Metrics (Excluding Prices)
+// Calculated Summary Metrics (including Total Sales Revenue from claimed items with valid price)
 const metrics = computed(() => {
   const stockData = stockStore.stockData || {};
   const stockSize = stockStore.stockSize > 0 ? stockStore.stockSize : 70;
 
   let soldCount = 0;
+  let totalSales = 0;
+  let pricedSoldCount = 0;
   let totalQueued = 0;
   const buyersMap = {};
   let mostQueuedItem = null;
@@ -234,6 +256,11 @@ const metrics = computed(() => {
   Object.entries(stockData).forEach(([numStr, item]) => {
     if (item && item.owner) {
       soldCount++;
+      const parsedPrice = parseInt(item.price, 10);
+      if (!isNaN(parsedPrice) && parsedPrice > 0) {
+        totalSales += parsedPrice;
+        pricedSoldCount++;
+      }
 
       // Map Buyer Volume Stats (group by normalized customer name so mixed proxy/UID bookings combine)
       const normName = normalizeCustomerName(item.owner);
@@ -293,6 +320,8 @@ const metrics = computed(() => {
 
   return {
     soldCount,
+    totalSales,
+    pricedSoldCount,
     stockSize,
     soldPercent,
     uniqueBuyersCount,
@@ -330,13 +359,13 @@ async function handleAnnounceShipping() {
     toast: true,
     position: "top-end",
     icon: "info",
-    title: `กำลังอ่านรายชื่อจัดส่งรอบ ${cycleLabel.value} 🔊`,
+    title: `กำลังอ่านรายชื่อจัดส่งและสรุปยอดรอบ ${cycleLabel.value} 🔊`,
     showConfirmButton: false,
     timer: 2500,
   });
 }
 
-// Copy Text Summary for Line / FB Page (No prices)
+// Copy Text Summary for Line / FB Page
 function copySummaryText() {
   const m = metrics.value;
   const title = systemStore.liveTitle || "ไลฟ์สด";
@@ -344,6 +373,9 @@ function copySummaryText() {
   let text = `🎉 สรุปผลการขายประจำไลฟ์!\n`;
   text += `📌 หัวข้อ: ${title}\n`;
   text += `📦 ขายได้ทั้งหมด: ${m.soldCount} / ${m.stockSize} ชิ้น (${m.soldPercent}%)\n`;
+  if (m.totalSales > 0) {
+    text += `💰 ยอดขายรวม: ฿${m.totalSales.toLocaleString()} บาท\n`;
+  }
   text += `👥 จำนวนลูกค้าทั้งหมด: ${m.uniqueBuyersCount} ท่าน\n`;
   text += `📊 เฉลี่ย ${m.avgItemsPerBuyer} ชิ้น / คน\n`;
   text += `⏳ คิวสำรองรอหลุด: ${m.totalQueued} รายการ\n`;

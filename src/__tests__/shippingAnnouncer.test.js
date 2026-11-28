@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   getShippingRequestedCustomers,
+  getLiveSalesSummary,
+  formatLiveSalesSummarySpeech,
   announceShippingCustomers,
 } from "../utils/deliverySync";
 
@@ -260,6 +262,163 @@ describe("Shipping Announcer (Live Finished Shipping Voice Announcements)", () =
       await announceShippingCustomers("sound-off-video", { force: true });
 
       expect(mockQueueAudio).not.toHaveBeenCalled();
+    });
+
+    it("announces total sales in Baht right after the shipping customer list", async () => {
+      const { get } = await import("firebase/database");
+
+      get.mockImplementation((path) => {
+        if (path === "delivery_customers") {
+          return Promise.resolve({
+            val: () => ({
+              "cust-1": {
+                name: "ปิ๊กกี้",
+                deliveryDate: "2026-08-19",
+                status: "pending",
+              },
+              "cust-2": {
+                name: "สมศรี",
+                deliveryDate: "2026-08-19",
+                status: "pending",
+              },
+            }),
+          });
+        }
+        if (path === "stock/live-with-sales") {
+          // Sparse array as returned by Firebase RTDB for numeric keys
+          return Promise.resolve({
+            val: () => [
+              null,
+              { owner: "ปิ๊กกี้", price: 80 },
+              { owner: "สมศรี", price: "120" },
+              { owner: null, price: 200 }, // Vacant item with price -> must NOT count
+              { owner: "พี่นก", price: 1250 },
+            ],
+          });
+        }
+        return Promise.resolve({ val: () => null });
+      });
+
+      mockSystemStore.shippingCycle = "2026-08-19";
+
+      await announceShippingCustomers("live-with-sales", { force: true });
+
+      expect(mockQueueAudio).toHaveBeenCalledTimes(5);
+      expect(mockQueueAudio).toHaveBeenNthCalledWith(
+        1,
+        "success",
+        "",
+        "ไลฟ์จบแล้วค่ะ ขอแจ้งรายชื่อลูกค้าที่ให้จัดส่งรอบวันพุธ (19 ส.ค.) มีทั้งหมด 2 ท่าน มีดังนี้ค่ะ",
+        { delayAfter: 800 }
+      );
+      expect(mockQueueAudio).toHaveBeenNthCalledWith(2, null, "", "คนที่ 1 คุณปิ๊กกี้", { delayAfter: 800 });
+      expect(mockQueueAudio).toHaveBeenNthCalledWith(3, null, "", "คนที่ 2 คุณสมศรี", { delayAfter: 800 });
+      expect(mockQueueAudio).toHaveBeenNthCalledWith(4, null, "", "รวมทั้งหมด 2 ท่านค่ะ", { delayAfter: 800 });
+      expect(mockQueueAudio).toHaveBeenNthCalledWith(
+        5,
+        null,
+        "",
+        "สรุปยอดขายไลฟ์นี้ ขายได้ทั้งหมด สาม ชิ้น รวมเป็นเงิน หนึ่งพันสี่ร้อยห้าสิบ บาทค่ะ ขอบคุณลูกค้าทุกท่านค่ะ",
+        { delayAfter: 500 }
+      );
+    });
+
+    it("still announces total sales in Baht when no customers requested shipping in current cycle", async () => {
+      const { get } = await import("firebase/database");
+
+      get.mockImplementation((path) => {
+        if (path === "delivery_customers") {
+          return Promise.resolve({ val: () => ({}) });
+        }
+        if (path === "stock/hold-only-live") {
+          return Promise.resolve({
+            val: () => ({
+              1: { owner: "พี่อ้อย", price: 100 },
+              2: { owner: "พี่แดง", price: 150 },
+            }),
+          });
+        }
+        return Promise.resolve({ val: () => null });
+      });
+
+      await announceShippingCustomers("hold-only-live", { force: true });
+
+      expect(mockQueueAudio).toHaveBeenCalledTimes(2);
+      expect(mockQueueAudio).toHaveBeenNthCalledWith(
+        1,
+        null,
+        "",
+        "ไลฟ์จบแล้วค่ะ ยังไม่มีรายชื่อลูกค้าที่แจ้งจัดส่งรอบวันพุธ (19 ส.ค.)ค่ะ",
+        { delayAfter: 800 }
+      );
+      expect(mockQueueAudio).toHaveBeenNthCalledWith(
+        2,
+        null,
+        "",
+        "สรุปยอดขายไลฟ์นี้ ขายได้ทั้งหมด สอง ชิ้น รวมเป็นเงิน สองร้อยห้าสิบ บาทค่ะ ขอบคุณลูกค้าทุกท่านค่ะ",
+        { delayAfter: 500 }
+      );
+    });
+
+    it("falls back to history/{videoId} when stock node is empty", async () => {
+      const { get } = await import("firebase/database");
+
+      get.mockImplementation((path) => {
+        if (path === "delivery_customers") {
+          return Promise.resolve({
+            val: () => ({
+              "cust-1": {
+                name: "ปิ๊กกี้",
+                deliveryDate: "2026-08-19",
+                status: "pending",
+              },
+            }),
+          });
+        }
+        if (path === "stock/archived-vid") {
+          return Promise.resolve({ val: () => null });
+        }
+        if (path === "history/archived-vid") {
+          return Promise.resolve({
+            val: () => ({ totalSales: 3460, totalItems: 42 }),
+          });
+        }
+        return Promise.resolve({ val: () => null });
+      });
+
+      await announceShippingCustomers("archived-vid", { force: true });
+
+      expect(mockQueueAudio).toHaveBeenCalledTimes(4);
+      expect(mockQueueAudio).toHaveBeenNthCalledWith(
+        4,
+        null,
+        "",
+        "สรุปยอดขายไลฟ์นี้ ขายได้ทั้งหมด สี่สิบสอง ชิ้น รวมเป็นเงิน สามพันสี่ร้อยหกสิบ บาทค่ะ ขอบคุณลูกค้าทุกท่านค่ะ",
+        { delayAfter: 500 }
+      );
+    });
+  });
+
+  describe("getLiveSalesSummary & formatLiveSalesSummarySpeech", () => {
+    it("guards against empty or unsafe videoId keys", async () => {
+      const { get } = await import("firebase/database");
+      expect(await getLiveSalesSummary("")).toEqual({ totalSales: 0, soldCount: 0, pricedSoldCount: 0 });
+      expect(await getLiveSalesSummary("../bad")).toEqual({ totalSales: 0, soldCount: 0, pricedSoldCount: 0 });
+      expect(await getLiveSalesSummary("bad.key")).toEqual({ totalSales: 0, soldCount: 0, pricedSoldCount: 0 });
+      expect(get).not.toHaveBeenCalled();
+    });
+
+    it("formats Thai cardinal sales speech without Western commas", () => {
+      expect(formatLiveSalesSummarySpeech({ totalSales: 12500, soldCount: 55 })).toBe(
+        "สรุปยอดขายไลฟ์นี้ ขายได้ทั้งหมด ห้าสิบห้า ชิ้น รวมเป็นเงิน หนึ่งหมื่นสองพันห้าร้อย บาทค่ะ"
+      );
+      expect(formatLiveSalesSummarySpeech({ totalSales: 800, soldCount: 0 })).toBe(
+        "สรุปยอดขายไลฟ์นี้ รวมเป็นเงินทั้งหมด แปดร้อย บาทค่ะ"
+      );
+      expect(formatLiveSalesSummarySpeech({ totalSales: 0, soldCount: 10 })).toBe(
+        "สรุปยอดขายไลฟ์นี้ ขายได้ทั้งหมด สิบ ชิ้น ยังไม่มีข้อมูลราคาที่บันทึกไว้ค่ะ"
+      );
+      expect(formatLiveSalesSummarySpeech({ totalSales: 0, soldCount: 0 })).toBe("");
     });
   });
 });

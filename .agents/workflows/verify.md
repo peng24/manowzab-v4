@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.9.2 — Live Chat Dash/Slash Multi-Buy & Self-Name Regex Hardening + AI v1.5.8 — 2026-11-28 (42 Test Files / 974 Tests + Vite Build + AI 125/125 Tests ผ่านครบ)** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.9.5 — Post-Live Sales Revenue TTS Summary After Shipping List + LiveSummaryModal Sales Display — 2026-11-28 (42 Test Files / 983 Tests + Vite Build ผ่านครบ)** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -101,6 +101,7 @@ description: Mandatory verification checklist after every code change
 | 4.20 | TTS Character Quota Counter & 90% Auto-Switch | `src/utils/ttsQuota.js`, `system.js`, `GoogleTtsAudio.js`, `TextToSpeech.js`, `Header.vue`, `TtsQuotaModal.vue`, `ttsQuota.test.js` | นับตัวอักษรเฉพาะคำขอที่ยิง API สำเร็จจริง (ไม่นับ cache hit), ซิงค์ข้ามเครื่องผ่าน `settings/ttsUsage/{YYYY-MM}`, รีเซ็ตอัตโนมัติวันที่ 1 เวลา 00:00 PT (`America/Los_Angeles`) พร้อมแสดงเดือน/เวลารีเซ็ตเป็นภาษาไทย (`14:00/15:00 น. (เวลาไทย)`) และคืนเสียงหลักที่ถูกสลับออก, แสดงป้าย % บน Header และหน้าต่าง `TtsQuotaModal`, และสลับอัตโนมัติเมื่อถึง 90% (`Chirp3 900k -> Standard-A`, `Standard 3.6M -> Native`) โดย free build ไม่นับ/ไม่แตะ Firebase |
 | 4.21 | Natural Thai Spacing & Zero Dot Verbalization (`จุด`) on Chirp 3: HD | `src/services/TextToSpeech.js`, `src/utils/thaiNumberWords.js`, `cloudTts.test.js`, `ttsStore.test.js`, `thaiNumberWords.test.js` | `formatSpeechText()` ใช้เว้นวรรคภาษาไทยล้วน (`${cleanAuthor} ${messageBody}`) ไม่ใช้ `" ... "` (กัน Chirp 3: HD อ่าน `"จุด"`) และไม่ใช้ `", "` (กันน้ำเสียง/จังหวะ Chirp 3: HD เพี้ยน), `formatMultiBuyTtsMessage()` ใช้ `"ทั้งหมด ... รายการ"`, และ `sanitize()` + `cleanAuthor` ล้างจุดไข่ปลาและจุดเดี่ยวที่ไม่ใช่ทศนิยมทั้งหมด (`ELLIPSIS_REGEX`, `NON_DECIMAL_DOT_REGEX` เช่น `"คุณสมใจ."`, `"คุณแม่.นาว"`, `"รับค่ะ."`, `"25. ค่ะ"`) พร้อมแปลงทศนิยมจริง (`38.5` ➔ `สามสิบแปดจุดห้า`) แบบ idempotent |
 | 4.22 | AI Price Detector v1.5.0 Stock Compatibility | `src/stores/stock.js`, `stockStore.test.js`, `live-product-capture-ai/src/services/firebase_sync.py` | `processCancel()` คงทั้ง `price` และ `details` ที่ AI ซิงค์ไว้เมื่อเจ้าของคนเดียวยกเลิก (ไม่มีคิวสำรอง) และ `get_stock_snapshot()` ฝั่ง AI แปลง array จาก Firebase RTDB เป็น `dict` เสมอป้องกัน `AttributeError` ตอนสรุปยอดขาย |
+| 4.23 | Post-Live Sales Revenue Announcement After Shipping List | `src/utils/deliverySync.js`, `src/components/LiveSummaryModal.vue`, `src/__tests__/shippingAnnouncer.test.js` | เมื่อไลฟ์จบ `announceShippingCustomers()` ต้องอ่านสรุปยอดขายรวมเป็นบาท (`getLiveSalesSummary` + `formatLiveSalesSummarySpeech` ใช้คำอ่านจำนวนนับภาษาไทยไร้จุลภาค) ต่อจากรายชื่อผู้ให้จัดส่ง (ทั้งกรณีมีและไม่มีผู้แจ้งจัดส่ง), นับเฉพาะรายการที่มีเจ้าของและราคา > 0 พร้อม fallback `history/{videoId}` และแสดงยอดขายรวมใน `LiveSummaryModal.vue` + ข้อความคัดลอกโดยไม่โพสต์ลงช่องแชท |
 
 
 ---
@@ -732,3 +733,10 @@ description: Mandatory verification checklist after every code change
   2. **`src/components/StockGrid.vue` & `src/components/HistoryModal.vue`**: เปลี่ยนเป็น `v-model` + `inputmode="numeric"` + `min="1"` + `max="300"` + `@keydown.enter.prevent` + `@change` + `@blur`, `await` ผลบันทึกจริงก่อนขึ้น Toast, กันการยิงซ้ำเมื่อ blur หลัง Enter, และคืนค่าเดิมอัตโนมัติเมื่อกรอกไม่ถูกต้องหรือบันทึกไม่สำเร็จ
   3. **ผลตรวจ Automated**: `npx vitest run` **✓ 42/42 Test Files / 978/978 Tests** (เพิ่ม 4 เคส cross-device sync ใน `stockStore.test.js`), `npm run build` **✓ ผ่าน**
   4. **UI ยอดขายรวมไร้กรอบสีสด (`StockGrid.vue`, `HistoryModal.vue`)**: ถอดกรอบ/พื้นหลัง/เงาออก (`background: transparent; border: none; box-shadow: none;`) ปรับเป็นสีทองสด (`#fbbf24` / `#fde047`) และปรับ `@keyframes pulse-sales` ให้ใช้ GPU `transform` ล้วน
+
+## 💰 ผลตรวจระบบสรุปยอดขายท้ายไลฟ์ต่อจากรายชื่อผู้ให้จัดส่ง (2026-11-28)
+
+- **สิ่งที่พัฒนา**:
+  1. **`src/utils/deliverySync.js`**: เพิ่ม `getLiveSalesSummary(videoId)` (คำนวณยอดขายรวมและจำนวนชิ้นจาก `stock/{videoId}` เฉพาะรายการที่มีเจ้าของและราคา > 0 รองรับ Firebase sparse array + fallback `history/{videoId}` + ป้องกัน path key ไม่ปลอดภัย) และ `formatLiveSalesSummarySpeech(summary)` (แปลงจำนวนชิ้นและยอดบาทเป็นคำอ่านภาษาไทยด้วย `numberToThaiWords` ไม่มีจุลภาค) และอัปเดต `announceShippingCustomers()` ให้พูดสรุปยอดขายรวมต่อจากรายชื่อลูกค้าที่ให้จัดส่ง (รวมถึงกรณีไม่มีคนแจ้งจัดส่งในรอบนั้น)
+  2. **`src/components/LiveSummaryModal.vue`**: เพิ่มการคำนวณและแสดง `ยอดขายรวมประจำไลฟ์` (`฿... บาท` + สัดส่วนชิ้นที่ระบุราคา), แสดงยอดรวมในข้อความคัดลอก (`copySummaryText`), และอัปเดตปุ่มอ่านเสียงเป็น `อ่านรายชื่อจัดส่ง + สรุปยอด`
+  3. **ผลตรวจ Automated**: `npm test` **✓ 42/42 Test Files / 983/983 Tests** (เพิ่ม 5 เคสใน `src/__tests__/shippingAnnouncer.test.js` ครอบคลุมทั้งกรณีมี/ไม่มีผู้จัดส่ง, sparse array, fallback `history/`, guard คีย์ไม่ปลอดภัย และรูปแบบคำอ่านภาษาไทย), `npm run build` **✓ ผ่าน (`2.43s`)**

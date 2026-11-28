@@ -8,6 +8,8 @@ import {
   compareCustomerPair,
   findDuplicateCustomerGroups,
   buildCustomerMergePlan,
+  inspectCustomerDeleteState,
+  buildCustomerDeletePlan,
 } from "../utils/addressMergeUtils";
 
 describe("addressMergeUtils — normalization helpers", () => {
@@ -425,5 +427,98 @@ describe("addressMergeUtils — buildCustomerMergePlan", () => {
         secondaries: [],
       })
     ).toThrow();
+  });
+});
+
+describe("addressMergeUtils — AddressPage safe customer deletion", () => {
+  it("removes both address_book and empty/completed delivery_customers records in full mode when there are 0 pending orders", () => {
+    const addressBook = {
+      "สมชาย": { name: "สมชาย", address: "123 กทม", phone: "081-111-1111" },
+    };
+    const deliveryCustomers = {
+      "manual-123": { name: "สมชาย", status: "done", itemCount: 0, totalBookings: 0 },
+      "cust_สมชาย": { name: "สมชาย", status: "pending", itemCount: 0, totalBookings: 0 },
+    };
+    const cust = {
+      name: "สมชาย",
+      normKey: "สมชาย",
+      addressBookKeys: ["สมชาย"],
+      deliveryIds: ["manual-123", "cust_สมชาย"],
+    };
+
+    const { state, multiPathUpdates } = buildCustomerDeletePlan({
+      cust,
+      mode: "full",
+      addressBook,
+      deliveryCustomers,
+    });
+
+    expect(state.hasPendingOrders).toBe(false);
+    expect(multiPathUpdates["address_book/สมชาย"]).toBeNull();
+    expect(multiPathUpdates["delivery_customers/manual-123"]).toBeNull();
+    expect(multiPathUpdates["delivery_customers/cust_สมชาย"]).toBeNull();
+  });
+
+  it("blocks full deletion when customer has active pending items or a scheduled delivery date, while allowing address_only clear", () => {
+    const addressBook = {
+      "พี่กวาง": { name: "พี่กวาง", address: "99 สุขุมวิท", phone: "086-555-8663" },
+    };
+    const deliveryCustomers = {
+      "manual-999": {
+        name: "พี่กวาง",
+        status: "pending",
+        itemCount: 3,
+        deliveryDate: "2026-12-01",
+        address: "99 สุขุมวิท",
+      },
+    };
+    const cust = {
+      name: "พี่กวาง",
+      normKey: "พี่กวาง",
+      addressBookKeys: ["พี่กวาง"],
+      deliveryIds: ["manual-999"],
+    };
+
+    const state = inspectCustomerDeleteState(cust, { addressBook, deliveryCustomers });
+    expect(state.hasPendingOrders).toBe(true);
+    expect(state.pendingItemCount).toBe(3);
+
+    expect(() =>
+      buildCustomerDeletePlan({ cust, mode: "full", addressBook, deliveryCustomers })
+    ).toThrow();
+
+    const { multiPathUpdates } = buildCustomerDeletePlan({
+      cust,
+      mode: "address_only",
+      addressBook,
+      deliveryCustomers,
+    });
+    expect(multiPathUpdates["address_book/พี่กวาง"]).toBeNull();
+    expect(multiPathUpdates["delivery_customers/manual-999"]).toBeUndefined();
+    expect(multiPathUpdates["delivery_customers/manual-999/address"]).toBe("");
+    // Should not bump updatedAt so the row doesn't jump to #1
+    expect(multiPathUpdates["delivery_customers/manual-999/updatedAt"]).toBeUndefined();
+  });
+
+  it("ignores invalid Firebase keys (containing forbidden chars or control chars) safely", () => {
+    const cust = {
+      name: "bad.name/key\n",
+      normKey: "bad.name/key",
+      addressBookKeys: ["bad.name/key", "valid_key"],
+      deliveryIds: ["bad$id", "valid_deliv"],
+    };
+    const addressBook = { valid_key: { name: "bad.name/key\n" } };
+    const deliveryCustomers = { valid_deliv: { name: "bad.name/key\n", status: "done", itemCount: 0 } };
+
+    const { multiPathUpdates } = buildCustomerDeletePlan({
+      cust,
+      mode: "full",
+      addressBook,
+      deliveryCustomers,
+    });
+
+    expect(multiPathUpdates["address_book/valid_key"]).toBeNull();
+    expect(multiPathUpdates["delivery_customers/valid_deliv"]).toBeNull();
+    expect(Object.keys(multiPathUpdates).some((p) => /[.#$[\]\n]/.test(p))).toBe(false);
   });
 });

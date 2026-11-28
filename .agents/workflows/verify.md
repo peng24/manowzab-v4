@@ -6,7 +6,7 @@ description: Mandatory verification checklist after every code change
 
 > **ต้องตรวจสอบทุกครั้งหลังแก้ไขโค้ด** — หากข้อใดเสียหาย ต้องแก้ไขก่อน commit
 > รายการด้านล่างเป็นเกณฑ์ที่ต้องตรวจ ไม่ใช่หลักฐานว่าผ่านทุกฟังก์ชันแล้ว ต้องระบุวิธีตรวจและขอบเขตผลจริงเสมอ
-> ผลอ้างอิงล่าสุด: **v5.9.0 — Address Book Duplicate Detection & Atomic Merge — 2026-11-28 (42 Test Files / 968 Tests + Vite Build ผ่านครบ)** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
+> ผลอ้างอิงล่าสุด: **v5.9.1 — Address Book Safe Customer Delete & Duplicate Merge — 2026-11-28 (42 Test Files / 971 Tests + Vite Build ผ่านครบ)** ดูผลตรวจด้านล่าง; ผลอ้างอิงย้อนหลังดู [release report v5.4.20](../../docs/release-5.4.20.md) และ [v5.4.17](../../docs/release-5.4.17.md)
 
 ---
 
@@ -259,6 +259,7 @@ description: Mandatory verification checklist after every code change
 | 15.9 | Clean Borderless WYSIWYG Label Layout (130x76mm / 76x130mm) | `src/components/ShippingLabelModal.vue` | ดีไซน์สะอาดตา ไร้กรอบดำ ผู้ส่งอยู่ซ้าย ผู้รับอยู่ขวา ขนาดตัวหนังสือสั่งพิมพ์เทียบสัดส่วน 1:1 พอดีเป๊ะตามพรีวิวบนหน้าจอ (`13.5pt` ชื่อผู้รับ, `11pt` ที่อยู่พร้อมย่ออัตโนมัติเมื่อที่อยู่ยาว, `14pt` รหัสไปรษณีย์, `9.5pt` COD/โอน, `10pt` ผู้ส่ง) พร้อมตัวเลือกปรับสเกลฟอนต์ (`labelFontScale`: พอดีตามพรีวิว / กะทัดรัด / ตัวใหญ่) |
 | 15.10 | Multi-Address & Custom Recipient Name | `src/components/CustomerAddressModal.vue` | แยกชื่อผู้รับจริง (`recipientName`) จากชื่อ CF และรองรับการบันทึกหลายที่อยู่ต่อ 1 ลูกค้าลง Address Book |
 | 15.11 | Duplicate Customer Detection & Atomic Merge (`findDuplicateCustomerGroups`, `buildCustomerMergePlan`) | `src/utils/addressMergeUtils.js`, `src/components/AddressMergeModal.vue`, `src/pages/AddressPage.vue`, `src/__tests__/addressMergeUtils.test.js` | ตรวจหาลูกค้าที่ซ้ำหรือมีหลายไอดีแยกกัน (`UC...` + `manual-...`/`cust_...`) โดยแสดง **ไอดี (UID/YouTube Channel ID)**, **เบอร์โทร**, และ **ที่อยู่/ผู้รับ** เปรียบเทียบกันแบบเห็นชัดเจนทั้งโหมดอัตโนมัติและโหมดเลือกคู่รวมเอง (Manual Merge), เตือนสีแดงเมื่อพบ YouTube ID/เบอร์/ที่อยู่ขัดแย้งกัน, และรวมแบบ Atomic Multi-Path Update โดยรักษาทุกที่อยู่ที่ไม่ซ้ำ, ยึด YouTube Channel ID เป็นหลัก, รวม `sessions`/`totalBookings`/วันส่งเร็วสุดครบ 100%, ปฏิบัติตาม Rule #13 สำหรับ `nicknames/`, และซิงค์ `stock/{activeVideo}` อัตโนมัติ |
+| 15.12 | Address Book Safe Customer Delete (`inspectCustomerDeleteState`, `buildCustomerDeletePlan`) | `src/utils/addressMergeUtils.js`, `src/pages/AddressPage.vue`, `src/__tests__/addressMergeUtils.test.js` | เมื่อลบลูกค้าในสมุดที่อยู่ที่ไม่มีสินค้าค้างส่ง/ไม่มีวันนัดส่ง ต้องลบได้ทั้ง `address_book` และ `delivery_customers` ให้แถวหายจริง (พร้อมตัวเลือกลบเฉพาะที่อยู่สำหรับลูกค้าที่มีประวัติ VIP), บล็อกการลบถาวรเมื่อมีสินค้าค้างส่งพร้อมปุ่มลัดไปรวมชื่อซ้ำหรือลบเฉพาะที่อยู่ (ไม่ดัน `updatedAt` ขึ้นแถวบนสุด), และกรองทุกคีย์ด้วย `isValidFirebaseKey` |
 
 ---
 

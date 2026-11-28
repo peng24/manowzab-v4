@@ -1542,3 +1542,157 @@ export function buildCustomerMergePlan({
     multiPathUpdates,
   };
 }
+
+/**
+ * Inspects a customer row from AddressPage to determine all matching `address_book` keys,
+ * all matching `delivery_customers` IDs, and whether the customer has active pending orders
+ * or scheduled deliveries that must be protected from deletion.
+ *
+ * @param {Object} cust - Customer row object from AddressPage
+ * @param {Object} [stores]
+ * @param {Object} [stores.addressBook]
+ * @param {Object} [stores.deliveryCustomers]
+ * @returns {{
+ *   addressBookKeys: string[],
+ *   deliveryIds: string[],
+ *   pendingItemCount: number,
+ *   activeDeliveryDates: string[],
+ *   totalBookings: number,
+ *   hasPendingOrders: boolean
+ * }}
+ */
+export function inspectCustomerDeleteState(
+  cust,
+  { addressBook = {}, deliveryCustomers = {} } = {}
+) {
+  const norm = normalizeName(cust?.name || "");
+  const safeNorm = toSafeDbKey(cust?.name || "");
+
+  const bookKeySet = new Set();
+  const addBookKey = (k) => {
+    if (isValidFirebaseKey(k)) bookKeySet.add(k);
+  };
+
+  if (Array.isArray(cust?.addressBookKeys)) {
+    cust.addressBookKeys.forEach(addBookKey);
+  }
+  if (cust?.normKey && addressBook?.[cust.normKey]) {
+    addBookKey(cust.normKey);
+  }
+  if (safeNorm && addressBook?.[safeNorm]) {
+    addBookKey(safeNorm);
+  }
+  if (norm) {
+    Object.entries(addressBook || {}).forEach(([k, b]) => {
+      if (!b || typeof b !== "object") return;
+      if (normalizeName(b.name || "") === norm || normalizeName(k) === norm) {
+        addBookKey(k);
+      }
+    });
+  }
+
+  const delivIdSet = new Set();
+  const addDelivId = (id) => {
+    if (isValidFirebaseKey(id) && deliveryCustomers?.[id]) {
+      delivIdSet.add(id);
+    }
+  };
+
+  if (Array.isArray(cust?.deliveryIds)) {
+    cust.deliveryIds.forEach(addDelivId);
+  }
+  if (norm) {
+    Object.entries(deliveryCustomers || {}).forEach(([id, c]) => {
+      if (!c || typeof c !== "object") return;
+      const cName = c.name || c.displayName || "";
+      if (normalizeName(cName) === norm || normalizeName(id) === norm) {
+        addDelivId(id);
+      }
+    });
+  }
+
+  let pendingItemCount = 0;
+  let totalBookings = 0;
+  const activeDeliveryDates = [];
+
+  for (const id of delivIdSet) {
+    const rec = deliveryCustomers[id];
+    if (!rec || typeof rec !== "object") continue;
+
+    totalBookings += Number(rec.totalBookings) || 0;
+
+    if (rec.status !== "done") {
+      const activeSessionsCount = Object.values(rec.sessions || {})
+        .filter((s) => s && s.status !== "done")
+        .reduce((sum, s) => sum + (Number(s.count) || 0), 0);
+      const recPending = Math.max(Number(rec.itemCount) || 0, activeSessionsCount);
+      pendingItemCount += recPending;
+
+      if (rec.deliveryDate && typeof rec.deliveryDate === "string" && rec.deliveryDate.trim()) {
+        activeDeliveryDates.push(rec.deliveryDate.trim());
+      }
+    }
+  }
+
+  return {
+    addressBookKeys: Array.from(bookKeySet),
+    deliveryIds: Array.from(delivIdSet),
+    pendingItemCount,
+    activeDeliveryDates,
+    totalBookings,
+    hasPendingOrders: pendingItemCount > 0 || activeDeliveryDates.length > 0,
+  };
+}
+
+/**
+ * Builds an atomic Firebase multi-path update for deleting a customer in AddressPage.
+ * - `mode: "full"`: Removes both `address_book` and `delivery_customers` entries so the customer
+ *   disappears cleanly from the Address Book. Refuses if the customer still has pending orders or
+ *   an active scheduled delivery date!
+ * - `mode: "address_only"`: Removes `address_book` entries and clears address fields on
+ *   `delivery_customers` while preserving bookings/history (without bumping `updatedAt` to row #1).
+ *
+ * @param {Object} params
+ * @param {Object} params.cust
+ * @param {'full'|'address_only'} [params.mode]
+ * @param {Object} [params.addressBook]
+ * @param {Object} [params.deliveryCustomers]
+ * @returns {{ state: Object, multiPathUpdates: Object }}
+ */
+export function buildCustomerDeletePlan({
+  cust,
+  mode = "full",
+  addressBook = {},
+  deliveryCustomers = {},
+} = {}) {
+  const state = inspectCustomerDeleteState(cust, { addressBook, deliveryCustomers });
+
+  if (mode === "full" && state.hasPendingOrders) {
+    throw new Error(
+      `ไม่สามารถลบรายชื่อ "${cust?.name || ""}" ได้ เนื่องจากยังมีสินค้าค้างจัดส่ง (${state.pendingItemCount} ชิ้น)`
+    );
+  }
+
+  const multiPathUpdates = {};
+
+  for (const key of state.addressBookKeys) {
+    multiPathUpdates[`address_book/${key}`] = null;
+  }
+
+  if (mode === "full") {
+    for (const id of state.deliveryIds) {
+      multiPathUpdates[`delivery_customers/${id}`] = null;
+    }
+  } else {
+    for (const id of state.deliveryIds) {
+      multiPathUpdates[`delivery_customers/${id}/address`] = "";
+      multiPathUpdates[`delivery_customers/${id}/phone`] = "";
+      multiPathUpdates[`delivery_customers/${id}/postalCode`] = "";
+      multiPathUpdates[`delivery_customers/${id}/recipientName`] = "";
+      multiPathUpdates[`delivery_customers/${id}/addresses`] = null;
+      multiPathUpdates[`delivery_customers/${id}/selectedAddressId`] = null;
+    }
+  }
+
+  return { state, multiPathUpdates };
+}

@@ -376,7 +376,12 @@ const AddressMergeModal = defineAsyncComponent(() => import("../components/Addre
 import { ref as dbRef, update } from "firebase/database";
 import { db } from "../composables/useFirebase";
 import { normalizeName } from "../utils/addressParser";
-import { findDuplicateCustomerGroups } from "../utils/addressMergeUtils";
+import { escapeHtml } from "../utils/dbUtils";
+import {
+  buildCustomerDeletePlan,
+  findDuplicateCustomerGroups,
+  inspectCustomerDeleteState,
+} from "../utils/addressMergeUtils";
 import Swal from "sweetalert2";
 
 let refreshTimer = null;
@@ -735,82 +740,125 @@ function editCustomer(cust) {
 }
 
 async function confirmDeleteCustomer(cust) {
-  const res = await Swal.fire({
-    titleText: `ลบที่อยู่ของ "${cust.name}"?`,
-    text: "ข้อมูลลูกค้าและที่อยู่จะถูกลบออกจากสมุดที่อยู่",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "ลบข้อมูล",
-    cancelButtonText: "ยกเลิก",
-    confirmButtonColor: "#ef4444",
-    cancelButtonColor: "#334155",
+  const deleteState = inspectCustomerDeleteState(cust, {
+    addressBook: addressBook.value,
+    deliveryCustomers: deliveryCustomers.value,
   });
 
-  if (res.isConfirmed) {
-    try {
-      const multiPathUpdates = {};
-      const norm = normalizeName(cust.name);
-      const safeNorm = norm ? norm.replace(/[.#$[\]/]/g, "_") : "";
+  let deleteMode = null;
 
-      // 1. ลบจาก address_book เท่านั้น (ป้องกัน Firebase invalid key จากจุด/สัญลักษณ์)
-      if (Array.isArray(cust.addressBookKeys) && cust.addressBookKeys.length > 0) {
-        cust.addressBookKeys.forEach((key) => {
-          if (key && !/[.#$[\]/]/.test(key)) {
-            multiPathUpdates[`address_book/${key}`] = null;
-          }
-        });
-      }
-      if (cust.normKey && !/[.#$[\]/]/.test(cust.normKey)) {
-        multiPathUpdates[`address_book/${cust.normKey}`] = null;
-      }
-      if (safeNorm) {
-        multiPathUpdates[`address_book/${safeNorm}`] = null;
-      }
-      Object.entries(addressBook.value || {}).forEach(([k, b]) => {
-        if (b && (normalizeName(b.name || "") === norm || normalizeName(k) === norm) && !/[.#$[\]/]/.test(k)) {
-          multiPathUpdates[`address_book/${k}`] = null;
-        }
-      });
-
-      // 2. เคลียร์เฉพาะข้อมูลที่อยู่ใน delivery_customers (ห้ามลบ record ลูกค้า เพื่อรักษายอดจองและประวัติสะสม 100%)
-      const clearAddressFields = (id) => {
-        multiPathUpdates[`delivery_customers/${id}/address`] = "";
-        multiPathUpdates[`delivery_customers/${id}/phone`] = "";
-        multiPathUpdates[`delivery_customers/${id}/postalCode`] = "";
-        multiPathUpdates[`delivery_customers/${id}/recipientName`] = "";
-        multiPathUpdates[`delivery_customers/${id}/addresses`] = null;
-        multiPathUpdates[`delivery_customers/${id}/selectedAddressId`] = null;
-        multiPathUpdates[`delivery_customers/${id}/updatedAt`] = Date.now();
-      };
-      if (Array.isArray(cust.deliveryIds) && cust.deliveryIds.length > 0) {
-        cust.deliveryIds.forEach((id) => clearAddressFields(id));
-      }
-      Object.entries(deliveryCustomers.value || {}).forEach(([id, c]) => {
-        if (c && (normalizeName(c.name || "") === norm || normalizeName(id) === norm)) {
-          clearAddressFields(id);
-        }
-      });
-
-      // 3. ดำเนินการลบที่อยู่แบบ Atomic Multi-Path Update (ไม่ลบข้อมูลการจองลูกค้า)
-      if (Object.keys(multiPathUpdates).length > 0) {
-        await update(dbRef(db), multiPathUpdates);
-      }
-
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "success",
-        titleText: `ลบที่อยู่ของ "${cust.name}" สำเร็จ`,
-        showConfirmButton: false,
-        timer: 2000,
-      });
-    } catch (err) {
-      Swal.fire({
-        icon: "error",
-        title: "เกิดข้อผิดพลาดในการลบ",
-        text: err.message,
-      });
+  if (deleteState.hasPendingOrders) {
+    // 🛡️ Protect active pending orders / scheduled deliveries from accidental deletion
+    const pendingDesc = [];
+    if (deleteState.pendingItemCount > 0) {
+      pendingDesc.push(`สินค้าค้างจัดส่ง <b>${deleteState.pendingItemCount} ชิ้น</b>`);
     }
+    if (deleteState.activeDeliveryDates.length > 0) {
+      pendingDesc.push(`นัดจัดส่งวันที่ <b>${escapeHtml(deleteState.activeDeliveryDates[0])}</b>`);
+    }
+
+    const res = await Swal.fire({
+      titleText: `ไม่สามารถลบรายชื่อ "${cust.name}" ถาวรได้`,
+      html: `
+        <div style="text-align:left;font-size:0.92em;line-height:1.55;color:#cbd5e1;">
+          <div>⚠️ ลูกค้ารายนี้ยังมี ${pendingDesc.join(" และ ")} อยู่ในระบบจัดส่ง</div>
+          <div style="margin-top:6px;">หากเป็นชื่อซ้ำกับลูกค้าอีกคน แนะนำให้กด <b>"รวมกับชื่ออื่น"</b> แทน เพื่อไม่ให้ยอดจองหายครับ</div>
+        </div>
+      `,
+      icon: "warning",
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: "🔀 ไปรวมกับชื่ออื่น",
+      denyButtonText: "ลบเฉพาะที่อยู่ (เก็บยอดจองไว้)",
+      cancelButtonText: "ปิด",
+      confirmButtonColor: "#f59e0b",
+      denyButtonColor: "#ef4444",
+      cancelButtonColor: "#334155",
+    });
+
+    if (res.isConfirmed) {
+      openMergeModal(cust.name);
+      return;
+    }
+    if (res.isDenied) {
+      deleteMode = "address_only";
+    } else {
+      return;
+    }
+  } else if (deleteState.deliveryIds.length > 0 && deleteState.totalBookings > 0 && cust.hasAddress) {
+    // VIP with past orders but 0 pending items -> let admin choose full delete vs address-only
+    const res = await Swal.fire({
+      titleText: `ลบรายชื่อ "${cust.name}"?`,
+      html: `
+        <div style="text-align:left;font-size:0.92em;line-height:1.55;color:#cbd5e1;">
+          <div>ลูกค้ารายนี้ไม่มีสินค้าค้างจัดส่ง (เคยสั่งซื้อสะสม <b>${deleteState.totalBookings} ออเดอร์</b>)</div>
+          <div style="margin-top:6px;">ต้องการ <b>ลบรายชื่อออกทั้งหมด</b> หรือ <b>ลบเฉพาะที่อยู่</b>?</div>
+        </div>
+      `,
+      icon: "warning",
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: "ลบรายชื่อออกทั้งหมด",
+      denyButtonText: "ลบเฉพาะที่อยู่",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#ef4444",
+      denyButtonColor: "#f59e0b",
+      cancelButtonColor: "#334155",
+    });
+
+    if (res.isConfirmed) {
+      deleteMode = "full";
+    } else if (res.isDenied) {
+      deleteMode = "address_only";
+    } else {
+      return;
+    }
+  } else {
+    // Standard delete (no pending orders, no VIP history or no address left) -> remove row completely
+    const res = await Swal.fire({
+      titleText: `ลบรายชื่อ "${cust.name}"?`,
+      text: "รายชื่อและที่อยู่ของลูกค้ารายนี้จะถูกลบออกจากสมุดที่อยู่อย่างถาวร",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "ลบรายชื่อ",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#334155",
+    });
+
+    if (!res.isConfirmed) return;
+    deleteMode = "full";
+  }
+
+  try {
+    const { multiPathUpdates } = buildCustomerDeletePlan({
+      cust,
+      mode: deleteMode,
+      addressBook: addressBook.value,
+      deliveryCustomers: deliveryCustomers.value,
+    });
+
+    if (Object.keys(multiPathUpdates).length > 0) {
+      await update(dbRef(db), multiPathUpdates);
+    }
+
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      titleText:
+        deleteMode === "full"
+          ? `ลบรายชื่อ "${cust.name}" ออกจากสมุดที่อยู่สำเร็จ`
+          : `ลบเฉพาะที่อยู่ของ "${cust.name}" สำเร็จ (เก็บยอดจองไว้แล้ว)`,
+      showConfirmButton: false,
+      timer: 2200,
+    });
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: "เกิดข้อผิดพลาดในการลบ",
+      text: err?.message || String(err),
+    });
   }
 }
 

@@ -255,6 +255,7 @@ import { useBlacklistStore } from "../stores/blacklist";
 import { useCustomerStore } from "../stores/customer";
 import { useNicknameStore } from "../stores/nickname";
 import { normalizeCustomerName, syncDeliveryCustomerForOwner } from "../utils/deliverySync";
+import { isAdminUser } from "../utils/chatParserUtils";
 import {
   detectCrossCustomerCollision,
   findDuplicateNicknameOwner,
@@ -527,6 +528,13 @@ let openSeq = 0;
  */
 async function open(chat) {
   if (!chat) return;
+  const isAdminAccount =
+    !chat.isProxyEdit &&
+    (Boolean(chat.isAdmin) ||
+      isAdminUser(chat.realName || chat.authorName || "", chat.displayName || ""));
+  if (isAdminAccount) {
+    return;
+  }
   const seq = ++openSeq;
   currentChat.value = chat;
   isOpen.value = true;
@@ -671,6 +679,15 @@ async function save() {
   const isProxyContext =
     Boolean(currentChat.value.isProxyEdit) ||
     (originalUid !== null && isTemporaryOrSyntheticUid(originalUid));
+
+  // 🛡️ Admin Account Guard: Never write customer nickname/address/delivery records onto an admin YouTube UID
+  const isAdminAccount =
+    !isProxyContext &&
+    (Boolean(currentChat.value.isAdmin) || isAdminUser(rawReal, originalDisplayName));
+  if (isAdminAccount) {
+    close();
+    return;
+  }
 
   // 🛡️ Duplicate Nickname Hard Block for real customer accounts (prevents two YouTube accounts merging orders/addresses!)
   if (!isProxyContext && trimmedNick) {

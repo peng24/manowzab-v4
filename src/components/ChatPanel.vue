@@ -499,6 +499,7 @@ import Swal from "sweetalert2";
 import {
   extractAdminCustomerName,
   evaluateChatScrollState,
+  isAdminUser,
 } from "../utils/chatParserUtils";
 import {
   formatChatClockTime,
@@ -695,6 +696,12 @@ function getAdminProxyCustomerName(chat) {
 function getCustomerMeta(chat) {
   if (!chat) return null;
   const proxyName = getAdminProxyCustomerName(chat);
+  if (
+    !proxyName &&
+    (chat.isAdmin || isAdminUser(chat.displayName || chat.authorName || "", chat.realName || ""))
+  ) {
+    return null;
+  }
   const rawName = proxyName || chat.displayName || chat.authorName || "";
   const targetUid = proxyName ? (chat.proxyUid || null) : chat.uid;
   const realName = !proxyName ? chat.realName : null;
@@ -1034,6 +1041,20 @@ function editNickname(chat) {
   const proxyName = getAdminProxyCustomerName(chat);
   if (proxyName) {
     editProxyCustomer(chat);
+    return;
+  }
+  if (
+    chat?.isAdmin ||
+    isAdminUser(chat?.realName || chat?.authorName || "", chat?.displayName || "")
+  ) {
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "info",
+      title: "บัญชีแอดมินไม่สามารถแก้ไขเป็นข้อมูลลูกค้าได้",
+      showConfirmButton: false,
+      timer: 2200,
+    });
     return;
   }
   if (quickEditModalRef.value) {

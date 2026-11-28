@@ -709,3 +709,14 @@ description: Mandatory verification checklist after every code change
     - รองรับคำถามพิมพ์ผิด `ห่นเทาไร่` (`เทาไร่`/`เทาไร`/`เท่าไร่`), `นาวใส่41` (`TRY_ITEM`), และบล็อกชื่อปลอม 4 ตัวจากไลฟ์ 27 พ.ย. (`ห่นเทาไร่`, `ให้หลานสาวคะ`, `เน็ตเสีย`, `ทา`) ไม่ให้ auto-learn เข้า `nicknames/`
     - `npm test -- --run`: **✓ ผ่านครบ 42/42 Test Files / 974/974 Tests** (`5.56s`)
     - `npm run build`: **✓ ผ่านครบทุก entry points**
+
+## 🛡️ ผลแก้ด่วนชื่อแอดมินสลับเป็น "พี่กวาง" & เพิ่ม Admin Identity Guard Layer 6 (2026-11-28)
+
+- **สาเหตุที่ตรวจพบใน Firebase RTDB**:
+  1. `nicknames/UCaGVyaBd7qQoiaIIuQqEHSg` (YouTube Channel ID ของแอดมิน `@Manowzab`) ถูกบันทึกเป็น `{"nick": "พี่กวาง", "realName": "@Manowzab"}`
+  2. `delivery_customers/UCaGVyaBd7qQoiaIIuQqEHSg` เก็บประวัติจัดส่งของลูกค้า `"พี่กวาง"` (`35` ออเดอร์, ที่อยู่ภูเก็ต, `065-239-8663`, `OA`, `โอน`) ทำให้แชทของแอดมินติดป้าย 📍 `OA` `โอน` และเสี่ยงโดนแก้ชื่อสลับกัน
+- **การแก้ไขจริงบน Firebase & โค้ดป้องกันถาวร (Layer 6)**:
+  1. แก้ `nicknames/UCaGVyaBd7qQoiaIIuQqEHSg` กลับเป็น `{"nick": "แอดมิน", "realName": "@Manowzab"}` และอัปเดตข้อความแชทสด `chats/mElx8P_abtE/-P7XGkF1KWSgRGaOTnid` เป็น `"แอดมิน"` ทันที
+  2. ย้าย `delivery_customers/UCaGVyaBd7qQoiaIIuQqEHSg` (ข้อมูล 100% ครบถ้วน + สำรองไฟล์ไว้แล้ว) ไปที่ `delivery_customers/cust_พี่กวาง` และถอดคีย์ออกจาก UID แอดมิน
+  3. เพิ่ม **Layer 6 Admin Identity Guard** ใน `useChatProcessor.js` (ตรวจ `isAccountAdmin` ก่อนดึง `nicknames/`), `ChatPanel.vue` (ไม่แสดงป้ายลูกค้าบนแชทแอดมินปกติ + บล็อกเปิด Modal แก้ไขลูกค้าบนบัญชีแอดมิน), และ `CustomerQuickEditModal.vue` (`isAdminAccount` guard) พร้อมเทสต์ใน `customerIdentityGuard.test.js`
+  4. **ผลตรวจ Automated**: `npx vitest run` **✓ 42/42 Test Files / 974/974 Tests**, `npm run build` **✓ ผ่าน (`3.27s`)**

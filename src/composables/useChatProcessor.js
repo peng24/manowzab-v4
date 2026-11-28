@@ -339,21 +339,33 @@ export function useChatProcessor() {
       return;
     }
 
+    // Check Admin status BEFORE nickname lookup so corrupted/stale nicknames can never hijack an admin account
+    const isAccountAdmin =
+      isVoiceChat ||
+      Boolean(item.authorDetails?.isChatOwner || item.authorDetails?.isChatModerator) ||
+      isAdminUser(realName, realName);
+
     // Check Nickname
     let displayName = realName;
-    let isNewCustomer = isVoiceChat ? false : true;
+    let isNewCustomer = isVoiceChat || isAccountAdmin ? false : true;
     if (!isVoiceChat && nicknameStore.hasNickname(uid, realName)) {
-      isNewCustomer = false;
-      displayName = nicknameStore.getNickname(uid, realName);
+      const storedNick = nicknameStore.getNickname(uid, realName);
+      if (isAccountAdmin) {
+        // 🛡️ Admin Identity Guard: Only allow admin-like nicknames (e.g. "แอดมิน", "Admin", "@Manowzab").
+        // Never let a customer nickname (e.g. "พี่กวาง") hijack the channel owner/moderator's displayName.
+        displayName = storedNick && isAdminUser(storedNick, "") ? storedNick : "แอดมิน";
+      } else {
+        isNewCustomer = false;
+        displayName = storedNick;
+      }
     }
 
     // ✅ Get phonetic name for TTS (separate from display name)
-    const phoneticName = nicknameStore.getPhoneticName(uid, displayName);
+    const phoneticName = isAccountAdmin
+      ? displayName
+      : nicknameStore.getPhoneticName(uid, displayName);
 
-    const isAdmin =
-      isVoiceChat ||
-      Boolean(item.authorDetails?.isChatOwner || item.authorDetails?.isChatModerator) ||
-      isAdminUser(displayName, realName);
+    const isAdmin = isAccountAdmin || isAdminUser(displayName, realName);
 
     // ✅ Prepare TTS Message (แปลงตัวเลขเป็นคำอ่านภาษาไทย เช่น 15 -> สิบห้า ไม่อ่าน หนึ่งห้า)
     let ttsMessage = replaceNumbersWithThaiWords(msg);

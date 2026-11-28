@@ -112,10 +112,17 @@ describe("Customer Identity & Cross-Customer Address Safety Guards", () => {
 
     // Layer 5: Duplicate nickname hard block across QuickEdit, Dashboard, and ChatProcessor auto-learn
     const chatProcSrc = readFileSync(resolve(process.cwd(), "src/composables/useChatProcessor.js"), "utf8");
+    const chatPanelSrc = readFileSync(resolve(process.cwd(), "src/components/ChatPanel.vue"), "utf8");
     expect(modalSrc).toContain("findDuplicateNicknameOwner");
     expect(modalSrc).toContain("suggestUniqueNickname");
     expect(dashSrc).toContain("findDuplicateNicknameOwner");
     expect(chatProcSrc).toContain("findDuplicateNicknameOwner");
+
+    // Layer 6: Admin Identity Guard (never let customer nicknames/badges hijack an admin YouTube UID)
+    expect(chatProcSrc).toContain("isAccountAdmin");
+    expect(chatProcSrc).toContain("isAdminUser(storedNick, \"\")");
+    expect(chatPanelSrc).toContain("บัญชีแอดมินไม่สามารถแก้ไขเป็นข้อมูลลูกค้าได้");
+    expect(modalSrc).toContain("isAdminAccount");
   });
 
   it("detects duplicate nicknames across different accounts while allowing self-updates and ignoring legacy proxy keys", () => {

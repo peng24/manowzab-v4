@@ -319,4 +319,31 @@ describe('reviewed chat log regressions — 2026-10-31', () => {
       method: 'hold-keyword',
     });
   });
+
+  // Audited Nov 27 live chat CSV (FI0KkbQ-DZE) + all 25 archived CSVs (1,446 rows)
+  it('supports dash/slash multi-buy (11-14, 6/7) and multi-cancel while keeping chest size ranges (52-54, 42/44) and bare dates blocked', () => {
+    expect(parseIntentDetails('11-14')).toMatchObject({ type: 'MULTI_BUY', itemIds: [11, 14] });
+    expect(parseIntentDetails('6/7')).toMatchObject({ type: 'MULTI_BUY', itemIds: [6, 7] });
+    expect(parseIntentDetails('รับ 11-14')).toMatchObject({ type: 'MULTI_BUY', itemIds: [11, 14] });
+    expect(parseIntentDetails('รับ 6/7')).toMatchObject({ type: 'MULTI_BUY', itemIds: [6, 7] });
+    expect(parseIntentDetails('ยกเลิก 11-14')).toMatchObject({ type: 'CANCEL_ITEM', itemId: 11, itemIds: [11, 14] });
+    expect(parseIntentDetails('11-14 ยกเลิก')).toMatchObject({ type: 'CANCEL_ITEM', itemId: 11, itemIds: [11, 14] });
+    expect(parseIntentDetails('52-54')).toEqual({ type: 'QUESTION', method: 'size-range-guard' });
+    expect(parseIntentDetails('42/44')).toEqual({ type: 'QUESTION', method: 'size-range-guard' });
+    expect(parseIntentDetails('อก 42-44')).toEqual({ type: 'QUESTION', method: 'size-range-guard' });
+    expect(parseIntentDetails('27/11/69').type).not.toBe('MULTI_BUY');
+    expect(parseIntentDetails('081-234-5678').type).not.toBe('MULTI_BUY');
+  });
+
+  it('blocks Nov 27 false self-names (ห่นเทาไร่, ให้หลานสาวคะ, เน็ตเสีย, ทา) and recognizes ห่นเทาไร่ as QUESTION and นาวใส่41 as TRY_ITEM', () => {
+    expect(parseIntentDetails('ห่นเทาไร่').type).toBe('QUESTION');
+    expect(extractCustomerSelfName('ห่นเทาไร่')).toBeNull();
+    expect(extractCustomerSelfName('ให้หลานสาวคะ')).toBeNull();
+    expect(extractCustomerSelfName('เน็ตเสีย')).toBeNull();
+    expect(extractCustomerSelfName('ทา')).toBeNull();
+    expect(parseIntentDetails('นาว15อกเท่าไหร่').type).toBe('QUESTION');
+    expect(parseIntentDetails('36นาวลองให้ดูหน่อย')).toMatchObject({ type: 'TRY_ITEM', itemId: 36 });
+    expect(parseIntentDetails('นาวใส่41')).toMatchObject({ type: 'TRY_ITEM', itemId: 41 });
+    expect(parseIntentDetails('4 13 17 วาศินา')).toMatchObject({ type: 'MULTI_BUY', itemIds: [4, 13, 17], customerName: 'วาศินา' });
+  });
 });

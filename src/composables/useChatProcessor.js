@@ -41,6 +41,7 @@ import {
   backdatedNoteRegex,
   adminSizeSelectionNoteRegex,
   sizeRangeRegex,
+  isSizeRangeText,
   quantityUnitRegex,
   pricePatternRegex,
   shippingRegex,
@@ -84,7 +85,7 @@ import {
 } from "../utils/chatParserUtils";
 
 // 🚀 Pre-compiled Module-Scoped Regexes (Zero allocation per chat message)
-const SPLIT_NUMS_REGEX = /(?:[\s,_]+|\s*(?:และ|เเละ|กับ|กะ)\s*)+/;
+const SPLIT_NUMS_REGEX = /(?:[\s,_/-]+|\s*(?:และ|เเละ|กับ|กะ)\s*)+/;
 const BACKDATED_ORDER_REGEX = /เมื่อวาน|เมือวาน|ย้อนหลัง|รอบเมื่อวาน/i;
 const STRIP_LEADING_NON_LETTER_REGEX = /^[^\u0E00-\u0E7Fa-zA-Z]+/;
 const STRIP_EDGE_PUNCT_REGEX = /^[^\w\u0E00-\u0E7F]+|[^\w\u0E00-\u0E7F]+$/g;
@@ -1009,11 +1010,11 @@ export function useChatProcessor() {
       conditionalBuyRegex.test(normalizedMsg) ||
       numberWithQuestionRegex.test(normalizedMsg) ||
       negationGuardRegex.test(normalizedMsg) ||
-      sizeRangeRegex.test(normalizedMsg) ||
+      isSizeRangeText(normalizedMsg) ||
       ((quantityUnitRegex.test(normalizedMsg) || pricePatternRegex.test(normalizedMsg)) && !explicitBuyRegex.test(normalizedMsg))
     ) {
       method =
-        questionRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || sizeRangeRegex.test(normalizedMsg)
+        questionRegex.test(normalizedMsg) || numberWithQuestionRegex.test(normalizedMsg) || isSizeRangeText(normalizedMsg)
           ? "question-skip"
           : negationGuardRegex.test(normalizedMsg)
           ? "negation-skip"
@@ -1079,7 +1080,7 @@ export function useChatProcessor() {
       } else if (
         (m = normalizedMsg.match(dashBuyRegex)) &&
         !PURE_DIGITS_TEST_REGEX.test(m[1].trim()) &&
-        !sizeRangeRegex.test(normalizedMsg) &&
+        !isSizeRangeText(normalizedMsg) &&
         parseInt(m[2]) >= 1 &&
         parseInt(m[2]) <= MAX_ITEM_ID
       ) {

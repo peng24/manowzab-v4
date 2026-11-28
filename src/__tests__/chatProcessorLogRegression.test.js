@@ -225,4 +225,34 @@ describe('actual chat processor log safety', () => {
     expect(state.stock.processOrder).toHaveBeenCalledTimes(1);
     expect(state.stock.processOrder.mock.calls[0][0]).toBe(2);
   });
+
+  it('books dash/slash multi-buy (11-14, 6/7) with Thai multi-buy TTS and blocks Nov 27 false self-names from writing nicknames', async () => {
+    state.nick.hasNickname.mockReturnValue(false);
+    const dashChat = await process('11-14');
+    expect(state.stock.processOrder).toHaveBeenCalledTimes(2);
+    expect(state.stock.processOrder.mock.calls.map(c => c[0])).toEqual([11, 14]);
+    expect(dashChat).toMatchObject({
+      type: 'buy',
+      detectionMethod: 'multi-buy',
+      ttsText: 'รายการที่ สิบเอ็ด รายการที่ สิบสี่ ทั้งหมด สอง รายการ',
+    });
+
+    state.stock.processOrder.mockClear();
+    const slashChat = await process('6/7');
+    expect(state.stock.processOrder.mock.calls.map(c => c[0])).toEqual([6, 7]);
+    expect(slashChat).toMatchObject({
+      type: 'buy',
+      detectionMethod: 'multi-buy',
+      ttsText: 'รายการที่ หก รายการที่ เจ็ด ทั้งหมด สอง รายการ',
+    });
+
+    state.stock.processOrder.mockClear();
+    await process('52-54');
+    expect(state.stock.processOrder).not.toHaveBeenCalled();
+
+    for (const noise of ['ห่นเทาไร่', 'ให้หลานสาวคะ', 'เน็ตเสีย', 'ทา']) {
+      await process(noise);
+    }
+    expect(state.update.mock.calls.some(([ref]) => ref.path.startsWith('nicknames/'))).toBe(false);
+  });
 });
